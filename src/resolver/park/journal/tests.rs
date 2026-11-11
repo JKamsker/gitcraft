@@ -166,7 +166,7 @@ fn existing_file_sync_requests_windows_write_access_without_changing_bytes()
     // too, so a read-only-open regression fails before any native Windows run.
     let windows_flush = |mut handle: &std::fs::File| -> std::io::Result<()> {
         use std::io::Write;
-        handle.write(&[])?;
+        assert_eq!(handle.write(&[])?, 0);
         handle.sync_all()
     };
     #[cfg(unix)]

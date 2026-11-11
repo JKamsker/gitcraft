@@ -5,6 +5,7 @@ pub(super) fn publish(
     path: &Path,
     bytes: &[u8],
     source: &Path,
+    evidence: (&Path, &str),
     validate: impl FnOnce() -> Result<(), String>,
 ) -> Result<(), String> {
     let parent = path.parent().ok_or("Missing parent")?;
@@ -12,12 +13,14 @@ pub(super) fn publish(
     let mut n = 0u64;
     let staging = loop {
         let staging = parent.join(format!(".gitcraft-restore-{n}"));
-        let mut builder = std::fs::DirBuilder::new();
+        let builder = std::fs::DirBuilder::new();
         #[cfg(unix)]
-        {
+        let builder = {
             use std::os::unix::fs::DirBuilderExt;
+            let mut builder = builder;
             builder.mode(0o700);
-        }
+            builder
+        };
         match builder.create(&staging) {
             Ok(()) => break staging,
             Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => n += 1,
@@ -25,20 +28,10 @@ pub(super) fn publish(
         }
     };
     let temp = staging.join("bytes");
-    let mut file = std::fs::OpenOptions::new()
-        .create_new(true)
-        .write(true)
-        .open(&temp)
-        .map_err(|e| e.to_string())?;
-    file.write_all(bytes).map_err(|e| e.to_string())?;
-    file.set_permissions(
-        std::fs::metadata(source)
-            .map_err(|e| e.to_string())?
-            .permissions(),
-    )
-    .and_then(|()| file.sync_all())
-    .map_err(|e| e.to_string())?;
-    drop(file);
+    durability::copy(source, &temp, evidence.0, evidence.1)?;
+    if std::fs::read(&temp).map_err(|e| e.to_string())? != bytes {
+        return Err("Recovery source bytes changed during publication".into());
+    }
     journal::sync_dir(&staging)?;
     journal::sync_dir(parent)?;
     effects::boundary("destination-temp-durable")?;

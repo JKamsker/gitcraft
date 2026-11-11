@@ -13,6 +13,10 @@ struct Entry {
     path: String,
     before: Image,
     after: Image,
+    #[serde(default)]
+    before_attributes: Option<u32>,
+    #[serde(default)]
+    after_attributes: Option<u32>,
 }
 #[derive(Serialize, Deserialize)]
 struct Plan {
@@ -120,9 +124,18 @@ pub(super) fn prepare(repo: &Path, gd: &Path, dir: &Path, parked: &Parked) -> Re
         };
         entries.push(Entry {
             git: false,
-            path,
+            before_attributes: durability::attributes(&target(repo, &path)?).ok(),
+            after_attributes: if parked.raw.contains(&path) {
+                Some(durability::attributes(&target(
+                    dir,
+                    &format!("raw/{path}"),
+                )?)?)
+            } else {
+                durability::attributes(&target(repo, &path)?).ok()
+            },
             before,
             after,
+            path,
         });
     }
     for name in std::iter::once("index").chain(STATE_FILES) {
@@ -135,6 +148,12 @@ pub(super) fn prepare(repo: &Path, gd: &Path, dir: &Path, parked: &Parked) -> Re
         entries.push(Entry {
             git: true,
             path: name.into(),
+            before_attributes: durability::attributes(&target(gd, name)?).ok(),
+            after_attributes: if matches!(after, Image::File(_)) {
+                Some(durability::attributes(&target(dir, name)?)?)
+            } else {
+                None
+            },
             before,
             after,
         });
@@ -173,7 +192,12 @@ pub(super) fn resume(repo: &Path, gd: &Path, dir: &Path, parked: &Parked) -> Res
     for entry in &plan.entries {
         let base = if entry.git { gd } else { repo };
         let actual = image(&target(base, &entry.path)?)?;
-        if actual != entry.before && actual != entry.after {
+        let attrs = durability::attributes(&target(base, &entry.path)?).ok();
+        let before_matches =
+            actual == entry.before && entry.before_attributes.is_none_or(|a| Some(a) == attrs);
+        let after_matches =
+            actual == entry.after && entry.after_attributes.is_none_or(|a| Some(a) == attrs);
+        if !before_matches && !after_matches {
             return Err(guidance(dir));
         }
         if entry.git && (entry.path == "index" || parked.state_files.contains(&entry.path))
@@ -184,17 +208,22 @@ pub(super) fn resume(repo: &Path, gd: &Path, dir: &Path, parked: &Parked) -> Res
             } else {
                 format!("raw/{}", entry.path)
             };
-            if image(&target(dir, &source)?)? != entry.after {
+            if image(&target(dir, &source)?)? != entry.after
+                || entry
+                    .after_attributes
+                    .is_some_and(|a| durability::attributes(&dir.join(&source)).ok() != Some(a))
+            {
                 return Err("Recovery source bytes changed".into());
             }
         }
     }
     for entry in &plan.entries {
-        if entry.before == entry.after {
-            continue;
-        }
         let path = target(if entry.git { gd } else { repo }, &entry.path)?;
-        if image(&path)? == entry.after {
+        if image(&path)? == entry.after
+            && entry
+                .after_attributes
+                .is_none_or(|a| durability::attributes(&path).ok() == Some(a))
+        {
             continue;
         }
         if image(&path)? != entry.before {
@@ -212,6 +241,9 @@ pub(super) fn resume(repo: &Path, gd: &Path, dir: &Path, parked: &Parked) -> Res
                 .open(&lock)
                 .map_err(|e| e.to_string())?;
             file.write_all(bytes)
+                .and_then(|()| {
+                    file.set_permissions(std::fs::metadata(dir.join("index"))?.permissions())
+                })
                 .and_then(|()| file.sync_all())
                 .map_err(|e| e.to_string())?;
             effects::boundary("index-lock-synced")?;
@@ -227,7 +259,8 @@ pub(super) fn resume(repo: &Path, gd: &Path, dir: &Path, parked: &Parked) -> Res
             } else {
                 dir.join("raw").join(&entry.path)
             };
-            super::publication::publish(&path, bytes, &source, || {
+            let key = format!("live/{}/{}", entry.git, entry.path);
+            super::publication::publish(&path, bytes, &source, (dir, &key), || {
                 if image(&target(if entry.git { gd } else { repo }, &entry.path)?)? != entry.before
                 {
                     return Err(guidance(dir));

@@ -27,6 +27,8 @@ mod locking;
 pub use discovery::recovery_location;
 #[path = "park/bytes.rs"]
 mod bytes;
+#[path = "park/durability.rs"]
+mod durability;
 #[path = "park/journal.rs"]
 mod journal;
 #[path = "park/publication.rs"]
@@ -186,6 +188,10 @@ fn unchanged(repo: &Path, gd: &Path, dir: &Path, snapshot: &str) -> bool {
             }
         })
         && raw_unchanged(repo, dir)
+        && serde_json::from_slice::<Parked>(
+            &std::fs::read(dir.join("parked.json")).unwrap_or_default(),
+        )
+        .is_ok_and(|p| durability::restored_attributes(repo, gd, dir, &p).unwrap_or(false))
 }
 
 /// Filters can map distinct worktree bytes to the same tree. Check the saved bytes too.
@@ -431,3 +437,7 @@ mod recording_regressions;
 #[cfg(recovery_recording)]
 #[path = "park/checks/discovery.rs"]
 mod recording_discovery;
+
+#[cfg(recovery_recording)]
+#[path = "park/checks/readonly.rs"]
+mod recording_readonly;

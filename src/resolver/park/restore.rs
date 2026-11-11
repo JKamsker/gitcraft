@@ -141,6 +141,7 @@ pub fn bring_back(repo: &Path, parked: &Parked) -> Result<(), String> {
     let current = run(repo, &["symbolic-ref", "-q", "--short", "HEAD"])
         .ok()
         .map(trimmed);
+    durability::capture_untouched(repo, &gd, &dir, parked)?;
     // Ignored files where the branch's go stop it too: git would write over those.
     journal::record(&dir, journal::Phase::Restoring)?;
     let checkout = ["checkout", "-q", "--no-overwrite-ignore"];
@@ -265,10 +266,12 @@ pub(super) fn verified(
     .iter()
     .any(|p| gd.join(p).exists())
         && original_checkout(repo, parked)?
-        && unchanged(repo, gd, dir, &parked.snapshot))
+        && unchanged(repo, gd, dir, &parked.snapshot)
+        && durability::restored_attributes(repo, gd, dir, parked)?)
 }
 
 pub(super) fn sync_live(repo: &Path, gd: &Path, parked: &Parked) -> Result<(), String> {
+    let dir = discovery::locate(repo, &parked.id)?;
     let tracked = run(repo, &["ls-files", "--cached", "-z"])?;
     let changed = run(
         repo,
@@ -288,7 +291,9 @@ pub(super) fn sync_live(repo: &Path, gd: &Path, parked: &Parked) -> Result<(), S
     for path in paths.filter(|p| !p.is_empty()) {
         let path = repo.join(crate::mcp::args::repo_path(path)?);
         if std::fs::symlink_metadata(&path).is_ok_and(|m| m.file_type().is_file()) {
-            journal::sync_file(&path)?;
+            let relative = path.strip_prefix(repo).map_err(|e| e.to_string())?;
+            let key = format!("live/false/{}", relative.to_string_lossy());
+            durability::sync_live_file(&dir, &key, &path)?;
         }
         let mut parent = path.parent().ok_or("Missing parent")?;
         while !parent.is_dir() {
@@ -297,7 +302,7 @@ pub(super) fn sync_live(repo: &Path, gd: &Path, parked: &Parked) -> Result<(), S
         journal::sync_ancestors(parent)?;
     }
     for name in std::iter::once("index").chain(parked.state_files.iter().map(String::as_str)) {
-        journal::sync_file(&gd.join(name))?;
+        durability::sync_live_file(&dir, &format!("live/true/{name}"), &gd.join(name))?;
     }
     journal::sync_ancestors(gd)?;
     effects::boundary("live-restore-synced")

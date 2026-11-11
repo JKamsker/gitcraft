@@ -13,7 +13,7 @@ pub(super) fn keep(
     theirs: &str,
     files: &[String],
 ) -> Result<Parked, String> {
-    std::fs::copy(gd.join("index"), dir.join("index"))
+    durability::copy(&gd.join("index"), &dir.join("index"), dir, "index")
         .map_err(|e| format!("couldn't keep the index: {e}"))?;
     effects::boundary("archive-index-copied")?;
     let (staged, tree) = trees(repo, &dir.join("index"))?;
@@ -80,7 +80,8 @@ pub(super) fn keep(
             if let Some(parent) = to.parent() {
                 std::fs::create_dir_all(parent).map_err(|e| e.to_string())?;
             }
-            std::fs::copy(&file, &to).map_err(|e| format!("couldn't keep {path}: {e}"))?;
+            durability::copy(&file, &to, dir, &format!("raw/{path}"))
+                .map_err(|e| format!("couldn't keep {path}: {e}"))?;
             effects::boundary("archive-raw-copied")?;
             parked.raw.push(path);
         }
@@ -88,7 +89,7 @@ pub(super) fn keep(
     for name in STATE_FILES {
         let from = gd.join(name);
         if from.is_file() {
-            std::fs::copy(&from, dir.join(name))
+            durability::copy(&from, &dir.join(name), dir, name)
                 .map_err(|e| format!("couldn't keep {name}: {e}"))?;
             effects::boundary("archive-metadata-copied")?;
             parked.state_files.push(name.to_owned());

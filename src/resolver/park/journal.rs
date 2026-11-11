@@ -38,6 +38,13 @@ fn sync_existing(
     windows: bool,
     flush: impl FnOnce(&std::fs::File) -> std::io::Result<()>,
 ) -> Result<(), String> {
+    #[cfg(recovery_recording)]
+    if windows && std::fs::metadata(path).is_ok_and(|m| m.permissions().readonly()) {
+        return Err(format!(
+            "Windows access policy denies write-open of {}",
+            path.display()
+        ));
+    }
     let file = std::fs::OpenOptions::new()
         .read(true)
         .write(windows)
@@ -47,18 +54,34 @@ fn sync_existing(
 }
 
 pub(super) fn sync_file(path: &Path) -> Result<(), String> {
-    sync_existing(path, cfg!(windows), std::fs::File::sync_all)?;
+    sync_existing(
+        path,
+        super::durability::windows_policy(),
+        std::fs::File::sync_all,
+    )?;
     super::effects::boundary("file-synced")
 }
 
 pub(super) fn sync_tree(dir: &Path) -> Result<(), String> {
+    sync_subtree(dir, dir)
+}
+
+fn sync_subtree(dir: &Path, root: &Path) -> Result<(), String> {
     for entry in std::fs::read_dir(dir).map_err(|e| e.to_string())? {
         let entry = entry.map_err(|e| e.to_string())?;
         let kind = entry.file_type().map_err(|e| e.to_string())?;
         if kind.is_dir() {
-            sync_tree(&entry.path())?;
+            sync_subtree(&entry.path(), root)?;
         } else if kind.is_file() {
-            sync_existing(&entry.path(), cfg!(windows), std::fs::File::sync_all)?;
+            let path = entry.path();
+            let key = path.strip_prefix(root).map_err(|e| e.to_string())?;
+            if !super::durability::proven(root, &key.to_string_lossy(), &path)? {
+                sync_existing(
+                    &path,
+                    super::durability::windows_policy(),
+                    std::fs::File::sync_all,
+                )?;
+            }
         } else {
             return Err("Recovery archive contains a non-regular file".into());
         }

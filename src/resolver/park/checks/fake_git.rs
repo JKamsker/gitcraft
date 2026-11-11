@@ -19,6 +19,11 @@ pub fn reset_refs(repo: &Path) {
         r.insert("refs/heads/main^{commit}".into(), "head".into());
     });
 }
+pub fn extra_tracked(repo: &Path, path: &str) {
+    with_refs(repo, |r| {
+        r.insert("fake:tracked".into(), path.into());
+    });
+}
 pub fn added(repo: &Path, path: &str) {
     with_refs(repo, |r| {
         r.insert("fake:added".into(), path.into());
@@ -46,7 +51,14 @@ pub fn run(repo: Option<&Path>, args: &[&str]) -> Result<String, String> {
         ["config", "--bool", ..] => "false".into(),
         ["config", ..] => String::new(),
         ["ls-files", "-v", "-z"] => "H file\0".into(),
-        ["ls-files", "--cached", "-z"] => "file\0".into(),
+        ["ls-files", "--cached", "-z"] => with_refs(repo, |r| {
+            format!(
+                "file\0{}",
+                r.get("fake:tracked")
+                    .map(|p| format!("{p}\0"))
+                    .unwrap_or_default()
+            )
+        }),
         ["ls-files", "-u"] => {
             if std::fs::read(gd.join("index")).unwrap() == b"DIRC-original" {
                 "conflict\n".into()
