@@ -118,26 +118,7 @@ fn a_hotfix_started_from_a_tag_is_finished_pushed_undone_and_redone() -> Result<
     );
     assert!(git::resolve(&bare, "refs/tags/v2.3.2").is_err());
     tab.dialog = None;
-    for reference in ["refs/heads/main", "refs/heads/develop", "refs/tags/v2.3.2"] {
-        tab.run_ops(
-            "Push reviewed hotfix ref",
-            vec![vec![
-                "push".into(),
-                "origin".into(),
-                format!("{reference}:{reference}"),
-            ]],
-            crate::repo::Refresh::All,
-            crate::repo::OpKind::plain(),
-            &ctx,
-        );
-        crate::repo::push_preflight::test_support::approve(&mut tab, &ctx)?;
-        wait(&mut tab, &ctx, |t| t.busy_op.is_none() && !t.loading);
-        assert!(
-            tab.status.as_deref().is_some_and(|(_, failed)| !failed),
-            "{:?}",
-            tab.status
-        );
-    }
+    push_finished_refs(&mut tab, &ctx)?;
     let current = git::run(Some(&dir), &["branch", "--show-current"]).unwrap_or_default();
     let tag_at = git::resolve(&dir, "v2.3.2").ok();
     let tag_object = git::run(Some(&dir), &["rev-parse", "refs/tags/v2.3.2"]).unwrap_or_default();
@@ -369,4 +350,28 @@ fn git_flows_names_are_used() {
     assert_eq!(names.main.as_deref(), Some("production"));
     assert_eq!(names.develop.as_deref(), Some("develop"));
     assert_eq!(names.prefix, "hf-");
+}
+
+fn push_finished_refs(tab: &mut RepoTab, ctx: &egui::Context) -> Result<(), String> {
+    for reference in ["refs/heads/main", "refs/heads/develop", "refs/tags/v2.3.2"] {
+        tab.run_ops(
+            "Push reviewed hotfix ref",
+            vec![vec![
+                "push".into(),
+                "origin".into(),
+                format!("{reference}:{reference}"),
+            ]],
+            crate::repo::Refresh::All,
+            crate::repo::OpKind::plain(),
+            ctx,
+        );
+        crate::repo::push_preflight::test_support::approve(tab, ctx)?;
+        wait(tab, ctx, |t| t.busy_op.is_none() && !t.loading);
+        assert!(
+            tab.status.as_deref().is_some_and(|(_, failed)| !failed),
+            "{:?}",
+            tab.status
+        );
+    }
+    Ok(())
 }

@@ -151,30 +151,33 @@ fn tab_navigation_and_search_reveal_hidden_rows_without_changing_operational_par
 }
 
 #[test]
-fn stale_namespace_search_results_cannot_restore_a_previous_scope() {
+fn stale_namespace_search_results_cannot_restore_a_previous_scope() -> Result<(), String> {
     let ctx = egui::Context::default();
     let mut tab = RepoTab::new_deferred("/nonexistent/history-search-scope-test".into(), &ctx);
     tab.search.open = true;
     tab.search.query = "needle".into();
-    tab.search.running = true;
+    crate::repo::messages::record_jobs(|| tab.run_search(&ctx));
+    let old = tab.search.request().ok_or("missing request")?;
+    let mut prefs = load(&ctx, tab.repo_key());
+    prefs.reveal = true;
+    ctx.data_mut(|data| data.insert_persisted(id(tab.repo_key()), prefs));
+    crate::repo::messages::record_jobs(|| tab.run_search(&ctx));
+    let current = tab.search.request().ok_or("missing current request")?;
     let _ = tab.tx.send(crate::repo::Msg::Search(
-        Vec::new(),
-        "needle".into(),
-        false,
+        old,
         Ok(vec!["old-checkpoint".into()]),
     ));
     tab.poll(&ctx);
     assert!(tab.search.results.is_empty());
     assert!(tab.search.running); // the current scope's request is still running.
     let _ = tab.tx.send(crate::repo::Msg::Search(
-        rules(&ctx, tab.repo_key()).excludes(),
-        "needle".into(),
-        false,
+        current,
         Ok(vec!["visible-commit".into()]),
     ));
     tab.poll(&ctx);
     assert_eq!(tab.search.results, ["visible-commit"]);
     assert!(!tab.search.running);
+    Ok(())
 }
 
 #[test]

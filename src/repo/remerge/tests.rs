@@ -160,63 +160,7 @@ fn the_window_shows_what_merges_resolved() {
         && t.settled()
         && !t.commits.is_empty()));
 
-    // The badges of the merges shown, read in the background.
-    let read = |t: &RepoTab| {
-        [&m.resolved, &m.evil, &m.clean]
-            .iter()
-            .all(|h| t.remerges.of(h).is_some())
-    };
-    let ok = run_until(&mut harness, read);
-    let t = harness.state();
-    assert!(
-        ok,
-        "the badges were never read: support {:?}, found {:?}, asked {:?}, running {}, merges {:?}",
-        t.remerges.support,
-        t.remerges.found.keys().collect::<Vec<_>>(),
-        t.remerges.asked,
-        t.remerges.batch_running,
-        t.commits
-            .iter()
-            .filter(|c| c.parents.len() == 2)
-            .map(|c| &c.hash)
-            .collect::<Vec<_>>()
-    );
-    let tab = harness.state();
-    let badge = |hash: &str| {
-        tab.commits
-            .get(row_of(tab, hash))
-            .and_then(|c| tab.remerge_badge(c))
-    };
-    assert_eq!(
-        badge(&m.resolved),
-        Some(RowBadge {
-            conflicts: 1,
-            edits: 1
-        })
-    );
-    assert_eq!(
-        badge(&m.evil),
-        Some(RowBadge {
-            conflicts: 0,
-            edits: 1
-        })
-    );
-    assert_eq!(badge(&m.clean), None);
-    // Never redone: git can't.
-    assert_eq!(badge(&m.octopus), None);
-    assert!(tab.remerges.of(&m.octopus).is_none());
-    // Read out with what they mean.
-    for label in ["resolved", "resolved + edited", "edited"] {
-        eprintln!("DBG {label}: {}", harness.query_by_label(label).is_some());
-    }
-    for n in harness.query_all_by_label_contains("differs") {
-        eprintln!("DBG node: {:?}", n);
-    }
-    assert!(
-        harness
-            .query_by_label_contains("conflicts resolved in 1 file")
-            .is_some()
-    );
+    assert_merge_badges(&mut harness, &m);
     // The resolved merge's and the evil one's.
     assert_eq!(
         harness
@@ -422,4 +366,64 @@ fn unticking_the_box_closes_a_diff_of_what_the_merge_resolved() {
     assert!(opened);
     assert!(!harness.state().remerges.on);
     assert!(harness.state().diff.is_none());
+}
+
+fn assert_merge_badges(harness: &mut Harness<'_>, m: &Merges) {
+    // The badges of the merges shown, read in the background.
+    let read = |t: &RepoTab| {
+        [&m.resolved, &m.evil, &m.clean]
+            .iter()
+            .all(|h| t.remerges.of(h).is_some())
+    };
+    let ok = run_until(harness, read);
+    let t = harness.state();
+    assert!(
+        ok,
+        "the badges were never read: support {:?}, found {:?}, asked {:?}, running {}, merges {:?}",
+        t.remerges.support,
+        t.remerges.found.keys().collect::<Vec<_>>(),
+        t.remerges.asked,
+        t.remerges.batch_running,
+        t.commits
+            .iter()
+            .filter(|c| c.parents.len() == 2)
+            .map(|c| &c.hash)
+            .collect::<Vec<_>>()
+    );
+    let tab = harness.state();
+    let badge = |hash: &str| {
+        tab.commits
+            .get(row_of(tab, hash))
+            .and_then(|c| tab.remerge_badge(c))
+    };
+    assert_eq!(
+        badge(&m.resolved),
+        Some(RowBadge {
+            conflicts: 1,
+            edits: 1
+        })
+    );
+    assert_eq!(
+        badge(&m.evil),
+        Some(RowBadge {
+            conflicts: 0,
+            edits: 1
+        })
+    );
+    assert_eq!(badge(&m.clean), None);
+    // Never redone: git can't.
+    assert_eq!(badge(&m.octopus), None);
+    assert!(tab.remerges.of(&m.octopus).is_none());
+    // Read out with what they mean.
+    for label in ["resolved", "resolved + edited", "edited"] {
+        eprintln!("DBG {label}: {}", harness.query_by_label(label).is_some());
+    }
+    for n in harness.query_all_by_label_contains("differs") {
+        eprintln!("DBG node: {:?}", n);
+    }
+    assert!(
+        harness
+            .query_by_label_contains("conflicts resolved in 1 file")
+            .is_some()
+    );
 }
