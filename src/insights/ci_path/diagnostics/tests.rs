@@ -113,3 +113,30 @@ fn missing_or_ambiguous_jobs_and_steps_never_turn_into_passed_tests() {
     );
     assert!(!intermittent(&seen));
 }
+
+#[test]
+fn missing_revision_never_establishes_same_sha_job_or_step_variation() {
+    for missing_current in [false, true] {
+        for missing_history in [false, true] {
+            for step in [None, Some(0)] {
+                let mut current = run(10, 2, CheckState::Passed);
+                let mut previous = run(10, 1, CheckState::Failed);
+                if missing_current {
+                    current.info.sha.clear();
+                }
+                if missing_history {
+                    previous.info.sha.clear();
+                }
+                let history = History {
+                    runs: vec![previous, current.clone()],
+                    ..History::default()
+                };
+                let seen = observations(&current, 0, step, &history);
+                assert_eq!(intermittent(&seen), !missing_current && !missing_history);
+                if missing_current || missing_history {
+                    assert_eq!(seen[0].state, None);
+                }
+            }
+        }
+    }
+}

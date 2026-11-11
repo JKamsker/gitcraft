@@ -9,7 +9,9 @@
 pub mod alignment;
 pub mod compare;
 pub mod diagnostics;
+mod load;
 pub mod workflow;
+pub use load::{read, read_pinned};
 
 #[cfg(test)]
 mod tests;
@@ -286,6 +288,12 @@ pub enum Baseline {
     None,
     /// This run.
     Run(u64),
+    /// The immediately previous workflow run, regardless of conclusion.
+    Previous,
+    /// The preceding attempt of this run at exactly the same revision.
+    PreviousAttempt,
+    /// Exact immutable selection after a shortcut or picker resolved.
+    Attempt(timing::history::RunKey),
 }
 
 /// The earlier run compared with, and the comparison.
@@ -305,6 +313,9 @@ pub struct Explorer {
     pub critical: Critical,
     /// The earlier successful runs it can be compared with, newest first.
     pub baselines: Vec<RunInfo>,
+    pub recent: Vec<RunInfo>,
+    pub history: timing::history::History,
+    pub diagnostics: Vec<diagnostics::Job>,
     /// Why they, or the one picked, couldn't be read.
     pub baseline_error: Option<String>,
     pub compared: Option<Compared>,
@@ -362,65 +373,6 @@ pub fn deps_of(
 
 /// Reads run `run` of `project`, its dependencies and critical path, and the earlier run to
 /// compare it with. `subject`: the commit the view is about, by name (`HEAD`) and id.
-pub fn read(
-    repo: &Path,
-    project: &Project,
-    run: u64,
-    baseline: Baseline,
-    subject: (&str, &str),
-) -> Result<Explorer, String> {
-    let timed = timing::timed_run(repo, project, run)?;
-    let file = |sha: &str, path: &str| workflow::at_revision(repo, sha, path);
-    let deps = deps_of(&timed, project.forge, file);
-    let critical = critical_path(&timed.jobs, &deps);
-    let (mut baselines, mut baseline_error) =
-        match timing::successful_runs(repo, project, &timed.info, BASELINES + 1) {
-            Ok(runs) => (runs, None),
-            Err(e) => (Vec::new(), Some(e)),
-        };
-    baselines.retain(|b| {
-        b.id != timed.info.id
-            && b.created
-                .zip(timed.info.created)
-                .is_none_or(|(b, now)| b <= now)
-    });
-    baselines.truncate(BASELINES);
-    let wanted = match baseline {
-        Baseline::Latest => baselines.first().map(|b| b.id),
-        Baseline::None => None,
-        Baseline::Run(id) => Some(id),
-    };
-    let compared = match wanted.map(|id| timing::timed_run(repo, project, id)) {
-        Some(Ok(before)) => {
-            let deps = deps_of(&before, project.forge, file);
-            let critical = critical_path(&before.jobs, &deps);
-            let comparison = compare::compare(&timed, &before);
-            Some(Compared {
-                run: before,
-                critical,
-                comparison,
-            })
-        }
-        Some(Err(e)) => {
-            baseline_error = Some(e);
-            None
-        }
-        None => None,
-    };
-    let provenance = provenance(project, &timed, compared.as_ref(), subject);
-    Ok(Explorer {
-        project: project.clone(),
-        run: timed,
-        deps,
-        critical,
-        baselines,
-        baseline_error,
-        compared,
-        now: crate::git::now(),
-        provenance,
-    })
-}
-
 /// Where it came from: the forge's runs of the commit, and how complete they are.
 pub fn provenance(
     project: &Project,

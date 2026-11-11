@@ -12,7 +12,7 @@ fn info(id: u64, attempt: u64) -> RunInfo {
 }
 
 #[test]
-fn exact_attempt_endpoints_cannot_drift_to_latest_on_a_rerun() {
+fn exact_attempt_endpoints_cannot_drift_to_latest_on_a_rerun() -> Result<(), String> {
     let mut calls = Vec::new();
     let run = read_attempt(
         "owner/repo",
@@ -28,8 +28,7 @@ fn exact_attempt_endpoints_cannot_drift_to_latest_on_a_rerun() {
                 r#"{"id":99,"run_attempt":2,"head_sha":"revision"}"#.into()
             })
         },
-    )
-    .unwrap();
+    )?;
     assert!(run.more);
     assert_eq!(
         calls,
@@ -55,26 +54,25 @@ fn exact_attempt_endpoints_cannot_drift_to_latest_on_a_rerun() {
             .is_err()
         );
     }
+    Ok(())
 }
 
 #[test]
-fn recent_history_queries_pin_workflow_branch_and_revision_without_query_injection() {
+fn recent_history_queries_pin_workflow_branch_and_revision_without_query_injection()
+-> Result<(), String> {
     let mut run = info(99, 3);
     run.sha = "sha&other=1".into();
     assert_eq!(
-        recent_endpoint("o/r", &run, true).unwrap(),
+        recent_endpoint("o/r", &run, true)?,
         "repos/o/r/actions/workflows/7/runs?per_page=8&branch=topic%2Fone&head_sha=sha%26other%3D1"
     );
-    assert!(
-        !recent_endpoint("o/r", &run, false)
-            .unwrap()
-            .contains("head_sha")
-    );
+    assert!(!recent_endpoint("o/r", &run, false)?.contains("head_sha"));
     run.url = "https://github.com/o/r/actions/runs/99".into();
     assert_eq!(
         run.attempt_url(),
         "https://github.com/o/r/actions/runs/99/attempts/3"
     );
+    Ok(())
 }
 
 #[test]
@@ -145,9 +143,12 @@ fn failed_history_listing_preserves_the_already_observed_current_attempt() {
         info: info(99, 3),
         ..TimedRun::default()
     };
+    let mut fetched = false;
     let history = from_recent(&current, Err("rate limited".into()), |_| {
-        panic!("no attempts requested without a listing")
+        fetched = true;
+        Err("unexpected attempt request".into())
     });
+    assert!(!fetched);
     assert_eq!(history.runs, [current]);
     assert_eq!(history.notes, ["Same-SHA history unknown: rate limited"]);
 }
