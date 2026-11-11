@@ -109,7 +109,8 @@ pub fn observations(
                 .and_then(|pair| pair.before)
                 .and_then(|i| run.jobs.get(i))
                 .filter(|_| {
-                    current.info.sha == run.info.sha
+                    !current.info.sha.is_empty()
+                        && current.info.sha == run.info.sha
                         && crate::ci::timing::history::same_workflow(&current.info, &run.info)
                 });
             let target = current.jobs.get(index);
