@@ -54,7 +54,7 @@ impl Read {
 }
 
 impl RepoTab {
-    pub(super) fn invalidate_forge_insights(&mut self) {
+    pub(in crate::repo) fn invalidate_forge_insights(&mut self) {
         if let Some(view) = &mut self.insights {
             view.ci_path = Default::default();
             view.deploy = Default::default();
@@ -74,7 +74,7 @@ impl RepoTab {
     }
 
     /// Account/transport, worktree and suspend transitions retire every repository read.
-    pub(super) fn invalidate_repository_insights(&mut self) {
+    pub(in crate::repo) fn invalidate_repository_insights(&mut self) {
         self.invalidate_forge_insights();
         if let Some(view) = &mut self.insights {
             view.read_lifetime = std::sync::Arc::new(());
@@ -92,7 +92,7 @@ impl RepoTab {
     }
 
     /// Observe shared A→B→A preferences and route changes before reads, replies or painting.
-    pub(super) fn sync_insights_context(&mut self, ctx: &egui::Context) {
+    pub(in crate::repo) fn sync_insights_context(&mut self, ctx: &egui::Context) {
         let (_, epoch) = super::super::forge_selection::lifetime(ctx, self.repo_key());
         let namespace = Namespace::capture(self);
         let Some(view) = &self.insights else { return };
