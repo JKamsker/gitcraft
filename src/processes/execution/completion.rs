@@ -65,11 +65,10 @@ pub(super) async fn finish(
     })?;
     if stopped.is_none()
         && let Some(confirm) = options.complete_remote.take()
+        && let Err(error) = confirm_delivery(confirm, blocking).await
     {
-        if let Err(error) = confirm_delivery(confirm, blocking).await {
-            *stopped = Some(error);
-            remote_confirmed = false;
-        }
+        *stopped = Some(error);
+        remote_confirmed = false;
     }
     if remote_confirmed
         && let Some(retire) = options.retire_remote.take()

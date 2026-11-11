@@ -68,6 +68,18 @@ fn tick(span: i64, width: f32, min_px: f32) -> i64 {
         .unwrap_or(14_400)
 }
 
+/// Flatten expanded jobs into the displayed job/step order before drawing rows.
+fn visible_rows(jobs: &[TimedJob], expanded: &HashSet<usize>) -> Vec<Row> {
+    let mut rows = Vec::new();
+    for (i, job) in jobs.iter().enumerate() {
+        rows.push(Row::Job(i));
+        if expanded.contains(&i) {
+            rows.extend((0..job.steps.len()).map(|s| Row::Step(i, s)));
+        }
+    }
+    rows
+}
+
 pub(super) fn show(
     ui: &mut Ui,
     explorer: &Explorer,
@@ -112,13 +124,7 @@ pub(super) fn show(
     }
     let span = (t1 - t0).max(1);
 
-    let mut rows = Vec::new();
-    for (i, job) in jobs.iter().enumerate() {
-        rows.push(Row::Job(i));
-        if expanded.contains(&i) {
-            rows.extend((0..job.steps.len()).map(|s| Row::Step(i, s)));
-        }
-    }
+    let rows = visible_rows(jobs, expanded);
     let height = AXIS_H
         + rows
             .iter()
