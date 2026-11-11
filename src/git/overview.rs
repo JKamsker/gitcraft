@@ -287,7 +287,7 @@ fn stash_message(line: &str) -> String {
 mod tests;
 
 mod transport;
-#[cfg(test)]
+#[cfg(all(test, unix))]
 use transport::script;
 use transport::sections_here;
 use transport::sections_there;
