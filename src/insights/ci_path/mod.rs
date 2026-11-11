@@ -6,7 +6,9 @@
 //! GitLab's stages); when it can't be read, they are inferred from when jobs started after
 //! others ended, and said to be. Runs are read through `gh` and `glab`; nothing is re-run.
 
+pub mod alignment;
 pub mod compare;
+pub mod diagnostics;
 pub mod workflow;
 
 #[cfg(test)]
