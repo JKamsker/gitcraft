@@ -31,7 +31,8 @@ mod tests {
             settings.profile_mut().author_email = "unapplied-profile@example.invalid".into();
             settings.put_for_test(&ctx);
             ctx.set_zoom_factor(1.75);
-            let _ = ctx.run_ui(Default::default(), |_| {});
+            ctx.run_ui(Default::default(), |_| {})
+                .drop_without_applying_deltas();
             assert_eq!(
                 ctx.zoom_factor(),
                 1.75,
@@ -39,7 +40,8 @@ mod tests {
             );
             Settings::set_show_detail(&ctx, on);
             Settings::set_diff_beside_graph(&ctx, on);
-            let _ = ctx.run_ui(Default::default(), |_| {});
+            ctx.run_ui(Default::default(), |_| {})
+                .drop_without_applying_deltas();
             let actual = Settings::get(&ctx);
             assert_eq!((actual.show_detail, actual.diff_beside_graph), (on, on));
             assert_eq!(actual.ui_scale, 1.25);
