@@ -8,7 +8,7 @@ import subprocess
 import tempfile
 import unittest
 
-from rust_file_size import HARD_LIMIT, WARNING_LINES, inventory, main, physical_lines
+from rust_file_size import HARD_LIMIT, WARNING_LINES, inventory, main, physical_lines, tracked_contents
 
 
 class LineTests(unittest.TestCase):
@@ -146,6 +146,47 @@ class RepositoryTests(unittest.TestCase):
         self.git("add", "link.rs")
         self.assertEqual(dict(inventory(self.root)), {"link.rs": 1})
         self.assertEqual(dict(inventory(self.root, staged=True)), {"link.rs": 1})
+
+    def test_policy_reader_rejects_snapshot_symlink_modes_independently_of_working_file(self):
+        self.write("policy.toml", 1)
+        self.write("link-name.txt", 1, stage=False)
+        (self.root / "link-name.txt").write_bytes(b"[env]")
+        blob = self.git("hash-object", "-w", "link-name.txt").decode().strip()
+        self.git("update-index", "--cacheinfo", f"120000,{blob},policy.toml")
+        self.git("commit", "-qm", "symlink policy snapshot")
+        for mode in ({"staged": True}, {"revision": "HEAD"}):
+            with self.subTest(mode=mode):
+                self.assertEqual(dict(tracked_contents(self.root, suffix=b".toml", **mode)),
+                                 {"policy.toml": b"[env]"})
+                with self.assertRaisesRegex(ValueError, "symlink policy input.*policy.toml"):
+                    tracked_contents(self.root, suffix=b".toml", reject_symlinks=True, **mode)
+        # Working policy is about its actual regular file, even when the index is a link.
+        self.assertEqual(dict(tracked_contents(self.root, suffix=b".toml", reject_symlinks=True)),
+                         {"policy.toml": (self.root / "policy.toml").read_bytes()})
+        (self.root / "policy.toml").unlink()
+        self.assertEqual(tracked_contents(self.root, suffix=b".toml", reject_symlinks=True), [])
+
+    @unittest.skipIf(os.name == "nt", "working symlink fixture requires Unix symlinks")
+    def test_policy_reader_rejects_actual_working_links_including_dangling_targets(self):
+        self.write("outside.txt", 501, stage=False)
+        for name, target in (("linked.toml", "outside.txt"), ("dangling.toml", "missing.txt")):
+            with self.subTest(target=target):
+                self.write(name, 1)
+                self.git("commit", "-qm", "regular policy snapshot")
+                path = self.root / name
+                regular = path.read_bytes()
+                path.unlink()
+                path.symlink_to(target)
+                options = {"suffix": name.encode(), "reject_symlinks": True}
+                with self.assertRaisesRegex(ValueError, "symlink policy input"):
+                    tracked_contents(self.root, **options)
+                self.assertEqual(dict(tracked_contents(self.root, suffix=name.encode())),
+                                 {name: target.encode()})
+                for mode in ({"staged": True}, {"revision": "HEAD"}):
+                    self.assertEqual(dict(tracked_contents(self.root, **options, **mode)),
+                                     {name: regular})
+                path.unlink()
+                path.write_bytes(regular)
 
     @unittest.skipIf(os.name == "nt", "newline filenames unavailable on Windows")
     def test_nul_delimited_paths_and_subdirectory_invocation(self):
