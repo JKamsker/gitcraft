@@ -9,6 +9,36 @@ use super::{Act, NodeRef, open_node};
 use crate::repo::insights::graph::Pick;
 use crate::repo::{Action, RepoTab};
 
+#[test]
+fn forge_retirement_clears_only_pr_owned_reads_and_preserves_display_options() {
+    use super::{Ask, State};
+    for pr_owned in [false, true] {
+        let mut state = State::default();
+        let ask = if pr_owned {
+            Ask::Pr {
+                number: 7,
+                head: "a".repeat(40),
+                base: "main".into(),
+            }
+        } else {
+            Ask::Commit("a".repeat(40))
+        };
+        state.read_ask = Some(ask.clone());
+        state.ask = Some(ask.clone());
+        state.filter.public_only = true;
+        state.force = true;
+        let old = state.data.start();
+        assert_eq!(state.invalidate_forge(), pr_owned);
+        assert_eq!(
+            state.data.accept(old, Err("old PR reply".into())),
+            !pr_owned
+        );
+        assert!(state.filter.public_only && state.force);
+        assert_eq!(state.ask, (!pr_owned).then_some(ask));
+        assert_eq!(state.data.value.is_none(), pr_owned);
+    }
+}
+
 /// Takes in background work until `done` holds, drawing the page each time.
 fn wait(tab: &mut RepoTab, ctx: &egui::Context, done: impl Fn(&RepoTab) -> bool) {
     let start = Instant::now();

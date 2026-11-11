@@ -6,6 +6,26 @@ use std::time::{Duration, Instant};
 use super::*;
 use crate::repo::insights::{InsightsAct, Kind, tests::draw};
 
+#[test]
+fn forge_retirement_clears_only_pr_owned_reads_and_preserves_display_options() {
+    for of in [Of::Commit, Of::Branch, Of::Pr(7)] {
+        let mut state = State::default();
+        state.of = of;
+        state.asked = Some((of, None));
+        state.hide_once = true;
+        let old = state.read.start();
+        let pr_owned = matches!(of, Of::Pr(_));
+        assert_eq!(state.invalidate_forge(), pr_owned);
+        assert_eq!(
+            state.read.accept(old, Err("old PR reply".into())),
+            !pr_owned
+        );
+        assert!(state.hide_once);
+        assert_eq!(state.of, if pr_owned { Of::Commit } else { of });
+        assert_eq!(state.read.value.is_none(), pr_owned);
+    }
+}
+
 fn wait(tab: &mut RepoTab, ctx: &egui::Context, done: impl Fn(&RepoTab) -> bool) {
     let start = Instant::now();
     while !done(tab) {

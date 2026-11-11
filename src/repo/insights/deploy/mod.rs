@@ -6,6 +6,8 @@
 mod flow;
 
 #[cfg(test)]
+mod lifecycle_tests;
+#[cfg(test)]
 mod tests;
 
 use egui::{Pos2, Ui};
@@ -49,6 +51,15 @@ pub(crate) struct State {
     selected: Option<Target>,
 }
 
+impl State {
+    fn unavailable(&mut self, title: &str, why: String) {
+        let subject = self.subject.take();
+        *self = Self::default();
+        self.subject = subject;
+        self.unavailable = Some((title.to_owned(), why));
+    }
+}
+
 /// What the view asks for.
 #[derive(Clone, Debug)]
 pub(crate) enum Act {
@@ -73,26 +84,26 @@ impl RepoTab {
         state.subject = subject.clone();
         state.unavailable = None;
         let Some((name, sha)) = subject else {
-            state.unavailable = Some((
-                "No commit".to_owned(),
+            state.unavailable(
+                "No commit",
                 "Select a commit, or open a repository with one, to see where it is deployed."
                     .to_owned(),
-            ));
+            );
             return;
         };
         if let Err(why) = available {
-            state.unavailable = Some(("No deployments to read".to_owned(), why));
+            state.unavailable("No deployments to read", why);
             return;
         }
         let Some(project) = project else {
-            state.unavailable = Some((
-                "No deployments to read".to_owned(),
+            state.unavailable(
+                "No deployments to read",
                 "The selected forge remote doesn't name a GitHub or GitLab project.".to_owned(),
-            ));
+            );
             return;
         };
         let request = state.flow.start();
-        self.insight_then(
+        self.insight_forge_then(
             ctx,
             move || analysis::read(&path, &project, &sha, (&name, &sha)),
             move |tab, result, ctx| tab.deploy_read(request, result, ctx),

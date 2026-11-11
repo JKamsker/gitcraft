@@ -24,7 +24,7 @@ fn draw(tab: &mut RepoTab, ctx: &egui::Context) -> Vec<Action> {
     acts
 }
 
-fn flow() -> Flow {
+pub(super) fn flow() -> Flow {
     let commit = "a".repeat(40);
     let read = Deployments {
         environments: ["staging", "production", "preview"]
