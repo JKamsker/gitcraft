@@ -8,6 +8,7 @@ that same artifact and uses the original libtest harness without recompiling.
 import argparse
 from collections import Counter
 import json
+import re
 from pathlib import Path
 import subprocess
 import sys
@@ -160,10 +161,52 @@ def serial_inventory(binaries, shard):
     return tests
 
 
+# These declarations or their owning test modules have #[cfg(unix)].
+WINDOWS_INACTIVE_RENAMES = {
+    'git::bundles::tests::format::partial_clone_export_never_fetches_promised_blobs',
+    'git::bundles::tests::verification::old_git_verification_is_fail_closed_for_promisor_or_unreadable_configuration',
+    'git::bundles::tests::verification::verification_streams_only_the_validated_header_and_keeps_the_old_git_fallback',
+    'git::drafts::tests::index_safety::configured_filters_hooks_fsmonitor_and_signing_never_run_for_drafts_or_recovery',
+    'git::drafts::tests::index_safety::private_index_preserves_racy_content_checks_across_timestamp_boundaries',
+    'git::drafts::tests::path_safety::changed_symlinks_and_conflicted_indexes_fail_without_following_targets_or_touching_index',
+    'git::drafts::tests::path_safety::ignored_rule_read_warnings_fail_closed_before_any_version_is_published',
+    'git::drafts::tests::path_safety::missing_paths_below_symlinks_fail_closed_and_do_not_publish_deletions',
+    'git::drafts::tests::path_safety::typed_remote_reader_quotes_paths_and_never_confuses_links_with_missing_files',
+    'git::drafts::tests::retention::retention_expires_owned_refs_with_cas_and_preserves_unknown_versions',
+    'git::drafts::tests::retention::tree_roots_survive_gc_restart_and_do_not_change_history_branches_reflog_or_normal_push',
+    'git::external_tool::tests::real::diff::a_diff_tool_that_fails_or_has_nothing_to_show_says_so',
+    'git::external_tool::tests::real::diff::a_preset_runs_its_program_with_the_files',
+    'git::external_tool::tests::real::diff::a_renamed_file_is_shown_against_what_it_was',
+    'git::external_tool::tests::real::diff::the_diff_tool_is_shown_each_kind_of_change',
+    'git::file_comparison::tests::paths::link_targets_and_binary_versions_are_read_without_following_links',
+    'git::file_comparison::tests::paths::raw_non_utf8_paths_stay_distinct_and_literal_folders_do_not_expand_globs',
+    'repo::tests::authentication_integration::an_editor_command_with_arguments_is_run_with_the_path_as_one_argument',
+}
+
+
+def verify_renamed_tests(full, tables, inactive=()):
+    """Bind documented decompositions to actual libtest discovery, without running tests."""
+    for path, expected in tables:
+        pairs = re.findall(r"^\| `([^`]+)` \| `([^`]+)` \|$", path.read_text(), re.M)
+        if len(pairs) != expected:
+            raise RuntimeError(f"Incomplete rename inventory: {path}: {len(pairs)} != {expected}")
+        for previous, current in pairs:
+            if current in inactive:
+                if full[previous] or full[current]:
+                    raise RuntimeError(f"Platform-gated migration unexpectedly present: {current}")
+                continue
+            if previous == current or full[current] != 1 or full[previous]:
+                raise RuntimeError(f"Test migration missing, duplicated or stale: {previous} -> {current}")
+    print(f"Verified {sum(count for _, count in tables)} documented test migrations", flush=True)
+
+
 def verify_partition(binaries):
     full = inventory(binaries, [])
     if not full:
         raise RuntimeError("No tests found; refusing an empty partition")
+    verify_renamed_tests(full, [(Path("src/git/maintenance-198.md"), 93),
+                                (Path("src/repo/maintenance-198.md"), 39)],
+                         WINDOWS_INACTIVE_RENAMES if sys.platform == "win32" else ())
     assigned = Counter()
     counts = {}
     for shard, filters in SHARDS.items():
