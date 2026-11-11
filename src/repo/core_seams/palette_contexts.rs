@@ -90,9 +90,12 @@ fn transport_case(review: bool, paused: bool, shortcuts: usize) {
         })
         .collect();
     assert_eq!(modes, PullMode::ALL);
-    let skip = &entries[entries.len() - 4];
-    assert_eq!(skip.1, "--no-verify");
-    assert!(matches!(skip.2, Action::PushSkippingHooks));
+    let skipped: Vec<_> = entries
+        .iter()
+        .filter(|(_, _, action)| matches!(action, Action::PushSkippingHooks))
+        .collect();
+    assert_eq!(skipped.len(), 1);
+    assert_eq!(skipped[0].1, "--no-verify");
     let item = offline::palette_item(paused);
     assert_eq!(
         (&*item.0, &*item.1),
@@ -161,15 +164,15 @@ fn composed_case(review: bool, selected: bool, busy: bool, lfs: bool) {
         "File versions across branches",
         "Fetch",
         "Pull",
-        "Behaviour timelineâ€¦",
-        "Inspect local Git bundleâ€¦",
-        "Stash only what is stagedâ€¦",
-        "Save snapshot (stash, keep the changes)â€¦",
-        "Distribute staged fixesâ€¦",
+        "Behaviour timeline\u{2026}",
+        "Inspect local Git bundle\u{2026}",
+        "Stash only what is staged\u{2026}",
+        "Save snapshot (stash, keep the changes)\u{2026}",
+        "Distribute staged fixes\u{2026}",
         "Undo",
         "Redo",
         "Timeline and undo tree",
-        "Stash changesâ€¦",
+        "Stash changes\u{2026}",
         "Stage all changes",
         "Commit",
         "Search commits",
@@ -177,9 +180,9 @@ fn composed_case(review: bool, selected: bool, busy: bool, lfs: bool) {
         "Find lost commits",
         "Activity: operations and their output",
         "Reload",
-        "Select stale or merged branchesâ€¦",
-        "Conflicts that can wait: isolated rebase and restackâ€¦",
-        "All refs and namespace historyâ€¦",
+        "Select stale or merged branches\u{2026}",
+        "Conflicts that can wait: isolated rebase and restack\u{2026}",
+        "All refs and namespace history\u{2026}",
         "Repository doctor",
     ];
     let positions: Vec<_> = ordered
@@ -206,7 +209,7 @@ fn composed_case(review: bool, selected: bool, busy: bool, lfs: bool) {
     let final_items = tab.palette_items(&ctx);
     for name in [
         "Code moved across files",
-        "Inspect state publication receiptsâ€¦",
+        "Inspect state publication receipts\u{2026}",
         "Find lost commits",
     ] {
         assert_eq!(

@@ -62,32 +62,32 @@ fn feature_contributions_preserve_order_search_hints_and_exact_targets() {
         actual,
         [
             (
-                "Conflicts that can wait: isolated rebase and restackâ€¦",
+                "Conflicts that can wait: isolated rebase and restack\u{2026}",
                 "Deferred rewrites",
                 "deferred"
             ),
             (
-                "Parallel branches in this folder: hunk ownershipâ€¦",
+                "Parallel branches in this folder: hunk ownership\u{2026}",
                 "Virtual branches",
                 "virtuals"
             ),
             (
-                "Inspect state publication receiptsâ€¦",
+                "Inspect state publication receipts\u{2026}",
                 "Working-state transaction recovery",
                 "receipts"
             ),
             (
-                "Named changelists: messages, commit and shelveâ€¦",
+                "Named changelists: messages, commit and shelve\u{2026}",
                 "Working changes",
                 "lists"
             ),
             (
-                "Push outbox: queue exact commit or send selected entriesâ€¦",
+                "Push outbox: queue exact commit or send selected entries\u{2026}",
                 "Offline publication",
                 "outbox"
             ),
             (
-                "Subtrees: register, update, inspect and publish vendored foldersâ€¦",
+                "Subtrees: register, update, inspect and publish vendored folders\u{2026}",
                 "Vendored source history",
                 "subtrees"
             ),
@@ -97,42 +97,42 @@ fn feature_contributions_preserve_order_search_hints_and_exact_targets() {
                 "sharing"
             ),
             (
-                "Publish submodule dependencies before parentâ€¦",
+                "Publish submodule dependencies before parent\u{2026}",
                 "submodules publish remote",
                 "dependencies"
             ),
             (
-                "Pull and push routesâ€¦",
+                "Pull and push routes\u{2026}",
                 "triangular upstream ahead behind",
                 "routes"
             ),
             (
-                "Publish to several hostsâ€¦",
+                "Publish to several hosts\u{2026}",
                 "publication group retry mirrors",
                 "publication"
             ),
             (
-                "Remote URLs, refspecs and mirror policyâ€¦",
+                "Remote URLs, refspecs and mirror policy\u{2026}",
                 "fetch push mapping prune",
                 "remote"
             ),
             (
-                "Replace refs and temporary history joinsâ€¦",
+                "Replace refs and temporary history joins\u{2026}",
                 "grafts original effective history",
                 "replacements"
             ),
             (
-                "Ref storage and reftable migrationâ€¦",
+                "Ref storage and reftable migration\u{2026}",
                 "refs compatibility",
                 "reftable"
             ),
             (
-                "How an object is storedâ€¦",
+                "How an object is stored\u{2026}",
                 "objects pack delta file version",
                 "object"
             ),
             (
-                "All refs and namespace historyâ€¦",
+                "All refs and namespace history\u{2026}",
                 "refs internals",
                 "refs"
             ),
@@ -158,9 +158,9 @@ fn feature_contributions_preserve_order_search_hints_and_exact_targets() {
     assert_eq!(
         actual,
         [
-            ("Stash only what is stagedâ€¦", "stash", "stash"),
+            ("Stash only what is staged\u{2026}", "stash", "stash"),
             (
-                "Save snapshot (stash, keep the changes)â€¦",
+                "Save snapshot (stash, keep the changes)\u{2026}",
                 "stash",
                 "stash"
             ),
@@ -178,6 +178,6 @@ fn feature_contributions_preserve_order_search_hints_and_exact_targets() {
     let entries = partial_stash::palette::stash(&ctx);
     assert_eq!(
         (&*entries[0].0, target(&entries[0].2)),
-        ("Stash changesâ€¦", "stash")
+        ("Stash changes\u{2026}", "stash")
     );
 }
