@@ -35,6 +35,7 @@ impl RepoTab {
             action => action,
         };
         let action = self.popout_intercept(action, ctx)?;
+        self.retire_navigation_restore(&action);
         // Any later user action supersedes a pending automatic backlink diff opening.
         if !matches!(&action, Action::OpenCommitChanges(_)) {
             self.commit_changes.cancel_pending();

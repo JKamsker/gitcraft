@@ -7,9 +7,12 @@ mod diff_navigation;
 #[path = "core_seams/file_navigation.rs"]
 mod file_navigation;
 
+mod target;
+pub(super) use target::PendingGoto;
+
 use super::{
-    Compare, CompareData, DiffKey, DiffView, MAX_HISTORY, Msg, RepoTab, WIP_HASH, conflict, diff,
-    file_text, file_view, spawn,
+    Compare, CompareData, DiffKey, DiffView, Msg, RepoTab, WIP_HASH, conflict, diff, file_text,
+    file_view, spawn,
 };
 use crate::git;
 use crate::settings::Settings;
@@ -197,50 +200,6 @@ impl RepoTab {
         self.diff = None;
         self.conflict = None;
         self.load_detail(hash, ctx);
-    }
-
-    pub(super) fn select_hash(&mut self, hash: &str, ctx: &egui::Context) {
-        match self.index.get(hash).copied() {
-            Some(row) => {
-                self.select_history(row, ctx);
-                self.scroll_to = Some(row);
-            }
-            None => {
-                self.status = Some(crate::repo::Notice::plain((
-                    crate::i18n::message(
-                        "repo-core-2900",
-                        &[("hash", hash.get(..8).unwrap_or(hash).to_string().into())],
-                    ),
-                    true,
-                )));
-            }
-        }
-    }
-
-    /// Selects `hash`, loading more history first if it's further down.
-    pub(super) fn goto(&mut self, hash: &str, ctx: &egui::Context) {
-        // Nothing read to look in yet: once it is (see `rebuild`).
-        if self.sleeping() || self.resuming {
-            self.pending_goto = Some(hash.to_owned());
-            return;
-        }
-        if !self.index.contains_key(hash) && self.history.iter().any(|c| c.hash == hash) {
-            self.history_filter.revealed.insert(hash.to_owned());
-            let previous = self.selected_hash();
-            self.rebuild_rows();
-            self.selected = previous.and_then(|h| self.index.get(&h).copied());
-        }
-        if self.index.contains_key(hash) {
-            self.pending_goto = None;
-            self.select_hash(hash, ctx);
-            self.history_filter.revealed.remove(hash);
-        } else if self.has_more && self.history.len() < MAX_HISTORY {
-            self.pending_goto = Some(hash.to_owned());
-            self.load_more(ctx);
-        } else {
-            self.pending_goto = None;
-            self.select_hash(hash, ctx);
-        }
     }
 
     /// Closes the diff of a file between two commits (opened from a comparison).

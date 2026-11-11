@@ -29,6 +29,7 @@ mod signing;
 mod terminal_page;
 mod themes;
 mod tips_row;
+mod view_preferences;
 
 use egui::Ui;
 use serde::{Deserialize, Serialize};
