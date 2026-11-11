@@ -14,6 +14,7 @@ GATE = "rust-file-size"
 SHARED = "./.github/workflows/rust-file-size.yml"
 IDENTIFIER = r"[A-Za-z_][A-Za-z0-9_-]*"
 COMPLEXITY_CHECK = "python3 ci/complexity_policy.py --revision HEAD"
+ASSET_CHECK = "python3 -m unittest discover -s ci -p test_checkout_assets.py -v"
 COMPILER_CHECK = "python3 -m unittest discover -s ci -p 'test_complexity*.py' -v"
 CLIPPY_CHECK = "python ci/clippy_packages.py"
 
@@ -128,7 +129,7 @@ def verify_shared_gate(text):
     require(not re.search(rf"^\s*(?:- )?{forbidden}:", text, re.M), "shared gate can skip, soften, or retarget checks")
     command = r"^\s+(?:- )?run: python3 ci/rust_file_size\.py --revision HEAD\s*$"
     require(re.search(command, text, re.M), "shared gate must check the complete immutable candidate")
-    verify_required_commands(text, "check", (COMPLEXITY_CHECK, COMPILER_CHECK))
+    verify_required_commands(text, "check", (COMPLEXITY_CHECK, COMPILER_CHECK, ASSET_CHECK))
 
 
 def verify_callers(text):
@@ -203,11 +204,13 @@ class WorkflowGateTests(unittest.TestCase):
     def required_commands(self):
         yield "shared-policy", self.shared, "check", COMPLEXITY_CHECK
         yield "shared-compiler", self.shared, "check", COMPILER_CHECK
+        yield "shared-assets", self.shared, "check", ASSET_CHECK
         for name, text, job in self.clippy:
             yield name, text, job, CLIPPY_CHECK
 
     def test_required_complexity_commands_cannot_be_removed_or_weakened(self):
         weakened = {
+            ASSET_CHECK: (ASSET_CHECK.replace("test_checkout_assets.py", "test_architecture.py"),),
             COMPLEXITY_CHECK: (COMPLEXITY_CHECK.replace("--revision HEAD", "--staged"),
                                COMPLEXITY_CHECK.replace("HEAD", "HEAD~1")),
             COMPILER_CHECK: (COMPILER_CHECK.replace("test_complexity*.py", "test_complexity_policy.py"),),

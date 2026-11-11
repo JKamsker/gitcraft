@@ -23,6 +23,8 @@ jobs:
         run: python3 -m unittest discover -s ci -p test_rust_file_size.py -v
       - name: Required workflow wiring regression tests
         run: python3 -m unittest discover -s ci -p test_workflow_gates.py -v
+      - name: Cross-platform checkout regression tests
+        run: python3 -m unittest discover -s ci -p test_checkout_assets.py -v
       - name: Enforce the full candidate tree
         run: python3 ci/rust_file_size.py --revision HEAD
       - name: Complexity gate regression tests
