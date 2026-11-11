@@ -212,12 +212,7 @@ impl RepoTab {
             Msg::Status(read, _) if read <= self.work_read => {}
             Msg::Status(read, result) => self.status_arrived(read, result, ctx),
             Msg::Detail(hash, result) => self.detail_arrived(hash, result, ctx),
-            Msg::DetailPrefetched(result) => {
-                if let Ok(d) = result {
-                    self.files_cache.insert(d.hash.clone(), d.files.clone());
-                    self.detail_cache.insert(&self.refs.head, d);
-                }
-            }
+            Msg::DetailPrefetched(result) => self.detail_prefetched(result),
             Msg::FilesPrefetched(asked, result) => self.files_prefetched(asked, result, ctx),
             Msg::RebaseCommits {
                 onto,

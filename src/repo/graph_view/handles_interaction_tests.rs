@@ -269,7 +269,7 @@ fn snapshot_drags_preserve_the_initial_hit_offset_and_other_preferences() {
 fn assert_refs_exchange(saved: &Settings, start: &Settings, after: &Cols, shown: &Cols, dx: f32) {
     for other in Bar::ALL {
         if other != Bar::Refs {
-            assert_eq!(preference(&saved, other), preference(&start, other));
+            assert_eq!(preference(saved, other), preference(start, other));
             assert_eq!(after.width(other), shown.width(other));
         }
     }

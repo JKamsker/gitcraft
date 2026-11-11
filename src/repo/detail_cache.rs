@@ -94,6 +94,60 @@ impl FilesCache {
     }
 }
 
+impl super::RepoTab {
+    /// Cache immutable content even when selection moved on; only the current detail
+    /// may change the visible panel or fulfill a pending first-file reveal.
+    pub(in crate::repo) fn detail_arrived(
+        &mut self,
+        hash: String,
+        result: Result<CommitDetail, String>,
+        ctx: &egui::Context,
+    ) {
+        if let Ok(d) = &result {
+            self.files_cache.insert(d.hash.clone(), d.files.clone());
+            self.detail_cache.insert(&self.refs.head, d.clone());
+        }
+        if self.detail_hash.as_deref() == Some(hash.as_str()) {
+            match result {
+                Ok(d) => self.show_detail(d, ctx),
+                Err(e) => {
+                    self.detail_error = Some(e);
+                    self.finish_commit_changes(&hash, ctx);
+                }
+            }
+        }
+    }
+    pub(in crate::repo) fn files_prefetched(
+        &mut self,
+        asked: Vec<String>,
+        result: Result<Vec<(String, Vec<ChangedFile>)>, String>,
+        ctx: &egui::Context,
+    ) {
+        self.files_cache.reading = false;
+        match result {
+            Ok(read) => {
+                for (hash, files) in read {
+                    self.files_cache.insert(hash, files);
+                }
+                let missed: Vec<_> = asked
+                    .into_iter()
+                    .filter(|hash| !self.files_cache.settled(hash))
+                    .collect();
+                self.files_cache.unreadable(missed);
+            }
+            Err(_) => self.files_cache.unreadable(asked),
+        }
+        // On to the rows on screen not read yet, if any.
+        ctx.request_repaint();
+    }
+    pub(in crate::repo) fn detail_prefetched(&mut self, result: Result<CommitDetail, String>) {
+        if let Ok(d) = result {
+            self.files_cache.insert(d.hash.clone(), d.files.clone());
+            self.detail_cache.insert(&self.refs.head, d);
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -150,53 +204,5 @@ mod tests {
         assert!(cache.contains("0", "h"));
         assert!(!cache.contains("1", "h"));
         assert!(cache.contains("new", "h"));
-    }
-}
-
-impl super::RepoTab {
-    /// Cache immutable content even when selection moved on; only the current detail
-    /// may change the visible panel or fulfill a pending first-file reveal.
-    pub(in crate::repo) fn detail_arrived(
-        &mut self,
-        hash: String,
-        result: Result<CommitDetail, String>,
-        ctx: &egui::Context,
-    ) {
-        if let Ok(d) = &result {
-            self.files_cache.insert(d.hash.clone(), d.files.clone());
-            self.detail_cache.insert(&self.refs.head, d.clone());
-        }
-        if self.detail_hash.as_deref() == Some(hash.as_str()) {
-            match result {
-                Ok(d) => self.show_detail(d, ctx),
-                Err(e) => {
-                    self.detail_error = Some(e);
-                    self.finish_commit_changes(&hash, ctx);
-                }
-            }
-        }
-    }
-    pub(in crate::repo) fn files_prefetched(
-        &mut self,
-        asked: Vec<String>,
-        result: Result<Vec<(String, Vec<ChangedFile>)>, String>,
-        ctx: &egui::Context,
-    ) {
-        self.files_cache.reading = false;
-        match result {
-            Ok(read) => {
-                for (hash, files) in read {
-                    self.files_cache.insert(hash, files);
-                }
-                let missed: Vec<_> = asked
-                    .into_iter()
-                    .filter(|hash| !self.files_cache.settled(hash))
-                    .collect();
-                self.files_cache.unreadable(missed);
-            }
-            Err(_) => self.files_cache.unreadable(asked),
-        }
-        // On to the rows on screen not read yet, if any.
-        ctx.request_repaint();
     }
 }

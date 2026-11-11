@@ -1,5 +1,6 @@
 //! Specialized diff presentations keep their loading/error/search behavior together.
 use super::*;
+use crate::repo::diff::encrypted;
 
 impl RepoTab {
     pub(super) fn markdown_content(&mut self, ui: &mut Ui, path: &str, as_file: bool) {
@@ -45,7 +46,7 @@ impl RepoTab {
                         },
                     );
                 } else {
-                    rendered::show(ui, &path, md, &mut view.markdown, !as_file);
+                    rendered::show(ui, path, md, &mut view.markdown, !as_file);
                 }
             }
         }
@@ -144,6 +145,56 @@ impl RepoTab {
                 return true;
             }
             Some((_, Ok(rich::Rich::Plain(note)))) => rich::fallback_note(ui, kind, note),
+        }
+        false
+    }
+    /// The decrypt control and decrypted document share the encrypted view's lifetime.
+    pub(super) fn encrypted_content(&mut self, ui: &mut Ui, acts: &mut Vec<Action>) -> bool {
+        let Some(view) = &self.diff else { return false };
+        let idle = self.busy_op.is_none();
+        if matches!(&view.data, Some(Ok(data)) if data.sops) {
+            ui.horizontal_wrapped(|ui| {
+                ui.label(crate::i18n::text("repo-core-2344"));
+                if view.lines.is_some() {
+                    ui.label(crate::i18n::text("repo-core-2345"));
+                }
+                let mut encoding = view.encrypted.json_encoding;
+                egui::ComboBox::from_id_salt("sops_json_encoding")
+                    .selected_text(encoding.label())
+                    .show_ui(ui, |ui| {
+                        use encrypted::JsonEncoding;
+                        for choice in [
+                            JsonEncoding::Ask,
+                            JsonEncoding::Document,
+                            JsonEncoding::Binary,
+                        ] {
+                            ui.selectable_value(&mut encoding, choice, choice.label());
+                        }
+                    });
+                if encoding != view.encrypted.json_encoding {
+                    acts.push(Action::DiffDecryptedEncoding(encoding));
+                }
+                if view.encrypted.enabled {
+                    if ui.button(crate::i18n::text("repo-core-2347")).clicked() {
+                        acts.push(Action::DiffDecrypted(false));
+                    }
+                } else if ui
+                    .add_enabled(
+                        idle && !self.loading && view.request == view.data_request,
+                        egui::Button::new(crate::i18n::text("repo-core-2348")),
+                    )
+                    .on_hover_text(crate::i18n::text("repo-core-2349"))
+                    .clicked()
+                {
+                    acts.push(Action::DiffDecrypted(true));
+                }
+            });
+        }
+        if view.encrypted.enabled {
+            if let Some(view) = &mut self.diff {
+                encrypted::show(ui, &mut view.encrypted);
+            }
+            return true;
         }
         false
     }
