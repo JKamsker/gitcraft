@@ -10,6 +10,7 @@ use super::output::{Tone, end_text};
 use super::*;
 use crate::git::TestEnd;
 use crate::git::fixture::Repo;
+use crate::repo::hang_diagnostics as diag;
 
 /// `main` with a base commit, `feature` of `n` commits on it, `broken` from `bad_from` on,
 /// checked out.
@@ -29,10 +30,16 @@ fn branch_repo(name: &str, n: usize, bad_from: usize) -> Result<(Repo, Vec<Strin
     Ok((repo, commits))
 }
 
+/// Opens and settles a visible lane, tracing tab teardown if its initial load fails.
 fn open(repo: &Repo, ctx: &egui::Context) -> Result<RepoTab, String> {
-    let mut tab = RepoTab::new(repo.path().to_path_buf(), ctx);
+    let mut tab = diag::run(format_args!("construct tab"), || {
+        RepoTab::new(repo.path().to_path_buf(), ctx)
+    });
     tab.test_lane.visible = true;
-    settle(&mut tab, ctx)?;
+    if let Err(error) = diag::run(format_args!("settle opening tab"), || settle(&mut tab, ctx)) {
+        diag::run(format_args!("drop unsettled tab and watcher"), || drop(tab));
+        return Err(error);
+    }
     Ok(tab)
 }
 
@@ -40,13 +47,21 @@ fn open(repo: &Repo, ctx: &egui::Context) -> Result<RepoTab, String> {
 fn settle(tab: &mut RepoTab, ctx: &egui::Context) -> Result<(), String> {
     let until = Instant::now() + Duration::from_secs(90);
     while Instant::now() < until {
-        tab.poll(ctx);
+        diag::poll(tab, ctx);
         let lane = &tab.test_lane;
         if tab.settled() && lane.shown == lane.reads && !lane.running() && tab.history_gen > 0 {
             return Ok(());
         }
         std::thread::sleep(Duration::from_millis(15));
     }
+    let _stage = diag::stage(format_args!(
+        "settle deadline loading={} history_gen={} lane_shown={} lane_reads={} running={}",
+        tab.loading,
+        tab.history_gen,
+        tab.test_lane.shown,
+        tab.test_lane.reads,
+        tab.test_lane.running(),
+    ));
     Err("the tab never settled".to_owned())
 }
 
@@ -170,12 +185,29 @@ fn commits_of(repo: &Repo, range: &str) -> Result<Vec<String>, String> {
 /// Testing up to a commit of the menu tests from the base to it.
 #[test]
 fn testing_up_to_a_commit_starts_at_the_base() -> Result<(), String> {
-    let ctx = egui::Context::default();
-    let (repo, commits) = branch_repo("upto", 3, 9)?;
-    let tab = open(&repo, &ctx)?;
-    let asked = dialog_start(&tab, Some(&commits[1]))?;
-    assert_eq!(asked.range, format!("main..{}", commits[1]));
-    Ok(())
+    let _trace = diag::trace("testing_up_to_a_commit_starts_at_the_base");
+    let ctx = diag::run(format_args!("create context"), egui::Context::default);
+    let result = (|| {
+        let (repo, commits) = diag::run(format_args!("repository setup"), || {
+            branch_repo("upto", 3, 9)
+        })?;
+        let result = (|| {
+            let tab = open(&repo, &ctx)?;
+            let result = (|| {
+                let asked = diag::run(format_args!("test dialog"), || {
+                    dialog_start(&tab, Some(&commits[1]))
+                })?;
+                assert_eq!(asked.range, format!("main..{}", commits[1]));
+                Ok(())
+            })();
+            diag::run(format_args!("drop tab and watcher"), || drop(tab));
+            result
+        })();
+        diag::run(format_args!("remove repository"), || drop(repo));
+        result
+    })();
+    diag::run(format_args!("drop context"), || drop(ctx));
+    result
 }
 
 /// Stop from the banner ends the commands; nothing is kept for them, the scratch worktrees go.

@@ -13,7 +13,10 @@ impl RepoTab {
         self.poll_as(ctx, false);
     }
 
+    /// Settles background work for either view, reserving active-view refreshes for `shown`.
     fn poll_as(&mut self, ctx: &egui::Context, shown: bool) {
+        #[cfg(test)]
+        super::super::hang_diagnostics::checkpoint(format_args!("poll connections and filesystem"));
         self.notice_connections(ctx);
         self.local_ci.poll(ctx);
         self.shown = shown;
@@ -35,8 +38,12 @@ impl RepoTab {
         }
 
         while let Ok(msg) = self.rx.try_recv() {
+            #[cfg(test)]
+            let _stage = super::super::hang_diagnostics::message(&msg);
             self.handle(msg, ctx);
         }
+        #[cfg(test)]
+        super::super::hang_diagnostics::checkpoint(format_args!("poll feature readers"));
         if !self.sleeping() {
             self.sync_branch_bands(ctx);
             self.poll_branch_bands(ctx);
@@ -62,6 +69,8 @@ impl RepoTab {
         if !shown || self.sleeping() {
             return;
         }
+        #[cfg(test)]
+        super::super::hang_diagnostics::checkpoint(format_args!("poll filesystem reload"));
         if let Some(wait) = self.folding.tick(Instant::now()) {
             ctx.request_repaint_after(wait);
         }
@@ -85,6 +94,8 @@ impl RepoTab {
             }
         }
 
+        #[cfg(test)]
+        super::super::hang_diagnostics::checkpoint(format_args!("poll background fetch"));
         // Background fetch.
         let minutes = Settings::get(ctx).auto_fetch_minutes;
         if minutes > 0
@@ -108,12 +119,16 @@ impl RepoTab {
             ctx.request_repaint_after(Duration::from_secs(30));
         }
 
+        #[cfg(test)]
+        super::super::hang_diagnostics::checkpoint(format_args!("poll network and CI state"));
         self.follow_network(ctx);
         self.poll_ci(ctx);
         self.poll_parallel(ctx);
         self.recount_siblings(ctx);
         self.poll_ci_view(ctx);
 
+        #[cfg(test)]
+        super::super::hang_diagnostics::checkpoint(format_args!("poll search"));
         // Debounced search while typing.
         if let Some(at) = self.search.edited
             && at.elapsed() > Duration::from_millis(350)
