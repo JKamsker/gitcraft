@@ -1,0 +1,15 @@
+{
+  "base": "c6d5a2bb8e4f933b5709f9b36e4e7b1e7a6a97a5",
+  "original_parent": "51963cfcf8ee93471cd351c11508ac2c66336d7e",
+  "accepted_tests": "a9194e489382cd852dd72729a44129ee85305886",
+  "preserved_combined": "f8d2a6266ba8b7130ef028ff3b056a9769788dfe",
+  "preserved_ref": "refs/recovery/issue-198/final-before-fold",
+  "old_recovery": "95415722a661c31b26c27937072aa1d82b9790cf",
+  "new_recovery": "c327eb291cdef95f8779715164d0de975639f52d",
+  "old_shard": "d91a92251711278bd0e275c840e46a2c474a9f75",
+  "new_shard": "3324c619cc5d51022355d88de2a9a081578ab8f7",
+  "application_equality_reference": "f8d2a6266ba8b7130ef028ff3b056a9769788dfe",
+  "application_equality": true,
+  "feature_parent": "9e145dab86eba48bda1b6111c78dd471807ef93c",
+  "previous_assembly_proof": "final-history-and-provenance.json"
+}

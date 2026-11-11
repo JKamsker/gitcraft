@@ -1,0 +1,248 @@
+{
+  "sha": "29d9695def41ccb2524b632bdfa334fb33470c92",
+  "sources": [
+    {
+      "original": "32afe81ee16ea182246a6249b0f6acc930ff8a1f",
+      "integrated": "e0e207b8b7ddce84cd5731f064ec4a1b85301625",
+      "patch_identical": true,
+      "author": "Jonas Kamsker <11245306+JKamsker@users.noreply.github.com>",
+      "original_patch_id": "ccb0bdba968d4ebf992ec3cff79022c97a235b20",
+      "integrated_patch_id": "ccb0bdba968d4ebf992ec3cff79022c97a235b20",
+      "patch_id_match": true,
+      "integrated_ancestor_of_candidate": true
+    },
+    {
+      "original": "31114036544cf22a7b522c17a157e8c969979ac4",
+      "integrated": "401e7e6c91eab5a0e9cf42bf9a91bd168dd80d13",
+      "patch_identical": true,
+      "author": "Jonas Kamsker <11245306+JKamsker@users.noreply.github.com>",
+      "original_patch_id": "3074ede222b4e564202166685f7a41b8eff95ef4",
+      "integrated_patch_id": "3074ede222b4e564202166685f7a41b8eff95ef4",
+      "patch_id_match": true,
+      "integrated_ancestor_of_candidate": true
+    },
+    {
+      "original": "865fd5e0e8d33f2708c4eb79e51eae4b1138171e",
+      "integrated": "7c28f641b4b23f7b50cbd62be8bf1a0290dc8041",
+      "patch_identical": true,
+      "author": "Jonas Kamsker <11245306+JKamsker@users.noreply.github.com>",
+      "original_patch_id": "534f72212355b1cc4bd8b482ee418782b857329a",
+      "integrated_patch_id": "534f72212355b1cc4bd8b482ee418782b857329a",
+      "patch_id_match": true,
+      "integrated_ancestor_of_candidate": true
+    },
+    {
+      "original": "68f40a4a271cce563db115389c5dbcbd91899e53",
+      "integrated": "c26bf23f8a0eb89f6e4fb003c5c8ff5ca4bbb5be",
+      "patch_identical": true,
+      "author": "Jonas Kamsker <11245306+JKamsker@users.noreply.github.com>",
+      "original_patch_id": "5495b2fa94ff16d14bce5d6f502a7f3b83cbdc4a",
+      "integrated_patch_id": "5495b2fa94ff16d14bce5d6f502a7f3b83cbdc4a",
+      "patch_id_match": true,
+      "integrated_ancestor_of_candidate": true
+    },
+    {
+      "original": "552a74e23394af76c38b7d72218263cc5551e685",
+      "integrated": "cc85d26e65c27bc2b03581feed5590a431af5383",
+      "patch_identical": true,
+      "author": "Jonas Kamsker <11245306+JKamsker@users.noreply.github.com>",
+      "original_patch_id": "19ef52aca4a1f537eb0d02ab5a87763ac0350209",
+      "integrated_patch_id": "19ef52aca4a1f537eb0d02ab5a87763ac0350209",
+      "patch_id_match": true,
+      "integrated_ancestor_of_candidate": true
+    },
+    {
+      "original": "ee1c92fd01e17c69ec0f2e4e614565d9a49a401e",
+      "integrated": "891d4f2bec1d4bf8004504bff778ab5e31e7a5af",
+      "patch_identical": true,
+      "author": "Jonas Kamsker <11245306+JKamsker@users.noreply.github.com>",
+      "original_patch_id": "079468a48b2b63013a9c6ab9db62d613d3231920",
+      "integrated_patch_id": "079468a48b2b63013a9c6ab9db62d613d3231920",
+      "patch_id_match": true,
+      "integrated_ancestor_of_candidate": true
+    },
+    {
+      "original": "ea8117bdfd597a2d0713742762a09e3da7e7dbe6",
+      "integrated": "d528caedbc14e0bae031423757a4a52772d8bb1d",
+      "patch_identical": true,
+      "author": "Jonas Kamsker <11245306+JKamsker@users.noreply.github.com>",
+      "original_patch_id": "d7c9428ae4218fc7c69e133c155b334ad3912784",
+      "integrated_patch_id": "d7c9428ae4218fc7c69e133c155b334ad3912784",
+      "patch_id_match": true,
+      "integrated_ancestor_of_candidate": true
+    },
+    {
+      "original": "77d8e0c8d728ada555f5d8820b79d70cddfca1cb",
+      "integrated": "829977fe894c4d7fca80ceb0054284cb036c427b",
+      "patch_identical": true,
+      "author": "Jonas Kamsker <11245306+JKamsker@users.noreply.github.com>",
+      "original_patch_id": "1f705f9ba9c5f64dea6d625cd47c7d1fdce97588",
+      "integrated_patch_id": "1f705f9ba9c5f64dea6d625cd47c7d1fdce97588",
+      "patch_id_match": true,
+      "integrated_ancestor_of_candidate": true
+    },
+    {
+      "original": "9c8256605b857e94a84519b57eb187711a2c2d92",
+      "integrated": "0c6efb6349bfb06fd920e948b2080ce800f2e283",
+      "patch_identical": true,
+      "author": "Jonas Kamsker <11245306+JKamsker@users.noreply.github.com>",
+      "original_patch_id": "6f7dcbdc626f2fcbcdf6da9221776170946e317c",
+      "integrated_patch_id": "6f7dcbdc626f2fcbcdf6da9221776170946e317c",
+      "patch_id_match": true,
+      "integrated_ancestor_of_candidate": true
+    },
+    {
+      "original": "68328ef49a21e5bc10be49ee548af7cca89479fe",
+      "integrated": "86b4eff2d83f6498392b58686451f1d4928d4fe0",
+      "patch_identical": true,
+      "author": "Jonas Kamsker <11245306+JKamsker@users.noreply.github.com>",
+      "original_patch_id": "6f90f3e7123eca78437f7a4aba6c7f4abb86772f",
+      "integrated_patch_id": "6f90f3e7123eca78437f7a4aba6c7f4abb86772f",
+      "patch_id_match": true,
+      "integrated_ancestor_of_candidate": true
+    },
+    {
+      "original": "ff8b09b81ce203793fa7cf3fed72567a36ce7636",
+      "integrated": "2234366265fcdbd804026aa2903f9eac779459c2",
+      "patch_identical": true,
+      "author": "Jonas Kamsker <11245306+JKamsker@users.noreply.github.com>",
+      "original_patch_id": "302b95e48902710a01408086785a72200fde4b62",
+      "integrated_patch_id": "302b95e48902710a01408086785a72200fde4b62",
+      "patch_id_match": true,
+      "integrated_ancestor_of_candidate": true
+    },
+    {
+      "original": "a34140fb7d441fdcabde0cc20099ee2fa8b46fa0",
+      "integrated": "83413c3291dbcc4503f97b7448c4c40b5a7758e4",
+      "patch_identical": true,
+      "author": "Jonas Kamsker <11245306+JKamsker@users.noreply.github.com>",
+      "original_patch_id": "2329908a73c31f552c3ab4e13cbdcc7e239e5053",
+      "integrated_patch_id": "2329908a73c31f552c3ab4e13cbdcc7e239e5053",
+      "patch_id_match": true,
+      "integrated_ancestor_of_candidate": true
+    },
+    {
+      "original": "811656c38b1855f2add75d35446d1054bbf8cf2e",
+      "integrated": "f0d35dad2fb625145c98656827a4ec0cf14d43ba",
+      "original_patch_id": "172dcd3904672013c2b026efe9340f7d5556a3b0",
+      "integrated_patch_id": "172dcd3904672013c2b026efe9340f7d5556a3b0",
+      "patch_id_match": true,
+      "integrated_ancestor_of_candidate": true
+    },
+    {
+      "original": "1ba66a9af92df892f4e71e5ba3d5fce73cde2e2e",
+      "integrated": "86b03adff4c15fec5251f797d42ea392bb77b5b2",
+      "original_patch_id": "0e982deb5d67a131847dd46704f8c64c403d4dc8",
+      "integrated_patch_id": "0e982deb5d67a131847dd46704f8c64c403d4dc8",
+      "patch_id_match": true,
+      "integrated_ancestor_of_candidate": true
+    },
+    {
+      "original": "afb7ef44b7c3dd0b8db5780d2f8eb0f0f57f9a38",
+      "integrated": "0766b38e5db43348f8870569ab3c11db9b8571d9",
+      "original_patch_id": "295e71bb0d46f77deee329916eb6b30f33125124",
+      "integrated_patch_id": "295e71bb0d46f77deee329916eb6b30f33125124",
+      "patch_id_match": true,
+      "integrated_ancestor_of_candidate": true
+    },
+    {
+      "original": "dbc331c0745667d87ca98283a33189e802503871",
+      "integrated": "5a55ab071ed63ec2dd050cd053486413c1eefd4b",
+      "original_patch_id": "6b217fb97d821cbf886a60b75f4e96282708bc01",
+      "integrated_patch_id": "6b217fb97d821cbf886a60b75f4e96282708bc01",
+      "patch_id_match": true,
+      "integrated_ancestor_of_candidate": true
+    },
+    {
+      "original": "8934e471b6a2191a5e961c5215cb307e51b366ea",
+      "integrated": "3c4899c4f4d180795391a91e3a38bf200662861c",
+      "original_patch_id": "e6fcc3f17aafaec1be27a934052ab78d3743b640",
+      "integrated_patch_id": "e6fcc3f17aafaec1be27a934052ab78d3743b640",
+      "patch_id_match": true,
+      "integrated_ancestor_of_candidate": true
+    },
+    {
+      "original": "3fd9f5eebee599e75e30ee58a83d2a5abc4e2aa5",
+      "integrated": "b77dd88a773691d342cccbf03e415cbe89a50716",
+      "original_patch_id": "62fc4d5c84fd2d2ccfe030c4939e69bae4dcd990",
+      "integrated_patch_id": "62fc4d5c84fd2d2ccfe030c4939e69bae4dcd990",
+      "patch_id_match": true,
+      "integrated_ancestor_of_candidate": true
+    },
+    {
+      "original": "4ca95881a59bc63979315e323ea33b343bbccca5",
+      "integrated": "b5cefa4cfc59265f6075b00f03652812c157e556",
+      "original_patch_id": "2a6d2b8de9e0345f00af6ff3647f63b3fcc919bf",
+      "integrated_patch_id": "2a6d2b8de9e0345f00af6ff3647f63b3fcc919bf",
+      "patch_id_match": true,
+      "integrated_ancestor_of_candidate": true
+    },
+    {
+      "original": "38db38560db33b8eb5d6048be8a36668175ee50b",
+      "integrated": "ea89845f6e0c284bc4a5c439993d29c9545d5d37",
+      "original_patch_id": "f0ada0cd221ca521a7f286df4814933439210a50",
+      "integrated_patch_id": "f0ada0cd221ca521a7f286df4814933439210a50",
+      "patch_id_match": true,
+      "integrated_ancestor_of_candidate": true
+    },
+    {
+      "original": "0a6e248d27d33dd60cacba95f275b53ff6c362bf",
+      "integrated": "f7400d3ab81734fa52c8c5c0fbebcece3d25349b",
+      "original_patch_id": "b1e4ee8e9b119dad136d24436d49485eab68335b",
+      "integrated_patch_id": "b1e4ee8e9b119dad136d24436d49485eab68335b",
+      "patch_id_match": true,
+      "integrated_ancestor_of_candidate": true
+    },
+    {
+      "original": "f558d25c4d0ecb4e28918981a50926e800ff96e9",
+      "integrated": "1db22508afe6cfde17acf9888ece2840337d2f44",
+      "original_patch_id": "35a299643fa52795daa291c558cab7f96bc7f64e",
+      "integrated_patch_id": "c4d695b185674cce2283f2e1710099f1ed5781f3",
+      "patch_id_match": false,
+      "integrated_ancestor_of_candidate": true,
+      "resolution": "wrap.rs expect removal was already applied by the integration compile repair; all other hunks applied. wrap.rs matches accepted f558 exactly at integration commit."
+    },
+    {
+      "original": "2383f57f8396c2cc4fe99c9162829ed3ff289d3b",
+      "integrated": "a8291d94e2a1d6fbefa86c09894b8453db60c1e4",
+      "original_patch_id": "d2053a3a7e274d2db6c2b83d523bd86f1a311646",
+      "integrated_patch_id": "d2053a3a7e274d2db6c2b83d523bd86f1a311646",
+      "patch_id_match": true,
+      "integrated_ancestor_of_candidate": true
+    },
+    {
+      "original": "46a4cae9935c978cc317d9b93a24f9d1ef448489",
+      "integrated": "dcdeeba71ab804c0132bcfb491dc40c91a0ad7fb",
+      "original_patch_id": "ef0cb5298468776fe9c5d8e16dc9e4d530ee66b1",
+      "integrated_patch_id": "ef0cb5298468776fe9c5d8e16dc9e4d530ee66b1",
+      "patch_id_match": true,
+      "integrated_ancestor_of_candidate": true
+    },
+    {
+      "original": "3d9fd654eb653846b21cf7847db1f1eba744937c",
+      "integrated": "90e05f40c483c02bcad7482afcea539f8508ea05",
+      "resolution": "Accepted entire repository_tools subtree from final repair, which already includes ownership38; add/add conflicts resolved without duplicating ownership. Subtree verified byte-identical.",
+      "original_patch_id": "dfc779b09f92b8d795ceca2c86a9da744f33b9d5",
+      "integrated_patch_id": "717928faf3386ae65918286a54a705e3fe41526d",
+      "patch_id_match": false,
+      "integrated_ancestor_of_candidate": true
+    },
+    {
+      "original": "b40e2b1ba80cbf1545423565714ef528b5e1005a",
+      "integrated": "585c1352ff79565567890df806cb779b2f1dfe7c",
+      "original_patch_id": "7e220388a0c1c364e332d8cc0c2acb8048839b64",
+      "integrated_patch_id": "7e220388a0c1c364e332d8cc0c2acb8048839b64",
+      "patch_id_match": true,
+      "integrated_ancestor_of_candidate": true
+    },
+    {
+      "original": "c3141edde0f1cac78947dfa8494d095f299e9c2b",
+      "integrated": "dd6c88f86e5aa2d4d19bf2c0dc64dc7e0aed0853",
+      "resolution": "Clean cherry-pick after46; parent90e already contains46; retained integration lint corrections.",
+      "original_patch_id": "3586c370a7297a4171743de7b0ac8b5c56c98e5d",
+      "integrated_patch_id": "3586c370a7297a4171743de7b0ac8b5c56c98e5d",
+      "patch_id_match": true,
+      "integrated_ancestor_of_candidate": true
+    }
+  ]
+}

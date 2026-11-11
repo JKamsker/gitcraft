@@ -1,0 +1,10 @@
+{
+  "source_head": "d91a92251711278bd0e275c840e46a2c474a9f75",
+  "source_tree": "8badb88fdec2ed3761a3c0101c69b018f2a7a319",
+  "delivery_scope": "docs/validation/issue-198-assembly",
+  "documentation_only": true,
+  "proof": "Remove only docs/validation/issue-198-assembly additions from final delivery tree; exact tree equals source_tree. Verified in external final gate evidence.",
+  "prior_application_checks_rebound": false,
+  "new_application_test_execution": false,
+  "final_candidate_gates": "Fresh final-commit checks are recorded outside the repository in /tmp/gitcraft-validation-p2-final; do not treat historical accepted-* or source-proof gates as new execution."
+}

@@ -1,0 +1,270 @@
+{
+  "sha": "29d9695def41ccb2524b632bdfa334fb33470c92",
+  "commits": [
+    {
+      "sha": "e0e207b8b7ddce84cd5731f064ec4a1b85301625",
+      "author": "Jonas Kamsker",
+      "email": "11245306+JKamsker@users.noreply.github.com",
+      "subject": "Extract localized manual outline into embedded documentation resource"
+    },
+    {
+      "sha": "401e7e6c91eab5a0e9cf42bf9a91bd168dd80d13",
+      "author": "Jonas Kamsker",
+      "email": "11245306+JKamsker@users.noreply.github.com",
+      "subject": "Remove denied expect and unwrap calls from manual outline"
+    },
+    {
+      "sha": "7c28f641b4b23f7b50cbd62be8bf1a0290dc8041",
+      "author": "Jonas Kamsker",
+      "email": "11245306+JKamsker@users.noreply.github.com",
+      "subject": "Preserve checkout path bytes when discovering Rust checker root"
+    },
+    {
+      "sha": "c26bf23f8a0eb89f6e4fb003c5c8ff5ca4bbb5be",
+      "author": "Jonas Kamsker",
+      "email": "11245306+JKamsker@users.noreply.github.com",
+      "subject": "refactor(standalone): separate save ownership and native fixtures"
+    },
+    {
+      "sha": "cc85d26e65c27bc2b03581feed5590a431af5383",
+      "author": "Jonas Kamsker",
+      "email": "11245306+JKamsker@users.noreply.github.com",
+      "subject": "refactor(insights): separate analysis, reads, and CI test fixtures"
+    },
+    {
+      "sha": "891d4f2bec1d4bf8004504bff778ab5e31e7a5af",
+      "author": "Jonas Kamsker",
+      "email": "11245306+JKamsker@users.noreply.github.com",
+      "subject": "refactor(repo): separate insight and workflow presentation responsibilities"
+    },
+    {
+      "sha": "d528caedbc14e0bae031423757a4a52772d8bb1d",
+      "author": "Jonas Kamsker",
+      "email": "11245306+JKamsker@users.noreply.github.com",
+      "subject": "refactor(settings): compose page owners and scoped preview modules"
+    },
+    {
+      "sha": "829977fe894c4d7fca80ceb0054284cb036c427b",
+      "author": "Jonas Kamsker",
+      "email": "11245306+JKamsker@users.noreply.github.com",
+      "subject": "refactor(repo): decompose repository tools and auxiliary feature modules"
+    },
+    {
+      "sha": "0c6efb6349bfb06fd920e948b2080ce800f2e283",
+      "author": "Jonas Kamsker",
+      "email": "11245306+JKamsker@users.noreply.github.com",
+      "subject": "refactor(repo): decompose graph and file presentation hotspots"
+    },
+    {
+      "sha": "86b4eff2d83f6498392b58686451f1d4928d4fe0",
+      "author": "Jonas Kamsker",
+      "email": "11245306+JKamsker@users.noreply.github.com",
+      "subject": "refactor(push-preflight): separate preview stages and repair capabilities"
+    },
+    {
+      "sha": "2234366265fcdbd804026aa2903f9eac779459c2",
+      "author": "Jonas Kamsker",
+      "email": "11245306+JKamsker@users.noreply.github.com",
+      "subject": "refactor(repo): decompose operation feature modules within Rust size cap"
+    },
+    {
+      "sha": "83413c3291dbcc4503f97b7448c4c40b5a7758e4",
+      "author": "Jonas Kamsker",
+      "email": "11245306+JKamsker@users.noreply.github.com",
+      "subject": "refactor(remote,forge): decompose protocol and provider responsibilities"
+    },
+    {
+      "sha": "73ac3ad586cd6e9e780a3cc37a9dec2bc803d5b1",
+      "author": "Jonas Kamsker",
+      "email": "11245306+JKamsker@users.noreply.github.com",
+      "subject": "Fix imports and test visibility after slice extraction"
+    },
+    {
+      "sha": "0d938bf6b6568cde722e0f8d5937ee7ed4d70719",
+      "author": "Jonas Kamsker",
+      "email": "11245306+JKamsker@users.noreply.github.com",
+      "subject": "Restore extracted fixture lint policy and remove redundant borrows"
+    },
+    {
+      "sha": "f0d35dad2fb625145c98656827a4ec0cf14d43ba",
+      "author": "Jonas Kamsker",
+      "email": "11245306+JKamsker@users.noreply.github.com",
+      "subject": "refactor(repo): decompose workflow UI, plans and regression suites"
+    },
+    {
+      "sha": "86b03adff4c15fec5251f797d42ea392bb77b5b2",
+      "author": "Jonas Kamsker",
+      "email": "11245306+JKamsker@users.noreply.github.com",
+      "subject": "refactor(review): decompose workflow evidence and paint contract owners"
+    },
+    {
+      "sha": "0766b38e5db43348f8870569ab3c11db9b8571d9",
+      "author": "Jonas Kamsker",
+      "email": "11245306+JKamsker@users.noreply.github.com",
+      "subject": "refactor(app): compose shell owners and keep Rust sources under 500 lines"
+    },
+    {
+      "sha": "5a55ab071ed63ec2dd050cd053486413c1eefd4b",
+      "author": "Jonas Kamsker",
+      "email": "11245306+JKamsker@users.noreply.github.com",
+      "subject": "refactor(diff): separate presentation and format owners under source cap"
+    },
+    {
+      "sha": "3c4899c4f4d180795391a91e3a38bf200662861c",
+      "author": "Jonas Kamsker",
+      "email": "11245306+JKamsker@users.noreply.github.com",
+      "subject": "refactor: decompose assigned feature modules below Rust source cap"
+    },
+    {
+      "sha": "b77dd88a773691d342cccbf03e415cbe89a50716",
+      "author": "Jonas Kamsker",
+      "email": "11245306+JKamsker@users.noreply.github.com",
+      "subject": "refactor(git): decompose oversized modules and share global option grammar"
+    },
+    {
+      "sha": "dbe7b8954ad1532b351b397903842e4df08119bb",
+      "author": "Jonas Kamsker",
+      "email": "11245306+JKamsker@users.noreply.github.com",
+      "subject": "Fix sibling visibility and fixture construction across integrated slices"
+    },
+    {
+      "sha": "0498aeeed56b6b85d17d522c9fcfa9394344a2a8",
+      "author": "Jonas Kamsker",
+      "email": "11245306+JKamsker@users.noreply.github.com",
+      "subject": "Repair extracted module access and scope compatibility imports"
+    },
+    {
+      "sha": "81bf294dbd1ca2778dbb01d8ded67e5326a18499",
+      "author": "Jonas Kamsker",
+      "email": "11245306+JKamsker@users.noreply.github.com",
+      "subject": "Finish test import compatibility after full-target compilation"
+    },
+    {
+      "sha": "b5cefa4cfc59265f6075b00f03652812c157e556",
+      "author": "Jonas Kamsker",
+      "email": "11245306+JKamsker@users.noreply.github.com",
+      "subject": "Refactor repository integration into typed plans and private feature ownership"
+    },
+    {
+      "sha": "ea89845f6e0c284bc4a5c439993d29c9545d5d37",
+      "author": "Jonas Kamsker",
+      "email": "11245306+JKamsker@users.noreply.github.com",
+      "subject": "refactor(repo-tools): own request transitions and scoped settlement"
+    },
+    {
+      "sha": "f7400d3ab81734fa52c8c5c0fbebcece3d25349b",
+      "author": "Jonas Kamsker",
+      "email": "11245306+JKamsker@users.noreply.github.com",
+      "subject": "refactor(issue-work): own planning over explicit immutable inputs"
+    },
+    {
+      "sha": "1db22508afe6cfde17acf9888ece2840337d2f44",
+      "author": "Jonas Kamsker",
+      "email": "11245306+JKamsker@users.noreply.github.com",
+      "subject": "fix(diff): coordinate fold invalidation and wrapped keyboard targets"
+    },
+    {
+      "sha": "a8291d94e2a1d6fbefa86c09894b8453db60c1e4",
+      "author": "Jonas Kamsker",
+      "email": "11245306+JKamsker@users.noreply.github.com",
+      "subject": "fix(git): preserve command context in route snapshots"
+    },
+    {
+      "sha": "fd718d56708fc2244abfa3e2d30147abece887ff",
+      "author": "Jonas Kamsker",
+      "email": "11245306+JKamsker@users.noreply.github.com",
+      "subject": "Validate compiled test migrations and repair extraction attributes"
+    },
+    {
+      "sha": "a9ab98bd8b6bd4c83ae6487dbf95daa4bf7a5ef3",
+      "author": "Jonas Kamsker",
+      "email": "11245306+JKamsker@users.noreply.github.com",
+      "subject": "Repair central extraction visibility and test constants"
+    },
+    {
+      "sha": "dcdeeba71ab804c0132bcfb491dc40c91a0ad7fb",
+      "author": "Jonas Kamsker",
+      "email": "11245306+JKamsker@users.noreply.github.com",
+      "subject": "Repair resolver recovery durability, restart guards and archive discovery"
+    },
+    {
+      "sha": "90e05f40c483c02bcad7482afcea539f8508ea05",
+      "author": "Jonas Kamsker",
+      "email": "11245306+JKamsker@users.noreply.github.com",
+      "subject": "fix(repo-tools): invalidate scoped preparations monotonically"
+    },
+    {
+      "sha": "72f1c297918c306b9e6693943ea8120bf4e068b4",
+      "author": "Jonas Kamsker",
+      "email": "11245306+JKamsker@users.noreply.github.com",
+      "subject": "Repair recovery extraction imports and recording cfg registration"
+    },
+    {
+      "sha": "28c10e6cc19aa633e029085d41d82653565d793e",
+      "author": "Jonas Kamsker",
+      "email": "11245306+JKamsker@users.noreply.github.com",
+      "subject": "Retire feature read lifetimes on repository context transitions"
+    },
+    {
+      "sha": "47c03c18801bf113bc4cbf81249e52922a7be6a1",
+      "author": "Jonas Kamsker",
+      "email": "11245306+JKamsker@users.noreply.github.com",
+      "subject": "Finish extraction lint fixes and fail closed on request identity exhaustion"
+    },
+    {
+      "sha": "585c1352ff79565567890df806cb779b2f1dfe7c",
+      "author": "Jonas Kamsker",
+      "email": "11245306+JKamsker@users.noreply.github.com",
+      "subject": "fix(diff): bound keyboard lookahead and invalidate folded geometry"
+    },
+    {
+      "sha": "70808c2a5a17374d517caffc2d73d8cce723db5e",
+      "author": "Jonas Kamsker",
+      "email": "11245306+JKamsker@users.noreply.github.com",
+      "subject": "Cover context retirement and mutation delivery with recording-only fixture"
+    },
+    {
+      "sha": "1b31de0d6612f4ef5321aedba2d9f71b7b32c40e",
+      "author": "Jonas Kamsker",
+      "email": "11245306+JKamsker@users.noreply.github.com",
+      "subject": "Release row borrows before updating diff search state"
+    },
+    {
+      "sha": "f778a98abd61a5ac6f6f35c3ec6b1f44be7c2ef0",
+      "author": "Jonas Kamsker",
+      "email": "11245306+JKamsker@users.noreply.github.com",
+      "subject": "Resolve body lints without weakening fixture assertions or lifetime checks"
+    },
+    {
+      "sha": "99acbe0879cbf979d13c19ee55d44348d7294416",
+      "author": "Jonas Kamsker",
+      "email": "11245306+JKamsker@users.noreply.github.com",
+      "subject": "Fix start-plan fixture result propagation"
+    },
+    {
+      "sha": "dd6c88f86e5aa2d4d19bf2c0dc64dc7e0aed0853",
+      "author": "Jonas Kamsker",
+      "email": "11245306+JKamsker@users.noreply.github.com",
+      "subject": "Fix resolver recovery ownership, preflight and destination publication"
+    },
+    {
+      "sha": "949a39890ee9f2cad83983e9367c3b902e84c008",
+      "author": "Jonas Kamsker",
+      "email": "11245306+JKamsker@users.noreply.github.com",
+      "subject": "Keep recovery compatibility entry points and lock lifetime explicit"
+    },
+    {
+      "sha": "f4e8d45979974a0e944cd63cd40043ae33286959",
+      "author": "Jonas Kamsker",
+      "email": "11245306+JKamsker@users.noreply.github.com",
+      "subject": "Retire feature reads on credential handoff and worktree transitions"
+    },
+    {
+      "sha": "29d9695def41ccb2524b632bdfa334fb33470c92",
+      "author": "Jonas Kamsker",
+      "email": "11245306+JKamsker@users.noreply.github.com",
+      "subject": "Correct documented branch cleanup and forge selection test prefixes"
+    }
+  ],
+  "authors_verified": true
+}
