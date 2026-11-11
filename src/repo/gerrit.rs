@@ -408,6 +408,15 @@ mod integration_tests {
             web_warning: None,
         });
         tab.refs.head = "a".repeat(40);
+        tab.run_key(crate::keymap::Command::Push, &ctx);
+        assert!(matches!(
+            tab.dialog.take(),
+            Some(Dialog::GerritReview {
+                skip_hooks: false,
+                ..
+            })
+        ));
+        assert!(tab.busy_op.is_none());
         tab.sync(&ctx);
         assert!(matches!(
             tab.dialog,

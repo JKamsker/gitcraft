@@ -143,3 +143,22 @@ fn cancelling_ordinary_push_preparation_never_sends() -> Result<(), String> {
     assert_eq!(remote_main(&w), before);
     Ok(())
 }
+
+#[test]
+fn offline_push_settles_preparation_and_drops_queued_actions() -> Result<(), String> {
+    let w = world("direct-offline")?;
+    let before = remote_main(&w);
+    commit(&w.mine, "offline")?;
+    let ctx = egui::Context::default();
+    let mut tab = direct_tab(&w, &ctx)?;
+    let _offline = crate::network::test_pause::set(Some(crate::network::Pause::Switch));
+    tab.apply(crate::repo::Action::Push, &ctx);
+    tab.waiting.push_back(crate::repo::running::Waiter::Push);
+    settle(&mut tab, &ctx)?;
+    assert_eq!(remote_main(&w), before);
+    assert!(tab.running.is_none());
+    assert!(tab.waiting.is_empty());
+    assert!(!tab.can_cancel());
+    assert!(tab.taskbar_progress().is_none());
+    Ok(())
+}

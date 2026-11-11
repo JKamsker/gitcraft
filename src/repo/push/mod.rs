@@ -136,6 +136,10 @@ impl RepoTab {
         if self.echo_push_pending() {
             return;
         }
+        if let Some(dialog) = self.review_dialog() {
+            self.dialog = Some(dialog);
+            return;
+        }
         self.push_labelled("Push", None, ctx);
     }
 
@@ -271,7 +275,10 @@ impl RepoTab {
                     tab.busy_op = None;
                     match prepared {
                         Ok(steps) if !control.is_cancelled() => {
-                            tab.run_ops(&label, steps, Refresh::All, OpKind::plain(), ctx)
+                            tab.run_ops(&label, steps, Refresh::All, OpKind::plain(), ctx);
+                            if tab.busy_op.is_none() {
+                                tab.after_op(false, false, ctx);
+                            }
                         }
                         result => tab.op_done(
                             label,

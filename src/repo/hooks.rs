@@ -101,6 +101,13 @@ pub(super) fn push_menu(push: &Response, acts: &mut Vec<Action>) {
 impl RepoTab {
     /// Pushes the way Push does, without the `pre-push` hook this once.
     pub(super) fn push_skipping_hooks(&mut self, ctx: &egui::Context) {
+        if let Some(mut dialog) = self.review_dialog() {
+            if let super::Dialog::GerritReview { skip_hooks, .. } = &mut dialog {
+                *skip_hooks = true;
+            }
+            self.dialog = Some(dialog);
+            return;
+        }
         self.skip_hooks.push = true;
         self.push(ctx);
         // Push may not have run (no branch, no remote, busy): the next one runs the hook again.
