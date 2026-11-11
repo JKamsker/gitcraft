@@ -10,6 +10,7 @@ fn assert_retired(tab: &RepoTab) {
     assert!(!state.runs.loading && state.runs.value.is_none());
     assert!(!state.explorer.loading && state.explorer.value.is_none());
     assert!(state.run.is_none() && state.selected.is_none() && state.expanded.is_empty());
+    assert!(state.pinned.is_none() && state.workflow.is_none());
 }
 
 #[test]
@@ -22,6 +23,8 @@ fn context_switches_retire_both_ci_stages_and_reload_the_visible_page() {
             let (runs, explorer) = {
                 let state = &mut tab.insights.as_mut().unwrap().ci_path;
                 state.selected = Some(0);
+                state.pinned = Some(RunKey { run: 9, attempt: 3 });
+                state.workflow = Some(12);
                 state.expanded.insert(0);
                 let initial = state.explorer.start();
                 state.explorer.accept(initial, Ok(tests::explorer()));

@@ -74,7 +74,7 @@ pub fn recent(
     let mut runs = parse_github_runs(&gh_api(repo, project, &endpoint)?)?;
     let more = runs.len() >= LIMIT;
     runs.retain(|run| same_workflow(info, run) && (!same_sha || run.sha == info.sha));
-    runs.sort_by_key(|run| std::cmp::Reverse((run.created, run.id)));
+    runs.sort_by_key(|run| std::cmp::Reverse((run.number, run.created, run.id)));
     Ok((runs, more))
 }
 
@@ -158,9 +158,14 @@ fn collect(
             )),
         }
     }
-    history
-        .runs
-        .sort_by_key(|run| (run.info.created, run.info.id, run.info.attempt));
+    history.runs.sort_by_key(|run| {
+        (
+            run.info.number,
+            run.info.created,
+            run.info.id,
+            run.info.attempt,
+        )
+    });
     history
 }
 

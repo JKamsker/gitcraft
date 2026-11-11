@@ -10,6 +10,40 @@ fn info(id: u64, attempt: u64, created: i64) -> RunInfo {
 }
 
 #[test]
+fn previous_run_uses_workflow_sequence_when_timestamps_tie_and_unknown_order_stays_unknown()
+-> Result<(), String> {
+    let mut current = info(10, 2, 100);
+    current.number = 50;
+    let mut future = info(11, 1, 100);
+    future.number = 51;
+    let mut previous = info(9, 1, 100);
+    previous.number = 49;
+    assert!(!earlier(&future, &current));
+    assert!(earlier(&previous, &current));
+    assert_eq!(
+        baseline_key(
+            &current,
+            Baseline::Previous,
+            &[],
+            &[future, current.clone(), previous]
+        )?,
+        Some(RunKey { run: 9, attempt: 1 })
+    );
+    let unknown = RunInfo {
+        id: 8,
+        ..RunInfo::default()
+    };
+    assert!(!earlier(&unknown, &current));
+    let tied_unknown = info(7, 1, 100);
+    assert!(!earlier(&tied_unknown, &current));
+    assert_eq!(
+        baseline_key(&current, Baseline::Previous, &[], &[unknown, tied_unknown])?,
+        None
+    );
+    Ok(())
+}
+
+#[test]
 fn shortcuts_resolve_to_exact_run_attempts_and_keep_reruns_separate() -> Result<(), String> {
     let current = info(10, 3, 100);
     let green = vec![info(7, 2, 70)];

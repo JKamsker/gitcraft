@@ -75,11 +75,22 @@ fn key(job: &TimedJob, workflow: Option<&Workflow>) -> Option<(Key, Evidence)> {
         if shown.contains("${{") {
             bindings(shown, &job.name)?
         } else {
-            job.name
+            let suffix = job
+                .name
                 .strip_prefix(shown)?
                 .strip_prefix(" (")?
-                .strip_suffix(')')?
-                .to_owned()
+                .strip_suffix(')')?;
+            let values = suffix.split(", ").collect::<Vec<_>>();
+            if file.matrix_axes.is_empty() || file.matrix_axes.len() != values.len() {
+                return None;
+            }
+            let bindings: BTreeMap<_, _> = file
+                .matrix_axes
+                .iter()
+                .zip(values)
+                .map(|(axis, value)| (format!("matrix.{axis}"), value))
+                .collect();
+            format!("{bindings:?}")
         }
     } else if file.calls {
         // The called job is part of identity; the caller alone is insufficient.
@@ -197,5 +208,7 @@ pub fn steps(now: &[TimedStep], before: &[TimedStep]) -> Vec<Pair> {
     pairs
 }
 
+#[cfg(test)]
+mod matrix_tests;
 #[cfg(test)]
 mod tests;

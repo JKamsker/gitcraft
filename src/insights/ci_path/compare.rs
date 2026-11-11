@@ -28,6 +28,7 @@ fn took(started: Option<i64>, finished: Option<i64>) -> Option<i64> {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct StepDelta {
     pub name: String,
+    pub index: Option<usize>,
     pub now: Option<i64>,
     pub before: Option<i64>,
     pub slower: bool,
@@ -142,6 +143,7 @@ fn steps(now: &[TimedStep], before: &[TimedStep]) -> Vec<StepDelta> {
             let took_now = n.and_then(|s| took(s.started, s.finished));
             let took_before = b.and_then(|s| took(s.started, s.finished));
             StepDelta {
+                index: pair.now,
                 name: n.or(b).map(|s| s.name.clone()).unwrap_or_default(),
                 now: took_now,
                 before: took_before,

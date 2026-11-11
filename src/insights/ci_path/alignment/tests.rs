@@ -25,6 +25,11 @@ fn workflow(name: &str, matrix: bool) -> Workflow {
             id: "test".into(),
             name: Some(name.into()),
             matrix,
+            matrix_axes: if matrix {
+                vec!["os".into()]
+            } else {
+                Vec::new()
+            },
             ..FileJob::default()
         }],
         ..Workflow::default()
