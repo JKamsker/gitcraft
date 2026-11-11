@@ -4,6 +4,7 @@
 use super::*;
 use crate::ci::timing::{RunInfo, TimedJob, TimedRun, TimedStep};
 use crate::insights::ci_path::{Compared, compare, critical_path, timing_deps};
+use crate::repo::insights::test_support::required;
 use crate::repo::insights::{InsightsAct, Kind};
 
 impl crate::repo::insights::context::namespace_tests::Fixture for State {
@@ -217,14 +218,14 @@ fn only_current_run_list_completion_changes_availability() {
         let mut tab = RepoTab::new_deferred("/nonexistent/ci-path-completions".into(), &ctx);
         tab.insights = Some(Box::new(super::super::InsightsView::new(Kind::CiPath)));
         let (old, current) = {
-            let state = &mut tab.insights.as_mut().unwrap().ci_path;
+            let state = &mut required(tab.insights.as_mut()).ci_path;
             state.selected = Some(7);
             state.expanded.insert(7);
             (state.runs.start(), state.runs.start())
         };
         // Old errors neither end a newer read nor hide its eventual success.
         tab.ci_path_runs(old, Err(error.into()), &ctx);
-        let state = &tab.insights.as_ref().unwrap().ci_path;
+        let state = &required(tab.insights.as_ref()).ci_path;
         assert!(state.runs.loading);
         assert!(state.runs.value.is_none());
         assert!(state.unavailable.is_none());
@@ -233,7 +234,7 @@ fn only_current_run_list_completion_changes_availability() {
 
         tab.ci_path_runs(current, Ok(Runs::default()), &ctx);
         tab.ci_path_runs(old, Err(error.into()), &ctx);
-        let state = &tab.insights.as_ref().unwrap().ci_path;
+        let state = &required(tab.insights.as_ref()).ci_path;
         assert!(!state.runs.loading);
         assert!(state.runs.ready().is_some());
         assert!(state.unavailable.is_none());
@@ -241,10 +242,10 @@ fn only_current_run_list_completion_changes_availability() {
         assert!(state.expanded.contains(&7));
 
         // The current tool error is authoritative; an old success cannot clear it.
-        let current = tab.insights.as_mut().unwrap().ci_path.runs.start();
+        let current = required(tab.insights.as_mut()).ci_path.runs.start();
         tab.ci_path_runs(current, Err(error.into()), &ctx);
         tab.ci_path_runs(old, Ok(Runs::default()), &ctx);
-        let state = &tab.insights.as_ref().unwrap().ci_path;
+        let state = &required(tab.insights.as_ref()).ci_path;
         assert!(!state.runs.loading);
         assert_eq!(state.runs.error(), Some(error));
         assert_eq!(
@@ -252,9 +253,9 @@ fn only_current_run_list_completion_changes_availability() {
             Some(error)
         );
 
-        let current = tab.insights.as_mut().unwrap().ci_path.runs.start();
+        let current = required(tab.insights.as_mut()).ci_path.runs.start();
         tab.ci_path_runs(current, Ok(Runs::default()), &ctx);
-        let state = &tab.insights.as_ref().unwrap().ci_path;
+        let state = &required(tab.insights.as_ref()).ci_path;
         assert!(state.unavailable.is_none());
         assert!(state.runs.ready().is_some());
     }

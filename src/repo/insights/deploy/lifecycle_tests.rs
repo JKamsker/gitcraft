@@ -1,8 +1,9 @@
 use super::*;
+use crate::repo::insights::test_support::required;
 use crate::repo::insights::{Kind, test_support as schedule};
 
 fn assert_retired(tab: &RepoTab) {
-    let view = tab.insights.as_ref().unwrap();
+    let view = required(tab.insights.as_ref());
     let state = &view.deploy;
     assert!(!view.loaded.contains(&Kind::Deploy));
     assert!(state.subject.is_none() && state.unavailable.is_none());
@@ -17,9 +18,9 @@ fn context_switches_retire_deployment_data_and_reload_the_visible_page() {
         for error in [false, true] {
             let ctx = egui::Context::default();
             let mut tab = schedule::tab(&ctx, Kind::Deploy);
-            let initial = tab.insights.as_mut().unwrap().deploy.flow.start();
+            let initial = required(tab.insights.as_mut()).deploy.flow.start();
             tab.deploy_read(initial, Ok(tests::flow()), &ctx);
-            let old = tab.insights.as_mut().unwrap().deploy.flow.start();
+            let old = required(tab.insights.as_mut()).deploy.flow.start();
             let result = if error {
                 Err("gh auth login".into())
             } else {
@@ -33,13 +34,13 @@ fn context_switches_retire_deployment_data_and_reload_the_visible_page() {
             old(&mut tab, &ctx);
             assert_retired(&tab);
             schedule::reload_from_frame(&mut tab, &ctx);
-            assert!(tab.insights.as_ref().unwrap().deploy.flow.loading);
-            let current = tab.insights.as_mut().unwrap().deploy.flow.start();
+            assert!(required(tab.insights.as_ref()).deploy.flow.loading);
+            let current = required(tab.insights.as_mut()).deploy.flow.start();
             let fresh = schedule::reply(&tab, &ctx, Ok(tests::flow()), move |tab, result, ctx| {
                 tab.deploy_read(current, result, ctx);
             });
             fresh(&mut tab, &ctx);
-            let state = &tab.insights.as_ref().unwrap().deploy;
+            let state = &required(tab.insights.as_ref()).deploy;
             assert!(state.flow.ready().is_some() && !state.flow.loading);
             assert!(state.picture.is_some());
         }
@@ -51,9 +52,9 @@ fn unavailable_deployment_subjects_retire_old_flow_and_picture() {
     for missing in ["commit", "forge", "project"] {
         let ctx = egui::Context::default();
         let mut tab = schedule::tab(&ctx, Kind::Deploy);
-        let initial = tab.insights.as_mut().unwrap().deploy.flow.start();
+        let initial = required(tab.insights.as_mut()).deploy.flow.start();
         tab.deploy_read(initial, Ok(tests::flow()), &ctx);
-        let old = tab.insights.as_mut().unwrap().deploy.flow.start();
+        let old = required(tab.insights.as_mut()).deploy.flow.start();
         match missing {
             "commit" => tab.refs.head.clear(),
             "forge" => tab.hosting = None,
@@ -62,7 +63,7 @@ fn unavailable_deployment_subjects_retire_old_flow_and_picture() {
         }
         crate::repo::messages::record_jobs(|| tab.deploy_load(&ctx));
         tab.deploy_read(old, Ok(tests::flow()), &ctx);
-        let state = &tab.insights.as_ref().unwrap().deploy;
+        let state = &required(tab.insights.as_ref()).deploy;
         assert!(state.unavailable.is_some());
         assert!(!state.flow.loading && state.flow.value.is_none());
         assert!(state.picture.is_none() && state.selected.is_none());
