@@ -1,0 +1,25 @@
+{
+  "ci_head": "0622a2ac1237311e29f6dcc94788b30f5b094bb4",
+  "run_id": 43109642223,
+  "job_id": 130822169435,
+  "artifacts": [
+    {
+      "path": "linux.log.gz",
+      "sha256": "0ec271de8b53870ac4b2f026d492597b576327eaac4d23c4936bbb0001c10017",
+      "gzip_sha256": "482681327a90b1ea9038c4d9f6bcd0e966fe7abad0063648f11c1fc8d2371794",
+      "bytes": 1077188
+    },
+    {
+      "path": "linux-job.json.gz",
+      "sha256": "60f1222b393226859e97543f341f6e683e826ab35578708922bbf6cfac48bceb",
+      "gzip_sha256": "7e2afcc629eae6ef5c70fc323c416ac0a981f07e798b9733e0142d29a91ea4d5",
+      "bytes": 3068
+    },
+    {
+      "path": "archive-ci-43109642223.py.gz",
+      "sha256": "248903831ed84e37680995ad6c13eece33902be602060c177208bf6807be3663",
+      "gzip_sha256": "26ddad90bada996e892951071e6a94b80702851181e8d9e529ec24e490c8f45b",
+      "bytes": 3901
+    }
+  ]
+}
