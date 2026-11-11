@@ -191,8 +191,7 @@ fn fetch_pull_and_push_from_the_keys() -> Result<(), String> {
     let mut tab = loaded(&dir, &ctx);
 
     press(&mut tab, &ctx, Command::Push);
-    assert!(git::resolve(&bare, &format!("refs/heads/{branch}")).is_err());
-    super::super::push_preflight::test_support::approve(&mut tab, &ctx)?;
+    assert!(tab.dialog.is_none(), "keyboard Push starts directly");
     wait(&mut tab, &ctx, |t| t.busy_op.is_none() && !t.loading);
     let pushed = run(Some(&bare), &["log", "-1", "--format=%s", &branch]);
 
