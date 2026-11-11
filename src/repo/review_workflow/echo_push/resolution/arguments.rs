@@ -40,6 +40,7 @@ impl PushArguments {
                     | "--follow-tags"
                     | "--no-follow-tags"
                     | "--recurse-submodules=no"
+                    | "--recurse-submodules=check"
                     | "--dry-run"
                     | "-n"
                     | "--force-with-lease" => {}
@@ -80,6 +81,19 @@ mod tests {
         let literal = parse(&["--", "--all", "--tags", "--delete"])?;
         assert!(!literal.all && !literal.tags && !literal.deleting);
         assert_eq!(literal.positional, ["--all", "--tags", "--delete"]);
+        Ok(())
+    }
+
+    #[test]
+    fn supported_submodule_modes_preserve_targets_and_option_boundaries() -> Result<(), String> {
+        for option in ["--recurse-submodules=no", "--recurse-submodules=check"] {
+            let args = parse(&[option, "origin", "HEAD:refs/heads/topic"])?;
+            assert_eq!(args.positional, ["origin", "HEAD:refs/heads/topic"]);
+            assert!(!args.all && !args.tags && !args.deleting);
+            let literal = parse(&["--", option, "HEAD:refs/heads/topic"])?;
+            assert_eq!(literal.positional, [option, "HEAD:refs/heads/topic"]);
+            assert!(!literal.all && !literal.tags && !literal.deleting);
+        }
         Ok(())
     }
 

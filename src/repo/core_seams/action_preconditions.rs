@@ -71,8 +71,8 @@ impl RepoTab {
             self.keyboard_clear_cursor();
         }
         // Fetch, Pull and Push asked for while something runs start once it is done.
-        if self.busy_op.is_some()
-            && let Some(waiter) = crate::repo::running::Waiter::of(&action, ctx)
+        if let Some(waiter) = crate::repo::running::Waiter::of(&action, ctx)
+            && (self.busy_op.is_some() || self.echo_push_pending())
         {
             self.wait_for_running(waiter);
             return None;
