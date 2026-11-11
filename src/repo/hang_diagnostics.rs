@@ -71,3 +71,28 @@ pub(crate) fn poll(tab: &mut super::RepoTab, ctx: &egui::Context) {
     ));
     tab.poll(ctx);
 }
+
+/// Test-thread breadcrumbs around synchronous poll work, without inspecting other threads.
+pub(crate) fn checkpoint(label: fmt::Arguments<'_>) {
+    if let Some(test) = TEST.with(Cell::get) {
+        eprintln!("[hang-stage {test}] reached {label}");
+    }
+}
+
+pub(super) fn message(msg: &super::messages::Msg) -> Option<Stage> {
+    use super::messages::Msg;
+    let label = match msg {
+        Msg::Loaded(_) => "Loaded",
+        Msg::Watcher(..) => "Watcher",
+        Msg::Then(_) => "Then",
+        Msg::Status(..) => "Status",
+        Msg::Submodules(..) => "Submodules",
+        Msg::Detail(..) => "Detail",
+        Msg::RefsCheck(_) => "RefsCheck",
+        _ => "other",
+    };
+    stage(format_args!(
+        "handle {label} {:?}",
+        std::mem::discriminant(msg)
+    ))
+}

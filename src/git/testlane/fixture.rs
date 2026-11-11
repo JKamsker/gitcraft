@@ -12,7 +12,9 @@ pub(crate) struct Repo {
 
 impl Drop for Repo {
     fn drop(&mut self) {
-        let _ = std::fs::remove_dir_all(&self.dir);
+        crate::repo::hang_diagnostics::run(format_args!("fixture remove directory"), || {
+            let _ = std::fs::remove_dir_all(&self.dir);
+        });
     }
 }
 
@@ -40,7 +42,9 @@ impl Repo {
     }
 
     pub(crate) fn git(&self, args: &[&str]) -> Result<String, String> {
-        git::run(Some(&self.dir), args)
+        crate::repo::hang_diagnostics::run(format_args!("fixture git {args:?}"), || {
+            git::run(Some(&self.dir), args)
+        })
     }
 
     /// Writes `files` (path, text; `None` removes it) and commits them as `message`: the
