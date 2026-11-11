@@ -6,10 +6,17 @@ import tempfile
 from pathlib import Path
 from unittest.mock import patch
 
-from architecture import history, mask, named_fields, report, source_metrics, sources_at
+from architecture import central_declaration, history, mask, named_fields, report, source_metrics, sources_at
 
 
 class MetricsTests(unittest.TestCase):
+    def test_central_declaration_fails_on_missing_or_ambiguous_owners(self):
+        paths = ("src/repo/mod.rs", "src/repo/tab_owner/model.rs")
+        with self.assertRaisesRegex(ValueError, "found 0"):
+            central_declaration([], "RepoTab", paths)
+        with self.assertRaisesRegex(ValueError, "found 2"):
+            central_declaration([{"name": "RepoTab", "path": p} for p in paths], "RepoTab", paths)
+
     def test_literals_comments_lifetimes_and_nested_blocks(self):
         source = '''
 // fn misleading() { if true {} }
@@ -135,6 +142,20 @@ enum Later {
             result = report("HEAD", 1)
         self.assertEqual(result["root_action_variants"], ["Select", "Reload"])
         self.assertEqual(result["summary"]["root_action_variants"], 2)
+
+        # PR #200 moved ownership out of mod.rs. Survey both layouts so old
+        # baselines remain reproducible and current candidates don't crash.
+        owner = repo / "tab_owner"
+        owner.mkdir()
+        (owner / "model.rs").write_text("pub struct RepoTab {\n    path: String,\n}\n")
+        (owner / "construction.rs").write_text(
+            "impl RepoTab { pub fn new_deferred() -> Self { Self { path: String::new() } } }\n")
+        (repo / "mod.rs").write_text("mod tab_owner;\n")
+        self.commit()
+        with patch("architecture.git", side_effect=self.git):
+            moved = report("HEAD", 1)
+        for key in ("repo_tab_fields", "constructor_lines", "dispatcher_lines", "root_action_variants"):
+            self.assertEqual(moved["summary"][key], result["summary"][key])
 
 
 if __name__ == "__main__":
