@@ -342,11 +342,11 @@ fn rejected_restore_and_drop_release_inherited_descriptors_before_listing() {
             drop_to_branch(&f.0, &p).unwrap_err()
         };
         assert!(!error.contains("is busy"), "{error}");
-        assert_eq!(inherited.count(), 1);
+        assert_eq!(inherited.count(), Ok(1));
         trace(None);
         assert_eq!(list(&f.0).unwrap(), vec![p]);
         assert!(
-            inherited.count() > 1,
+            matches!(inherited.count(), Ok(n) if n > 1),
             "duplicates remain open through listing"
         );
         f.proof();
