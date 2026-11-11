@@ -139,3 +139,5 @@ fn rejection(checked: Checked) -> Result<Box<Rejection>, String> {
 include!("tests/rejection_and_pull.rs");
 include!("tests/destination.rs");
 include!("tests/sync.rs");
+
+include!("tests/direct.rs");

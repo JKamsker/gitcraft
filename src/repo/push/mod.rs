@@ -120,6 +120,16 @@ pub(crate) struct PushFlow {
     then_push: Option<Chain>,
 }
 
+impl PushFlow {
+    /// Only the ordinary Push/Sync flow skips the optional history checklist.
+    /// Force attempts have a pinned commit and retain their explicit review.
+    pub(in crate::repo) fn ordinary_attempt(&self, label: &str) -> bool {
+        self.attempt
+            .as_ref()
+            .is_some_and(|a| a.label == label && a.commit.is_none())
+    }
+}
+
 impl RepoTab {
     /// The toolbar's Push: the checked-out branch, to where it goes.
     pub(super) fn push(&mut self, ctx: &egui::Context) {
@@ -128,10 +138,6 @@ impl RepoTab {
         }
         if let Some(dialog) = self.review_dialog() {
             self.dialog = Some(dialog);
-            return;
-        }
-        if !self.submodules.is_empty() {
-            self.repository_tools_act(super::repository_tools::Act::Dependencies, ctx);
             return;
         }
         self.push_labelled("Push", None, ctx);
@@ -191,8 +197,15 @@ impl RepoTab {
         }
     }
 
-    /// Whether `branch` tracks a remote branch that is still there.
+    /// Whether `branch` has an upstream, including one deleted on the remote.
     fn tracks(&self, branch: &str) -> bool {
+        self.refs
+            .local
+            .iter()
+            .any(|b| b.name == branch && !b.upstream.is_empty())
+    }
+
+    fn tracks_live(&self, branch: &str) -> bool {
         self.refs
             .local
             .iter()
@@ -235,7 +248,51 @@ impl RepoTab {
         let label = attempt.label.clone();
         self.push_flow.banner = None;
         self.push_flow.attempt = Some(attempt);
-        self.run_ops(&label, steps, Refresh::All, OpKind::plain(), ctx);
+        let steps = self.skip_hooks.push_steps(steps);
+        // Resolve the exact ordinary target before optional reviewer echo captures it.
+        // Preparation runs in the background, without a consent dialog or history scan.
+        self.busy_op = Some(label.clone());
+        let control = self.follow_op(&steps, false, ctx);
+        let path = self.path.clone();
+        spawn_or(
+            &self.tx,
+            ctx,
+            {
+                let label = label.clone();
+                move |error| {
+                    Msg::Then(Box::new(move |tab, ctx| {
+                        tab.busy_op = None;
+                        tab.op_done(label, Err(error), Refresh::All, OpKind::plain(), false, ctx);
+                    }))
+                }
+            },
+            move || {
+                let began = std::time::Instant::now();
+                let prepared = crate::push_preflight::prepare_ordinary_push(&path, &steps, &|| {
+                    !control.is_cancelled() && began.elapsed() < std::time::Duration::from_secs(120)
+                });
+                Msg::Then(Box::new(move |tab, ctx| {
+                    tab.busy_op = None;
+                    match prepared {
+                        Ok(steps) if !control.is_cancelled() => {
+                            tab.running = None;
+                            tab.run_ops(&label, steps, Refresh::All, OpKind::plain(), ctx);
+                            if tab.busy_op.is_none() {
+                                tab.after_op(false, false, ctx);
+                            }
+                        }
+                        result => tab.op_done(
+                            label,
+                            Err(result.err().unwrap_or_else(|| git::CANCELLED.into())),
+                            Refresh::All,
+                            OpKind::plain(),
+                            false,
+                            ctx,
+                        ),
+                    }
+                }))
+            },
+        );
     }
 
     /// Sync: pulls the checked-out branch the way the settings say, then pushes it. It stops
@@ -255,7 +312,7 @@ impl RepoTab {
             self.push_flow.banner = Some(Banner::Detached);
             return;
         };
-        if !self.tracks(&current) {
+        if !self.tracks_live(&current) {
             // Nothing to pull from: publishing is all there is to do.
             let done = format!("Sync: {current} published (it had nothing to pull)");
             self.push_labelled(SYNC_PUBLISH, Some(done), ctx);

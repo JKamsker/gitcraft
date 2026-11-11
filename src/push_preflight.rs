@@ -228,3 +228,48 @@ pub(crate) fn outbox_config_stamp(repo: &Path) -> Result<String, String> {
 }
 
 pub(crate) use fix::accept_rewrite;
+
+/// The direct Push flow retains route validation without scanning or repairing history.
+/// Git itself decides whether the ordinary update is a fast-forward.
+pub(crate) fn prepare_ordinary_push(
+    repo: &Path,
+    ops: &[Vec<String>],
+    active: &dyn Fn() -> bool,
+) -> Result<Vec<Vec<String>>, String> {
+    let mut prepared = Vec::new();
+    for op in ops {
+        if !has_push(std::slice::from_ref(op)) {
+            prepared.push(op.clone());
+            continue;
+        }
+        let route = routing::resolve(repo, std::slice::from_ref(op), active)?;
+        if route.force || route.deleting {
+            return Err("This push configuration rewrites or deletes remote history. Use an explicit force-with-lease or deletion action to review it; nothing was pushed.".into());
+        }
+        // Refuse unpublished child commits without starting unrelated child pushes.
+        let mut args = vec![
+            "push".into(),
+            "--porcelain".into(),
+            "--recurse-submodules=check".into(),
+        ];
+        if route.skip_hooks {
+            args.push("--no-verify".into());
+        }
+        if route.tracking {
+            args.push("--set-upstream".into());
+        }
+        args.extend(
+            route
+                .extras
+                .into_iter()
+                .filter(|arg| arg != "--recurse-submodules=check"),
+        );
+        args.extend([
+            "--".into(),
+            route.remote,
+            format!("{}:{}", route.source, route.destination),
+        ]);
+        prepared.push(args);
+    }
+    Ok(prepared)
+}

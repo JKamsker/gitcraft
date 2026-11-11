@@ -237,6 +237,16 @@ pub(in crate::git) fn run_watched_extra_recorded(
     } else {
         trace.as_ref().and_then(|t| t.failed_hook(args))
     };
+    if ended.code != Some(0)
+        && failed_hook
+            .as_ref()
+            .is_some_and(|hook| hook.name == "pre-push")
+    {
+        // Keep the same privacy boundary as reviewed pushes, including the activity
+        // and hook logs: arbitrary local hook output can contain credentials.
+        ended.stdout.clear();
+        ended.stderr = "Hook output withheld because it can contain credentials or secrets.".into();
+    }
     crate::git::doctor::hook_log::record(dir, args, ended.code == Some(0), ended.stderr.as_bytes());
     let recorded = Recorded::new(
         &words,
