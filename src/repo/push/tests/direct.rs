@@ -198,3 +198,17 @@ fn direct_push_checks_submodules_without_publishing_them() -> Result<(), String>
     assert_eq!(remote_main(&w), root_head);
     Ok(())
 }
+#[test]
+fn ordinary_push_does_not_follow_reachable_annotated_tags() -> Result<(), String> {
+    let w = world("direct-follow-tags")?;
+    let head = commit(&w.mine, "tagged branch")?;
+    run(&w.mine, &["tag", "-a", "private-tag", "-m", "not part of this push"])?;
+    run(&w.mine, &["config", "push.followTags", "true"])?;
+    let ctx = egui::Context::default();
+    let mut tab = direct_tab(&w, &ctx)?;
+    tab.apply(crate::repo::Action::Push, &ctx);
+    settle(&mut tab, &ctx)?;
+    assert_eq!(remote_main(&w), head);
+    assert!(git::resolve(&w.bare, "refs/tags/private-tag").is_err());
+    Ok(())
+}

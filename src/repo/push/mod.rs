@@ -277,7 +277,7 @@ impl RepoTab {
                         Ok(steps) if !control.is_cancelled() => {
                             tab.running = None;
                             tab.run_ops(&label, steps, Refresh::All, OpKind::plain(), ctx);
-                            if tab.busy_op.is_none() {
+                            if tab.busy_op.is_none() && !tab.echo_push_pending() {
                                 tab.after_op(false, false, ctx);
                             }
                         }

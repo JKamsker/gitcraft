@@ -230,22 +230,38 @@ pub(in crate::git) fn run_watched_extra_recorded(
         Ok(ended) => ended,
         Err(e) => return failed(e),
     };
-    let failed_hook = if target.is_some() && extra.trace_hooks {
+    let events = if target.is_some() && extra.trace_hooks {
         let (stderr, events) = crate::git::hooks::split_trace(ended.stderr.as_bytes());
         ended.stderr = String::from_utf8_lossy(&stderr).into_owned();
-        crate::git::hooks::failed_hook(&events, args)
+        Some(events)
     } else {
-        trace.as_ref().and_then(|t| t.failed_hook(args))
+        trace.as_ref().and_then(|t| t.events())
     };
-    if ended.code != Some(0)
-        && failed_hook
-            .as_ref()
-            .is_some_and(|hook| hook.name == "pre-push")
+    let failed_hook = events
+        .as_deref()
+        .and_then(|events| crate::git::hooks::failed_hook(events, args));
+    if crate::git::hooks::subcommand(args) == Some("push")
+        && crate::git::hooks::push_output_private(events.as_deref())
     {
-        // Keep the same privacy boundary as reviewed pushes, including the activity
-        // and hook logs: arbitrary local hook output can contain credentials.
+        // Sanitize before either log or the result sees output, even on success or
+        // without tracing. Keep only structured refusal/authentication diagnostics.
+        let refusal =
+            args.last()
+                .and_then(|spec| spec.split_once(':'))
+                .and_then(|(source, destination)| {
+                    super::reviewed_refusal(ended.stdout.as_bytes(), source, destination)
+                });
+        let authentication_failed = super::is_auth_error(&ended.stderr);
         ended.stdout.clear();
-        ended.stderr = "Hook output withheld because it can contain credentials or secrets.".into();
+        ended.stderr = if failed_hook.is_some() {
+            "Hook output withheld because it can contain credentials or secrets.".into()
+        } else if authentication_failed {
+            "Authentication failed. Hook output withheld because it can contain credentials or secrets.".into()
+        } else {
+            refusal.unwrap_or_else(|| {
+                "Hook output withheld because it can contain credentials or secrets.".into()
+            })
+        };
     }
     crate::git::doctor::hook_log::record(dir, args, ended.code == Some(0), ended.stderr.as_bytes());
     let recorded = Recorded::new(

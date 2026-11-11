@@ -145,7 +145,7 @@ pub(in crate::repo::review_workflow) fn show(
             ))
             .clicked()
         {
-            s.pending_push = None;
+            acts.push(Action::ReviewTools(ToolsAct::Echo(Act::CancelPush)));
         }
     }
 }

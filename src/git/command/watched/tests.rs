@@ -283,3 +283,46 @@ fn remote_stream_progress_cancel_and_partial_output_use_the_event_loop() -> Resu
     );
     Ok(())
 }
+#[cfg(unix)]
+#[test]
+fn successful_and_untraced_push_hooks_keep_both_logs_and_results_private() -> Result<(), String> {
+    use std::os::unix::fs::PermissionsExt;
+    let repo = crate::git::stack::test_repo::TestRepo::new("watched-hook-privacy")?;
+    let bare = repo.path().join("remote.git");
+    repo.git(&["init", "--bare", bare.to_str().ok_or("path")?])?;
+    repo.git(&["remote", "add", "origin", bare.to_str().ok_or("path")?])?;
+    let hook = repo.path().join(".git/hooks/pre-push");
+    let secret = "PRIVATE-HOOK-STDOUT-STDERR";
+    for (quiet, code) in [(false, 0), (true, 0), (true, 3), (false, 3)] {
+        std::fs::write(
+            &hook,
+            format!("#!/bin/sh\necho {secret}\necho {secret} >&2\nexit {code}\n"),
+        )
+        .map_err(|e| e.to_string())?;
+        std::fs::set_permissions(&hook, std::fs::Permissions::from_mode(0o755))
+            .map_err(|e| e.to_string())?;
+        let control = OpControl::new(|| {});
+        let (result, recorded) = run_watched_recorded(
+            Some(repo.path()),
+            &["push", "--porcelain", "origin", "HEAD:refs/heads/main"],
+            None,
+            quiet,
+            &control,
+        );
+        assert_eq!(result.is_ok(), code == 0, "{result:?}");
+        assert!(!format!("{result:?}").contains(secret));
+        assert!(!recorded.output.contains(secret));
+        assert!(
+            crate::git::doctor::hook_log::runs(repo.path())
+                .iter()
+                .all(|entry| !entry.output.contains(secret))
+        );
+        if code == 0 {
+            assert_eq!(
+                crate::git::resolve(&bare, "refs/heads/main")?,
+                repo.tip("HEAD")?
+            );
+        }
+    }
+    Ok(())
+}

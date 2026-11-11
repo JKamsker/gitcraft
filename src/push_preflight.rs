@@ -250,6 +250,7 @@ pub(crate) fn prepare_ordinary_push(
         let mut args = vec![
             "push".into(),
             "--porcelain".into(),
+            "--no-follow-tags".into(),
             "--recurse-submodules=check".into(),
         ];
         if route.skip_hooks {
