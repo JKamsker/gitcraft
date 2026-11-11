@@ -8,6 +8,8 @@ use std::time::Duration;
 
 // Includes preserve the externally selected Gate-2 test name.
 include!("owned_fixtures/fixture.rs");
+#[path = "owned_fixtures/transaction_outcomes.rs"]
+mod transaction_outcomes;
 include!("owned_fixtures/transaction_cases.rs");
 include!("owned_fixtures/tree_repairs.rs");
 include!("owned_fixtures/native_locking.rs");
