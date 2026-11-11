@@ -79,9 +79,7 @@ impl RepoTab {
         }
         self.select(row, ctx);
         if already_open {
-            let mut settings = crate::settings::Settings::get(ctx);
-            settings.show_detail = true;
-            settings.set(ctx);
+            crate::settings::Settings::set_show_detail(ctx, true);
         } else {
             self.reveal_selected_changes(hash, ctx);
         }
@@ -149,10 +147,8 @@ impl RepoTab {
     pub(super) fn reveal_selected_changes(&mut self, hash: String, ctx: &egui::Context) {
         self.commit_changes.history = Some(hash.clone());
         self.commit_changes.pending = Some(hash.clone());
-        let mut settings = crate::settings::Settings::get(ctx);
-        if !settings.show_detail {
-            settings.show_detail = true;
-            settings.set(ctx);
+        if !crate::settings::Settings::get(ctx).show_detail {
+            crate::settings::Settings::set_show_detail(ctx, true);
         }
         if self.detail.as_ref().is_some_and(|d| d.hash == hash) || self.detail_error.is_some() {
             self.finish_commit_changes(&hash, ctx);

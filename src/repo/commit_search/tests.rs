@@ -78,13 +78,19 @@ fn old_successes_and_errors_cannot_settle_a_repeated_query_or_navigate() -> Resu
             answer(&mut tab, &ctx, &current, Ok(vec!["fresh".into()]));
             assert!(!tab.search.running);
             assert_eq!(tab.search.results, ["fresh"]);
-            assert_eq!(tab.pending_goto.as_deref(), Some("fresh"));
+            assert_eq!(
+                tab.pending_goto.as_ref().map(|target| target.hash()),
+                Some("fresh")
+            );
             // Once consumed, even a duplicate current completion is stale.
             for request in [&old, &current] {
                 answer(&mut tab, &ctx, request, Err("late failure".into()));
                 assert_eq!(tab.search.results, ["fresh"]);
                 assert!(tab.search.problem.is_none());
-                assert_eq!(tab.pending_goto.as_deref(), Some("fresh"));
+                assert_eq!(
+                    tab.pending_goto.as_ref().map(|target| target.hash()),
+                    Some("fresh")
+                );
             }
         }
     }

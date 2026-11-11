@@ -273,6 +273,7 @@ impl RepoTab {
     /// Shows `view` again through the actions that open it.
     fn restore_navigation(&mut self, view: &View, ctx: &egui::Context) {
         self.tour = None;
+        self.commit_changes.stop();
         match view {
             View::Graph { selected } => {
                 self.close_pages(true, ctx);
@@ -290,13 +291,15 @@ impl RepoTab {
                     DiffKey::Work(file) => self.work_file(file).map_or(key.clone(), DiffKey::Work),
                     _ => key.clone(),
                 };
+                if self.diff.as_ref().is_none_or(|d| d.key != key) {
+                    self.apply(Action::OpenDiff(key), ctx);
+                }
+                // Replay the destination before starting its passive selection read:
+                // an explicit new opening retires older navigation requests.
                 if let Some(hash) = selected.as_deref()
                     && self.selected_hash().as_deref() != Some(hash)
                 {
                     self.reselect(hash, ctx);
-                }
-                if self.diff.as_ref().is_none_or(|d| d.key != key) {
-                    self.apply(Action::OpenDiff(key), ctx);
                 }
             }
             View::File { path, rev, tab } => {
@@ -351,12 +354,11 @@ impl RepoTab {
     /// from the graph, that is said.
     fn reselect(&mut self, hash: &str, ctx: &egui::Context) {
         if let Some(&row) = self.index.get(hash) {
-            self.apply(Action::Select(row), ctx);
-            self.scroll_to = Some(row);
+            self.restore_commit_selection(row, ctx);
         } else if hash == WIP_HASH {
             // The changes row goes once everything is committed: nothing to say.
         } else if self.history_index.contains_key(hash) || self.has_more {
-            self.goto(hash, ctx);
+            self.goto_target(super::navigate::PendingGoto::Restore(hash.to_owned()), ctx);
         } else {
             self.status = Some(crate::repo::Notice::plain((
                 crate::i18n::message(
@@ -366,6 +368,17 @@ impl RepoTab {
                 false,
             )));
         }
+    }
+
+    /// Restoring a place selects its commit without opening a new place. An explicit
+    /// diff remains that place even when its selected commit arrives on a later page.
+    pub(super) fn restore_commit_selection(&mut self, row: usize, ctx: &egui::Context) {
+        self.commit_changes.stop();
+        self.keyboard_clear_cursor();
+        let shown = self.diff.take();
+        self.select(row, ctx);
+        self.diff = shown;
+        self.scroll_to = Some(row);
     }
 
     /// Back / forward from the keys and the mouse's buttons, unless a dialog has them.
@@ -427,3 +440,6 @@ impl RepoTab {
 
 #[cfg(test)]
 mod tests;
+
+#[cfg(test)]
+mod restoration_tests;
