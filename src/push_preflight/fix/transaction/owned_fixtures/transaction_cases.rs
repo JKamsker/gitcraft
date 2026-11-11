@@ -91,50 +91,7 @@ fn execute_case(root: &Path, case: &str) -> Result<(), String> {
         Ok(hook) => hook,
         Err(error) => {
             if case == "files-sha1-diagnostic" {
-                // Repeat only the owned bare capability transaction, using the existing
-                // production bounded transport while retaining normally withheld stderr.
-                for entry in fs::read_dir(std::env::temp_dir()).map_err(|e| e.to_string())? {
-                    let directory = entry.map_err(|e| e.to_string())?.path();
-                    let probe = directory.join("capability.git");
-                    if !probe.is_dir() {
-                        continue;
-                    }
-                    let old = run(&probe, &["rev-parse", "HEAD"], b"", None)?;
-                    let objects = run(
-                        &probe,
-                        &[
-                            "cat-file",
-                            "--batch-all-objects",
-                            "--batch-check=%(objectname) %(objecttype)",
-                        ],
-                        b"",
-                        None,
-                    )?;
-                    let new = objects
-                        .lines()
-                        .filter_map(|line| line.strip_suffix(" commit"))
-                        .find(|oid| *oid != old)
-                        .ok_or("missing owned candidate commit")?;
-                    let hooks = format!("core.hooksPath={}", directory.display());
-                    let input = transaction(&old, new);
-                    let output = git::local_repair_input(
-                        &f.repo,
-                        &[
-                            "-C",
-                            &probe.to_string_lossy(),
-                            "-c",
-                            &hooks,
-                            "update-ref",
-                            "--stdin",
-                        ],
-                        input.as_bytes(),
-                        &[],
-                    )?;
-                    write(root.join("diagnostic-input"), &input)?;
-                    write(root.join("diagnostic.stdout"), &output.stdout)?;
-                    write(root.join("diagnostic.stderr"), &output.stderr)?;
-                    write(root.join("diagnostic-status"), output.status.to_string())?;
-                }
+                diagnose_capability(root, &f.repo)?;
             }
             write(root.join("case.json"),serde_json::to_vec_pretty(&json!({"case":case,"constructor_error":error,"before":before,"after":snapshot(&f.repo)?})).map_err(|error| error.to_string())?)?;
             return Err(format!(
@@ -208,120 +165,58 @@ fn execute_case(root: &Path, case: &str) -> Result<(), String> {
         "files-sha1" | "files-sha256" | "reftable-sha1" | "reftable-sha256"
     ) {
         result?;
-        assert_eq!(after["head"], f.new);
-        assert_eq!(after["symref"], "refs/heads/main");
-        assert_eq!(
-            fs::read(f.repo.join("file.txt")).map_err(|error| error.to_string())?,
-            b"after\n"
-        );
-        run(
-            &f.repo,
-            &["diff-index", "--cached", "--quiet", &f.new, "--"],
+        transaction_outcomes::success(&f, &after, &directory)?;
+    } else {
+        assert!(result.is_err(), "{case} unexpectedly succeeded");
+        transaction_outcomes::failure(&f, case, &directory, elapsed, &before, &after)?;
+    }
+    Ok(())
+}
+
+fn diagnose_capability(root: &Path, repo: &Path) -> Result<(), String> {
+    // Repeat only the owned bare capability transaction, using the existing
+    // production bounded transport while retaining normally withheld stderr.
+    for entry in fs::read_dir(std::env::temp_dir()).map_err(|e| e.to_string())? {
+        let directory = entry.map_err(|e| e.to_string())?.path();
+        let probe = directory.join("capability.git");
+        if !probe.is_dir() {
+            continue;
+        }
+        let old = run(&probe, &["rev-parse", "HEAD"], b"", None)?;
+        let objects = run(
+            &probe,
+            &[
+                "cat-file",
+                "--batch-all-objects",
+                "--batch-check=%(objectname) %(objecttype)",
+            ],
             b"",
             None,
         )?;
-        for phase in ["prepared", "checkout", "committed"] {
-            assert_eq!(
-                fs::read(root.join(format!("observed-{phase}.ok")))
-                    .map_err(|error| error.to_string())?,
-                format!("refs/heads/main\n{}\n{}\n", f.old, f.new).as_bytes()
-            );
-        }
-        let input = fs::read(root.join("original-input-prepared")).map_err(|e| e.to_string())?;
-        assert!(
-            input
-                .split_inclusive(|b| *b == b'\n')
-                .any(|line| line == format!("{} {} refs/heads/main\n", f.old, f.new).as_bytes())
-        );
-        assert_eq!(
-            fs::read(root.join("original-args-prepared")).map_err(|error| error.to_string())?,
-            b"prepared\0"
-        );
-        assert_eq!(
-            fs::read_to_string(root.join("original-config-prepared"))
-                .map_err(|error| error.to_string())?
-                .trim(),
-            f.root
-                .join("original hooks ' \\ path")
-                .to_str()
-                .ok_or("Owned fixture path is not UTF-8")?
-        );
-        assert!(!directory.exists());
-    } else {
-        assert!(result.is_err(), "{case} unexpectedly succeeded");
-        if case != "missing-ack" {
-            assert!(directory.exists());
-            assert!(directory.join("before.index").exists());
-            assert!(directory.join("recovery.txt").exists());
-        }
-        match case {
-            "index-change" => {
-                assert_eq!(after["head"], before["head"]);
-                assert_eq!(
-                    fs::read(f.repo.join(".git/index")).map_err(|error| error.to_string())?,
-                    fs::read(root.join("external.index")).map_err(|error| error.to_string())?
-                );
-                assert_eq!(after["work"], before["work"]);
-            }
-            "work-change" => {
-                assert_eq!(after["head"], before["head"]);
-                assert_eq!(after["index"], before["index"]);
-                assert_eq!(
-                    fs::read(f.repo.join("file.txt")).map_err(|error| error.to_string())?,
-                    b"external-work\n"
-                );
-            }
-            "committed-failure" => {
-                assert_eq!(after["head"], f.new);
-                assert_eq!(
-                    fs::read(f.repo.join("file.txt")).map_err(|error| error.to_string())?,
-                    b"external-after-commit\n"
-                );
-                assert!(directory.join("checkout.ok").is_file());
-            }
-            _ => assert_eq!(before, after, "{case} changed repository"),
-        }
-        if [
-            "veto",
-            "held-ref-lock",
-            "switch-head",
-            "detach-head",
-            "index-change",
-            "work-change",
-            "missing-ack",
-            "prelock-switch-head",
-            "prelock-detach-head",
-            "reftable-switch-head",
-            "reftable-detach-head",
-        ]
-        .contains(&case)
-        {
-            assert!(!directory.join("checkout-attempted").exists());
-        }
-        if [
-            "switch-head",
-            "detach-head",
-            "reftable-switch-head",
-            "reftable-detach-head",
-        ]
-        .contains(&case)
-        {
-            assert!(
-                fs::read_to_string(root.join("mutation.stderr"))
-                    .map_err(|error| error.to_string())?
-                    .contains(if case.starts_with("reftable") {
-                        "lock"
-                    } else {
-                        "HEAD.lock"
-                    })
-            );
-        }
-        if case.starts_with("prelock-") {
-            assert!(!root.join("original-input-prepared").exists());
-        }
-        if case == "timeout" {
-            assert!((14_000..25_000).contains(&elapsed));
-        }
+        let new = objects
+            .lines()
+            .filter_map(|line| line.strip_suffix(" commit"))
+            .find(|oid| *oid != old)
+            .ok_or("missing owned candidate commit")?;
+        let hooks = format!("core.hooksPath={}", directory.display());
+        let input = transaction(&old, new);
+        let output = git::local_repair_input(
+            repo,
+            &[
+                "-C",
+                &probe.to_string_lossy(),
+                "-c",
+                &hooks,
+                "update-ref",
+                "--stdin",
+            ],
+            input.as_bytes(),
+            &[],
+        )?;
+        write(root.join("diagnostic-input"), &input)?;
+        write(root.join("diagnostic.stdout"), &output.stdout)?;
+        write(root.join("diagnostic.stderr"), &output.stderr)?;
+        write(root.join("diagnostic-status"), output.status.to_string())?;
     }
     Ok(())
 }
