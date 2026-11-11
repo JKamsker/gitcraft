@@ -144,28 +144,29 @@ fn abrupt_effect_stops_restart_through_production_entrypoints() {
             let first = list(&f.0).unwrap();
             assert_eq!(list(&f.0).unwrap(), first);
             if let Some(p) = p.as_ref().or(first.first()) {
-                let restored = bring_back(&f.0, p);
-                if restored.is_ok() {
-                    assert_eq!(std::fs::read(f.0.join("file")).unwrap(), b"\xffraw\0\r\n");
-                    assert_eq!(
-                        std::fs::read(f.0.join(".git/index")).unwrap(),
-                        b"DIRC-original"
-                    );
-                    assert_eq!(
-                        std::fs::read(f.0.join(".git/MERGE_HEAD")).unwrap(),
-                        b"theirs\r\n"
-                    );
-                } else {
-                    // Interrupted Git/index-lock publication requires explicit recovery;
-                    // do not silently ignore restart failure or remove an unowned lock.
-                    let e = restored.unwrap_err();
-                    assert!(
-                        e.contains("Interrupted recovery")
-                            || e.contains("progress")
-                            || e.contains("locked")
-                            || e.contains("Commit or stash"),
-                        "{action}:{stop}: {e}"
-                    );
+                match bring_back(&f.0, p) {
+                    Ok(()) => {
+                        assert_eq!(std::fs::read(f.0.join("file")).unwrap(), b"\xffraw\0\r\n");
+                        assert_eq!(
+                            std::fs::read(f.0.join(".git/index")).unwrap(),
+                            b"DIRC-original"
+                        );
+                        assert_eq!(
+                            std::fs::read(f.0.join(".git/MERGE_HEAD")).unwrap(),
+                            b"theirs\r\n"
+                        );
+                    }
+                    Err(e) => {
+                        // Interrupted Git/index-lock publication requires explicit recovery;
+                        // do not silently ignore restart failure or remove an unowned lock.
+                        assert!(
+                            e.contains("Interrupted recovery")
+                                || e.contains("progress")
+                                || e.contains("locked")
+                                || e.contains("Commit or stash"),
+                            "{action}:{stop}: {e}"
+                        );
+                    }
                 }
                 drop_to_branch(&f.0, p).unwrap();
                 refs_clean(&f, p);
