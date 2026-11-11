@@ -13,6 +13,9 @@ ROOT = Path(__file__).resolve().parents[1]
 GATE = "rust-file-size"
 SHARED = "./.github/workflows/rust-file-size.yml"
 IDENTIFIER = r"[A-Za-z_][A-Za-z0-9_-]*"
+COMPLEXITY_CHECK = "python3 ci/complexity_policy.py --revision HEAD"
+COMPILER_CHECK = "python3 -m unittest discover -s ci -p 'test_complexity*.py' -v"
+CLIPPY_CHECK = "cargo clippy --locked --all-targets -- -D warnings"
 
 
 def require(condition, message):
@@ -68,6 +71,40 @@ def dependencies(fields):
     return set(names)
 
 
+def job_steps(text, job):
+    top = mapping(text, 0)
+    jobs = nested(top, "jobs", 2)
+    require(job in jobs, f"missing required job: {job}")
+    fields = mapping(jobs[job][1], 4)
+    require(not ({"if", "continue-on-error", "defaults"} & fields.keys()),
+            f"required job {job} can skip, soften, or retarget checks")
+    require("defaults" not in top, "workflow defaults can retarget required checks")
+    require("steps" in fields and not fields["steps"][0], f"missing steps for {job}")
+    blocks = re.split(r"(?m)^      - ", fields["steps"][1])
+    require(not any(line.strip() and not line.lstrip().startswith("#")
+                    for line in blocks[0].splitlines()), "unsupported steps layout")
+    steps = [mapping("        " + block, 8) for block in blocks[1:]]
+    checkouts = [step for step in steps if step.get("uses", ("",))[0] == "actions/checkout@v4"]
+    require(bool(checkouts), f"required job {job} must check out the candidate")
+    for step in checkouts:
+        if "with" in step:
+            options = nested(step, "with", 10)
+            require(not ({"repository", "ref", "path"} & options.keys()),
+                    "checkout can retarget required checks")
+    return steps
+
+
+def verify_required_commands(text, job, commands):
+    steps = job_steps(text, job)
+    for command in commands:
+        matches = [step for step in steps if step.get("run", (None,))[0] == command]
+        require(len(matches) == 1, f"required exact command missing or duplicated: {command}")
+        step = matches[0]
+        require(not ({"if", "continue-on-error", "working-directory", "shell", "env"} & step.keys()),
+                f"required command can skip, soften, or retarget checks: {command}")
+        require(not step["run"][1].strip(), f"required command has trailing content: {command}")
+
+
 def verify_shared_gate(text):
     top = mapping(text, 0)
     require(set(nested(top, "on", 2)) == {"workflow_call"}, "shared gate must be reusable without filters")
@@ -78,6 +115,7 @@ def verify_shared_gate(text):
     require(not re.search(rf"^\s*(?:- )?{forbidden}:", text, re.M), "shared gate can skip, soften, or retarget checks")
     command = r"^\s+(?:- )?run: python3 ci/rust_file_size\.py --revision HEAD\s*$"
     require(re.search(command, text, re.M), "shared gate must check the complete immutable candidate")
+    verify_required_commands(text, "check", (COMPLEXITY_CHECK, COMPILER_CHECK))
 
 
 def verify_callers(text):
@@ -124,6 +162,9 @@ class WorkflowGateTests(unittest.TestCase):
         cls.shared = (workflows / "rust-file-size.yml").read_text(encoding="utf-8")
         cls.callers = {name: (workflows / name).read_text(encoding="utf-8")
                        for name in ("ci.yml", "release.yml")}
+        cls.clippy = [(name, (workflows / name).read_text(encoding="utf-8"), job)
+                      for name, job in (("ci.yml", "lint"), ("release.yml", "build"),
+                                        ("windows-tests.yml", "windows-build"))]
 
     def test_shared_gate_checks_the_full_immutable_candidate(self):
         verify_shared_gate(self.shared)
@@ -132,6 +173,51 @@ class WorkflowGateTests(unittest.TestCase):
         for name, text in self.callers.items():
             with self.subTest(workflow=name):
                 verify_callers(text)
+
+    def test_every_build_workflow_requires_strict_all_target_clippy(self):
+        for name, text, job in self.clippy:
+            with self.subTest(workflow=name):
+                verify_required_commands(text, job, (CLIPPY_CHECK,))
+
+    def required_commands(self):
+        yield "shared-policy", self.shared, "check", COMPLEXITY_CHECK
+        yield "shared-compiler", self.shared, "check", COMPILER_CHECK
+        for name, text, job in self.clippy:
+            yield name, text, job, CLIPPY_CHECK
+
+    def test_required_complexity_commands_cannot_be_removed_or_weakened(self):
+        weakened = {
+            COMPLEXITY_CHECK: (COMPLEXITY_CHECK.replace("--revision HEAD", "--staged"),
+                               COMPLEXITY_CHECK.replace("HEAD", "HEAD~1")),
+            COMPILER_CHECK: (COMPILER_CHECK.replace("test_complexity*.py", "test_complexity_policy.py"),),
+            CLIPPY_CHECK: (CLIPPY_CHECK.replace("--all-targets", "--lib"),
+                          CLIPPY_CHECK.replace("--locked ", ""),
+                          CLIPPY_CHECK.replace("-D warnings", "-W warnings"),
+                          CLIPPY_CHECK + " --cap-lints allow"),
+        }
+        for name, text, job, command in self.required_commands():
+            for replacement in ("", command + " || true", command + " && echo ignored", *weakened[command]):
+                with self.subTest(workflow=name, replacement=replacement), self.assertRaisesRegex(ValueError, "exact command"):
+                    verify_required_commands(text.replace(command, replacement), job, (command,))
+
+    def test_required_complexity_steps_cannot_skip_soften_or_retarget_checks(self):
+        for name, text, job, command in self.required_commands():
+            for field in ("if: false", "continue-on-error: true", "working-directory: elsewhere",
+                          "shell: echo {0}", "env:\n          RUSTFLAGS: --cap-lints allow"):
+                changed = text.replace(f"        run: {command}", f"        {field}\n        run: {command}")
+                with self.subTest(workflow=name, field=field), self.assertRaisesRegex(ValueError, "skip, soften, or retarget"):
+                    verify_required_commands(changed, job, (command,))
+
+    def test_required_jobs_and_checkouts_cannot_skip_soften_or_retarget_checks(self):
+        for name, text, job, command in self.required_commands():
+            for field in ("if: false", "continue-on-error: true", "defaults:\n      run:\n        working-directory: elsewhere"):
+                changed = text.replace(f"  {job}:\n", f"  {job}:\n    {field}\n")
+                with self.subTest(workflow=name, field=field), self.assertRaisesRegex(ValueError, "skip, soften, or retarget"):
+                    verify_required_commands(changed, job, (command,))
+            for field in ("repository: other/project", "ref: other-branch", "path: elsewhere"):
+                changed = text.replace("uses: actions/checkout@v4", f"uses: actions/checkout@v4\n        with:\n          {field}")
+                with self.subTest(workflow=name, checkout=field), self.assertRaisesRegex(ValueError, "retarget"):
+                    verify_required_commands(changed, job, (command,))
 
     def test_shared_gate_rejects_conditional_softened_or_retargeted_checks(self):
         for field in ("if: false", "continue-on-error: true", "working-directory: elsewhere",
