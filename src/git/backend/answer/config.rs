@@ -42,36 +42,7 @@ pub(super) fn answer(path: &Path, args: &[&str]) -> Option<Answer> {
         return None;
     };
     let action = action.unwrap_or(Action::Get);
-    let matches: Box<dyn Fn(&str) -> bool> = match action {
-        Action::Get | Action::GetAll => {
-            let (section, subsection, name) = key_parts(query)?;
-            let (section, subsection, name) = (
-                section.to_owned(),
-                subsection.map(str::to_owned),
-                name.to_owned(),
-            );
-            Box::new(move |key: &str| {
-                key_parts(key).is_some_and(|(s, sub, n)| {
-                    s.eq_ignore_ascii_case(&section)
-                        && n.eq_ignore_ascii_case(&name)
-                        && sub == subsection.as_deref()
-                })
-            })
-        }
-        Action::GetRegexp => {
-            // `!pattern` inverts. Git's (POSIX) regexes read `\d`, `\w`… as the letter
-            // itself: those are left to it.
-            let escaped_word = query
-                .as_bytes()
-                .windows(2)
-                .any(|w| w[0] == b'\\' && w[1].is_ascii_alphanumeric());
-            if query.starts_with('!') || escaped_word {
-                return None;
-            }
-            let pattern = regex::Regex::new(&lowered_ends(query)).ok()?;
-            Box::new(move |key: &str| pattern.is_match(key))
-        }
-    };
+    let matches = matcher(&action, query)?;
     let repo = open(path)?;
     let entries = entries(&repo, local)?;
     let found: Vec<&(String, Option<BString>)> =
@@ -105,6 +76,42 @@ pub(super) fn answer(path: &Path, args: &[&str]) -> Option<Answer> {
         out.push(if nul { 0 } else { b'\n' });
     }
     Some(Answer::out(out))
+}
+
+type KeyMatcher = Box<dyn Fn(&str) -> bool>;
+
+/// Validate native query matching independently of config loading and rendering.
+fn matcher(action: &Action, query: &str) -> Option<KeyMatcher> {
+    Some(match action {
+        Action::Get | Action::GetAll => {
+            let (section, subsection, name) = key_parts(query)?;
+            let (section, subsection, name) = (
+                section.to_owned(),
+                subsection.map(str::to_owned),
+                name.to_owned(),
+            );
+            Box::new(move |key: &str| {
+                key_parts(key).is_some_and(|(s, sub, n)| {
+                    s.eq_ignore_ascii_case(&section)
+                        && n.eq_ignore_ascii_case(&name)
+                        && sub == subsection.as_deref()
+                })
+            })
+        }
+        Action::GetRegexp => {
+            // `!pattern` inverts. Git's (POSIX) regexes read `\d`, `\w`… as the letter
+            // itself: those are left to it.
+            let escaped_word = query
+                .as_bytes()
+                .windows(2)
+                .any(|w| w[0] == b'\\' && w[1].is_ascii_alphanumeric());
+            if query.starts_with('!') || escaped_word {
+                return None;
+            }
+            let pattern = regex::Regex::new(&lowered_ends(query)).ok()?;
+            Box::new(move |key: &str| pattern.is_match(key))
+        }
+    })
 }
 
 /// A key's section, subsection and name: `remote.origin.url`, `user.name`.

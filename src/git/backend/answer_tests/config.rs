@@ -2,6 +2,24 @@
 
 use super::*;
 
+#[test]
+fn ambiguous_config_flags_and_nonportable_patterns_are_left_to_git() -> Result<(), String> {
+    let repo = Repo::new("answer-config-fallback")?;
+    left_to_git(
+        repo.path(),
+        &[
+            &["config", "--local", "--local", "user.name"],
+            &["config", "--null", "-z", "user.name"],
+            &["config", "--bool", "--type=int", "user.name"],
+            &["config", "--get", "--get-all", "user.name"],
+            &["config", "--get-regexp", "!user"],
+            &["config", "--get-regexp", "\\w"],
+            &["config", "--get-regexp", "["],
+        ],
+    );
+    Ok(())
+}
+
 /// Check Git-config reading, includes, key casing, and option compatibility.
 #[test]
 pub(super) fn config_lookups_are_gits() -> Result<(), String> {
