@@ -1,6 +1,6 @@
 //! The tab's state types: operations and their undo, open diffs, comparisons, the commit search.
 
-use std::collections::HashSet;
+pub(super) use super::commit_search::Search;
 use std::time::Instant;
 
 use super::file_text::FileText;
@@ -425,26 +425,6 @@ impl Compare {
             None
         }
     }
-}
-
-#[derive(Default)]
-pub(super) struct Search {
-    pub(super) open: bool,
-    pub(super) focus: bool,
-    /// Search what commits added or removed in files (`git log -S`), not their messages.
-    pub(super) code: bool,
-    pub(super) query: String,
-    /// The query the results are for.
-    pub(super) searched: String,
-    pub(super) results: Vec<String>,
-    pub(super) matches: std::sync::Arc<HashSet<String>>,
-    pub(super) current: usize,
-    pub(super) running: bool,
-    pub(super) edited: Option<Instant>,
-    /// Why the query can't be searched (its operators written wrong), or what git said.
-    pub(super) problem: Option<String>,
-    /// What the field suggests while an operator is typed.
-    pub(super) suggest: super::graph_view::suggest::SuggestState,
 }
 
 #[path = "core_seams/operation_state.rs"]

@@ -101,6 +101,7 @@ impl RepoTab {
             edit.request_focus();
         }
         if edit.changed() {
+            self.search.retire();
             self.authorship.filter = false;
             self.search.edited = Some(std::time::Instant::now());
             self.search.suggest.dismissed = None;
@@ -211,6 +212,7 @@ impl RepoTab {
         };
         let (query, cursor) = suggest::accept(&self.search.query, &listing.range, item);
         self.search.query = query;
+        self.search.retire();
         self.search.edited = Some(std::time::Instant::now());
         self.search.suggest.chosen = None;
         if let Some(mut state) = egui::TextEdit::load_state(ctx, id) {

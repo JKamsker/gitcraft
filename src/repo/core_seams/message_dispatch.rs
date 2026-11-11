@@ -388,11 +388,7 @@ impl RepoTab {
             Msg::Mergiraf(path, result) => self.mergiraf_done(path, result),
             Msg::JobPanicked(e) => self.status = Some(crate::repo::Notice::plain((e, true))),
             Msg::Then(then) => then(self, ctx),
-            Msg::Search(excluded, query, code, result) => {
-                if crate::repo::history_filter::rules(ctx, self.repo_key()).excludes() == excluded {
-                    self.search_done(query, code, result, ctx);
-                }
-            }
+            Msg::Search(request, result) => self.search_done(request, result, ctx),
             // Asked before the list asked for last (one read before a merge answering after
             // the one read since), or of the forge the remotes no longer point to.
             Msg::Prs(asked, _) if self.prs_loaded != Some(asked) => {}

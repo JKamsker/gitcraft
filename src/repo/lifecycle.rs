@@ -82,6 +82,7 @@ impl Lifecycle {
 impl super::RepoTab {
     /// Retire feature reads without cancelling or settling submitted mutations.
     pub(crate) fn invalidate_repository_context(&mut self) {
+        self.search.retire();
         self.invalidate_repository_tool_requests();
         self.cochanges.invalidate_context();
         for parked in &mut self.parked {
