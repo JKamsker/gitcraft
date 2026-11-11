@@ -78,37 +78,7 @@ fn hostile_config_and_option_like_refs() -> Result<(), String> {
     git(&["update-ref", &format!("refs/tags/{tag}"), "HEAD~1"])?;
     let head = head(&dir);
 
-    let commits = log(&dir, None, Default::default(), 0, 10)?;
-    assert_eq!(commits.len(), 2);
-    assert_eq!(commits[0].hash, head);
-    // From the option-like tag alone: only the commit it is on.
-    let from_tag = log(
-        &dir,
-        Some(&[format!("refs/tags/{tag}")]),
-        Default::default(),
-        0,
-        10,
-    )?;
-    assert_eq!(from_tag.len(), 1);
-    assert!(log(&dir, Some(&[]), Default::default(), 0, 10)?.is_empty());
-    let tag_only = [format!("refs/tags/{tag}")];
-    assert_eq!(
-        search(&dir, None, Default::default(), "two")?,
-        std::slice::from_ref(&head)
-    );
-    // A query that names a commit (here a tag `2024`) and is in its message: found once.
-    git(&["commit", "-q", "--allow-empty", "-m", "release 2024"])?;
-    git(&["tag", "2024"])?;
-    let found = search(&dir, None, Default::default(), "2024")?;
-    let release = git(&["rev-parse", "HEAD"])?;
-    git(&["tag", "-d", "2024"])?;
-    git(&["reset", "-q", "--soft", "HEAD~1"])?;
-    assert_eq!(found, [release.trim()]);
-    assert!(search(&dir, Some(&tag_only), Default::default(), "two")?.is_empty());
-    assert_eq!(
-        search_code(&dir, Some(&tag_only), Default::default(), "a")?.len(),
-        1
-    );
+    assert_hostile_history_queries(&dir, tag, &head)?;
     let patch = file_diff(&dir, &head, name, DiffOptions::default())?;
     assert!(patch.starts_with("diff --git \"a/q"), "{patch}");
     assert!(!patch.contains('\x1b'), "{patch}");
@@ -318,4 +288,37 @@ fn a_clone_elsewhere_names_its_folder_from_there() {
     assert_eq!(clone_from("~/repos/x"), ("~", "repos/x".to_owned()));
     assert_eq!(clone_from("~"), ("~", ".".to_owned()));
     assert_eq!(clone_from("/srv/x"), ("/", "/srv/x".to_owned()));
+}
+
+fn assert_hostile_history_queries(dir: &Path, tag: &str, head: &str) -> Result<(), String> {
+    let git = |args: &[&str]| run(Some(dir), args);
+    let commits = log(dir, None, Default::default(), 0, 10)?;
+    assert_eq!(commits.len(), 2);
+    assert_eq!(commits[0].hash, head);
+    // From the option-like tag alone: only the commit it is on.
+    let from_tag = log(
+        dir,
+        Some(&[format!("refs/tags/{tag}")]),
+        Default::default(),
+        0,
+        10,
+    )?;
+    assert_eq!(from_tag.len(), 1);
+    assert!(log(dir, Some(&[]), Default::default(), 0, 10)?.is_empty());
+    let tag_only = [format!("refs/tags/{tag}")];
+    assert_eq!(search(dir, None, Default::default(), "two")?, [head]);
+    // A query that names a commit (here a tag `2024`) and is in its message: found once.
+    git(&["commit", "-q", "--allow-empty", "-m", "release 2024"])?;
+    git(&["tag", "2024"])?;
+    let found = search(dir, None, Default::default(), "2024")?;
+    let release = git(&["rev-parse", "HEAD"])?;
+    git(&["tag", "-d", "2024"])?;
+    git(&["reset", "-q", "--soft", "HEAD~1"])?;
+    assert_eq!(found, [release.trim()]);
+    assert!(search(dir, Some(&tag_only), Default::default(), "two")?.is_empty());
+    assert_eq!(
+        search_code(dir, Some(&tag_only), Default::default(), "a")?.len(),
+        1
+    );
+    Ok(())
 }
