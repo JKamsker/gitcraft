@@ -22,7 +22,8 @@ impl RepoTab {
             return false;
         };
         let conflicted = matches!(&diff.key, DiffKey::Work(f) if f.area == git::Area::Conflicted);
-        !conflicted
+        self.docked(super::popout::Panel::Diff)
+            && !conflicted
             && self.conflict.is_none()
             && self.rebase.is_none()
             && self.file_view.is_none()
@@ -73,13 +74,12 @@ impl RepoTab {
 
     /// The header's button putting the diff below the graph, or back in its place. Only for
     /// the diffs that can show there (whether it showed).
-    pub(super) fn split_toggle(&self, ui: &mut Ui) -> bool {
+    pub(super) fn split_toggle(&self, ui: &mut Ui, acts: &mut Vec<Action>) -> bool {
         if !self.diff_can_split() {
             return false;
         }
         let t = Tokens::get(ui.ctx());
-        let mut settings = Settings::get(ui.ctx());
-        let on = settings.diff_beside_graph;
+        let on = self.diff_beside_graph(ui.ctx());
         let tip = if on {
             crate::i18n::text("repo-core-2414")
         } else {
@@ -90,10 +90,17 @@ impl RepoTab {
             widgets::active_underline(ui, button.rect, t.accent);
         }
         if button.clicked() {
-            settings.diff_beside_graph = !on;
-            settings.set(ui.ctx());
+            acts.push(Action::DiffBesideGraph(!on));
         }
         true
+    }
+
+    /// An explicit layout choice replaces automatic history-follow presentation.
+    pub(super) fn set_diff_beside_graph(&mut self, on: bool, ctx: &egui::Context) {
+        self.commit_changes.stop();
+        let mut settings = Settings::get(ctx);
+        settings.diff_beside_graph = on;
+        settings.set(ctx);
     }
 
     /// Leaves a pull request's or a commit's builds page (or the insights) for the graph: a
@@ -111,3 +118,6 @@ impl RepoTab {
         self.ci_view = None;
     }
 }
+
+#[cfg(test)]
+mod tests;

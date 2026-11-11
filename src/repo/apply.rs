@@ -315,6 +315,7 @@ impl RepoTab {
             Action::FoldAttributes(paths) => self.ask_fold_attributes(&paths, ctx),
             Action::DiffAsFile(on) => self.show_diff_as_file(on, ctx),
             Action::DiffRendered(on) => self.show_diff_rendered(on, ctx),
+            Action::DiffBesideGraph(on) => self.set_diff_beside_graph(on, ctx),
             Action::DiffRich(kind) => self.show_diff_rich(kind, ctx),
             Action::DiffGoToLine { old, new } => self.diff_go_to_line(old, new),
             Action::DiffWrap(on) => self.wrap_diff(on, ctx),

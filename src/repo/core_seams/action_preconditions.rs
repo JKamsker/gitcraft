@@ -16,6 +16,7 @@ impl RepoTab {
                     | Action::OpenCommitChanges(_)
                     | Action::OpenDiff(_)
                     | Action::CloseDiff
+                    | Action::DiffBesideGraph(_)
                     | Action::FileView { .. }
                     | Action::CloseFileView
                     | Action::Reload
