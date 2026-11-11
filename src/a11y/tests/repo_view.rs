@@ -36,35 +36,42 @@ fn repo(name: &str) -> Result<PathBuf, String> {
     Ok(dir)
 }
 
-type H<'a> = Harness<'a, Option<RepoTab>>;
+struct Repository(RepoTab);
+
+impl eframe::App for Repository {
+    fn ui(&mut self, ui: &mut egui::Ui, _frame: &mut eframe::Frame) {
+        self.0.ui(ui);
+        super::super::end_frame(ui.ctx());
+    }
+}
+
+type H<'a> = Harness<'a, Repository>;
+
+/// eframe's creation callback runs before the first pass: set_fonts only takes effect
+/// at the beginning of a pass, even when a repository read is immediately ready.
+fn prepared_harness<S: eframe::App + 'static>(
+    create: impl FnOnce(&egui::Context) -> S,
+) -> Harness<'static, S> {
+    Harness::builder()
+        .with_size([1400.0, 860.0])
+        .build_eframe(move |cc| {
+            let ctx = &cc.egui_ctx;
+            // Nothing asked of the network: no avatars, no background fetch.
+            let settings = Settings {
+                avatars: false,
+                auto_fetch_minutes: 0,
+                ..Settings::default()
+            };
+            settings.set(ctx);
+            crate::theme::install_fonts(ctx);
+            crate::theme::apply(ctx, &crate::theme::ThemeId::default(), &Default::default());
+            create(ctx)
+        })
+}
 
 fn harness(path: &Path) -> H<'static> {
     let path = path.to_owned();
-    Harness::builder()
-        .with_size([1400.0, 860.0])
-        .build_ui_state(
-            move |ui, tab: &mut Option<RepoTab>| {
-                let tab = tab.get_or_insert_with(|| {
-                    // Nothing asked of the network: no avatars, no background fetch.
-                    let settings = Settings {
-                        avatars: false,
-                        auto_fetch_minutes: 0,
-                        ..Settings::default()
-                    };
-                    settings.set(ui.ctx());
-                    crate::theme::install_fonts(ui.ctx());
-                    crate::theme::apply(
-                        ui.ctx(),
-                        &crate::theme::ThemeId::default(),
-                        &Default::default(),
-                    );
-                    RepoTab::new(path.clone(), ui.ctx())
-                });
-                tab.ui(ui);
-                super::super::end_frame(ui.ctx());
-            },
-            None,
-        )
+    prepared_harness(move |ctx| Repository(RepoTab::new(path, ctx)))
 }
 
 /// Frames until the repository is read (the git work runs in the background).
@@ -72,17 +79,48 @@ fn settle(harness: &mut H<'_>) {
     let until = Instant::now() + Duration::from_secs(30);
     while Instant::now() < until {
         harness.step();
-        if harness
-            .state()
-            .as_ref()
-            .is_some_and(|t| !t.opening() && t.settled())
-        {
+        let tab = &harness.state().0;
+        if !tab.opening() && tab.settled() {
             break;
         }
         std::thread::sleep(Duration::from_millis(20));
     }
     for _ in 0..5 {
         harness.step();
+    }
+}
+
+#[test]
+fn first_frame_fonts_support_ready_and_pending_repository_content() {
+    struct Content {
+        ready: bool,
+        first_pass: Option<bool>,
+    }
+    impl eframe::App for Content {
+        fn ui(&mut self, ui: &mut egui::Ui, _frame: &mut eframe::Frame) {
+            self.first_pass.get_or_insert(self.ready);
+            if self.ready {
+                ui.label(egui::RichText::new("Ready heading").font(crate::theme::semibold(16.0)));
+                ui.label(egui::RichText::new("Ready row").font(crate::theme::medium(13.0)));
+            } else {
+                ui.label("Pending repository read");
+            }
+        }
+    }
+    for ready in [false, true] {
+        let mut harness = prepared_harness(move |_| Content {
+            ready,
+            first_pass: None,
+        });
+        assert_eq!(harness.state().first_pass, Some(ready));
+        if !ready {
+            harness.get_by_label("Pending repository read");
+            assert!(harness.query_by_label("Ready heading").is_none());
+            harness.state_mut().ready = true;
+            harness.step();
+        }
+        harness.get_by_label("Ready heading");
+        harness.get_by_label("Ready row");
     }
 }
 
