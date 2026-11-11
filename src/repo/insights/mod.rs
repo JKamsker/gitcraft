@@ -9,6 +9,8 @@ pub(crate) mod graph;
 pub(crate) mod heat_grid;
 mod page;
 #[cfg(test)]
+mod test_support;
+#[cfg(test)]
 mod tests;
 
 mod churn;
@@ -141,6 +143,8 @@ pub(crate) struct InsightsView {
     pub(crate) table: bool,
     /// The views read once already: showing one again doesn't read it again.
     loaded: HashSet<Kind>,
+    /// Shared preference lifetime last observed, including another tab's A→B→A.
+    forge_epoch: Option<u64>,
     /// The pull request the big area showed when the page was opened over it, which the
     /// views about a change take for theirs.
     pub(crate) pr: Option<u64>,
@@ -164,6 +168,7 @@ impl InsightsView {
             kind,
             table: false,
             loaded: HashSet::new(),
+            forge_epoch: None,
             pr: None,
             impact: Default::default(),
             ci_path: Default::default(),
@@ -207,6 +212,38 @@ pub(crate) enum InsightsAct {
 }
 
 impl RepoTab {
+    /// Retire forge/account-dependent reads and their derived presentation together.
+    pub(super) fn invalidate_forge_insights(&mut self) {
+        if let Some(view) = &mut self.insights {
+            view.ci_path = Default::default();
+            view.deploy = Default::default();
+            view.review_heat = Default::default();
+            view.pr = None;
+            view.loaded.remove(&Kind::CiPath);
+            view.loaded.remove(&Kind::Deploy);
+            view.loaded.remove(&Kind::ReviewHeat);
+            view.constellation.invalidate_forge();
+            if view.impact.invalidate_forge() {
+                view.loaded.remove(&Kind::Impact);
+            }
+            if view.transform.invalidate_forge() {
+                view.loaded.remove(&Kind::Transform);
+            }
+        }
+    }
+
+    /// Observe the shared preference clock even when this tab's final selection is equal.
+    pub(super) fn sync_insights_context(&mut self, ctx: &egui::Context) {
+        let (_, epoch) = super::forge_selection::lifetime(ctx, self.repo_key());
+        let previous = self.insights.as_ref().and_then(|view| view.forge_epoch);
+        if previous.is_some_and(|previous| previous != epoch) {
+            self.invalidate_forge_insights();
+        }
+        if let Some(view) = &mut self.insights {
+            view.forge_epoch = Some(epoch);
+        }
+    }
+
     pub(super) fn insights_act(&mut self, act: InsightsAct, ctx: &egui::Context) {
         match act {
             InsightsAct::Open(kind) => self.open_insights(kind, ctx),
@@ -293,6 +330,10 @@ impl RepoTab {
 
     /// Reads view `kind` (again).
     fn load_insight(&mut self, kind: Kind, ctx: &egui::Context) {
+        self.sync_insights_context(ctx);
+        if let Some(view) = &mut self.insights {
+            view.loaded.insert(kind);
+        }
         match kind {
             Kind::Impact => self.impact_load(ctx),
             Kind::CiPath => self.ci_path_load(ctx),
@@ -367,7 +408,17 @@ impl RepoTab {
         work: impl FnOnce() -> T + Send + 'static,
         then: impl FnOnce(&mut RepoTab, T, &egui::Context) + Send + 'static,
     ) {
-        self.forge_then(ctx, move || crate::git::offline(work), then);
+        let (clock, epoch) = super::forge_selection::lifetime(ctx, self.repo_key());
+        self.forge_then(
+            ctx,
+            move || crate::git::offline(work),
+            move |tab, result, ctx| {
+                tab.sync_insights_context(ctx);
+                if clock.load(std::sync::atomic::Ordering::SeqCst) == epoch {
+                    then(tab, result, ctx);
+                }
+            },
+        );
     }
 
     /// The palette's entries: one per view.

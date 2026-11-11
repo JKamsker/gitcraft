@@ -57,7 +57,7 @@ fn timed(jobs: Vec<TimedJob>, number: u64) -> TimedRun {
     }
 }
 
-fn explorer() -> Explorer {
+pub(super) fn explorer() -> Explorer {
     let run = timed(
         vec![
             job(

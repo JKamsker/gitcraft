@@ -11,6 +11,28 @@ fn state(tab: &RepoTab) -> Option<&State> {
     tab.insights.as_ref().map(|v| &v.constellation)
 }
 
+#[test]
+fn forge_retirement_rebuilds_equal_forge_data_while_retaining_local_snapshot() {
+    let ctx = egui::Context::default();
+    crate::theme::install_fonts(&ctx);
+    let mut tab = super::super::test_support::tab(&ctx, View::Constellation);
+    let initial = &mut tab.insights.as_mut().unwrap().constellation;
+    let request = initial.read.start();
+    initial.read.accept(request, Ok(Snapshot::default()));
+    tab.constellation_build();
+    let fingerprint = tab.constellation_forge_read();
+    tab.invalidate_forge_insights();
+    let retired = state(&tab).unwrap();
+    assert!(retired.read.ready().is_some());
+    assert!(retired.built.is_some());
+    assert!(retired.forge_read.is_none());
+    assert_eq!(tab.constellation_forge_read(), fingerprint);
+    draw(&mut tab, &ctx, 900.0);
+    let state = state(&tab).unwrap();
+    assert!(state.read.ready().is_some());
+    assert_eq!(state.forge_read, Some(fingerprint));
+}
+
 /// Takes in background work until `done` holds, drawing the page each time.
 fn wait(tab: &mut RepoTab, ctx: &egui::Context, done: impl Fn(&RepoTab) -> bool) {
     let start = Instant::now();
