@@ -1,4 +1,5 @@
 //! Separate raw snapshot panes. Opening one drops DiffView and its reading-mode lifetimes.
+pub(super) mod palette;
 mod selection;
 
 mod code_moves;
