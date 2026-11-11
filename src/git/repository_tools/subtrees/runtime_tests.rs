@@ -88,76 +88,11 @@ fn lifecycle(history: History) -> Result<(), String> {
         added.upstream.as_deref()
     );
 
-    // Conflicting edits exercise the real helper, retained candidate and continuation.
-    original.write(
-        &file,
-        source.base().replace("line 3\n", "LOCAL\n").as_bytes(),
-    )?;
-    original.git(&["commit", "-qam", "local vendor edit"])?;
-    source.write(
-        "file",
-        source.base().replace("line 3\n", "UPSTREAM\n").as_bytes(),
-    )?;
-    source.git(&["commit", "-qam", "upstream edit"])?;
-    let upstream_head = source.git(&["rev-parse", "main"])?;
-    fetch(&runner, &read(repo, &key)?, &key)?;
-    let old = original.git(&["rev-parse", "HEAD"])?;
-    let old_index = std::fs::read(repo.join(".git/index")).map_err(|e| e.to_string())?;
-    let old_file = std::fs::read(repo.join(&file)).map_err(|e| e.to_string())?;
-    prepare(&runner, &read(repo, &key)?, &key, Kind::Update, false)?;
-    let (view, conflict) = candidate_view(repo)?;
-    assert_eq!(
-        conflict.stage,
-        Stage::Conflict,
-        "{}; {:?}",
-        conflict.notice,
-        control.take_steps()
-    );
-    assert_eq!(original.git(&["rev-parse", "HEAD"])?, old);
-    assert_eq!(
-        std::fs::read(repo.join(".git/index")).map_err(|e| e.to_string())?,
-        old_index
-    );
-    assert_eq!(
-        std::fs::read(repo.join(&file)).map_err(|e| e.to_string())?,
-        old_file
-    );
-    assert!(resume(&runner, &view, &conflict.id).is_err());
-    let resolved = source.base().replace("line 3\n", "LOCAL plus UPSTREAM\n");
-    std::fs::write(conflict.worktree.join(&file), &resolved).map_err(|e| e.to_string())?;
-    git::run(Some(&conflict.worktree), &["add", "--", &file])?;
-    resume(&runner, &read(repo, &conflict.id)?, &conflict.id)?;
-    let ready = read(repo, &conflict.id)?;
-    let resolved_candidate = ready
-        .state
-        .candidates
-        .iter()
-        .find(|c| c.id == conflict.id)
-        .ok_or("Lost candidate")?;
-    assert_eq!(
-        resolved_candidate.stage,
-        Stage::Ready,
-        "{}",
-        resolved_candidate.notice
-    );
-    let result = resolved_candidate
-        .result
-        .clone()
-        .ok_or("No resolved result")?;
-    original.write("other", b"unrelated dirty edit\n")?;
-    assert!(accept(&runner, &ready, &conflict.id).is_err());
-    assert_eq!(original.git(&["rev-parse", "HEAD"])?, old);
-    assert_eq!(
-        std::fs::read(repo.join("other")).map_err(|e| e.to_string())?,
-        b"unrelated dirty edit\n"
-    );
-    original.git(&["restore", "--worktree", "other"])?;
-    accept(&runner, &read(repo, &conflict.id)?, &conflict.id)?;
-    assert_eq!(original.git(&["rev-parse", "HEAD"])?, result);
-    assert_eq!(
-        std::fs::read(repo.join(&file)).map_err(|e| e.to_string())?,
-        resolved.as_bytes()
-    );
+    let ConflictOutcome {
+        result,
+        upstream_head,
+        conflict,
+    } = assert_conflict_resolution(&original, &source, &runner, &key, &file)?;
 
     // The split is an exact committed folder snapshot; original checkout stays intact.
     prepare(&runner, &read(repo, &key)?, &key, Kind::Split, false)?;
@@ -214,4 +149,96 @@ fn subtree_signing_default_reads_effective_config_without_the_inspection_overrid
     fixture.git(&["config", "include.path", "subtree-signing"])?;
     assert!(read(repo, "")?.sign_commits);
     Ok(())
+}
+
+struct ConflictOutcome {
+    result: String,
+    upstream_head: String,
+    conflict: Candidate,
+}
+
+fn assert_conflict_resolution(
+    original: &Fixture,
+    source: &Fixture,
+    runner: &Runner<'_>,
+    key: &str,
+    file: &str,
+) -> Result<ConflictOutcome, String> {
+    let repo = original.path();
+    // Conflicting edits exercise the real helper, retained candidate and continuation.
+    original.write(
+        file,
+        source.base().replace("line 3\n", "LOCAL\n").as_bytes(),
+    )?;
+    original.git(&["commit", "-qam", "local vendor edit"])?;
+    source.write(
+        "file",
+        source.base().replace("line 3\n", "UPSTREAM\n").as_bytes(),
+    )?;
+    source.git(&["commit", "-qam", "upstream edit"])?;
+    let upstream_head = source.git(&["rev-parse", "main"])?;
+    fetch(runner, &read(repo, key)?, key)?;
+    let old = original.git(&["rev-parse", "HEAD"])?;
+    let old_index = std::fs::read(repo.join(".git/index")).map_err(|e| e.to_string())?;
+    let old_file = std::fs::read(repo.join(file)).map_err(|e| e.to_string())?;
+    prepare(runner, &read(repo, key)?, key, Kind::Update, false)?;
+    let (view, conflict) = candidate_view(repo)?;
+    assert_eq!(
+        conflict.stage,
+        Stage::Conflict,
+        "{}; {:?}",
+        conflict.notice,
+        runner.control.take_steps()
+    );
+    assert_eq!(original.git(&["rev-parse", "HEAD"])?, old);
+    assert_eq!(
+        std::fs::read(repo.join(".git/index")).map_err(|e| e.to_string())?,
+        old_index
+    );
+    assert_eq!(
+        std::fs::read(repo.join(file)).map_err(|e| e.to_string())?,
+        old_file
+    );
+    assert!(resume(runner, &view, &conflict.id).is_err());
+    let resolved = source.base().replace("line 3\n", "LOCAL plus UPSTREAM\n");
+    std::fs::write(conflict.worktree.join(file), &resolved).map_err(|e| e.to_string())?;
+    git::run(Some(&conflict.worktree), &["add", "--", file])?;
+    resume(runner, &read(repo, &conflict.id)?, &conflict.id)?;
+    let ready = read(repo, &conflict.id)?;
+    let resolved_candidate = ready
+        .state
+        .candidates
+        .iter()
+        .find(|c| c.id == conflict.id)
+        .ok_or("Lost candidate")?;
+    assert_eq!(
+        resolved_candidate.stage,
+        Stage::Ready,
+        "{}",
+        resolved_candidate.notice
+    );
+    let result = resolved_candidate
+        .result
+        .clone()
+        .ok_or("No resolved result")?;
+    original.write("other", b"unrelated dirty edit\n")?;
+    assert!(accept(runner, &ready, &conflict.id).is_err());
+    assert_eq!(original.git(&["rev-parse", "HEAD"])?, old);
+    assert_eq!(
+        std::fs::read(repo.join("other")).map_err(|e| e.to_string())?,
+        b"unrelated dirty edit\n"
+    );
+    original.git(&["restore", "--worktree", "other"])?;
+    accept(runner, &read(repo, &conflict.id)?, &conflict.id)?;
+    assert_eq!(original.git(&["rev-parse", "HEAD"])?, result);
+    assert_eq!(
+        std::fs::read(repo.join(file)).map_err(|e| e.to_string())?,
+        resolved.as_bytes()
+    );
+
+    Ok(ConflictOutcome {
+        result,
+        upstream_head,
+        conflict,
+    })
 }

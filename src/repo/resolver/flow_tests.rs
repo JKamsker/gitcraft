@@ -107,14 +107,7 @@ fn phase(tab: &RepoTab) -> Option<Phase> {
 
 #[test]
 fn a_merge_put_aside_is_resolved_brought_back_and_applied() -> Result<(), String> {
-    let repo = Repo::new("resolver flow")?;
-    repo.commit("base", &[("a.txt", Some("a base\n"))])?;
-    repo.git(&["checkout", "-q", "-b", "side"])?;
-    repo.commit("side", &[("a.txt", Some("a side\n"))])?;
-    repo.git(&["checkout", "-q", "main"])?;
-    repo.commit("main", &[("a.txt", Some("a main\n"))])?;
-    repo.git(&["branch", "other"])?;
-    assert!(repo.git(&["merge", "-q", "side"]).is_err());
+    let repo = conflicted("resolver flow")?;
     let _stand_in = register(repo.path(), stand_in());
     let dir = repo.path().to_path_buf();
     let mut h = harness(dir.clone());
@@ -192,48 +185,7 @@ fn a_merge_put_aside_is_resolved_brought_back_and_applied() -> Result<(), String
         "the run comes back in the next session"
     );
 
-    // Bring it back: its branch, its merge as it was, and the review opened.
-    act(&mut h, ResolverAct::BringBack(id.clone()));
-    assert!(
-        wait(&mut h, |t| t.resolver.reviewing()
-            && t.resolver.parked.is_empty()),
-        "brought back and shown"
-    );
-    // The panel on the right shows its changes again (conflicted and staged files), not the
-    // commit looked at meanwhile.
-    assert!(
-        wait(&mut h, |t| t
-            .selected
-            .and_then(|i| t.commits.get(i))
-            .is_some_and(|c| c.hash == crate::repo::WIP_HASH)),
-        "its changes selected"
-    );
-    assert!(merging(&dir));
-    assert_eq!(
-        repo.git(&["symbolic-ref", "--short", "HEAD"])?.trim(),
-        "main"
-    );
-    assert!(
-        repo.git(&["ls-files", "-u"])?.contains("a.txt"),
-        "the conflict is back"
-    );
-
-    // Apply: the agent's file, marked resolved.
-    act(&mut h, ResolverAct::Apply);
-    assert!(
-        wait(&mut h, |t| phase(t) == Some(Phase::Applied)
-            && t.busy_op.is_none()),
-        "applied"
-    );
-    assert!(
-        wait(&mut h, |_| repo
-            .git(&["ls-files", "-u"])
-            .is_ok_and(|u| u.is_empty())),
-        "marked resolved"
-    );
-    let a = std::fs::read_to_string(dir.join("a.txt")).map_err(|e| e.to_string())?;
-    assert_eq!(a.trim_end(), RESOLVED);
-    assert!(merging(&dir), "the merge goes on, to be committed");
+    apply_retained_run(&mut h, &repo, &dir, &id)?;
     // Closing removes the agent workspace; byte-exact recovery remains discoverable.
     act(&mut h, ResolverAct::Dismiss);
     assert!(wait(&mut h, |t| t.resolver.run.is_none()));
@@ -481,5 +433,51 @@ fn insights_action_closes_only_the_read_only_resolver_review() -> Result<(), Str
         &ws
     ));
     assert!(ws.dir().is_dir());
+    Ok(())
+}
+
+fn apply_retained_run(h: &mut H<'_>, repo: &Repo, dir: &Path, id: &str) -> Result<(), String> {
+    // Bring it back: its branch, its merge as it was, and the review opened.
+    act(h, ResolverAct::BringBack(id.to_owned()));
+    assert!(
+        wait(h, |t| t.resolver.reviewing()
+            && t.resolver.parked.is_empty()),
+        "brought back and shown"
+    );
+    // The panel on the right shows its changes again (conflicted and staged files), not the
+    // commit looked at meanwhile.
+    assert!(
+        wait(h, |t| t
+            .selected
+            .and_then(|i| t.commits.get(i))
+            .is_some_and(|c| c.hash == crate::repo::WIP_HASH)),
+        "its changes selected"
+    );
+    assert!(merging(dir));
+    assert_eq!(
+        repo.git(&["symbolic-ref", "--short", "HEAD"])?.trim(),
+        "main"
+    );
+    assert!(
+        repo.git(&["ls-files", "-u"])?.contains("a.txt"),
+        "the conflict is back"
+    );
+
+    // Apply: the agent's file, marked resolved.
+    act(h, ResolverAct::Apply);
+    assert!(
+        wait(h, |t| phase(t) == Some(Phase::Applied)
+            && t.busy_op.is_none()),
+        "applied"
+    );
+    assert!(
+        wait(h, |_| repo
+            .git(&["ls-files", "-u"])
+            .is_ok_and(|u| u.is_empty())),
+        "marked resolved"
+    );
+    let a = std::fs::read_to_string(dir.join("a.txt")).map_err(|e| e.to_string())?;
+    assert_eq!(a.trim_end(), RESOLVED);
+    assert!(merging(dir), "the merge goes on, to be committed");
     Ok(())
 }

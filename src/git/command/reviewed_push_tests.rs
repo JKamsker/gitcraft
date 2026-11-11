@@ -124,35 +124,7 @@ fn recording_reviewed_push_policy_preserves_counted_alias_and_exact_subcommand()
     }
     assert!(configs.contains(&(format!("url.{address}.insteadOf"), placeholder)));
     assert!(configs.contains(&("core.hooksPath".into(), "/owned/pinned-hooks".into())));
-    for trace_hooks in [false, true] {
-        let mut remote_extra = extra.clone();
-        remote_extra.trace_hooks = trace_hooks;
-        let remote = remote::Target {
-            host: remote::Host::Ssh("uncontacted.invalid".into()),
-            path: "/repo".into(),
-        };
-        let request = remote_request(&remote, &remote_extra, &words);
-        assert!(request.script.starts_with(CREDENTIAL_REMOTE_PIN));
-        assert!(request.script.contains("\"$GITCRAFT_GIT_ORIGINAL\""));
-        assert!(
-            request
-                .script
-                .contains("'gitcraft-credential-transport' 'push' '--porcelain'")
-        );
-        assert!(!request.script.contains("DUMMY_ONLY"));
-        assert!(
-            request
-                .env
-                .contains(&("GIT_CONFIG_COUNT".into(), "10".into()))
-        );
-        assert!(
-            !request
-                .env
-                .iter()
-                .any(|(k, _)| k == "GITCRAFT_CREDENTIAL_OWNER")
-        );
-        assert!(request.unset.iter().any(|s| s == "GIT_CONFIG_COUNT"));
-    }
+    assert_remote_requests(&extra, &words);
     let other = reviewed_push_extra(
         repo,
         &words,
@@ -293,4 +265,37 @@ fn recording_refusal_only_relays_known_status_for_the_reviewed_ref() -> Result<(
     assert!(safe.contains("[remote rejected]"));
     assert!(reviewed_refusal(good.as_bytes(), &source, "refs/heads/other").is_none());
     Ok(())
+}
+
+#[cfg(unix)]
+fn assert_remote_requests(extra: &Extra, words: &[&str]) {
+    for trace_hooks in [false, true] {
+        let mut remote_extra = extra.clone();
+        remote_extra.trace_hooks = trace_hooks;
+        let remote = remote::Target {
+            host: remote::Host::Ssh("uncontacted.invalid".into()),
+            path: "/repo".into(),
+        };
+        let request = remote_request(&remote, &remote_extra, words);
+        assert!(request.script.starts_with(CREDENTIAL_REMOTE_PIN));
+        assert!(request.script.contains("\"$GITCRAFT_GIT_ORIGINAL\""));
+        assert!(
+            request
+                .script
+                .contains("'gitcraft-credential-transport' 'push' '--porcelain'")
+        );
+        assert!(!request.script.contains("DUMMY_ONLY"));
+        assert!(
+            request
+                .env
+                .contains(&("GIT_CONFIG_COUNT".into(), "10".into()))
+        );
+        assert!(
+            !request
+                .env
+                .iter()
+                .any(|(k, _)| k == "GITCRAFT_CREDENTIAL_OWNER")
+        );
+        assert!(request.unset.iter().any(|s| s == "GIT_CONFIG_COUNT"));
+    }
 }
