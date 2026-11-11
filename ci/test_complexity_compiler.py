@@ -6,6 +6,8 @@ import subprocess
 import tempfile
 import unittest
 
+from complexity_policy import policy_errors
+
 
 def branching(count):
     checks = "\n".join(f"if value == {i} {{ score += 1; }}" for i in range(count))
@@ -13,6 +15,59 @@ def branching(count):
 
 
 class CompilerTests(unittest.TestCase):
+    def test_real_cargo_lint_caps_require_snapshot_policy_protection(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            (root / "src").mkdir()
+            (root / ".cargo").mkdir()
+            manifest = '''[package]
+name = "complexity-cap-fixture"
+version = "0.0.0"
+edition = "2024"
+[workspace]
+[lints.clippy]
+cognitive_complexity = "forbid"
+'''
+            config = "cognitive-complexity-threshold = 25\n"
+            (root / "Cargo.toml").write_text(manifest)
+            (root / "clippy.toml").write_text(config)
+            (root / "src/lib.rs").write_text(
+                f"pub fn score(value: usize) -> usize {{ {branching(25)} }}\n"
+            )
+            env = os.environ.copy()
+            env["CARGO_TARGET_DIR"] = str(root / "target")
+            env["CLIPPY_CONF_DIR"] = str(root)
+
+            def clippy():
+                return subprocess.run(
+                    ["cargo", "clippy", "--offline", "--all-targets", "--", "-D", "warnings"],
+                    cwd=root, env=env, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True,
+                )
+
+            baseline = clippy()
+            self.assertNotEqual(baseline.returncode, 0, baseline.stdout)
+            self.assertIn("cognitive_complexity", baseline.stdout)
+            for name, flags in (
+                ("config", '[build]\nrustflags=["--cap-lints", "allow"]'),
+                ("config.toml", '[build]\nrustflags="--cap-lints=allow"'),
+                ("config.toml", '[target.\'cfg(all())\']\nrustflags=["--cap-lints=allow"]'),
+            ):
+                with self.subTest(name=name, flags=flags):
+                    path = root / ".cargo" / name
+                    path.write_text(flags)
+                    try:
+                        capped = clippy()
+                        self.assertEqual(capped.returncode, 0, capped.stdout)
+                        errors = policy_errors([
+                            ("Cargo.toml", manifest.encode()), ("clippy.toml", config.encode()),
+                            (f".cargo/{name}", flags.encode()),
+                        ])
+                        self.assertEqual(len(errors), 1, errors)
+                        self.assertIn("must not cap compiler lints", errors[0])
+                    finally:
+                        path.unlink()
+            self.assertNotEqual(clippy().returncode, 0)
+
     def test_threshold_functions_closures_async_and_local_suppressions(self):
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)

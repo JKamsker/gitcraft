@@ -37,10 +37,10 @@ const DOC: &str = r##"#[clippy::cognitive_complexity = "100"]"##;
         self.assertEqual(self.errors(source.encode()), [])
 
     def test_all_packages_and_nearer_configs_cannot_weaken_policy(self):
-        for path in ("crates/new/Cargo.toml", "vendor/Cargo.toml", "tests/fixture/Cargo.toml"):
+        for path in ("crates/new/Cargo.toml", "vendor/Cargo.toml", "tests/fixture/Cargo.toml", "crates/new/CARGO.TOML"):
             with self.subTest(path=path):
                 self.assertIn("must forbid", self.errors(extra=[(path, b'[package]\nname="new"')])[0])
-        for path in (".clippy.toml", "src/clippy.toml", "crates/new/.clippy.toml"):
+        for path in (".clippy.toml", "src/clippy.toml", "crates/new/.clippy.toml", "src/.CLIPPY.TOML"):
             with self.subTest(path=path):
                 self.assertIn("single clippy.toml", self.errors(extra=[(path, CONFIG)])[0])
         for level in (b"allow", b"warn", b"deny"):
@@ -56,8 +56,77 @@ const DOC: &str = r##"#[clippy::cognitive_complexity = "100"]"##;
                     ("Cargo.toml", MANIFEST),
                 ])[0])
 
+    def test_cargo_config_cannot_cap_lints_through_flags_or_environment(self):
+        configurations = (
+            '[build]\nrustflags = ["--cap-lints", "allow"]',
+            '[build]\nrustflags = "--cap-lints=warn"',
+            '[target.x86_64-unknown-linux-gnu]\nrustflags = ["--cap-lints=allow"]',
+            '[target.\'cfg(windows)\']\nrustflags = "--cap-lints allow"',
+            '[env]\nRUSTFLAGS = "--cap-lints=allow"',
+            '[env]\nRUSTFLAGS = {value="--cap-lints allow", force=true}',
+            '[env]\nCARGO_ENCODED_RUSTFLAGS = "--cap-lints\\u001fallow"',
+            '[env]\nCARGO_BUILD_RUSTFLAGS = "--cap-lints=allow"',
+            '[env]\nCARGO_TARGET_X86_64_PC_WINDOWS_MSVC_RUSTFLAGS = "--cap-lints=allow"',
+            '[build]\nrustflags = ["--cap-\\u006cints=allow"]',
+        )
+        for path in (".cargo/config", ".cargo/config.toml", "crates/new/.cargo/config", ".CARGO/CONFIG.TOML"):
+            for config in configurations:
+                with self.subTest(path=path, config=config):
+                    errors = self.errors(extra=[(path, config.encode())])
+                    self.assertEqual(len(errors), 1)
+                    self.assertIn("must not cap compiler lints", errors[0])
+
+    def test_cargo_config_allows_ordinary_flags_and_ignores_comments(self):
+        config = b'''# --cap-lints allow is a forbidden compiler argument, not an active setting here.
+[build]
+rustflags = ["--cfg", "project_build", "-C", "debuginfo=1"]
+[target.'cfg(windows)']
+rustflags = "-C target-feature=+crt-static"
+[env]
+CARGO_ENCODED_RUSTFLAGS = {value="--cfg\\u001fproject_build", force=true}
+RUSTFLAGS = "--cfg=cap_lints"
+'''
+        for name in ("config", "config.toml"):
+            self.assertEqual(self.errors(extra=[(f".cargo/{name}", config)]), [])
+
 
 class SnapshotTests(unittest.TestCase):
+    def test_cargo_config_caps_are_checked_in_complete_working_index_and_revision(self):
+        for relative in (".cargo/config", ".cargo/config.toml", ".CARGO/CONFIG", ".CARGO/CONFIG.TOML"):
+            with self.subTest(relative=relative), tempfile.TemporaryDirectory() as temp:
+                root = Path(temp)
+
+                def git(*args):
+                    return subprocess.check_output(["git", "-C", temp, *args], stderr=subprocess.PIPE)
+
+                def check(*args):
+                    with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
+                        return main(["--root", temp, *args])
+
+                git("init", "-q")
+                git("config", "user.name", "Fixture")
+                git("config", "user.email", "fixture@example.invalid")
+                git("config", "commit.gpgsign", "false")
+                (root / "Cargo.toml").write_bytes(MANIFEST)
+                (root / "clippy.toml").write_bytes(CONFIG)
+                config = root / relative
+                config.parent.mkdir()
+                config.write_text('[build]\nrustflags=["--cfg", "fixture"]\n')
+                git("add", ".")
+                git("commit", "-qm", "ordinary compiler flags")
+                config.write_text('[build]\nrustflags=["--cap-lints=allow"]\n')
+                self.assertEqual(check(), 1)
+                self.assertEqual(check("--staged"), 0)
+                self.assertEqual(check("--revision", "HEAD"), 0)
+                git("add", ".")
+                self.assertEqual(check("--staged"), 1)
+                self.assertEqual(check("--revision", "HEAD"), 0)
+                git("commit", "-qm", "lint cap")
+                config.write_text('[build]\nrustflags=[]\n')
+                self.assertEqual(check(), 0)
+                self.assertEqual(check("--staged"), 1)
+                self.assertEqual(check("--revision", "HEAD"), 1)
+
     def test_index_and_revision_ignore_other_snapshot_edits(self):
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
