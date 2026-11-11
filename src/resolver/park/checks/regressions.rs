@@ -321,3 +321,34 @@ fn symlink_source_is_a_failed_precondition_and_does_not_publish_a_plan() {
     bring_back(&f.0, &p).unwrap();
     refs_clean(&f, &p);
 }
+
+#[cfg(unix)]
+#[test]
+fn rejected_restore_and_drop_release_inherited_descriptors_before_listing() {
+    for restore in [false, true] {
+        let f = Fixture::new();
+        let p = f.park();
+        if restore {
+            std::fs::write(f.0.join(".git/index.lock"), b"independent git writer").unwrap();
+        } else {
+            let archive = crate::agent::repo_file(&f.0, "parked-recovery/test-id").unwrap();
+            std::fs::create_dir_all(&archive).unwrap();
+            std::fs::write(archive.join("existing"), b"mine").unwrap();
+        }
+        let inherited = locking::tests::Inherited::new();
+        let error = if restore {
+            bring_back(&f.0, &p).unwrap_err()
+        } else {
+            drop_to_branch(&f.0, &p).unwrap_err()
+        };
+        assert!(!error.contains("is busy"), "{error}");
+        assert_eq!(inherited.count(), 1);
+        trace(None);
+        assert_eq!(list(&f.0).unwrap(), vec![p]);
+        assert!(
+            inherited.count() > 1,
+            "duplicates remain open through listing"
+        );
+        f.proof();
+    }
+}

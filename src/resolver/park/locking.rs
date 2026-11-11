@@ -3,8 +3,7 @@
 use super::*;
 
 pub(super) struct Lease {
-    // Closing the retained handle releases the lock; it is never read directly.
-    _file: std::fs::File,
+    file: std::fs::File,
 }
 
 pub(super) fn acquire(repo: &Path, id: &str) -> Result<Lease, String> {
@@ -32,5 +31,23 @@ pub(super) fn acquire(repo: &Path, id: &str) -> Result<Lease, String> {
         .map_err(|e| e.to_string())?;
     file.try_lock()
         .map_err(|e| format!("Recovery {id} is busy: {e}"))?;
-    Ok(Lease { _file: file }) // Drop closes this handle and releases the OS lock, even on panic.
+    #[cfg(all(test, unix))]
+    tests::retain(&file);
+    Ok(Lease { file })
 }
+
+impl Drop for Lease {
+    fn drop(&mut self) {
+        // flock belongs to the open file description. A concurrent fork can inherit
+        // it until exec, even with CLOEXEC; closing only our descriptor then leaves
+        // the completed operation locked. End ownership explicitly, including on
+        // early returns and unwinding. Lease is private and never cloned or handed
+        // to children: inherited descriptors do not own a recovery operation.
+        let _ = self.file.unlock();
+        // Keep the permanent inode; unlinking would split independent callers.
+    }
+}
+
+#[cfg(all(test, unix))]
+#[path = "locking/tests.rs"]
+pub(super) mod tests;

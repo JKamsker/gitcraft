@@ -76,7 +76,12 @@ fn restoration_rejects_both_hidden_index_flags() -> Result<(), String> {
             repo.git(&["status", "--porcelain", "--untracked-files=no"])?
                 .is_empty()
         );
-        assert!(bring_back(repo.path(), &parked).is_err());
+        #[cfg(unix)]
+        let inherited = locking::tests::Inherited::new();
+        let error = bring_back(repo.path(), &parked).unwrap_err();
+        assert!(!error.contains("is busy"), "{error}");
+        #[cfg(unix)]
+        assert_eq!(inherited.count(), 1);
         assert_eq!(
             read(repo.path(), "notes.txt").as_deref(),
             Some("hidden user edit\n")
@@ -179,7 +184,12 @@ fn recovery_archive_collision_keeps_both_originals() -> Result<(), String> {
     let archive = crate::agent::repo_file(repo.path(), "parked-recovery/collision")?;
     std::fs::create_dir_all(&archive).map_err(|e| e.to_string())?;
     std::fs::write(archive.join("existing"), b"mine").map_err(|e| e.to_string())?;
-    assert!(drop_to_branch(repo.path(), &parked).is_err());
+    #[cfg(unix)]
+    let inherited = locking::tests::Inherited::new();
+    let error = drop_to_branch(repo.path(), &parked).unwrap_err();
+    assert!(!error.contains("is busy"), "{error}");
+    #[cfg(unix)]
+    assert_eq!(inherited.count(), 1);
     assert_eq!(
         std::fs::read(archive.join("existing")).map_err(|e| e.to_string())?,
         b"mine"
