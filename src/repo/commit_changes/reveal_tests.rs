@@ -38,6 +38,8 @@ fn row_and_hash_navigation_reveal_new_diff_and_reject_old_details_and_diff_resul
     for by_hash in [false, true] {
         let ctx = egui::Context::default();
         let mut tab = RepoTab::new_deferred("/recording-only/history-selection".into(), &ctx);
+        // Model a displayed tab without starting its filesystem watchers or initial reads.
+        tab.life.shown(std::time::Instant::now());
         for (i, hash) in ["a".repeat(40), "b".repeat(40)].into_iter().enumerate() {
             tab.index.insert(hash.clone(), i);
             tab.commits.push(std::sync::Arc::new(crate::git::Commit {
