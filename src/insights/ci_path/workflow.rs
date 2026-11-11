@@ -22,6 +22,8 @@ pub struct FileJob {
     pub declared: bool,
     /// It runs once per combination of a matrix (or `parallel:` on GitLab).
     pub matrix: bool,
+    /// Ordered literal matrix axes, excluding include/exclude. Empty means unknown.
+    pub matrix_axes: Vec<String>,
     /// It calls another workflow (`uses:`), whose jobs the forge lists as `caller / callee`.
     pub calls: bool,
     /// Its stage (GitLab).
@@ -100,6 +102,16 @@ pub fn parse_github(text: &str) -> Result<Workflow, String> {
                 needs: names(&job["needs"]),
                 declared: !job["needs"].is_badvalue(),
                 matrix: !job["strategy"]["matrix"].is_badvalue(),
+                matrix_axes: job["strategy"]["matrix"]
+                    .as_hash()
+                    .map(|axes| {
+                        axes.iter()
+                            .filter_map(|(key, _)| key.as_str())
+                            .filter(|key| !matches!(*key, "include" | "exclude"))
+                            .map(str::to_owned)
+                            .collect()
+                    })
+                    .unwrap_or_default(),
                 calls: job["uses"].as_str().is_some(),
                 stage: String::new(),
             })
@@ -146,6 +158,7 @@ pub fn parse_gitlab(text: &str) -> Result<Workflow, String> {
             needs: names(&job["needs"]),
             declared: !job["needs"].is_badvalue(),
             matrix: !job["parallel"].is_badvalue(),
+            matrix_axes: Vec::new(),
             calls: !job["trigger"].is_badvalue(),
             stage: job["stage"].as_str().unwrap_or("test").to_owned(),
         });

@@ -28,6 +28,7 @@ fn took(started: Option<i64>, finished: Option<i64>) -> Option<i64> {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct StepDelta {
     pub name: String,
+    pub index: Option<usize>,
     pub now: Option<i64>,
     pub before: Option<i64>,
     pub slower: bool,
@@ -133,16 +134,16 @@ fn align<'a>(
 }
 
 fn steps(now: &[TimedStep], before: &[TimedStep]) -> Vec<StepDelta> {
-    let a = keyed(now.iter().map(|s| s.name.as_str()));
-    let b = keyed(before.iter().map(|s| s.name.as_str()));
-    align(&a, &b)
+    super::alignment::steps(now, before)
         .into_iter()
-        .map(|(n, b)| {
+        .map(|pair| {
+            let (n, b) = (pair.now, pair.before);
             let n = n.map(|i| &now[i]);
             let b = b.map(|i| &before[i]);
             let took_now = n.and_then(|s| took(s.started, s.finished));
             let took_before = b.and_then(|s| took(s.started, s.finished));
             StepDelta {
+                index: pair.now,
                 name: n.or(b).map(|s| s.name.clone()).unwrap_or_default(),
                 now: took_now,
                 before: took_before,
@@ -197,8 +198,25 @@ pub fn work(jobs: &[TimedJob]) -> i64 {
 pub fn compare(now: &TimedRun, before: &TimedRun) -> Comparison {
     let a = keyed(now.jobs.iter().map(|j| j.name.as_str()));
     let b = keyed(before.jobs.iter().map(|j| j.name.as_str()));
-    let jobs = align(&a, &b)
+    let pairs = align(&a, &b)
         .into_iter()
+        .map(|(now, before)| super::alignment::Pair {
+            now,
+            before,
+            evidence: crate::insights::Evidence::Inferred,
+        })
+        .collect::<Vec<_>>();
+    compare_aligned(now, before, &pairs)
+}
+
+pub fn compare_aligned(
+    now: &TimedRun,
+    before: &TimedRun,
+    pairs: &[super::alignment::Pair],
+) -> Comparison {
+    let jobs = pairs
+        .iter()
+        .map(|pair| (pair.now, pair.before))
         .map(|(n, b)| {
             let job_now = n.map(|i| &now.jobs[i]);
             let job_before = b.map(|i| &before.jobs[i]);
