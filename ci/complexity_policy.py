@@ -17,6 +17,23 @@ from rust_file_size import git, tracked_contents
 
 THRESHOLD = 25
 OVERRIDE = re.compile(r"\b(?:r#)?clippy\s*::\s*(?:r#)?cognitive_complexity\s*=")
+LINT_CAP = re.compile(r"(?<![\w-])--cap-lints(?:=|\s|$)")
+
+
+def cargo_config_caps(value):
+    """Inspect parsed values, including flags supplied through Cargo's env tables.
+
+    TOML parsing resolves escapes before matching, and recursion covers build,
+    target/cfg, array, string, and encoded Rust flags without assuming a target.
+    Comments and similarly named cfg options do not change compiler lint caps.
+    """
+    if isinstance(value, str):
+        return bool(LINT_CAP.search(value))
+    if isinstance(value, dict):
+        return any(cargo_config_caps(item) for item in value.values())
+    if isinstance(value, list):
+        return any(cargo_config_caps(item) for item in value)
+    return False
 
 
 def policy_errors(sources):
@@ -25,8 +42,8 @@ def policy_errors(sources):
     packages = 0
     for path, content in sources:
         text = content.decode("utf-8")
-        name = Path(path).name
-        if path.endswith(".rs"):
+        name = Path(path).name.casefold()
+        if path.casefold().endswith(".rs"):
             if OVERRIDE.search(mask(text)):
                 errors.append(f"{path}: local Clippy complexity threshold overrides are forbidden")
         elif name in ("clippy.toml", ".clippy.toml"):
@@ -37,7 +54,7 @@ def policy_errors(sources):
             limit = tomllib.loads(text).get("cognitive-complexity-threshold")
             if type(limit) is not int or limit != THRESHOLD:
                 errors.append(f"{path}: cognitive-complexity-threshold must be {THRESHOLD}")
-        elif name == "Cargo.toml":
+        elif name == "cargo.toml":
             manifest = tomllib.loads(text)
             if "package" not in manifest:
                 continue
@@ -47,6 +64,9 @@ def policy_errors(sources):
                 lint = lint.get("level")
             if lint != "forbid":
                 errors.append(f"{path}: package must forbid clippy::cognitive_complexity")
+        elif Path(path).parent.name.casefold() == ".cargo" and name in ("config", "config.toml"):
+            if cargo_config_caps(tomllib.loads(text)):
+                errors.append(f"{path}: Cargo config must not cap compiler lints with --cap-lints")
     if not config_found:
         errors.append("missing tracked clippy.toml")
     if not packages:
@@ -63,9 +83,10 @@ def main(argv=None):
     args = parser.parse_args(argv)
     try:
         root = Path(git(args.root, "rev-parse", "--show-toplevel").removesuffix(b"\n").decode())
-        sources = []
-        for suffix in (b".rs", b".toml"):
-            sources.extend(tracked_contents(root, staged=args.staged, revision=args.revision, suffix=suffix))
+        # Cargo config names are case-insensitive on Windows. Preserve the size
+        # checker's exact extension policy while scanning policy inputs broadly.
+        sources = tracked_contents(root, staged=args.staged, revision=args.revision,
+                                   suffix=(b".rs", b".toml", b".cargo/config"), ignore_case=True)
         errors = policy_errors(sources)
         for error in errors:
             print(f"error: {error}")
