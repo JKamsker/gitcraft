@@ -37,6 +37,10 @@ def main():
         except json.JSONDecodeError:
             print(line.rstrip(), flush=True)
             continue
+        if message.get("reason") == "compiler-message":
+            rendered = message.get("message", {}).get("rendered")
+            print(rendered.rstrip() if rendered else line.rstrip(), flush=True)
+            continue
         if message.get("reason") != "compiler-artifact":
             continue
         if not message.get("profile", {}).get("test"):
