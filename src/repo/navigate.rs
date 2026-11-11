@@ -7,57 +7,18 @@ mod diff_navigation;
 #[path = "core_seams/file_navigation.rs"]
 mod file_navigation;
 
+mod target;
+pub(super) use target::PendingGoto;
+
 use super::{
-    Action, Compare, CompareData, DiffKey, DiffView, MAX_HISTORY, Msg, RepoTab, WIP_HASH, conflict,
-    diff, file_text, file_view, spawn,
+    Compare, CompareData, DiffKey, DiffView, Msg, RepoTab, WIP_HASH, conflict, diff, file_text,
+    file_view, spawn,
 };
 use crate::git;
 use crate::settings::Settings;
 use crate::theme::Tokens;
 
-/// A delayed graph selection retains whether it came from browsing or view restoration.
-#[derive(Clone)]
-pub(super) enum PendingGoto {
-    History(String),
-    Restore(String),
-}
-
-impl PendingGoto {
-    pub(super) fn hash(&self) -> &str {
-        match self {
-            Self::History(hash) | Self::Restore(hash) => hash,
-        }
-    }
-
-    pub(super) fn restoring(&self) -> bool {
-        matches!(self, Self::Restore(_))
-    }
-}
-
 impl RepoTab {
-    pub(super) fn retire_navigation_restore(&mut self, action: &Action) {
-        if self
-            .pending_goto
-            .as_ref()
-            .is_some_and(PendingGoto::restoring)
-            && matches!(
-                action,
-                Action::Select(_)
-                    | Action::SelectHash(_)
-                    | Action::SelectStash(_)
-                    | Action::ActivityCommit(_)
-                    | Action::OpenCommitChanges(_)
-                    | Action::CloseDiff
-                    | Action::FileView { .. }
-                    | Action::OpenPr(_)
-                    | Action::OpenCi { .. }
-                    | Action::Navigate(_)
-            )
-        {
-            self.pending_goto = None;
-        }
-    }
-
     pub(super) fn is_wip(&self, row: usize) -> bool {
         self.commits.get(row).is_some_and(|c| c.hash == WIP_HASH)
     }
@@ -239,64 +200,6 @@ impl RepoTab {
         self.diff = None;
         self.conflict = None;
         self.load_detail(hash, ctx);
-    }
-
-    pub(super) fn select_hash(&mut self, hash: &str, ctx: &egui::Context) {
-        self.select_target(&PendingGoto::History(hash.to_owned()), ctx);
-    }
-
-    fn select_target(&mut self, target: &PendingGoto, ctx: &egui::Context) {
-        let hash = target.hash();
-        match self.index.get(hash).copied() {
-            Some(row) => {
-                if target.restoring() {
-                    self.restore_commit_selection(row, ctx);
-                } else {
-                    self.select_history(row, ctx);
-                }
-                self.scroll_to = Some(row);
-            }
-            None => {
-                self.status = Some(crate::repo::Notice::plain((
-                    crate::i18n::message(
-                        "repo-core-2900",
-                        &[("hash", hash.get(..8).unwrap_or(hash).to_string().into())],
-                    ),
-                    true,
-                )));
-            }
-        }
-    }
-
-    /// Selects `hash`, loading more history first if it's further down.
-    pub(super) fn goto(&mut self, hash: &str, ctx: &egui::Context) {
-        self.goto_target(PendingGoto::History(hash.to_owned()), ctx);
-    }
-
-    pub(super) fn goto_target(&mut self, target: PendingGoto, ctx: &egui::Context) {
-        let hash = target.hash().to_owned();
-        // Nothing read to look in yet: once it is (see `rebuild`).
-        if self.sleeping() || self.resuming {
-            self.pending_goto = Some(target);
-            return;
-        }
-        if !self.index.contains_key(&hash) && self.history.iter().any(|c| c.hash == hash) {
-            self.history_filter.revealed.insert(hash.clone());
-            let previous = self.selected_hash();
-            self.rebuild_rows();
-            self.selected = previous.and_then(|h| self.index.get(&h).copied());
-        }
-        if self.index.contains_key(&hash) {
-            self.pending_goto = None;
-            self.select_target(&target, ctx);
-            self.history_filter.revealed.remove(&hash);
-        } else if self.has_more && self.history.len() < MAX_HISTORY {
-            self.pending_goto = Some(target);
-            self.load_more(ctx);
-        } else {
-            self.pending_goto = None;
-            self.select_target(&target, ctx);
-        }
     }
 
     /// Closes the diff of a file between two commits (opened from a comparison).

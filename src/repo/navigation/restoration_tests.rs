@@ -194,31 +194,52 @@ fn hidden_and_paged_restore_targets_keep_their_intent_through_late_details() {
 }
 
 #[test]
-fn a_later_history_selection_retires_a_paged_restoration() {
-    for by_hash in [false, true] {
-        let ctx = egui::Context::default();
-        let mut tab = tab(&ctx, false);
-        let a = "a".repeat(40);
-        let b = "b".repeat(40);
-        tab.history.retain(|commit| commit.hash == a);
-        tab.rebuild_rows();
-        tab.has_more = true;
-        messages::record_jobs(|| {
-            tab.goto_target(
-                super::super::navigate::PendingGoto::Restore(b.clone()),
-                &ctx,
-            );
-            assert!(tab.pending_goto.is_some());
-            let action = if by_hash {
-                Action::SelectHash(a.clone())
-            } else {
-                Action::Select(tab.index[&a])
-            };
-            tab.apply(action, &ctx);
-            assert!(tab.pending_goto.is_none());
-            tab.history.push(commit(&b));
-            tab.rebuild(&ctx);
-            assert_eq!(tab.selected_hash(), Some(a));
-        });
+fn a_later_explicit_destination_retires_a_paged_restoration() {
+    let a = "a".repeat(40);
+    let b = "b".repeat(40);
+    for saved in [false, true] {
+        let mut destinations = vec![
+            Action::Select(0),
+            Action::SelectHash(a.clone()),
+            Action::OpenDiff(key(&a)),
+            Action::OpenDiffOfLines {
+                hash: a.clone(),
+                path: "file.txt".into(),
+                lines: Vec::new(),
+            },
+            Action::FileView {
+                path: "file.txt".into(),
+                rev: Some(a.clone()),
+                tab: file_view::FileTab::File,
+            },
+        ];
+        destinations.extend(
+            crate::repo::insights::Kind::ALL
+                .map(|kind| Action::Insights(crate::repo::insights::InsightsAct::Open(kind))),
+        );
+        for action in destinations {
+            let ctx = egui::Context::default();
+            let mut tab = tab(&ctx, saved);
+            tab.history.retain(|commit| commit.hash == a);
+            tab.rebuild_rows();
+            tab.has_more = true;
+            messages::record_jobs(|| {
+                tab.goto_target(
+                    super::super::navigate::PendingGoto::Restore(b.clone()),
+                    &ctx,
+                );
+                assert!(tab.pending_goto.is_some());
+                tab.apply(action, &ctx);
+                assert!(tab.pending_goto.is_none());
+                let destination = tab.current_view();
+                let request = tab.diff.as_ref().map(|view| view.request);
+                tab.history.push(commit(&b));
+                tab.rebuild(&ctx);
+                tab.handle(Msg::Detail(b.clone(), Ok(detail(&b))), &ctx);
+                assert_eq!(tab.selected_hash().as_deref(), Some(a.as_str()));
+                assert_eq!(tab.current_view(), destination);
+                assert_eq!(tab.diff.as_ref().map(|view| view.request), request);
+            });
+        }
     }
 }
