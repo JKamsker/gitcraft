@@ -65,8 +65,12 @@ def policy_errors(sources):
             if lint != "forbid":
                 errors.append(f"{path}: package must forbid clippy::cognitive_complexity")
         elif Path(path).parent.name.casefold() == ".cargo" and name in ("config", "config.toml"):
-            if cargo_config_caps(tomllib.loads(text)):
+            config = tomllib.loads(text)
+            if cargo_config_caps(config):
                 errors.append(f"{path}: Cargo config must not cap compiler lints with --cap-lints")
+            environment = config.get("env", {})
+            if isinstance(environment, dict) and any(key.upper() == "CLIPPY_CONF_DIR" for key in environment):
+                errors.append(f"{path}: Cargo config must not redirect Clippy configuration with CLIPPY_CONF_DIR")
     if not config_found:
         errors.append("missing tracked clippy.toml")
     if not packages:

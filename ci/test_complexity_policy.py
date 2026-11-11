@@ -89,6 +89,16 @@ RUSTFLAGS = "--cfg=cap_lints"
         for name in ("config", "config.toml"):
             self.assertEqual(self.errors(extra=[(f".cargo/{name}", config)]), [])
 
+    def test_cargo_config_cannot_redirect_clippy_configuration(self):
+        for path in (".cargo/config", ".cargo/config.toml", "nested/.cargo/config", ".CARGO/CONFIG.TOML"):
+            for variable in ("CLIPPY_CONF_DIR", "clippy_conf_dir"):
+                for value in ('"/external/config"', '{value="../alternate", relative=true}',
+                              '{value="/external/config", force=true}'):
+                    with self.subTest(path=path, variable=variable, value=value):
+                        errors = self.errors(extra=[(path, f"[env]\n{variable}={value}\n".encode())])
+                        self.assertEqual(len(errors), 1)
+                        self.assertIn("must not redirect Clippy configuration", errors[0])
+
 
 class SnapshotTests(unittest.TestCase):
     def test_cargo_config_caps_are_checked_in_complete_working_index_and_revision(self):
@@ -114,7 +124,7 @@ class SnapshotTests(unittest.TestCase):
                 config.write_text('[build]\nrustflags=["--cfg", "fixture"]\n')
                 git("add", ".")
                 git("commit", "-qm", "ordinary compiler flags")
-                config.write_text('[build]\nrustflags=["--cap-lints=allow"]\n')
+                config.write_text('[build]\nrustflags=["--cap-lints=allow"]\n[env]\nCLIPPY_CONF_DIR="/external"\n')
                 self.assertEqual(check(), 1)
                 self.assertEqual(check("--staged"), 0)
                 self.assertEqual(check("--revision", "HEAD"), 0)

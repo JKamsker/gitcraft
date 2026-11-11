@@ -1,6 +1,7 @@
 """Execute Clippy on dependency-free fixtures to protect the real lint boundary."""
 
 import os
+import json
 from pathlib import Path
 import subprocess
 import tempfile
@@ -15,7 +16,7 @@ def branching(count):
 
 
 class CompilerTests(unittest.TestCase):
-    def test_real_cargo_lint_caps_require_snapshot_policy_protection(self):
+    def test_real_cargo_lint_caps_and_redirects_require_snapshot_policy_protection(self):
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
             (root / "src").mkdir()
@@ -47,10 +48,16 @@ cognitive_complexity = "forbid"
             baseline = clippy()
             self.assertNotEqual(baseline.returncode, 0, baseline.stdout)
             self.assertIn("cognitive_complexity", baseline.stdout)
-            for name, flags in (
-                ("config", '[build]\nrustflags=["--cap-lints", "allow"]'),
-                ("config.toml", '[build]\nrustflags="--cap-lints=allow"'),
-                ("config.toml", '[target.\'cfg(all())\']\nrustflags=["--cap-lints=allow"]'),
+            alternate = root / "alternate"
+            alternate.mkdir()
+            (alternate / "clippy.toml").write_text("cognitive-complexity-threshold = 100\n")
+            redirect = f'[env]\nCLIPPY_CONF_DIR={{value={json.dumps(alternate.as_posix())}, force=true}}'
+            for name, flags, diagnostic in (
+                ("config", '[build]\nrustflags=["--cap-lints", "allow"]', "must not cap compiler lints"),
+                ("config.toml", '[build]\nrustflags="--cap-lints=allow"', "must not cap compiler lints"),
+                ("config.toml", '[target.\'cfg(all())\']\nrustflags=["--cap-lints=allow"]', "must not cap compiler lints"),
+                ("config", redirect, "must not redirect Clippy configuration"),
+                ("config.toml", redirect, "must not redirect Clippy configuration"),
             ):
                 with self.subTest(name=name, flags=flags):
                     path = root / ".cargo" / name
@@ -63,7 +70,7 @@ cognitive_complexity = "forbid"
                             (f".cargo/{name}", flags.encode()),
                         ])
                         self.assertEqual(len(errors), 1, errors)
-                        self.assertIn("must not cap compiler lints", errors[0])
+                        self.assertIn(diagnostic, errors[0])
                     finally:
                         path.unlink()
             self.assertNotEqual(clippy().returncode, 0)
