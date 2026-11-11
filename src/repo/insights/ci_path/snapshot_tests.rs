@@ -44,8 +44,11 @@ fn exact_revision_project_workflow_and_attempt_guard_snapshot_acceptance() {
 }
 
 #[test]
-fn changing_attempt_or_baseline_retires_prior_successes_and_errors() -> Result<(), String> {
-    for error in [false, true] {
+fn changing_run_attempt_or_baseline_retires_prior_successes_and_errors() -> Result<(), String> {
+    for (choice, error, late) in (0..3)
+        .flat_map(|choice| [false, true].map(|error| (choice, error)))
+        .flat_map(|(choice, error)| [false, true].map(|late| (choice, error, late)))
+    {
         let ctx = egui::Context::default();
         let mut tab = schedule::tab(&ctx, Kind::CiPath);
         let mut snapshot = tests::explorer();
@@ -56,6 +59,10 @@ fn changing_attempt_or_baseline_retires_prior_successes_and_errors() -> Result<(
         let project = snapshot.project.clone();
         let sha = snapshot.run.info.sha.clone();
         let key = RunKey::of(&snapshot.run.info);
+        let target = RunKey {
+            run: key.run + u64::from(choice == 2),
+            attempt: 2,
+        };
         let old = {
             let state = state(&mut tab)?;
             state.run = Some((project, key.run));
@@ -63,25 +70,44 @@ fn changing_attempt_or_baseline_retires_prior_successes_and_errors() -> Result<(
             state.pinned = Some(key);
             let ready = state.explorer.start();
             assert!(state.explorer.accept(ready, Ok(snapshot.clone())));
+            let inventory = state.runs.start();
+            assert!(state.runs.accept(
+                inventory,
+                Ok(Runs {
+                    list: vec![(
+                        snapshot.project.clone(),
+                        Run {
+                            id: target.run,
+                            attempt: target.attempt,
+                            ..Run::default()
+                        }
+                    )],
+                    errors: Vec::new(),
+                })
+            ));
             state.explorer.start()
         };
         crate::repo::messages::record_jobs(|| {
             tab.ci_path_act(
-                Act::PickAttempt(RunKey {
-                    run: key.run,
-                    attempt: 2,
-                }),
+                match choice {
+                    0 => Act::PickAttempt(target),
+                    1 => Act::PickBaseline(Baseline::None),
+                    _ => Act::PickRun(0),
+                },
                 &ctx,
             )
         });
         assert!(state(&mut tab)?.explorer.ready().is_none());
-        assert_eq!(
-            state(&mut tab)?.pinned,
-            Some(RunKey {
-                run: key.run,
-                attempt: 2
-            })
-        );
+        let expected = if choice == 1 { key } else { target };
+        assert_eq!(state(&mut tab)?.pinned, Some(expected));
+        let mut fresh = snapshot.clone();
+        fresh.run.info.id = expected.run;
+        fresh.run.info.attempt = expected.attempt;
+        fresh.compared = None;
+        let current = state(&mut tab)?.explorer.start();
+        if late {
+            tab.ci_path_run(current, Ok(fresh.clone()));
+        }
         tab.ci_path_run(
             old,
             if error {
@@ -90,8 +116,19 @@ fn changing_attempt_or_baseline_retires_prior_successes_and_errors() -> Result<(
                 Ok(snapshot)
             },
         );
-        assert!(state(&mut tab)?.explorer.ready().is_none());
-        assert!(state(&mut tab)?.explorer.loading);
+        if !late {
+            assert!(state(&mut tab)?.explorer.ready().is_none());
+            assert!(state(&mut tab)?.explorer.loading);
+            tab.ci_path_run(current, Ok(fresh));
+        }
+        assert!(!state(&mut tab)?.explorer.loading);
+        assert_eq!(
+            state(&mut tab)?
+                .explorer
+                .ready()
+                .map(|value| RunKey::of(&value.run.info)),
+            Some(expected)
+        );
     }
     Ok(())
 }
