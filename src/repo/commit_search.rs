@@ -66,6 +66,10 @@ impl Request {
             && self.code == tab.search.code
             && self.from == tab.log_from
             && self.order == tab.log_order
+            && self.order == super::graph_order::load(ctx, tab.repo_key())
+            && self.from
+                == super::branch_visibility::Visibility::load(ctx, tab.repo_key())
+                    .revisions(&tab.refs)
             && self.excluded == super::history_filter::rules(ctx, tab.repo_key()).excludes()
             && self.connection == crate::connections::current()
             && self.connection_generation != u64::MAX

@@ -215,6 +215,7 @@ impl RepoTab {
                 return;
             }
         }
+        self.search.retire();
         self.visibility.store(ctx, self.repo_key());
         self.reload(ctx);
     }
@@ -222,6 +223,9 @@ impl RepoTab {
     /// Takes what is kept for the repository, now that the worktrees read tell which one it is,
     /// with `log_from` what the history just read was logged from.
     pub(super) fn take_visibility(&mut self, log_from: Option<Vec<String>>, ctx: &egui::Context) {
+        if self.log_from != log_from {
+            self.search.retire();
+        }
         let mut visibility = Visibility::load(ctx, self.repo_key());
         if visibility.prune(&self.refs) {
             visibility.store(ctx, self.repo_key());

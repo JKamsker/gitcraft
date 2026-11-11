@@ -193,3 +193,54 @@ fn clearing_or_invalidating_the_query_retires_inflight_work() -> Result<(), Stri
     }
     Ok(())
 }
+
+#[test]
+fn actual_scope_setters_retire_every_a_b_a_transition() -> Result<(), String> {
+    for transition in [
+        "requested-order",
+        "loaded-order",
+        "requested-roots",
+        "loaded-roots",
+    ] {
+        let ctx = egui::Context::default();
+        let mut tab = tab(&ctx);
+        let old = start(&mut tab, &ctx, "same")?;
+        let original_order = tab.log_order;
+        let different_order = git::LogOrder {
+            first_parent: !original_order.first_parent,
+            ..original_order
+        };
+        let original_roots = tab.log_from.clone();
+        super::super::messages::record_jobs(|| match transition {
+            "requested-order" => {
+                tab.set_log_order(different_order, &ctx);
+                tab.set_log_order(original_order, &ctx);
+            }
+            "loaded-order" => {
+                tab.take_order(different_order, &ctx);
+                tab.take_order(original_order, &ctx);
+            }
+            "requested-roots" => {
+                use super::super::branch_visibility::Change;
+                tab.change_visibility(Change::Solo("refs/heads/another".into()), &ctx);
+                tab.change_visibility(Change::ShowAll, &ctx);
+            }
+            _ => {
+                tab.take_visibility(Some(vec!["refs/heads/another".into()]), &ctx);
+                tab.take_visibility(original_roots, &ctx);
+            }
+        });
+        assert!(old.cancel.is_cancelled(), "{transition}");
+        assert!(!tab.search.running, "{transition}");
+        let current = start(&mut tab, &ctx, "same")?;
+        for result in [Ok(vec!["stale".into()]), Err("stale failure".into())] {
+            answer(&mut tab, &ctx, &old, result);
+            assert!(tab.search.running);
+            assert!(tab.search.results.is_empty());
+            assert!(tab.search.problem.is_none());
+        }
+        answer(&mut tab, &ctx, &current, Ok(Vec::new()));
+        assert!(!tab.search.running);
+    }
+    Ok(())
+}
