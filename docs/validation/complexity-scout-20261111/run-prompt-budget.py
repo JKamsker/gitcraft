@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Reproduce the pure parser boundary check; this is not an application test run."""
 import argparse
+import gzip
 import hashlib
 import json
 import os
@@ -78,7 +79,7 @@ def main():
                    str(crate / "Cargo.toml"), *arguments[separator:]]
         result = subprocess.run(command, env=environment, stdout=subprocess.PIPE,
                                 stderr=subprocess.STDOUT, check=False)
-        (args.output / f"{name}.log").write_bytes(result.stdout)
+        (args.output / f"{name}.log.gz").write_bytes(gzip.compress(result.stdout, mtime=0))
         results.append({"name": name, "command": command,
                         "exit_code": result.returncode, "expected": expected})
         if result.returncode != expected:
