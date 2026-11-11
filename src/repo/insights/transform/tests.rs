@@ -23,10 +23,12 @@ impl crate::repo::insights::context::namespace_tests::Fixture for State {
 #[test]
 fn forge_retirement_clears_only_pr_owned_reads_and_preserves_display_options() {
     for of in [Of::Commit, Of::Branch, Of::Pr(7)] {
-        let mut state = State::default();
-        state.of = of;
-        state.asked = Some((of, None));
-        state.hide_once = true;
+        let mut state = State {
+            of,
+            asked: Some((of, None)),
+            hide_once: true,
+            ..Default::default()
+        };
         let old = state.read.start();
         let pr_owned = matches!(of, Of::Pr(_));
         assert_eq!(state.invalidate_forge(), pr_owned);
