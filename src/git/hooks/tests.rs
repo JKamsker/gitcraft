@@ -200,3 +200,19 @@ fn the_script_for_elsewhere_passes_the_hook_events_back() {
         })
     );
 }
+#[test]
+fn push_output_stays_private_without_complete_hook_free_evidence() {
+    use super::push_output_private;
+    let start = r#"{"event":"start","sid":"root"}"#;
+    let end = r#"{"event":"exit","sid":"root","code":0}"#;
+    assert!(!push_output_private(Some(&format!("{start}\n{end}"))));
+    for trace in [None, Some(""), Some(start), Some("not json"), Some(end)] {
+        assert!(push_output_private(trace));
+    }
+    for code in [0, 3] {
+        let events = format!(
+            "{start}\n{{\"event\":\"child_start\",\"sid\":\"root\",\"child_id\":0,\"child_class\":\"hook\",\"hook_name\":\"pre-push\"}}\n{{\"event\":\"child_exit\",\"sid\":\"root\",\"child_id\":0,\"code\":{code}}}\n{end}"
+        );
+        assert!(push_output_private(Some(&events)));
+    }
+}

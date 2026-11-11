@@ -230,13 +230,55 @@ pub(in crate::git) fn run_watched_extra_recorded(
         Ok(ended) => ended,
         Err(e) => return failed(e),
     };
-    let failed_hook = if target.is_some() && extra.trace_hooks {
+    let events = if target.is_some() && extra.trace_hooks {
         let (stderr, events) = crate::git::hooks::split_trace(ended.stderr.as_bytes());
         ended.stderr = String::from_utf8_lossy(&stderr).into_owned();
-        crate::git::hooks::failed_hook(&events, args)
+        Some(events)
     } else {
-        trace.as_ref().and_then(|t| t.failed_hook(args))
+        trace.as_ref().and_then(|t| t.events())
     };
+    let failed_hook = events
+        .as_deref()
+        .and_then(|events| crate::git::hooks::failed_hook(events, args));
+    let missing_folder = target
+        .as_ref()
+        .filter(|_| {
+            ended.code == Some(1)
+                && ended
+                    .stderr
+                    .lines()
+                    .any(|line| remote::is_missing_folder(line.as_bytes()))
+        })
+        .map(super::missing_folder);
+    if crate::git::hooks::subcommand(args) == Some("push")
+        && crate::git::hooks::push_output_private(events.as_deref())
+    {
+        // Sanitize before either log or the result sees output, even on success or
+        // without tracing. Keep only structured refusal/authentication diagnostics.
+        let refusal =
+            args.last()
+                .and_then(|spec| spec.split_once(':'))
+                .and_then(|(source, destination)| {
+                    super::reviewed_push::reviewed_refusal(
+                        ended.stdout.as_bytes(),
+                        source,
+                        destination,
+                    )
+                });
+        let authentication_failed = super::is_auth_error(&ended.stderr);
+        ended.stdout.clear();
+        ended.stderr = if let Some(error) = &missing_folder {
+            error.clone()
+        } else if failed_hook.is_some() {
+            "Hook output withheld because it can contain credentials or secrets.".into()
+        } else if authentication_failed {
+            "Authentication failed. Hook output withheld because it can contain credentials or secrets.".into()
+        } else {
+            refusal.unwrap_or_else(|| {
+                "Hook output withheld because it can contain credentials or secrets.".into()
+            })
+        };
+    }
     crate::git::doctor::hook_log::record(dir, args, ended.code == Some(0), ended.stderr.as_bytes());
     let recorded = Recorded::new(
         &words,
@@ -254,16 +296,8 @@ pub(in crate::git) fn run_watched_extra_recorded(
         }
         return (Ok(ended.stdout), recorded);
     }
-    if let Some(t) = &target
-        && ended.code == Some(1)
-        // After whatever the connection printed first (a login banner).
-        && ended
-            .stderr
-            .lines()
-            .any(|l| remote::is_missing_folder(l.as_bytes()))
-    {
-        let e = super::missing_folder(t);
-        return (Err(e), recorded);
+    if let Some(error) = missing_folder {
+        return (Err(error), recorded);
     }
     let e = failure_message(
         args,
