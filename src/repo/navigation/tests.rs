@@ -327,3 +327,6 @@ fn other_keys_and_text_fields_do_not_step() {
 // and accents. Gives the folder and the file's path.
 include!("tests_repository.rs");
 include!("tests_keyboard_ui.rs");
+
+#[path = "manual_history.rs"]
+mod manual_history;
