@@ -343,7 +343,7 @@ fn a_pull_request_is_seen_only_once_its_comparison_shows() -> Result<(), String>
         .as_ref()
         .is_some_and(|v| v.data.is_some())));
     std::thread::sleep(std::time::Duration::from_millis(100));
-    tab.poll(&ctx);
+    crate::repo::hang_diagnostics::poll(&mut tab, &ctx);
     assert_eq!(git::reviewed(dir, &key, 4)?, None);
     drop(_failed);
 
