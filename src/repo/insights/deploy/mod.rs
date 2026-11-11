@@ -95,29 +95,33 @@ impl RepoTab {
         self.insight_then(
             ctx,
             move || analysis::read(&path, &project, &sha, (&name, &sha)),
-            move |tab, result: Result<Flow, String>, ctx| {
-                let Some(state) = tab.insights.as_mut().map(|v| &mut v.deploy) else {
-                    return;
-                };
-                if let Err(e) = &result
-                    && super::ci_path::tool_problem(e)
-                {
-                    state.flow.accept(request, Err(e.clone()));
-                    state.unavailable = Some(("The forge's tool is needed".to_owned(), e.clone()));
-                    return;
-                }
-                if state.flow.accept(request, result) {
-                    state.picture = state.flow.ready().map(|f| flow::picture(f, ctx));
-                    let valid = state
-                        .picture
-                        .as_ref()
-                        .is_some_and(|p| state.selected.is_none_or(|s| p.targets.contains(&s)));
-                    if !valid {
-                        state.selected = None;
-                    }
-                }
-            },
+            move |tab, result, ctx| tab.deploy_read(request, result, ctx),
         );
+    }
+
+    fn deploy_read(&mut self, request: u64, result: Result<Flow, String>, ctx: &egui::Context) {
+        let Some(state) = self.insights.as_mut().map(|v| &mut v.deploy) else {
+            return;
+        };
+        if !state.flow.accept(request, result) {
+            return;
+        }
+        state.unavailable = state
+            .flow
+            .error()
+            .filter(|error| super::ci_path::tool_problem(error))
+            .map(|error| ("The forge's tool is needed".to_owned(), error.to_owned()));
+        if state.unavailable.is_some() {
+            return;
+        }
+        state.picture = state.flow.ready().map(|f| flow::picture(f, ctx));
+        let valid = state
+            .picture
+            .as_ref()
+            .is_some_and(|p| state.selected.is_none_or(|s| p.targets.contains(&s)));
+        if !valid {
+            state.selected = None;
+        }
     }
 
     pub(super) fn deploy_act(&mut self, act: Act, _ctx: &egui::Context) {
