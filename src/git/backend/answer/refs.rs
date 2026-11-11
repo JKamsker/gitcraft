@@ -132,8 +132,15 @@ enum Filter<'a> {
     Contains(&'a str),
 }
 
-/// Format supported `git for-each-ref` queries using the current ref snapshot.
-pub(super) fn answer(path: &Path, args: &[&str]) -> Option<Answer> {
+struct Query<'a> {
+    pieces: Vec<Piece>,
+    sort: Option<bool>,
+    patterns: Vec<Pattern>,
+    filters: Vec<Filter<'a>>,
+}
+
+/// Separate the supported CLI grammar from repository traversal and formatting.
+fn query<'a>(args: &[&'a str]) -> Option<Query<'a>> {
     let mut pieces = None;
     let mut sort = None;
     let mut patterns = Vec::new();
@@ -163,7 +170,22 @@ pub(super) fn answer(path: &Path, args: &[&str]) -> Option<Answer> {
             patterns.push(Pattern::new(arg)?);
         }
     }
-    let pieces = pieces?;
+    Some(Query {
+        pieces: pieces?,
+        sort,
+        patterns,
+        filters,
+    })
+}
+
+/// Format supported `git for-each-ref` queries using the current ref snapshot.
+pub(super) fn answer(path: &Path, args: &[&str]) -> Option<Answer> {
+    let Query {
+        pieces,
+        sort,
+        patterns,
+        filters,
+    } = query(args)?;
     let repo = open(path)?;
     plain(&repo)?;
     // A linked worktree has refs of its own besides the shared ones.
