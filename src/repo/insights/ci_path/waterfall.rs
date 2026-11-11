@@ -5,6 +5,7 @@
 //! links and the picked job's dependencies are drawn as arrows, solid when the workflow file
 //! says so and dashed when inferred.
 
+mod dependencies;
 mod job;
 use job::{glyph_after, job_bar, job_tip, state_color, unknown};
 
@@ -67,6 +68,18 @@ fn tick(span: i64, width: f32, min_px: f32) -> i64 {
         .unwrap_or(14_400)
 }
 
+/// Flatten expanded jobs into the displayed job/step order before drawing rows.
+fn visible_rows(jobs: &[TimedJob], expanded: &HashSet<usize>) -> Vec<Row> {
+    let mut rows = Vec::new();
+    for (i, job) in jobs.iter().enumerate() {
+        rows.push(Row::Job(i));
+        if expanded.contains(&i) {
+            rows.extend((0..job.steps.len()).map(|s| Row::Step(i, s)));
+        }
+    }
+    rows
+}
+
 pub(super) fn show(
     ui: &mut Ui,
     explorer: &Explorer,
@@ -111,13 +124,7 @@ pub(super) fn show(
     }
     let span = (t1 - t0).max(1);
 
-    let mut rows = Vec::new();
-    for (i, job) in jobs.iter().enumerate() {
-        rows.push(Row::Job(i));
-        if expanded.contains(&i) {
-            rows.extend((0..job.steps.len()).map(|s| Row::Step(i, s)));
-        }
-    }
+    let rows = visible_rows(jobs, expanded);
     let height = AXIS_H
         + rows
             .iter()
@@ -352,45 +359,5 @@ pub(super) fn show(
     }
 
     // The critical path's links, then the picked job's dependencies.
-    let mut links: Vec<(usize, usize, Evidence, Color32)> = explorer
-        .critical
-        .jobs
-        .windows(2)
-        .filter_map(|w| {
-            let dep = explorer
-                .deps
-                .edges
-                .iter()
-                .find(|d| d.from == w[0] && d.to == w[1])?;
-            Some((w[0], w[1], dep.evidence, t.text))
-        })
-        .collect();
-    if let Some(sel) = selected {
-        for d in explorer.deps.before(sel) {
-            if !explorer.critical.link(d.from, sel) {
-                links.push((d.from, sel, d.evidence, t.text_dim));
-            }
-        }
-    }
-    for (from, to, evidence, color) in links {
-        let (Some(&ya), Some(&yb)) = (centers.get(&from), centers.get(&to)) else {
-            continue;
-        };
-        let (Some(end), Some(start)) = (
-            end_of(&jobs[from], now),
-            jobs[to].ready().or(jobs[to].started),
-        ) else {
-            continue;
-        };
-        let a = pos2(x(end), ya);
-        let b = pos2(x(start).max(a.x + 4.0), yb);
-        let knee = a.x + 4.0;
-        let points = [a, pos2(knee, ya), pos2(knee, yb), b];
-        common::evidence_segment(&painter, &points, evidence, Stroke::new(1.5, color));
-        painter.add(Shape::convex_polygon(
-            vec![b, b + vec2(-5.0, -3.5), b + vec2(-5.0, 3.5)],
-            color,
-            Stroke::NONE,
-        ));
-    }
+    dependencies::paint(&painter, explorer, selected, &centers, &x, &t);
 }
