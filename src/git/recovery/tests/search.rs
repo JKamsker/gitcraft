@@ -3,6 +3,61 @@
 use super::*;
 
 #[test]
+fn shared_blobs_keep_each_path_and_stash_layer_before_and_after_drop() -> Result<(), String> {
+    for dropped in [false, true] {
+        let f = Fixture::new()?;
+        f.write("first", b"parse_header shared history\n")?;
+        f.write("second", b"parse_header shared history\n")?;
+        let history = f.commit("shared sources")?;
+        f.write("first", b"parse_header shared stash layers\n")?;
+        git::run(Some(&f.0), &["add", "first"])?;
+        git::run(Some(&f.0), &["stash", "push", "-qm", "shared layers"])?;
+        let stash = git::resolve(&f.0, "refs/stash")?;
+        if dropped {
+            git::run(Some(&f.0), &["stash", "drop"])?;
+        }
+        let results = search(&f.0, "parse_header", &|| true)?;
+        assert_eq!(results.report.hits.len(), 2);
+        for path in ["first", "second"] {
+            assert!(
+                results
+                    .report
+                    .hits
+                    .iter()
+                    .flat_map(|hit| &hit.provenance)
+                    .any(|source| {
+                        source.commit == history
+                            && source.path == path
+                            && source.origin == Origin::History
+                    }),
+                "Missing history path {path}: {:?}",
+                results.report
+            );
+        }
+        let expected = if dropped {
+            Origin::DroppedStash
+        } else {
+            Origin::LiveStash
+        };
+        for layer in ["working", "staged"] {
+            assert!(
+                results
+                    .report
+                    .hits
+                    .iter()
+                    .flat_map(|hit| &hit.provenance)
+                    .any(|source| {
+                        source.commit == stash && source.layer == layer && source.origin == expected
+                    }),
+                "Missing {expected:?} layer {layer}: {:?}",
+                results.report
+            );
+        }
+    }
+    Ok(())
+}
+
+#[test]
 pub(super) fn content_search_finds_reflog_commits_and_staged_only_blobs_without_any_writes()
 -> Result<(), String> {
     let f = Fixture::new()?;
