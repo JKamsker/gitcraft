@@ -295,7 +295,7 @@ pub struct RepoTab {
     /// Find in the diff, file or blame shown.
     pub(in crate::repo) find: find::Find,
     /// A commit to select once enough history is loaded (search results, links).
-    pub(in crate::repo) pending_goto: Option<String>,
+    pub(in crate::repo) pending_goto: Option<navigate::PendingGoto>,
 
     /// Every operation and change seen, kept across restarts; undo and redo walk it.
     pub(in crate::repo) timeline: timeline::Timeline,
