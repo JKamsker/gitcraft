@@ -191,6 +191,12 @@ pub(crate) fn generation() -> u64 {
 thread_local! { static PINNED: RefCell<Option<Context>> = const { RefCell::new(None) }; }
 
 pub(crate) fn set(context: Context) {
+    #[cfg(test)]
+    SET_ATTEMPTS.with(|count| {
+        if let Some(attempts) = count.get() {
+            count.set(Some(attempts + 1));
+        }
+    });
     let mut active = ACTIVE
         .write()
         .unwrap_or_else(std::sync::PoisonError::into_inner);
@@ -202,6 +208,28 @@ pub(crate) fn set(context: Context) {
             std::sync::atomic::Ordering::Release,
         );
     }
+}
+
+#[cfg(test)]
+thread_local! { static SET_ATTEMPTS: std::cell::Cell<Option<usize>> = const { std::cell::Cell::new(None) }; }
+
+/// Observe calls on this test thread; application of the connection stays unchanged.
+#[cfg(test)]
+pub(crate) fn record_set_attempts<T>(work: impl FnOnce() -> T) -> (T, usize) {
+    struct Reset(Option<usize>);
+    impl Drop for Reset {
+        fn drop(&mut self) {
+            SET_ATTEMPTS.with(|count| count.set(self.0));
+        }
+    }
+    let previous = SET_ATTEMPTS.with(|count| count.replace(Some(0)));
+    assert!(previous.is_none(), "nested connection recording");
+    let _reset = Reset(previous);
+    let result = work();
+    (
+        result,
+        SET_ATTEMPTS.with(|count| count.get().unwrap_or_default()),
+    )
 }
 
 pub(crate) fn current() -> Context {

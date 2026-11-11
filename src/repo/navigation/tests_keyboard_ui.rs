@@ -41,6 +41,12 @@ fn the_keys_step_through_the_drawn_tab() {
     frames(&mut harness);
 
     let key = commit_key(&head, &file);
+    assert_eq!(harness.state().diff.as_ref().map(|view| &view.key), Some(&key));
+    // History navigation already revealed it; start the explicit manual-open path
+    // from the graph, retaining the original split and back/forward assertions.
+    harness.state_mut().queue(Action::CloseDiff);
+    frames(&mut harness);
+    assert!(harness.state().diff.is_none());
     harness.state_mut().queue(Action::OpenDiff(key.clone()));
     frames(&mut harness);
     assert!(harness.state().diff_beside_graph(&harness.ctx));
