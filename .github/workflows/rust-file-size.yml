@@ -16,7 +16,14 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
       - name: Checker regression tests
         run: python3 -m unittest discover -s ci -p test_rust_file_size.py -v
       - name: Enforce the full candidate tree
         run: python3 ci/rust_file_size.py --revision HEAD
+      - name: Complexity gate regression tests
+        run: python3 -m unittest discover -s ci -p 'test_complexity*.py' -v
+      - name: Prevent complexity policy overrides in the candidate tree
+        run: python3 ci/complexity_policy.py --revision HEAD

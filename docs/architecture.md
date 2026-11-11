@@ -31,6 +31,36 @@ and CI reliability with #190.
 
 ## Reproduce the survey
 
+### Enforced compiler complexity budget
+
+`cargo clippy --locked --all-targets -- -D warnings` enforces
+`clippy::cognitive_complexity` with a threshold of **25**, configured in the
+repository's single `clippy.toml` and forbidden in every package manifest.
+PR lint and release builds run it. This is Clippy's branching score, not a
+measurement of human comprehension. It is separate from the advisory lexical
+survey below and the unconditional full-tree 500-line cap above.
+
+Clippy analyzes the code compiled for that platform/features; inactive cfg
+branches and macro-generated bodies are not a complete source inventory.
+Use all-target builds on supported platforms and preserve behavioral tests.
+`ci/complexity_policy.py` checks all tracked Rust sources and Cargo/Clippy
+configuration, including inactive branches, to reject per-item threshold
+overrides, nested configurations and packages missing the forbidden lint.
+Local `allow` attributes cannot override `forbid`. Do not move complex behavior
+into macros to avoid analysis or split functions without clear responsibilities.
+
+With Python 3.11+, check working contents, the complete index, or an immutable
+candidate using `python3 ci/complexity_policy.py`, `--staged`, or
+`--revision HEAD`. The shared CI gate runs policy checks and dependency-free
+compiler fixtures: score 25 passes, score 26 fails, including closures, async
+bodies and nested functions. Run those with:
+
+```sh
+python3 -m unittest discover -s ci -p 'test_complexity*.py' -v
+```
+
+### Advisory history and lexical measurements
+
 From the repository root, with Python 3.10+ and Git:
 
 ```sh

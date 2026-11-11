@@ -90,6 +90,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
       - uses: Swatinem/rust-cache@v2
 
       # The version into Cargo.toml and Cargo.lock, so the app, the .exe's details and the
@@ -114,6 +116,9 @@ jobs:
       # Match ci.yml's isolation of tests sensitive to parallel subprocess load.
       # Keep their original time limits; run them separately instead of weakening assertions.
       # Windows runs the shared shards in parallel with this packaging job.
+      - name: Clippy and complexity gate
+        run: cargo clippy --locked --all-targets -- -D warnings
+
       - name: Test
         if: runner.os != 'Windows'
         run: cargo test --locked -- --skip parallel_bisect::tests::a_test_past_its_limit_is_stopped_and_skipped --skip app::palette::tests::thousands_of_branches_open_and_filter_quickly
