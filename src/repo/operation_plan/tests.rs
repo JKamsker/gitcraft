@@ -11,6 +11,8 @@ mod ignored_scans;
 mod routes;
 #[path = "short_rebase.rs"]
 mod short_rebase;
+#[path = "stash_guards.rs"]
+mod stash_guards;
 fn recorded_route() -> Result<git::RouteBinding, String> {
     serde_json::from_value(serde_json::json!({
         "args": ["push", "--", "original", "HEAD:refs/heads/main"],
