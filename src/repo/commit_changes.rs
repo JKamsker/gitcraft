@@ -51,6 +51,40 @@ fn completed(
     })
 }
 impl RepoTab {
+    /// User history navigation reveals a diff; passive selection restoration during
+    /// reload keeps the ordinary select path and must not reopen closed views.
+    pub(super) fn select_history(&mut self, row: usize, ctx: &egui::Context) {
+        let Some(commit) = self.commits.get(row) else {
+            return;
+        };
+        let hash = commit.hash.clone();
+        let reveal = self.stash_at(row).is_none()
+            && !hash.starts_with('\u{0}')
+            && (self.commit_changes.follows_history()
+                || self.diff.is_none()
+                || !crate::settings::Settings::get(ctx).show_detail);
+        if !reveal {
+            self.commit_changes.stop();
+            self.select(row, ctx);
+            return;
+        }
+        let already_open = self.selected == Some(row)
+            && self.diff.as_ref().is_some_and(
+                |view| matches!(&view.key, DiffKey::Commit { hash: shown, .. } if shown == &hash),
+            );
+        if !already_open {
+            self.diff = None;
+        }
+        self.select(row, ctx);
+        if already_open {
+            let mut settings = crate::settings::Settings::get(ctx);
+            settings.show_detail = true;
+            settings.set(ctx);
+        } else {
+            self.reveal_selected_changes(hash, ctx);
+        }
+    }
+
     pub(super) fn open_commit_changes(&mut self, hash: String, ctx: &egui::Context) {
         if self.conflict.is_some() || self.rebase.is_some() || self.reword.is_some() {
             self.status = Some(crate::repo::Notice::plain((

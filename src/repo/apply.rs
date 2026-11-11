@@ -76,7 +76,7 @@ impl RepoTab {
             Action::Select(row) => {
                 self.leave_pages();
                 self.doctor = None;
-                self.select(row, ctx);
+                self.select_history(row, ctx);
                 self.hint_after_select(row, ctx);
             }
             Action::ActivityCommit(hash) => self.activity_commit(hash, ctx),
