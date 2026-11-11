@@ -76,7 +76,7 @@ def job_steps(text, job):
     jobs = nested(top, "jobs", 2)
     require(job in jobs, f"missing required job: {job}")
     fields = mapping(jobs[job][1], 4)
-    require(not ({"if", "continue-on-error", "defaults"} & fields.keys()),
+    require(not ({"if", "continue-on-error", "defaults", "container"} & fields.keys()),
             f"required job {job} can skip, soften, or retarget checks")
     require("defaults" not in top, "workflow defaults can retarget required checks")
     for owner, indent, allowed in ((top, 2, {"CARGO_TERM_COLOR"}),
@@ -215,7 +215,9 @@ class WorkflowGateTests(unittest.TestCase):
 
     def test_required_jobs_and_checkouts_cannot_skip_soften_or_retarget_checks(self):
         for name, text, job, command in self.required_commands():
-            for field in ("if: false", "continue-on-error: true", "defaults:\n      run:\n        working-directory: elsewhere"):
+            for field in ("if: false", "continue-on-error: true", "defaults:\n      run:\n        working-directory: elsewhere",
+                          "container:\n      image: rust:latest\n      env:\n        RUSTFLAGS: --cap-lints allow",
+                          "container:\n      image: rust:latest\n      options: --env RUSTFLAGS=--cap-lints=allow"):
                 changed = text.replace(f"  {job}:\n", f"  {job}:\n    {field}\n")
                 with self.subTest(workflow=name, field=field), self.assertRaisesRegex(ValueError, "skip, soften, or retarget"):
                     verify_required_commands(changed, job, (command,))
