@@ -1,7 +1,9 @@
 //! Remembered text in raw Git objects, without checking out, fetching or filtering data.
 mod batch;
 mod file;
+mod provenance;
 mod recover;
+mod scan;
 pub(crate) use recover::{Prepared, Preview, Target, inspect, perform, prepare};
 #[cfg(test)]
 mod tests;
@@ -232,136 +234,15 @@ fn search_inner(repo: &Path, query: &str, active: &dyn Fn() -> bool) -> Result<R
         )
         .into());
     }
-    let all = read_commits(&reader, &commits, &mut report)?;
-    let parents: BTreeSet<_> = all
-        .values()
-        .filter(|commit| {
-            matches!(commit.parents.len(), 2 | 3)
-                && (commit.subject.starts_with("WIP on ") || commit.subject.starts_with("On "))
-        })
-        .flat_map(|commit| commit.parents.iter().skip(1).cloned())
-        .collect();
-    let extra = read_commits(&reader, &parents, &mut report)?;
-    let mut trees = BTreeMap::<String, Vec<(String, String, String)>>::new();
-    let mut entries = 0;
-    let mut ordered: Vec<_> = all.values().collect();
-    ordered.sort_by(|a, b| b.when.cmp(&a.when).then_with(|| a.oid.cmp(&b.oid)));
-    for commit in ordered {
-        let dropped = stash_shape(commit, &extra);
-        let origin = if dropped {
-            if live.contains(&commit.oid) {
-                Origin::LiveStash
-            } else {
-                Origin::DroppedStash
-            }
-        } else if unreachable.contains(&commit.oid) {
-            Origin::Unreachable
-        } else {
-            Origin::History
-        };
-        let mut layers = vec![(&commit.tree, "working")];
-        if dropped {
-            for (i, parent) in commit.parents.iter().enumerate().skip(1) {
-                if let Some(parent) = extra.get(parent) {
-                    layers.push((&parent.tree, if i == 1 { "staged" } else { "untracked" }));
-                }
-            }
-        }
-        for (tree, layer) in layers {
-            if !reader.active() {
-                return Err("Content recovery cancelled or timed out".into());
-            }
-            if !trees.contains_key(tree) {
-                trees.insert(tree.clone(), tree_entries(&reader, tree, &mut report)?);
-            }
-            for (path, mode, blob) in &trees[tree] {
-                if entries >= ENTRIES || (blobs.len() >= OBJECTS && !blobs.contains_key(blob)) {
-                    report.limited = true;
-                    break;
-                }
-                entries += 1;
-                let sources = blobs.entry(blob.clone()).or_default();
-                if sources.len() >= 50 {
-                    report.limited = true;
-                    continue;
-                }
-                sources.push(Provenance {
-                    commit: commit.oid.clone(),
-                    tree: tree.clone(),
-                    path: path.clone(),
-                    mode: mode.clone(),
-                    when: commit.when,
-                    subject: commit.subject.clone(),
-                    origin: origin.clone(),
-                    layer,
-                });
-            }
-            if entries >= ENTRIES {
-                break;
-            }
-        }
-        if entries >= ENTRIES {
-            break;
-        }
-    }
-    let ids: Vec<_> = blobs.keys().cloned().collect();
-    let checked = batch::check(&reader, &ids)?;
-    let mut requested = Vec::new();
-    for item in checked {
-        let Some((kind, size)) = item.info else {
-            report.missing += 1;
-            continue;
-        };
-        if kind != "blob" {
-            return Err(crate::i18n::text(
-                "backend-an-expected-content-object-changed-type-2096e4",
-            )
-            .into());
-        }
-        if size > BLOB_LIMIT {
-            report.large += 1;
-            continue;
-        }
-        if report.bytes + size > BYTE_LIMIT {
-            report.limited = true;
-            continue;
-        }
-        report.bytes += size;
-        requested.push((item.oid, size));
-    }
-    for group in batch::groups(&requested) {
-        for (oid, bytes) in batch::read(&reader, group, "blob")? {
-            report.scanned += 1;
-            let text = match std::str::from_utf8(&bytes) {
-                Ok(text) if !text.contains('\0') => text,
-                _ => {
-                    report.binary += 1;
-                    continue;
-                }
-            };
-            if let Some(at) = text.find(query) {
-                let (line, excerpt) = excerpt(text, at);
-                let occurrences = text.match_indices(query).take(1001).count();
-                if report.hits.len() >= HITS {
-                    report.limited = true;
-                    continue;
-                }
-                let mut provenance = blobs.remove(&oid).unwrap_or_default();
-                provenance.sort_by(|a, b| b.when.cmp(&a.when).then_with(|| a.path.cmp(&b.path)));
-                report.hits.push(Hit {
-                    blob: oid,
-                    size: bytes.len(),
-                    line,
-                    excerpt,
-                    occurrences,
-                    provenance,
-                });
-            }
-        }
-    }
-    report
-        .hits
-        .sort_by(|a, b| b.when().cmp(&a.when()).then_with(|| a.blob.cmp(&b.blob)));
+    provenance::collect(
+        &reader,
+        &commits,
+        &unreachable,
+        &live,
+        &mut blobs,
+        &mut report,
+    )?;
+    scan::scan(&reader, query, blobs, &mut report)?;
     if reader.identity()? != identity {
         return Err(crate::i18n::text(
             "backend-repository-identity-changed-during-search-search-again-28cf73",
