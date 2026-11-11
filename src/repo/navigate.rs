@@ -76,7 +76,7 @@ impl RepoTab {
     }
 
     pub(super) fn load_detail(&mut self, hash: String, ctx: &egui::Context) {
-        self.pending_commit_diff = None;
+        self.commit_changes.cancel_pending();
         // A row of no commit (the changes row, a merge put aside): nothing for git to read.
         if hash.starts_with('\u{0}') {
             return;
@@ -202,7 +202,7 @@ impl RepoTab {
     pub(super) fn select_hash(&mut self, hash: &str, ctx: &egui::Context) {
         match self.index.get(hash).copied() {
             Some(row) => {
-                self.select(row, ctx);
+                self.select_history(row, ctx);
                 self.scroll_to = Some(row);
             }
             None => {

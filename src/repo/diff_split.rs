@@ -32,7 +32,12 @@ impl RepoTab {
 
     /// The diff shows below the graph now.
     pub(super) fn diff_beside_graph(&self, ctx: &egui::Context) -> bool {
-        Settings::get(ctx).diff_beside_graph && self.diff_can_split()
+        self.diff_can_split()
+            && (Settings::get(ctx).diff_beside_graph
+                || self
+                    .diff
+                    .as_ref()
+                    .is_some_and(|view| self.commit_changes.graph_with_diff(&view.key)))
     }
 
     /// The graph on top, the diff below, the border between them dragged to resize (egui keeps

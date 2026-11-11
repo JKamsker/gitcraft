@@ -32,75 +32,8 @@ impl RepoTab {
                     .filter(|&c| !(rewording && c == keymap::Command::Commit))
                     .map(Action::Key),
             );
-            let esc = ctx.input(|i| i.key_pressed(Key::Escape));
-            let diff_keys = self.diff.is_some()
-                && (self.main_keys(ctx, Panel::Diff) || self.conflict.is_some());
-            if esc && self.file_comparison.is_some() {
-                acts.push(Action::CloseFileComparison);
-            } else if esc && self.close_drop_menu() {
-            } else if esc && self.resolver.reviewing() {
-                // Drawn over everything else of the big area (a conflict editor too): it
-                // closes first, and the editor under it stays as it is.
-                acts.push(Action::Resolver(
-                    crate::repo::resolver::ResolverAct::CloseReview,
-                ));
-            } else if esc && diff_keys && self.note_open(ctx) {
-                acts.push(Action::Agent(crate::repo::agents::AgentAct::Tray(
-                    crate::repo::agents::TrayAct::Close,
-                )));
-            } else if esc && diff_keys && self.line_comment_open() {
-                acts.push(Action::Pr(pr_review::PrAct::CloseLine));
-            } else if esc && self.diff.as_ref().is_some_and(|d| d.moved.is_some()) {
-                acts.push(Action::DiffMoved(None));
-            } else if esc
-                && self.conflict.is_none()
-                && self.rebase.as_ref().is_some_and(|r| !r.typing)
-            {
-                // What is drawn first (see the central panel) closes first: a diff opened
-                // meanwhile is under it.
-                acts.push(Action::CloseRebase);
-            } else if esc && self.conflict.is_none() && self.split.is_some() {
-                acts.push(Action::CloseSplit);
-            } else if esc && self.conflict.is_none() && self.absorb.is_some() {
-                acts.push(Action::CloseAbsorb);
-            } else if esc && diff_keys {
-                acts.push(Action::CloseDiff);
-            } else if esc && let Some(rebase) = &self.rebase {
-                if !rebase.typing {
-                    acts.push(Action::CloseRebase);
-                }
-            } else if esc && self.file_view.is_some() {
-                acts.push(Action::CloseFileView);
-            } else if esc && self.bakeoff.view.is_some() {
-                acts.push(Action::Bake(crate::repo::bakeoff::BakeAct::Close));
-            } else if esc && self.ci_view.is_some() && self.main_keys(ctx, Panel::Ci) {
-                acts.push(Action::CloseCi);
-            } else if esc && self.versions.view.is_some() {
-                // The patch of a pair first, then the comparison.
-                let open_pair = self
-                    .versions
-                    .view
-                    .as_ref()
-                    .is_some_and(|v| v.selected.is_some());
-                acts.push(Action::Versions(if open_pair {
-                    crate::repo::versions::VersionsAct::Deselect
-                } else {
-                    crate::repo::versions::VersionsAct::Close
-                }));
-            } else if esc && self.pr_view.is_some() && self.main_keys(ctx, Panel::Pr) {
-                acts.push(Action::ClosePr);
-            } else if esc && self.timeline_view.is_some() {
-                acts.push(Action::ToggleTimeline);
-            } else if esc && self.insights.is_some() {
-                acts.push(Action::Insights(crate::repo::insights::InsightsAct::Back));
-            } else if esc && self.doctor.as_ref().is_some_and(|d| !d.asking()) {
-                acts.push(Action::CloseDoctor);
-            } else if esc && self.compare.is_some() {
-                acts.push(Action::CloseCompare);
-            } else if esc && self.search.open {
-                acts.push(Action::ToggleSearch);
-            } else if esc && self.reflog.is_some() {
-                acts.push(Action::CloseReflog);
+            if ctx.input(|i| i.key_pressed(Key::Escape)) {
+                self.close_innermost_view(ctx, acts);
             }
             for command in keymap::pressed(ctx, keymap::Scope::Changes) {
                 acts.push(Action::Key(command));
@@ -110,6 +43,75 @@ impl RepoTab {
         }
         if !free_keys && self.search.open && keymap::take(ctx, keymap::Command::Search) {
             self.search.focus = true;
+        }
+    }
+    /// Close priority follows the central rendering stack; nested comments win first.
+    fn close_innermost_view(&mut self, ctx: &egui::Context, acts: &mut Vec<Action>) {
+        let diff_keys =
+            self.diff.is_some() && (self.main_keys(ctx, Panel::Diff) || self.conflict.is_some());
+        if self.file_comparison.is_some() {
+            acts.push(Action::CloseFileComparison);
+        } else if self.close_drop_menu() {
+        } else if self.resolver.reviewing() {
+            // Drawn over everything else of the big area (a conflict editor too): it
+            // closes first, and the editor under it stays as it is.
+            acts.push(Action::Resolver(
+                crate::repo::resolver::ResolverAct::CloseReview,
+            ));
+        } else if diff_keys && self.note_open(ctx) {
+            acts.push(Action::Agent(crate::repo::agents::AgentAct::Tray(
+                crate::repo::agents::TrayAct::Close,
+            )));
+        } else if diff_keys && self.line_comment_open() {
+            acts.push(Action::Pr(pr_review::PrAct::CloseLine));
+        } else if self.diff.as_ref().is_some_and(|d| d.moved.is_some()) {
+            acts.push(Action::DiffMoved(None));
+        } else if self.conflict.is_none() && self.rebase.as_ref().is_some_and(|r| !r.typing) {
+            // What is drawn first (see the central panel) closes first: a diff opened
+            // meanwhile is under it.
+            acts.push(Action::CloseRebase);
+        } else if self.conflict.is_none() && self.split.is_some() {
+            acts.push(Action::CloseSplit);
+        } else if self.conflict.is_none() && self.absorb.is_some() {
+            acts.push(Action::CloseAbsorb);
+        } else if diff_keys {
+            acts.push(Action::CloseDiff);
+        } else if let Some(rebase) = &self.rebase {
+            if !rebase.typing {
+                acts.push(Action::CloseRebase);
+            }
+        } else if self.file_view.is_some() {
+            acts.push(Action::CloseFileView);
+        } else if self.bakeoff.view.is_some() {
+            acts.push(Action::Bake(crate::repo::bakeoff::BakeAct::Close));
+        } else if self.ci_view.is_some() && self.main_keys(ctx, Panel::Ci) {
+            acts.push(Action::CloseCi);
+        } else if self.versions.view.is_some() {
+            // The patch of a pair first, then the comparison.
+            let open_pair = self
+                .versions
+                .view
+                .as_ref()
+                .is_some_and(|v| v.selected.is_some());
+            acts.push(Action::Versions(if open_pair {
+                crate::repo::versions::VersionsAct::Deselect
+            } else {
+                crate::repo::versions::VersionsAct::Close
+            }));
+        } else if self.pr_view.is_some() && self.main_keys(ctx, Panel::Pr) {
+            acts.push(Action::ClosePr);
+        } else if self.timeline_view.is_some() {
+            acts.push(Action::ToggleTimeline);
+        } else if self.insights.is_some() {
+            acts.push(Action::Insights(crate::repo::insights::InsightsAct::Back));
+        } else if self.doctor.as_ref().is_some_and(|d| !d.asking()) {
+            acts.push(Action::CloseDoctor);
+        } else if self.compare.is_some() {
+            acts.push(Action::CloseCompare);
+        } else if self.search.open {
+            acts.push(Action::ToggleSearch);
+        } else if self.reflog.is_some() {
+            acts.push(Action::CloseReflog);
         }
     }
 }

@@ -249,3 +249,29 @@ impl RepoTab {
         }
     }
 }
+
+impl RepoTab {
+    /// Refresh rich content only when the accepted source changes or is absent.
+    pub(in crate::repo) fn diff_arrived(
+        &mut self,
+        request: u64,
+        result: Result<diff::DiffData, String>,
+        ctx: &egui::Context,
+    ) {
+        let mut reread = false;
+        if let Some(view) = &mut self.diff {
+            // The rich view is read again only when the change itself changed.
+            let source = |d: &Option<Result<diff::DiffData, String>>| match d {
+                Some(Ok(d)) => Some(d.source),
+                _ => None,
+            };
+            let before = source(&view.data);
+            let fresh = request == view.request;
+            view.arrived(request, result);
+            reread = fresh && (before != source(&view.data) || view.rich.is_none());
+        }
+        if reread {
+            self.load_diff_rich(ctx);
+        }
+    }
+}

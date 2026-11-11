@@ -63,17 +63,7 @@ fn unchanged_scroll_reflow_refreshes_production_target_and_all_patches() -> Resu
                         let expected = scroll_hunk(&data, after_split, after.as_ref().map(|g| g.offsets.as_slice()), offset..offset+380.0).ok_or("visible")?;
                         assert_eq!(target, expected);
                         if new_y <= offset { assert_eq!(target, 4); }
-                        for pick in [Pick::Stage, Pick::Unstage, Pick::Discard] {
-                            let patch = partial_patch("", &data.lines, &hunk_changes(&data.lines, target), pick).ok_or("patch")?;
-                            let expected_patch = if target == 4 {
-                                format!("@@ -20,101 +20,101 @@\n-old_second\n+new_second\n{}", " tail\n".repeat(100))
-                            } else {
-                                format!("@@ -1,2 +1,2 @@\n {}\n-old_first\n+new_first\n", "context ".repeat(400))
-                            };
-                            assert_eq!(patch, expected_patch);
-                            assert_eq!(patch.contains("-old_second\n+new_second"), target == 4);
-                            assert_eq!(patch.contains("-old_first\n+new_first"), target == 0);
-                        }
+                        assert_target_patches(&data, target)?;
                         // Reflow does not override fresh pointer intent or explicit selections.
                         view.chosen.insert(2);
                         view.anchor = Some(2);
@@ -87,6 +77,28 @@ fn unchanged_scroll_reflow_refreshes_production_target_and_all_patches() -> Resu
                 result?;
             }
         }
+    }
+    Ok(())
+}
+
+fn assert_target_patches(data: &DiffData, target: usize) -> Result<(), String> {
+    for pick in [Pick::Stage, Pick::Unstage, Pick::Discard] {
+        let patch = partial_patch("", &data.lines, &hunk_changes(&data.lines, target), pick)
+            .ok_or("patch")?;
+        let expected_patch = if target == 4 {
+            format!(
+                "@@ -20,101 +20,101 @@\n-old_second\n+new_second\n{}",
+                " tail\n".repeat(100)
+            )
+        } else {
+            format!(
+                "@@ -1,2 +1,2 @@\n {}\n-old_first\n+new_first\n",
+                "context ".repeat(400)
+            )
+        };
+        assert_eq!(patch, expected_patch);
+        assert_eq!(patch.contains("-old_second\n+new_second"), target == 4);
+        assert_eq!(patch.contains("-old_first\n+new_first"), target == 0);
     }
     Ok(())
 }
