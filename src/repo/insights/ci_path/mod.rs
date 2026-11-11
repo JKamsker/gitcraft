@@ -150,14 +150,15 @@ impl RepoTab {
         let Some(state) = self.insights.as_mut().map(|v| &mut v.ci_path) else {
             return;
         };
-        if let Err(e) = &result
-            && tool_problem(e)
-        {
-            state.runs.accept(request, Err(e.clone()));
-            state.unavailable = Some(("The forge's tool is needed".to_owned(), e.clone()));
+        if !state.runs.accept(request, result) {
             return;
         }
-        if !state.runs.accept(request, result) {
+        state.unavailable = state
+            .runs
+            .error()
+            .filter(|error| tool_problem(error))
+            .map(|error| ("The forge's tool is needed".to_owned(), error.to_owned()));
+        if state.unavailable.is_some() {
             return;
         }
         let Some(runs) = state.runs.ready() else {

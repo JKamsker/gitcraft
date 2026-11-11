@@ -155,3 +155,59 @@ fn a_flow_draws_as_a_picture_and_as_tables_and_esc_unpicks_first() {
     tab.apply(Action::Insights(InsightsAct::Back), &ctx);
     assert!(tab.insights.is_none());
 }
+
+#[test]
+fn only_current_deployment_completion_changes_availability_and_picture() {
+    for error in [
+        "gh isn't installed",
+        "gh isn't signed in",
+        "run gh auth login",
+    ] {
+        let ctx = egui::Context::default();
+        let mut tab = RepoTab::new_deferred("/nonexistent/deploy-completions".into(), &ctx);
+        tab.insights = Some(Box::new(super::super::InsightsView::new(Kind::Deploy)));
+        let initial = tab.insights.as_mut().unwrap().deploy.flow.start();
+        tab.deploy_read(initial, Ok(flow()), &ctx);
+        let (old, current) = {
+            let state = &mut tab.insights.as_mut().unwrap().deploy;
+            state.selected = Some(Target::Run(0));
+            (state.flow.start(), state.flow.start())
+        };
+        // A rejected error preserves loading, data and the current presentation.
+        tab.deploy_read(old, Err(error.into()), &ctx);
+        let state = &tab.insights.as_ref().unwrap().deploy;
+        assert!(state.flow.loading);
+        assert!(state.flow.ready().is_some());
+        assert!(state.unavailable.is_none());
+        assert_eq!(state.selected, Some(Target::Run(0)));
+        assert_eq!(state.picture.as_ref().map(|p| p.graph.nodes.len()), Some(7));
+
+        tab.deploy_read(current, Ok(flow()), &ctx);
+        tab.deploy_read(old, Err(error.into()), &ctx);
+        let state = &tab.insights.as_ref().unwrap().deploy;
+        assert!(!state.flow.loading);
+        assert!(state.flow.ready().is_some());
+        assert!(state.unavailable.is_none());
+        assert_eq!(state.selected, Some(Target::Run(0)));
+        assert_eq!(state.picture.as_ref().map(|p| p.graph.nodes.len()), Some(7));
+
+        // A stale success must also preserve a current tool error.
+        let current = tab.insights.as_mut().unwrap().deploy.flow.start();
+        tab.deploy_read(current, Err(error.into()), &ctx);
+        tab.deploy_read(old, Ok(flow()), &ctx);
+        let state = &tab.insights.as_ref().unwrap().deploy;
+        assert!(!state.flow.loading);
+        assert_eq!(state.flow.error(), Some(error));
+        assert_eq!(
+            state.unavailable.as_ref().map(|v| v.1.as_str()),
+            Some(error)
+        );
+
+        let current = tab.insights.as_mut().unwrap().deploy.flow.start();
+        tab.deploy_read(current, Ok(flow()), &ctx);
+        let state = &tab.insights.as_ref().unwrap().deploy;
+        assert!(state.unavailable.is_none());
+        assert!(state.flow.ready().is_some());
+        assert_eq!(state.picture.as_ref().map(|p| p.graph.nodes.len()), Some(7));
+    }
+}
