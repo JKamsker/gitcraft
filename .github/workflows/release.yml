@@ -89,6 +89,9 @@ jobs:
       PKG: gitcraft-${{ needs.version.outputs.label }}-${{ matrix.name }}
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
       - uses: dtolnay/rust-toolchain@stable
         with:
           components: clippy
@@ -117,7 +120,7 @@ jobs:
       # Keep their original time limits; run them separately instead of weakening assertions.
       # Windows runs the shared shards in parallel with this packaging job.
       - name: Clippy and complexity gate
-        run: cargo clippy --locked --all-targets -- -D warnings
+        run: python ci/clippy_packages.py
 
       - name: Test
         if: runner.os != 'Windows'
