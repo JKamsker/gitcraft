@@ -50,6 +50,22 @@ fn harness(
     )
 }
 
+fn toggle_header(h: &mut Harness<'_, RepoTab>, beside: bool) {
+    let tip = crate::i18n::text(if beside {
+        "repo-core-2414"
+    } else {
+        "repo-core-2415"
+    });
+    // Narrow headers expose the same control through their actual overflow menu.
+    if h.query_by_label(tip).is_none() {
+        h.get_by_label(crate::i18n::text("dev-integration-ui-diff-options"))
+            .click();
+        h.run_steps(2);
+    }
+    h.get_by_label(tip).click();
+    h.run_steps(2);
+}
+
 #[test]
 fn header_toggle_uses_visible_layout_and_retires_automatic_history_following() {
     for (width, ready) in [
@@ -69,13 +85,7 @@ fn header_toggle_uses_visible_layout_and_retires_automatic_history_following() {
                 assert_eq!(Settings::get(&h.ctx).diff_beside_graph, saved);
                 for _ in 0..3 {
                     assert_eq!(h.state().diff_beside_graph(&h.ctx), beside);
-                    let tip = crate::i18n::text(if beside {
-                        "repo-core-2414"
-                    } else {
-                        "repo-core-2415"
-                    });
-                    h.get_by_label(tip).click();
-                    h.run_steps(2);
+                    toggle_header(&mut h, beside);
                     beside = !beside;
                     assert_eq!(h.state().diff_beside_graph(&h.ctx), beside);
                     assert_eq!(Settings::get(&h.ctx).diff_beside_graph, beside);
@@ -141,6 +151,12 @@ fn history_reveal_and_explicit_layout_choices_do_not_reapply_the_profile() {
         settings.profile_mut().author_email = "unapplied-profile@example.invalid".into();
         settings.put_for_test(&ctx);
         ctx.set_zoom_factor(1.75);
+        let _ = ctx.run_ui(Default::default(), |_| {});
+        assert_eq!(
+            ctx.zoom_factor(),
+            1.75,
+            "fixture zoom must already be applied"
+        );
         let (_, applied) = crate::connections::record_set_attempts(|| {
             crate::repo::messages::record_jobs(|| {
                 tab.apply(Action::Select(0), &ctx);
@@ -151,6 +167,7 @@ fn history_reveal_and_explicit_layout_choices_do_not_reapply_the_profile() {
             applied, 0,
             "layout actions must not replace the connection/profile epoch"
         );
+        let _ = ctx.run_ui(Default::default(), |_| {});
         assert_eq!(ctx.zoom_factor(), 1.75);
         let settings = Settings::get(&ctx);
         assert!(settings.show_detail && settings.diff_beside_graph);
