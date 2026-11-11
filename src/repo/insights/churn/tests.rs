@@ -8,6 +8,25 @@ use super::{Act, State};
 use crate::git;
 use crate::repo::{Action, RepoTab};
 
+impl crate::repo::insights::context::namespace_tests::Fixture for State {
+    fn seed(&mut self) {
+        use crate::repo::insights::context::namespace_tests::seed_slot;
+        seed_slot(&mut self.read);
+        seed_slot(&mut self.built);
+        self.rev = Some("keep-branch".into());
+        self.limit = 42;
+        self.selected = Some((7, 7));
+    }
+    fn assert_retired(&self) {
+        use crate::repo::insights::context::namespace_tests::assert_slot_retired;
+        assert_slot_retired(&self.read);
+        assert_slot_retired(&self.built);
+        assert!(self.selected.is_none() && !self.filter_edited);
+        assert_eq!(self.rev.as_deref(), Some("keep-branch"));
+        assert_eq!(self.limit, 42);
+    }
+}
+
 fn state(tab: &RepoTab) -> Option<&State> {
     tab.insights.as_deref().map(|v| &v.churn)
 }

@@ -24,6 +24,7 @@ impl RepoTab {
             self.discard_decrypted();
         }
         self.sync_forge_selection(ctx);
+        self.sync_insights_context(ctx);
         if let Some(poller) = &mut self.poller {
             poller.tick(ctx);
         }

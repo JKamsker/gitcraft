@@ -6,6 +6,21 @@ use crate::ci::timing::{RunInfo, TimedJob, TimedRun, TimedStep};
 use crate::insights::ci_path::{Compared, compare, critical_path, timing_deps};
 use crate::repo::insights::{InsightsAct, Kind};
 
+impl crate::repo::insights::context::namespace_tests::Fixture for State {
+    fn seed(&mut self) {
+        use crate::repo::insights::context::namespace_tests::seed_slot;
+        seed_slot(&mut self.runs);
+        seed_slot(&mut self.explorer);
+        self.selected = Some(7);
+    }
+    fn assert_retired(&self) {
+        use crate::repo::insights::context::namespace_tests::assert_slot_retired;
+        assert_slot_retired(&self.runs);
+        assert_slot_retired(&self.explorer);
+        assert!(self.selected.is_none() && self.run.is_none() && self.expanded.is_empty());
+    }
+}
+
 fn draw(tab: &mut RepoTab, ctx: &egui::Context) -> Vec<Action> {
     let mut acts = Vec::new();
     let input = egui::RawInput {
@@ -57,7 +72,7 @@ fn timed(jobs: Vec<TimedJob>, number: u64) -> TimedRun {
     }
 }
 
-fn explorer() -> Explorer {
+pub(super) fn explorer() -> Explorer {
     let run = timed(
         vec![
             job(
@@ -189,4 +204,58 @@ fn a_missing_tool_is_what_is_needed_not_a_failure() {
         "To get started with GitHub CLI, please run:  gh auth login"
     ));
     assert!(!tool_problem("HTTP 502"));
+}
+
+#[test]
+fn only_current_run_list_completion_changes_availability() {
+    for error in [
+        "gh isn't installed",
+        "gh isn't signed in",
+        "run gh auth login",
+    ] {
+        let ctx = egui::Context::default();
+        let mut tab = RepoTab::new_deferred("/nonexistent/ci-path-completions".into(), &ctx);
+        tab.insights = Some(Box::new(super::super::InsightsView::new(Kind::CiPath)));
+        let (old, current) = {
+            let state = &mut tab.insights.as_mut().unwrap().ci_path;
+            state.selected = Some(7);
+            state.expanded.insert(7);
+            (state.runs.start(), state.runs.start())
+        };
+        // Old errors neither end a newer read nor hide its eventual success.
+        tab.ci_path_runs(old, Err(error.into()), &ctx);
+        let state = &tab.insights.as_ref().unwrap().ci_path;
+        assert!(state.runs.loading);
+        assert!(state.runs.value.is_none());
+        assert!(state.unavailable.is_none());
+        assert_eq!(state.selected, Some(7));
+        assert!(state.expanded.contains(&7));
+
+        tab.ci_path_runs(current, Ok(Runs::default()), &ctx);
+        tab.ci_path_runs(old, Err(error.into()), &ctx);
+        let state = &tab.insights.as_ref().unwrap().ci_path;
+        assert!(!state.runs.loading);
+        assert!(state.runs.ready().is_some());
+        assert!(state.unavailable.is_none());
+        assert_eq!(state.selected, Some(7));
+        assert!(state.expanded.contains(&7));
+
+        // The current tool error is authoritative; an old success cannot clear it.
+        let current = tab.insights.as_mut().unwrap().ci_path.runs.start();
+        tab.ci_path_runs(current, Err(error.into()), &ctx);
+        tab.ci_path_runs(old, Ok(Runs::default()), &ctx);
+        let state = &tab.insights.as_ref().unwrap().ci_path;
+        assert!(!state.runs.loading);
+        assert_eq!(state.runs.error(), Some(error));
+        assert_eq!(
+            state.unavailable.as_ref().map(|v| v.1.as_str()),
+            Some(error)
+        );
+
+        let current = tab.insights.as_mut().unwrap().ci_path.runs.start();
+        tab.ci_path_runs(current, Ok(Runs::default()), &ctx);
+        let state = &tab.insights.as_ref().unwrap().ci_path;
+        assert!(state.unavailable.is_none());
+        assert!(state.runs.ready().is_some());
+    }
 }

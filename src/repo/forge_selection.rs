@@ -224,7 +224,7 @@ impl RepoTab {
         if !changed {
             return;
         }
-        self.invalidate_repository_context();
+        self.invalidate_forge_context();
         self.clear_forge_forks();
         let moved = !super::load::same_repository(self.hosting.as_ref(), hosting.as_ref());
         self.forge_generation += 1;
