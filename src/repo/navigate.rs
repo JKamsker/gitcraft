@@ -37,29 +37,42 @@ impl RepoTab {
             return;
         };
         let stash = self.stash_at(row);
+        let hash = commit.hash.clone();
+        let reveal = stash.is_none()
+            && hash != WIP_HASH
+            && !hash.starts_with('\u{0}')
+            && (self.commit_changes.follows_history()
+                || self.diff.is_none()
+                || !Settings::get(ctx).show_detail);
         if self.selected == Some(row) && self.stash_view == stash {
+            if reveal && (self.diff.is_none() || !Settings::get(ctx).show_detail) {
+                self.reveal_selected_changes(hash, ctx);
+            }
             return;
         }
-        let hash = commit.hash.clone();
         // Below the graph, the diff stays and follows what is opened next.
         let keep_diff = self.diff_beside_graph(ctx);
         self.selected = Some(row);
         self.stash_view = stash;
         self.file_view = None;
         self.compare = None;
-        if !keep_diff
-            && (matches!(
-                self.diff,
-                Some(DiffView {
-                    key: DiffKey::Commit { .. } | DiffKey::Range { .. } | DiffKey::Remerge { .. },
-                    ..
-                })
-            ) || hash != WIP_HASH)
+        if reveal
+            || !keep_diff
+                && (matches!(
+                    self.diff,
+                    Some(DiffView {
+                        key: DiffKey::Commit { .. }
+                            | DiffKey::Range { .. }
+                            | DiffKey::Remerge { .. },
+                        ..
+                    })
+                ) || hash != WIP_HASH)
         {
             self.diff = None;
             self.conflict = None;
         }
         if hash == WIP_HASH {
+            self.commit_changes.stop();
             self.detail = None;
             self.detail_hash = None;
             self.drop_extras();
@@ -72,11 +85,16 @@ impl RepoTab {
             self.fetch_detail(snapshot, ctx);
             return;
         }
-        self.load_detail(hash, ctx);
+        self.load_detail(hash.clone(), ctx);
+        if reveal {
+            self.reveal_selected_changes(hash, ctx);
+        } else {
+            self.commit_changes.stop();
+        }
     }
 
     pub(super) fn load_detail(&mut self, hash: String, ctx: &egui::Context) {
-        self.pending_commit_diff = None;
+        self.commit_changes.cancel_pending();
         // A row of no commit (the changes row, a merge put aside): nothing for git to read.
         if hash.starts_with('\u{0}') {
             return;

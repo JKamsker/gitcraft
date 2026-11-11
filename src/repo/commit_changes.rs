@@ -1,6 +1,30 @@
-//! A backlink opens changes and a first-file diff after the existing background detail read.
+//! First-file reveal after a backlink or history selection, bound to its detail read.
 use super::{DiffKey, RepoTab};
 use crate::git::ChangedFile;
+
+#[derive(Default)]
+pub(super) struct State {
+    pending: Option<String>,
+    history: Option<String>,
+}
+
+impl State {
+    pub(super) fn cancel_pending(&mut self) {
+        self.pending = None;
+    }
+
+    pub(super) fn follows_history(&self) -> bool {
+        self.history.is_some()
+    }
+
+    pub(super) fn graph_with_diff(&self, key: &DiffKey) -> bool {
+        matches!(key, DiffKey::Commit { hash, .. } if self.history.as_ref() == Some(hash))
+    }
+
+    pub(super) fn stop(&mut self) {
+        *self = Self::default();
+    }
+}
 enum Destination {
     Diff(DiffKey),
     NoChanges,
@@ -44,14 +68,22 @@ impl RepoTab {
         self.compare = None;
         // Works outside a filtered/bounded graph, without loading the entire history.
         self.activity_commit(hash.clone(), ctx);
-        self.pending_commit_diff = Some(hash.clone());
+        // A cached history selection may already have opened it. A backlink uses
+        // the saved layout rather than opting into transient history following.
+        self.commit_changes.history = None;
+        if self.diff.as_ref().is_some_and(
+            |view| matches!(&view.key, DiffKey::Commit { hash: shown, .. } if shown == &hash),
+        ) {
+            return;
+        }
+        self.commit_changes.pending = Some(hash.clone());
         if self.detail.as_ref().is_some_and(|d| d.hash == hash) || self.detail_error.is_some() {
             self.finish_commit_changes(&hash, ctx);
         }
     }
     pub(super) fn finish_commit_changes(&mut self, hash: &str, ctx: &egui::Context) {
         let destination = completed(
-            &mut self.pending_commit_diff,
+            &mut self.commit_changes.pending,
             hash,
             self.detail
                 .as_ref()
@@ -73,6 +105,21 @@ impl RepoTab {
                 )))
             }
             Some(Destination::Failed) | None => (), // The existing detail pane displays the error.
+        }
+    }
+
+    /// Selection opens a transient graph/diff composition, leaving saved layout choices
+    /// untouched. At short heights graph_diff_view uses the existing central diff route.
+    pub(super) fn reveal_selected_changes(&mut self, hash: String, ctx: &egui::Context) {
+        self.commit_changes.history = Some(hash.clone());
+        self.commit_changes.pending = Some(hash.clone());
+        let mut settings = crate::settings::Settings::get(ctx);
+        if !settings.show_detail {
+            settings.show_detail = true;
+            settings.set(ctx);
+        }
+        if self.detail.as_ref().is_some_and(|d| d.hash == hash) || self.detail_error.is_some() {
+            self.finish_commit_changes(&hash, ctx);
         }
     }
 }
@@ -118,6 +165,10 @@ mod tests {
         assert!(completed(&mut pending, "new", Some(&[file("new.txt", 'M')])).is_none());
     }
 }
+
+#[cfg(test)]
+#[path = "commit_changes/reveal_tests.rs"]
+mod reveal_tests;
 
 /// Owned actual detail/diff loading coverage. Compile only until containment is cleared.
 #[cfg(test)]
@@ -182,7 +233,7 @@ mod runtime_held_tests {
             }
             std::thread::sleep(std::time::Duration::from_millis(10));
         }
-        assert!(tab.pending_commit_diff.is_none());
+        assert!(tab.commit_changes.pending.is_none());
         Ok(())
     }
 }
