@@ -6,6 +6,21 @@ use crate::ci::timing::{RunInfo, TimedJob, TimedRun, TimedStep};
 use crate::insights::ci_path::{Compared, compare, critical_path, timing_deps};
 use crate::repo::insights::{InsightsAct, Kind};
 
+impl crate::repo::insights::context::namespace_tests::Fixture for State {
+    fn seed(&mut self) {
+        use crate::repo::insights::context::namespace_tests::seed_slot;
+        seed_slot(&mut self.runs);
+        seed_slot(&mut self.explorer);
+        self.selected = Some(7);
+    }
+    fn assert_retired(&self) {
+        use crate::repo::insights::context::namespace_tests::assert_slot_retired;
+        assert_slot_retired(&self.runs);
+        assert_slot_retired(&self.explorer);
+        assert!(self.selected.is_none() && self.run.is_none() && self.expanded.is_empty());
+    }
+}
+
 fn draw(tab: &mut RepoTab, ctx: &egui::Context) -> Vec<Action> {
     let mut acts = Vec::new();
     let input = egui::RawInput {

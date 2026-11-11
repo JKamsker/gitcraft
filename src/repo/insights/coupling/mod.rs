@@ -102,6 +102,18 @@ impl Default for State {
     }
 }
 
+impl State {
+    pub(super) fn retire_repository(&mut self) {
+        *self = Self {
+            limit: self.limit,
+            options: std::mem::take(&mut self.options),
+            filter: std::mem::take(&mut self.filter),
+            range: self.range,
+            ..Self::default()
+        };
+    }
+}
+
 /// What the view asks for.
 #[derive(Clone, Debug)]
 pub(crate) enum Act {

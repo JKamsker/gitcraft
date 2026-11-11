@@ -9,6 +9,23 @@ use super::{Act, NodeRef, open_node};
 use crate::repo::insights::graph::Pick;
 use crate::repo::{Action, RepoTab};
 
+impl crate::repo::insights::context::namespace_tests::Fixture for super::State {
+    fn seed(&mut self) {
+        use crate::repo::insights::context::namespace_tests::seed_slot;
+        seed_slot(&mut self.data);
+        seed_slot(&mut self.layout);
+        self.filter.public_only = true;
+        self.force = true;
+    }
+    fn assert_retired(&self) {
+        use crate::repo::insights::context::namespace_tests::assert_slot_retired;
+        assert_slot_retired(&self.data);
+        assert_slot_retired(&self.layout);
+        assert!(self.selected.is_none() && self.read_ask.is_none());
+        assert!(self.filter.public_only && self.force);
+    }
+}
+
 #[test]
 fn forge_retirement_clears_only_pr_owned_reads_and_preserves_display_options() {
     use super::{Ask, State};

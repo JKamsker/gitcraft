@@ -43,6 +43,17 @@ pub(crate) struct State {
     test: Option<usize>,
 }
 
+impl State {
+    pub(super) fn retire_repository(&mut self) {
+        *self = Self {
+            ask: self.ask.take(),
+            report: self.report.take(),
+            typed: std::mem::take(&mut self.typed),
+            ..Self::default()
+        };
+    }
+}
+
 /// What the view asks for.
 #[derive(Clone, Debug)]
 pub(crate) enum Act {

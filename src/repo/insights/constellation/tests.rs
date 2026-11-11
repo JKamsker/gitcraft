@@ -7,6 +7,21 @@ use crate::git::fixture::Repo;
 use crate::repo::insights::tests::draw;
 use crate::repo::insights::{InsightsAct, Kind as View};
 
+impl crate::repo::insights::context::namespace_tests::Fixture for State {
+    fn seed(&mut self) {
+        use crate::repo::insights::context::namespace_tests::seed_slot;
+        seed_slot(&mut self.read);
+        seed_slot(&mut self.disk);
+        self.selected = Some(7);
+    }
+    fn assert_retired(&self) {
+        use crate::repo::insights::context::namespace_tests::assert_slot_retired;
+        assert_slot_retired(&self.read);
+        assert_slot_retired(&self.disk);
+        assert!(self.built.is_none() && self.selected.is_none() && self.other.is_none());
+    }
+}
+
 fn state(tab: &RepoTab) -> Option<&State> {
     tab.insights.as_ref().map(|v| &v.constellation)
 }

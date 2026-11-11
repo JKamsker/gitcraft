@@ -42,6 +42,15 @@ pub(crate) struct State {
 }
 
 impl State {
+    pub(super) fn retire_repository(&mut self) {
+        *self = Self {
+            ask: self.ask.take(),
+            filter: std::mem::take(&mut self.filter),
+            force: self.force,
+            ..Self::default()
+        };
+    }
+
     pub(super) fn invalidate_forge(&mut self) -> bool {
         if !matches!(self.ask, Some(Ask::Pr { .. }))
             && !matches!(self.read_ask, Some(Ask::Pr { .. }))
