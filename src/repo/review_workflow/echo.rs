@@ -76,6 +76,7 @@ pub(crate) enum Act {
     Infer,
     Check,
     PushAnyway(String),
+    CancelPush,
 }
 impl RepoTab {
     pub(in crate::repo) fn echo_frame(&mut self, ctx: &egui::Context) {
@@ -85,6 +86,12 @@ impl RepoTab {
         }
     }
     pub(in crate::repo) fn echo_act(&mut self, act: Act, ctx: &egui::Context) {
+        if matches!(act, Act::CancelPush) {
+            if self.review_tools.echo.pending_push.take().is_some() {
+                self.after_op(false, false, ctx);
+            }
+            return;
+        }
         if matches!(act, Act::Stop) {
             self.review_tools.echo.cancel.cancel();
             return;
@@ -314,7 +321,7 @@ impl RepoTab {
                         Err(e)=>{s.error=Some(e);tab.review_tools.open=true;}
                     }
                 },
-                Err(e)=>{tab.review_tools.echo.error=Some(e);tab.review_tools.open=true;}
+                Err(e)=>{tab.review_tools.echo.error=Some(e);tab.review_tools.open=true;tab.after_op(false,false,ctx);}
             }
         });
         true
@@ -343,8 +350,11 @@ impl RepoTab {
                     tab.review_tools.echo.passed=Some(op.ops.clone());
                     tab.run_ops_ex(&op.label,op.ops,op.refresh,op.kind,op.quiet,ctx);
                     tab.review_tools.echo.passed=None;
+                    if tab.busy_op.is_none() && !tab.echo_push_pending() {
+                        tab.after_op(false, false, ctx);
+                    }
                 },
-                Err(e)=>{tab.status=Some(crate::repo::Notice::plain((e.clone(),true)));tab.review_tools.echo.error=Some(e);}
+                Err(e)=>{tab.status=Some(crate::repo::Notice::plain((e.clone(),true)));tab.review_tools.echo.error=Some(e);tab.after_op(false,false,ctx);}
             }
         });
     }
