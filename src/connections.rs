@@ -196,10 +196,10 @@ pub(crate) fn set(context: Context) {
         .unwrap_or_else(std::sync::PoisonError::into_inner);
     if active.as_ref() != Some(&context) {
         *active = Some(context);
-        let _ = GENERATION.fetch_update(
-            std::sync::atomic::Ordering::AcqRel,
-            std::sync::atomic::Ordering::Acquire,
-            |generation| Some(generation.saturating_add(1)),
+        // ACTIVE's writer lock serializes every generation update.
+        GENERATION.store(
+            generation().saturating_add(1),
+            std::sync::atomic::Ordering::Release,
         );
     }
 }
