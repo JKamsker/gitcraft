@@ -137,6 +137,7 @@ unexpected_cfgs = { level = "warn", check-cfg = ["cfg(recovery_recording)"] }
 unsafe_code = "deny"
 
 [lints.clippy]
+cognitive_complexity = "forbid"
 unwrap_used = "deny"
 expect_used = "deny"
 panic = "deny"

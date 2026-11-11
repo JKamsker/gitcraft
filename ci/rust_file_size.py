@@ -26,7 +26,7 @@ def git(root, *args, input=None):
     ).stdout
 
 
-def entries(root, revision=None):
+def entries(root, revision=None, *, suffix=b".rs", ignore_case=False):
     """Return (path, mode, blob) without decoding Git's NUL-delimited paths."""
     if revision is not None:
         tree = git(root, "rev-parse", "--verify", "--end-of-options", revision + "^{tree}").strip()
@@ -39,7 +39,8 @@ def entries(root, revision=None):
             continue
         metadata, path = record.split(b"\t", 1)
         mode, second, third = metadata.split()
-        if not path.endswith(b".rs"):
+        candidate = path.lower() if ignore_case else path
+        if not candidate.endswith(suffix):
             continue
         if revision is None:
             if third != b"0":
@@ -74,23 +75,41 @@ def blob_contents(root, tracked):
     return contents
 
 
-def inventory(root, *, staged=False, revision=None):
-    tracked = entries(root, revision)
+def tracked_contents(root, *, staged=False, revision=None, suffix=b".rs", ignore_case=False,
+                     reject_symlinks=False):
+    """Read complete snapshots; policy callers may require regular source inputs.
+
+    Size inventory counts Git's link contents. Configuration policy must instead
+    reject links, since the compiler may follow their targets as active settings.
+    """
+    tracked = entries(root, revision, suffix=suffix, ignore_case=ignore_case)
     if staged or revision is not None:
-        return [(os.fsdecode(path), physical_lines(content))
+        if reject_symlinks:
+            for path, mode, _ in tracked:
+                if mode == b"120000":
+                    raise ValueError(f"symlink policy input is forbidden: {os.fsdecode(path)!r}")
+        return [(os.fsdecode(path), content)
                 for (path, _, _), content in zip(tracked, blob_contents(root, tracked))]
     result = []
     for path, _, _ in tracked:
         filename = root / os.fsdecode(path)
         try:
+            linked = filename.is_symlink()
+            if reject_symlinks and linked:
+                raise ValueError(f"symlink policy input is forbidden: {os.fsdecode(path)!r}")
             # Read the link itself, as Git does, never an unrelated target.
-            content = os.fsencode(os.readlink(filename)) if filename.is_symlink() else filename.read_bytes()
+            content = os.fsencode(os.readlink(filename)) if linked else filename.read_bytes()
         except FileNotFoundError:
             # An unstaged deletion is absent from the working candidate tree.
             # --staged and --revision still inspect its committed/index blob.
             continue
-        result.append((os.fsdecode(path), physical_lines(content)))
+        result.append((os.fsdecode(path), content))
     return result
+
+
+def inventory(root, *, staged=False, revision=None):
+    return [(path, physical_lines(content))
+            for path, content in tracked_contents(root, staged=staged, revision=revision)]
 
 
 def main(argv=None):

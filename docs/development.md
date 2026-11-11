@@ -65,6 +65,16 @@ CI remains authoritative even when local checks are skipped. The lexical
 
 ## Tests
 
+With Python 3.11+ and Clippy installed, run `python ci/clippy_packages.py` to lint
+every tracked Cargo package with locked dependencies, all targets, and warnings
+as errors. This includes independent workspaces and members omitted from a
+workspace's defaults. A new tracked package is included automatically; there are
+no package exemptions. Missing or linked manifests fail before compilation.
+The isolated recovery harness selects `--cfg recovery_recording`, its intended
+recording profile; other packages use their default features and configuration.
+Only code active for the selected platform, features, and cfg is analyzed. This
+does not claim coverage of every inactive configuration.
+
 A plain `cargo test` runs everything that needs no outside machine or server. The tests below are
 skipped unless you give them one.
 
