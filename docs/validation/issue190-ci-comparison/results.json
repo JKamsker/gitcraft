@@ -1,0 +1,182 @@
+{
+  "source_commit": "3d3a390d7539468c384ad3633de6dfde77d98e05",
+  "archive_sha256": "b091d83eaf28304587036d2b6494b1a89eea0d7e1f36d8cf4a729f5b41f48435",
+  "runner_sha256": "07a289a25bb7342755a83250fef238fc81d753b43161db91a9ea8aff641ebb9d",
+  "output": "/mnt/e/private/gitcraft-build/issue190-evidence-77a168c0",
+  "cargo_version": "cargo 1.99.1 (5f94df478 2026-08-27)",
+  "rustc_version": "rustc 1.99.1 (58cf8f9c3 2026-10-13)",
+  "results": [
+    {
+      "name": "fixed-history",
+      "command": [
+        "/home/jonas/.cargo/bin/cargo",
+        "test",
+        "--locked",
+        "--offline",
+        "ci::timing::history::tests::"
+      ],
+      "exit_code": 0,
+      "log_sha256": "2515b9d18c78364a141593c952e6195d7258a294bdc0d1d7963034ed79f1604d"
+    },
+    {
+      "name": "fixed-alignment",
+      "command": [
+        "/home/jonas/.cargo/bin/cargo",
+        "test",
+        "--locked",
+        "--offline",
+        "insights::ci_path::alignment::"
+      ],
+      "exit_code": 0,
+      "log_sha256": "08ace5c852876899435d00d319c8d4deaeb41888a894c8a23de01e39a4e60411"
+    },
+    {
+      "name": "fixed-diagnostics",
+      "command": [
+        "/home/jonas/.cargo/bin/cargo",
+        "test",
+        "--locked",
+        "--offline",
+        "insights::ci_path::diagnostics::tests::"
+      ],
+      "exit_code": 0,
+      "log_sha256": "74c631d2f886385e8785e5adabe81da8d724545abd5e7766e823b953dfcf02f2"
+    },
+    {
+      "name": "fixed-load",
+      "command": [
+        "/home/jonas/.cargo/bin/cargo",
+        "test",
+        "--locked",
+        "--offline",
+        "insights::ci_path::load::tests::"
+      ],
+      "exit_code": 0,
+      "log_sha256": "f03ee3dcf07a2dd5dbbe397f318f3681a25579dd295a95911df5c64e34a614e3"
+    },
+    {
+      "name": "fixed-workflow",
+      "command": [
+        "/home/jonas/.cargo/bin/cargo",
+        "test",
+        "--locked",
+        "--offline",
+        "insights::ci_path::workflow::tests::"
+      ],
+      "exit_code": 0,
+      "log_sha256": "62ea24fdc308d80bf2e5c7182a1bfacdaeb8839d3c37a530bef57d2243e380d9"
+    },
+    {
+      "name": "negative-matrix-axis-identity",
+      "command": [
+        "/home/jonas/.cargo/bin/cargo",
+        "test",
+        "--locked",
+        "--offline",
+        "insights::ci_path::alignment::matrix_tests::"
+      ],
+      "exit_code": 101,
+      "log_sha256": "3ef890fc008599d3ec2b75c56cc99d55d9608145afe7cfdffeb0b59b48fd41fb"
+    },
+    {
+      "name": "negative-missing-sha",
+      "command": [
+        "/home/jonas/.cargo/bin/cargo",
+        "test",
+        "--locked",
+        "--offline",
+        "insights::ci_path::diagnostics::tests::missing_revision"
+      ],
+      "exit_code": 101,
+      "log_sha256": "0cfa228050c3caab311ca428776e0d8feb4ca2336170393a1bdbe5fa53d17d2e"
+    },
+    {
+      "name": "negative-prior-order",
+      "command": [
+        "/home/jonas/.cargo/bin/cargo",
+        "test",
+        "--locked",
+        "--offline",
+        "insights::ci_path::load::tests::previous_run"
+      ],
+      "exit_code": 101,
+      "log_sha256": "12a03399888499574cfc188af9749f3575f0acf1605c8ccaa8c9ad86af39b78c"
+    },
+    {
+      "name": "restored-history",
+      "command": [
+        "/home/jonas/.cargo/bin/cargo",
+        "test",
+        "--locked",
+        "--offline",
+        "ci::timing::history::tests::"
+      ],
+      "exit_code": 0,
+      "log_sha256": "502ed056508fcf6a90ddc88101998c22557c16db421410b6a63d59f518bd3d3d"
+    },
+    {
+      "name": "restored-alignment",
+      "command": [
+        "/home/jonas/.cargo/bin/cargo",
+        "test",
+        "--locked",
+        "--offline",
+        "insights::ci_path::alignment::"
+      ],
+      "exit_code": 0,
+      "log_sha256": "cdd22c87cac571125a92d62607e7438eaa79a0c590590f48906f5fe535e8a37e"
+    },
+    {
+      "name": "restored-diagnostics",
+      "command": [
+        "/home/jonas/.cargo/bin/cargo",
+        "test",
+        "--locked",
+        "--offline",
+        "insights::ci_path::diagnostics::tests::"
+      ],
+      "exit_code": 0,
+      "log_sha256": "e77b6c7a2bc31d14d67e68cb6195d5082b79dfbc4aecc94fb405d515608faefa"
+    },
+    {
+      "name": "restored-load",
+      "command": [
+        "/home/jonas/.cargo/bin/cargo",
+        "test",
+        "--locked",
+        "--offline",
+        "insights::ci_path::load::tests::"
+      ],
+      "exit_code": 0,
+      "log_sha256": "daca8e72c143a0a4d690f8591cf5137aef7d089d95b3fb71b5a2f9330ba7bde2"
+    },
+    {
+      "name": "restored-workflow",
+      "command": [
+        "/home/jonas/.cargo/bin/cargo",
+        "test",
+        "--locked",
+        "--offline",
+        "insights::ci_path::workflow::tests::"
+      ],
+      "exit_code": 0,
+      "log_sha256": "499ab94e87ef633ce5d9d3eedb8909965e58623b481366c56c81bb5799939dfe"
+    },
+    {
+      "name": "clippy",
+      "command": [
+        "/home/jonas/.cargo/bin/cargo",
+        "clippy",
+        "--locked",
+        "--offline",
+        "--all-targets",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "exit_code": 0,
+      "log_sha256": "3ce71bcdaacbf82da642073710eb6bb6598107e014e0207689dcce9973953f56"
+    }
+  ],
+  "limitations": "Copied-source model fixture only; network, Git and timestamps stubbed. No application/UI/runtime/API integration claim."
+}
