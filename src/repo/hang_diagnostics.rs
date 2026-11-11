@@ -79,6 +79,7 @@ pub(crate) fn checkpoint(label: fmt::Arguments<'_>) {
     }
 }
 
+/// Labels synchronous message handling in an active trace; inactive traces return no guard.
 pub(super) fn message(msg: &super::messages::Msg) -> Option<Stage> {
     use super::messages::Msg;
     let label = match msg {

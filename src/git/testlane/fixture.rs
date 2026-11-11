@@ -11,6 +11,7 @@ pub(crate) struct Repo {
 }
 
 impl Drop for Repo {
+    /// Removes the owned fixture directory, tracing cleanup when diagnostics are active.
     fn drop(&mut self) {
         crate::repo::hang_diagnostics::run(format_args!("fixture remove directory"), || {
             let _ = std::fs::remove_dir_all(&self.dir);
@@ -41,6 +42,7 @@ impl Repo {
         &self.dir
     }
 
+    /// Runs Git in this fixture and traces its arguments without changing the result.
     pub(crate) fn git(&self, args: &[&str]) -> Result<String, String> {
         crate::repo::hang_diagnostics::run(format_args!("fixture git {args:?}"), || {
             git::run(Some(&self.dir), args)

@@ -30,6 +30,7 @@ fn branch_repo(name: &str, n: usize, bad_from: usize) -> Result<(Repo, Vec<Strin
     Ok((repo, commits))
 }
 
+/// Opens and settles a visible lane, tracing tab teardown if its initial load fails.
 fn open(repo: &Repo, ctx: &egui::Context) -> Result<RepoTab, String> {
     let mut tab = diag::run(format_args!("construct tab"), || {
         RepoTab::new(repo.path().to_path_buf(), ctx)

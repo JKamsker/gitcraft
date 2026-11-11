@@ -13,6 +13,7 @@ impl RepoTab {
         self.poll_as(ctx, false);
     }
 
+    /// Settles background work for either view, reserving active-view refreshes for `shown`.
     fn poll_as(&mut self, ctx: &egui::Context, shown: bool) {
         #[cfg(test)]
         super::super::hang_diagnostics::checkpoint(format_args!("poll connections and filesystem"));
