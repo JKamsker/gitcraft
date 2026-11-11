@@ -176,6 +176,7 @@ impl RepoTab {
             .map(|c| c.hash.clone())
             .collect();
         let shown = self.search.results.get(self.search.current).cloned();
+        self.search.retire();
         self.search.query.clear();
         self.search.edited = None;
         self.search.running = false;
