@@ -244,6 +244,7 @@ impl RepoTab {
         let label = attempt.label.clone();
         self.push_flow.banner = None;
         self.push_flow.attempt = Some(attempt);
+        let steps = self.skip_hooks.push_steps(steps);
         // Resolve the exact ordinary target before optional reviewer echo captures it.
         // Preparation runs in the background, without a consent dialog or history scan.
         self.busy_op = Some(label.clone());
