@@ -194,3 +194,44 @@ fn explicit_force_publish_wildcard_and_default_sources_are_pinned() -> Result<()
     assert_eq!(mapped[0].1, r.tip("refs/heads/feature")?);
     Ok(())
 }
+
+#[test]
+fn ordinary_push_with_submodule_check_retains_echo_source_evidence() -> Result<(), String> {
+    let r = git::stack::test_repo::TestRepo::new("echo-ordinary-submodule-check")?;
+    let remote = git::stack::test_repo::TestRepo::new("echo-ordinary-target")?;
+    r.git(&[
+        "remote",
+        "add",
+        "origin",
+        remote.path().to_str().ok_or("path")?,
+    ])?;
+    let head = r.commit("handler.rs", "fn checked() {}\n", "checked source")?;
+    let branch = r.git(&["symbolic-ref", "--short", "HEAD"])?;
+    let spec = format!("HEAD:refs/heads/{}", branch.trim());
+    let ordinary = crate::push_preflight::prepare_ordinary_push(
+        r.path(),
+        &steps(&["push", "--porcelain", "--", "origin", &spec]),
+        &|| true,
+    )?;
+    let reviewed = prepare(r.path(), &ordinary)?;
+    let pairs = reviewed.pairs?;
+    assert_eq!(pairs.len(), 1);
+    assert_eq!(pairs[0].1, head);
+    // Checking submodules adds no child publication. Publishing them would require
+    // separate source evidence and remains outside this ordinary root review.
+    assert!(
+        prepare(
+            r.path(),
+            &steps(&[
+                "push",
+                "--recurse-submodules=on-demand",
+                "--",
+                "origin",
+                &spec
+            ])
+        )?
+        .pairs
+        .is_err()
+    );
+    Ok(())
+}

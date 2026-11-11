@@ -185,6 +185,31 @@ pub(super) fn failed_hook(events: &str, args: &[&str]) -> Option<FailedHook> {
     failed
 }
 
+/// Only a complete local trace without a pre-push hook permits retaining push output.
+/// Missing, truncated, and remote child-only traces keep arbitrary hook output private.
+pub(super) fn push_output_private(events: Option<&str>) -> bool {
+    let mut root = None;
+    let mut finished = false;
+    for line in events.unwrap_or_default().lines() {
+        let Ok(event) = serde_json::from_str::<serde_json::Value>(line) else {
+            return true;
+        };
+        if event["event"] == "start" && root.is_none() {
+            root = event["sid"].as_str().map(str::to_owned);
+        }
+        if event["event"] == "child_start"
+            && event["child_class"] == "hook"
+            && hook_name(&event) == "pre-push"
+        {
+            return true;
+        }
+        if event["event"] == "exit" && event["sid"].as_str() == root.as_deref() {
+            finished = root.is_some();
+        }
+    }
+    !finished
+}
+
 /// The name of the hook a `child_start` starts: `hook_name`, else (older gits) the file name
 /// of the program run.
 fn hook_name(event: &serde_json::Value) -> String {
@@ -241,6 +266,10 @@ impl TraceFile {
     /// The hook that failed the git command `args`, as the events written say.
     pub fn failed_hook(&self, args: &[&str]) -> Option<FailedHook> {
         failed_hook(&std::fs::read_to_string(&self.0).ok()?, args)
+    }
+
+    pub fn events(&self) -> Option<String> {
+        std::fs::read_to_string(&self.0).ok()
     }
 }
 

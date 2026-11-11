@@ -153,6 +153,10 @@ impl RepoTab {
     /// cancelled, they are dropped instead, and the status says so: they were asked for on top
     /// of it. A background fetch's failure doesn't drop them.
     pub(super) fn after_op(&mut self, ok: bool, quiet: bool, ctx: &egui::Context) {
+        // A held push still owns these waiters, even if another background task ends.
+        if self.echo_push_pending() {
+            return;
+        }
         if !ok && !quiet {
             let dropped = std::mem::take(&mut self.waiting);
             if !dropped.is_empty()
