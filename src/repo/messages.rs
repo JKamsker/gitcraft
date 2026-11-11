@@ -181,7 +181,10 @@ pub(super) enum Msg {
         result: Result<Vec<git::RebaseCommit>, String>,
     },
     /// Results for a query, searched in the code (`true`) or in the messages.
-    Search(Vec<String>, String, bool, Result<Vec<String>, String>),
+    Search(
+        std::sync::Arc<super::commit_search::Request>,
+        Result<Vec<String>, String>,
+    ),
     /// A comparison's files, for the request numbered so.
     Compare(u64, Result<CompareData, String>),
     /// The open pull requests, as asked for at that moment (see `RepoTab::prs_loaded`).
