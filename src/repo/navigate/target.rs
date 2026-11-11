@@ -1,5 +1,13 @@
 //! A commit target owns its browsing/restoration intent through graph paging.
-use crate::repo::{Action, MAX_HISTORY, RepoTab, insights::InsightsAct};
+use crate::repo::{
+    Action, MAX_HISTORY, RepoTab,
+    bakeoff::BakeAct,
+    insights::InsightsAct,
+    reflog::ReflogAct,
+    resolver::ResolverAct,
+    review_workflow::{ReviewAct, StoryAct},
+    versions::VersionsAct,
+};
 
 #[derive(Clone)]
 pub(in crate::repo) enum PendingGoto {
@@ -31,6 +39,7 @@ impl RepoTab {
                     | Action::SelectHash(_)
                     | Action::SelectStash(_)
                     | Action::SelectPr(_)
+                    | Action::FocusCommit
                     | Action::ActivityCommit(_)
                     | Action::OpenCommitChanges(_)
                     | Action::OpenDiff(_)
@@ -40,12 +49,33 @@ impl RepoTab {
                     | Action::LineHistory { .. }
                     | Action::BlameAt { .. }
                     | Action::OpenPinnedFileLine(_)
+                    | Action::OpenLineDossier(_)
+                    | Action::OpenSymbolBiography(_)
                     | Action::OpenPr(_)
                     | Action::OpenCi { .. }
                     | Action::Insights(InsightsAct::Open(_))
                     | Action::OpenDoctor(_)
                     | Action::OpenTour
                     | Action::OpenFileComparison(_)
+                    | Action::Compare { .. }
+                    | Action::Story(StoryAct::OpenCode { .. })
+                    | Action::Review(ReviewAct::Open(_))
+                    | Action::OpenSplit(_)
+                    | Action::OpenMove(_)
+                    | Action::OpenAbsorb
+                    | Action::InteractiveRebase { .. }
+                    | Action::Versions(
+                        VersionsAct::Rewrite(_)
+                            | VersionsAct::Branches { .. }
+                            | VersionsAct::PrSince(_)
+                    )
+                    | Action::Bake(BakeAct::Compare(_))
+                    | Action::Resolver(ResolverAct::Review(_))
+                    | Action::ToggleTimeline
+                    | Action::Reflog(
+                        ReflogAct::Show(_) | ReflogAct::FindLost | ReflogAct::Select(_)
+                    )
+                    | Action::ComparisonNormalPatch
                     | Action::Navigate(_)
             )
         {
@@ -110,3 +140,6 @@ impl RepoTab {
         }
     }
 }
+
+#[cfg(test)]
+mod tests;

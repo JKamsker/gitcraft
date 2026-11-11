@@ -217,7 +217,40 @@ fn a_later_explicit_destination_retires_a_paged_restoration() {
             crate::repo::insights::Kind::ALL
                 .map(|kind| Action::Insights(crate::repo::insights::InsightsAct::Open(kind))),
         );
+        destinations.extend([
+            Action::Compare {
+                base: a.clone(),
+                base_label: "base".into(),
+                target: None,
+                target_label: "work".into(),
+                captions: [None, None],
+                since_fork: false,
+            },
+            Action::Story(crate::repo::review_workflow::StoryAct::OpenCode {
+                commit: a.clone(),
+                path: "file.txt".into(),
+                line: 17,
+            }),
+        ]);
+        destinations.extend(
+            [
+                crate::repo::file_comparison::Page::Migration,
+                crate::repo::file_comparison::Page::CodeMoves,
+                crate::repo::file_comparison::Page::Lens,
+                crate::repo::file_comparison::Page::Matrix,
+            ]
+            .map(Action::OpenFileComparison),
+        );
         for action in destinations {
+            let opens_diff = matches!(
+                &action,
+                Action::OpenDiff(_) | Action::OpenDiffOfLines { .. }
+            );
+            let opens_comparison = matches!(&action, Action::Compare { .. });
+            let opens_file_comparison = matches!(&action, Action::OpenFileComparison(_));
+            let opens_story = matches!(&action, Action::Story(_));
+            let opens_file = opens_story || matches!(&action, Action::FileView { .. });
+            let opens_insights = matches!(&action, Action::Insights(_));
             let ctx = egui::Context::default();
             let mut tab = tab(&ctx, saved);
             tab.history.retain(|commit| commit.hash == a);
@@ -231,15 +264,124 @@ fn a_later_explicit_destination_retires_a_paged_restoration() {
                 assert!(tab.pending_goto.is_some());
                 tab.apply(action, &ctx);
                 assert!(tab.pending_goto.is_none());
+                assert_eq!(tab.diff.is_some(), opens_diff);
+                assert_eq!(tab.compare.is_some(), opens_comparison);
+                assert_eq!(tab.file_comparison.is_some(), opens_file_comparison);
+                assert_eq!(tab.file_view.is_some(), opens_file);
+                assert_eq!(tab.insights.is_some(), opens_insights);
+                if opens_story {
+                    assert!(
+                        tab.file_view
+                            .as_ref()
+                            .is_some_and(|view| view.path == "file.txt"
+                                && view.rev.as_deref() == Some(a.as_str())
+                                && view.marked_line == Some(17))
+                    );
+                }
                 let destination = tab.current_view();
                 let request = tab.diff.as_ref().map(|view| view.request);
+                let comparison = tab.compare.as_ref().map(|view| view.request);
+                let pinned = tab
+                    .file_view
+                    .as_ref()
+                    .map(|view| (view.path.clone(), view.rev.clone(), view.marked_line));
+                let file_comparison = tab.file_comparison.is_some();
                 tab.history.push(commit(&b));
                 tab.rebuild(&ctx);
                 tab.handle(Msg::Detail(b.clone(), Ok(detail(&b))), &ctx);
                 assert_eq!(tab.selected_hash().as_deref(), Some(a.as_str()));
                 assert_eq!(tab.current_view(), destination);
                 assert_eq!(tab.diff.as_ref().map(|view| view.request), request);
+                assert_eq!(tab.compare.as_ref().map(|view| view.request), comparison);
+                assert_eq!(
+                    tab.file_view.as_ref().map(|view| (
+                        view.path.clone(),
+                        view.rev.clone(),
+                        view.marked_line
+                    )),
+                    pinned
+                );
+                assert_eq!(tab.file_comparison.is_some(), file_comparison);
             });
         }
+    }
+}
+
+#[test]
+fn restoring_an_existing_automatic_diff_adopts_its_request_as_explicit() {
+    for saved in [false, true] {
+        for ready in [false, true] {
+            for same in [false, true] {
+                let ctx = egui::Context::default();
+                let mut tab = tab(&ctx, saved);
+                let a = "a".repeat(40);
+                let b = "b".repeat(40);
+                tab.selected = tab.index.get(if same { &a } else { &b }).copied();
+                tab.detail_hash = Some(a.clone());
+                let mut view = DiffView::new(key(&a));
+                if ready {
+                    view.data = Some(Ok(Default::default()));
+                }
+                let request = view.request;
+                tab.diff = Some(view);
+                messages::record_jobs(|| {
+                    tab.reveal_selected_changes(a.clone(), &ctx);
+                    assert!(tab.commit_changes.follows_history());
+                    tab.restore_navigation(
+                        &View::Diff {
+                            key: key(&a),
+                            selected: Some(a.clone()),
+                        },
+                        &ctx,
+                    );
+                    restored(&tab, true, &a);
+                    assert_eq!(tab.diff_beside_graph(&ctx), saved);
+                    tab.handle(Msg::Detail(a.clone(), Ok(detail(&a))), &ctx);
+                    assert_eq!(tab.diff.as_ref().map(|view| view.request), Some(request));
+                    restored(&tab, true, &a);
+                });
+            }
+        }
+    }
+}
+
+#[test]
+fn focusing_the_commit_box_retires_paged_navigation_without_reapplying_the_profile() {
+    for saved in [false, true] {
+        let ctx = egui::Context::default();
+        let mut tab = tab(&ctx, saved);
+        let a = "a".repeat(40);
+        let b = "b".repeat(40);
+        tab.history.retain(|commit| commit.hash == a);
+        tab.work.unstaged.push(git::StatusFile {
+            path: "file.txt".into(),
+            old_path: None,
+            code: 'M',
+            area: git::Area::Unstaged,
+        });
+        tab.rebuild_rows();
+        tab.selected = tab.index.get(&a).copied();
+        tab.has_more = true;
+        Settings::set_show_detail(&ctx, false);
+        let (_, applied) = crate::connections::record_set_attempts(|| {
+            messages::record_jobs(|| {
+                tab.goto_target(
+                    super::super::navigate::PendingGoto::Restore(b.clone()),
+                    &ctx,
+                );
+                assert!(tab.pending_goto.is_some());
+                tab.apply(Action::FocusCommit, &ctx);
+                assert!(tab.pending_goto.is_none());
+                assert_eq!(tab.selected_hash().as_deref(), Some(WIP_HASH));
+                assert!(tab.focus_commit_summary);
+                tab.history.push(commit(&b));
+                tab.rebuild(&ctx);
+                tab.handle(Msg::Detail(b.clone(), Ok(detail(&b))), &ctx);
+                assert_eq!(tab.selected_hash().as_deref(), Some(WIP_HASH));
+                assert!(tab.focus_commit_summary);
+                assert!(Settings::get(&ctx).show_detail);
+            })
+        });
+        assert_eq!(applied, 0);
     }
 }
