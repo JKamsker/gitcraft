@@ -30,10 +30,24 @@ pub(super) fn sync_dir(dir: &Path) -> Result<(), String> {
     Ok(())
 }
 
+// FlushFileBuffers requires GENERIC_WRITE on Windows, including for an existing
+// archive or live file. Unix permits fsync on a read-only descriptor. Never create,
+// truncate, change permissions, or skip a failed flush to obtain durability.
+fn sync_existing(
+    path: &Path,
+    windows: bool,
+    flush: impl FnOnce(&std::fs::File) -> std::io::Result<()>,
+) -> Result<(), String> {
+    let file = std::fs::OpenOptions::new()
+        .read(true)
+        .write(windows)
+        .open(path)
+        .map_err(|e| format!("Open recovery file {} for sync: {e}", path.display()))?;
+    flush(&file).map_err(|e| format!("Sync recovery file {}: {e}", path.display()))
+}
+
 pub(super) fn sync_file(path: &Path) -> Result<(), String> {
-    std::fs::File::open(path)
-        .and_then(|f| f.sync_all())
-        .map_err(|e| e.to_string())?;
+    sync_existing(path, cfg!(windows), std::fs::File::sync_all)?;
     super::effects::boundary("file-synced")
 }
 
@@ -44,9 +58,7 @@ pub(super) fn sync_tree(dir: &Path) -> Result<(), String> {
         if kind.is_dir() {
             sync_tree(&entry.path())?;
         } else if kind.is_file() {
-            std::fs::File::open(entry.path())
-                .and_then(|f| f.sync_all())
-                .map_err(|e| e.to_string())?;
+            sync_existing(&entry.path(), cfg!(windows), std::fs::File::sync_all)?;
         } else {
             return Err("Recovery archive contains a non-regular file".into());
         }
@@ -176,6 +188,6 @@ pub(super) fn recover_locked(repo: &Path, parked: &Parked) -> Result<bool, Strin
     }
 }
 
-#[cfg(all(test, not(recovery_recording)))]
+#[cfg(test)]
 #[path = "journal/tests.rs"]
 mod tests;

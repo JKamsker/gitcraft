@@ -153,3 +153,64 @@ fn cleanup_restart_is_idempotent_and_archive_collisions_preserve_both_copies()
     );
     Ok(())
 }
+
+#[test]
+fn existing_file_sync_requests_windows_write_access_without_changing_bytes()
+-> Result<(), Box<dyn std::error::Error>> {
+    let fixture = Fixture::new()?;
+    let file = fixture.0.join("raw-index");
+    let original = b"DIRC\0raw\xff\r\n";
+    std::fs::write(&file, original)?;
+    // A zero-byte write checks the actual handle's write access without altering
+    // bytes. Model FlushFileBuffers' documented GENERIC_WRITE requirement on Unix
+    // too, so a read-only-open regression fails before any native Windows run.
+    let windows_flush = |mut handle: &std::fs::File| -> std::io::Result<()> {
+        use std::io::Write;
+        handle.write(&[])?;
+        handle.sync_all()
+    };
+    #[cfg(unix)]
+    assert!(sync_existing(&file, false, windows_flush).is_err());
+    sync_existing(&file, true, windows_flush)?;
+    sync_file(&file)?;
+    sync_tree(&fixture.0)?;
+    assert_eq!(std::fs::read(&file)?, original);
+    let missing = fixture.0.join("missing");
+    let mut flushed = false;
+    let error = sync_existing(&missing, true, |_| {
+        flushed = true;
+        Ok(())
+    })
+    .unwrap_err();
+    assert!(!flushed && !missing.exists());
+    assert!(
+        error.contains("Open recovery file") && error.contains("missing"),
+        "{error}"
+    );
+    Ok(())
+}
+
+#[test]
+fn failed_regular_file_flush_reports_its_path_and_retains_originals()
+-> Result<(), Box<dyn std::error::Error>> {
+    let fixture = Fixture::new()?;
+    let file = fixture.0.join("original-index");
+    std::fs::write(&file, b"original")?;
+    let error = sync_existing(&file, true, |_| {
+        Err(std::io::Error::new(
+            std::io::ErrorKind::PermissionDenied,
+            "recorded FlushFileBuffers failure",
+        ))
+    })
+    .unwrap_err();
+    assert!(
+        error.contains("Sync recovery file") && error.contains("original-index"),
+        "{error}"
+    );
+    assert!(
+        error.contains("recorded FlushFileBuffers failure"),
+        "{error}"
+    );
+    assert_eq!(std::fs::read(file)?, b"original");
+    Ok(())
+}
