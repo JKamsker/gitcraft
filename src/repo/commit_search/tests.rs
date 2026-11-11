@@ -133,7 +133,7 @@ fn request_witness_checks_path_roots_order_query_mode_and_namespace() -> Result<
                 "namespace" => {
                     let mut settings = crate::settings::Settings::get(&ctx);
                     settings.history_filter.namespaces = "refs/other/*".into();
-                    settings.set(&ctx);
+                    settings.put_for_test(&ctx);
                 }
                 "connection" => {
                     crate::connections::Context {
