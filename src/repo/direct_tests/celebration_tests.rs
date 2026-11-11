@@ -187,6 +187,7 @@ fn successful_first_commit_survives_queued_push_then_failure_until_confirmed_rea
     });
     tab.waiting.push_back(super::super::running::Waiter::Push);
     tab.celebration_observed_heads(String::new(), "root".into());
+    let theirs = f.advance_receiver()?;
     tab.op_done(
         "Commit".into(),
         Ok(String::new()),
@@ -195,33 +196,34 @@ fn successful_first_commit_survives_queued_push_then_failure_until_confirmed_rea
         true,
         &ctx,
     );
-    assert!(tab.busy_op.is_none());
-    assert!(matches!(
-        tab.dialog,
-        Some(super::super::Dialog::PushLoading { .. })
-    ));
+    assert!(tab.busy_op.is_some(), "queued push starts directly");
+    assert!(tab.dialog.is_none());
     assert_eq!(tab.celebration.pending.len(), 1);
     assert!(crate::audio::take_recorded().is_empty());
-    let before = f.receiver_head()?;
-    let plan = super::super::push_preflight::test_support::review(&mut tab, &ctx)?;
-    assert_eq!(f.receiver_head()?, before, "review must not send");
-    let theirs = f.advance_receiver()?;
-    tab.apply(super::super::Action::SubmitPreflight(Box::new(plan)), &ctx);
-    super::super::push_preflight::test_support::wait_for(&mut tab, &ctx, |t| t.busy_op.is_none())?;
-    assert!(
-        tab.last_op
-            .as_ref()
-            .is_some_and(|op| op.ops.iter().any(|step| step
-                .first()
-                .is_some_and(|s| s == crate::push_preflight::APPROVED)))
-    );
+    // Handle only operation settlement: a real refresh would confirm the celebration,
+    // which this test deliberately checks with synthetic reads below.
+    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(20);
+    loop {
+        let msg = tab
+            .rx
+            .recv_timeout(std::time::Duration::from_secs(1))
+            .map_err(|e| e.to_string())?;
+        if matches!(&msg, super::super::Msg::OpDone { label, .. } if label == "Push") {
+            tab.handle(msg, &ctx);
+            break;
+        }
+        if let super::super::Msg::Then(next) = msg {
+            next(&mut tab, &ctx);
+        }
+        if std::time::Instant::now() >= deadline {
+            return Err("Push did not settle".into());
+        }
+    }
     assert!(
         tab.activity
             .last()
             .is_some_and(|entry| matches!(&entry.outcome,
-            super::super::activity::Outcome::Failed(error) if error.contains("stale info"))),
-        "{:?}",
-        tab.activity.last()
+        super::super::activity::Outcome::Failed(error) if error.contains("rejected")))
     );
     assert_eq!(f.receiver_head()?, theirs);
 
