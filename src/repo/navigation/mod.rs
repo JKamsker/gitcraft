@@ -290,13 +290,15 @@ impl RepoTab {
                     DiffKey::Work(file) => self.work_file(file).map_or(key.clone(), DiffKey::Work),
                     _ => key.clone(),
                 };
+                if self.diff.as_ref().is_none_or(|d| d.key != key) {
+                    self.apply(Action::OpenDiff(key), ctx);
+                }
+                // Replay the destination before starting its passive selection read:
+                // an explicit new opening retires older navigation requests.
                 if let Some(hash) = selected.as_deref()
                     && self.selected_hash().as_deref() != Some(hash)
                 {
                     self.reselect(hash, ctx);
-                }
-                if self.diff.as_ref().is_none_or(|d| d.key != key) {
-                    self.apply(Action::OpenDiff(key), ctx);
                 }
             }
             View::File { path, rev, tab } => {
