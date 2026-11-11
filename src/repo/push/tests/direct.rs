@@ -162,3 +162,37 @@ fn offline_push_settles_preparation_and_drops_queued_actions() -> Result<(), Str
     assert!(tab.taskbar_progress().is_none());
     Ok(())
 }
+
+#[test]
+fn direct_push_checks_submodules_without_publishing_them() -> Result<(), String> {
+    let w = world("direct-submodules")?;
+    let child_remote = w.root.join("child.git");
+    run(&w.root, &["clone", "--bare", &path(&w.bare), &path(&child_remote)])?;
+    run(&w.mine, &["-c", "protocol.file.allow=always", "submodule", "add", &path(&child_remote), "child"])?;
+    let child = w.mine.join("child");
+    run(&child, &["config", "user.name", "t"])?;
+    run(&child, &["config", "user.email", "t@t"])?;
+    let child_before = git::resolve(&child_remote, "refs/heads/main")?;
+    let child_head = commit(&child, "unpublished child")?;
+    run(&w.mine, &["add", "child", ".gitmodules"])?;
+    let root_head = commit(&w.mine, "references unpublished child")?;
+    let root_before = remote_main(&w);
+    // A normal push must not follow this configuration into child writes.
+    run(&w.mine, &["config", "push.recurseSubmodules", "on-demand"])?;
+    let ctx = egui::Context::default();
+    let mut tab = direct_tab(&w, &ctx)?;
+    assert!(!tab.submodules.is_empty());
+    tab.apply(crate::repo::Action::Push, &ctx);
+    settle(&mut tab, &ctx)?;
+    assert!(tab.dialog.is_none());
+    assert_eq!(remote_main(&w), root_before);
+    assert_eq!(git::resolve(&child_remote, "refs/heads/main")?, child_before);
+    assert!(tab.status.as_deref().is_some_and(|(_, error)| *error));
+    run(&child, &["push", "origin", "main"])?;
+    assert_eq!(git::resolve(&child_remote, "refs/heads/main")?, child_head);
+    tab.apply(crate::repo::Action::Push, &ctx);
+    settle(&mut tab, &ctx)?;
+    assert!(tab.dialog.is_none());
+    assert_eq!(remote_main(&w), root_head);
+    Ok(())
+}

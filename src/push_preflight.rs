@@ -246,14 +246,24 @@ pub(crate) fn prepare_ordinary_push(
         if route.force || route.deleting {
             return Err("This push configuration rewrites or deletes remote history. Use an explicit force-with-lease or deletion action to review it; nothing was pushed.".into());
         }
-        let mut args = vec!["push".into(), "--porcelain".into()];
+        // Refuse unpublished child commits without starting unrelated child pushes.
+        let mut args = vec![
+            "push".into(),
+            "--porcelain".into(),
+            "--recurse-submodules=check".into(),
+        ];
         if route.skip_hooks {
             args.push("--no-verify".into());
         }
         if route.tracking {
             args.push("--set-upstream".into());
         }
-        args.extend(route.extras);
+        args.extend(
+            route
+                .extras
+                .into_iter()
+                .filter(|arg| arg != "--recurse-submodules=check"),
+        );
         args.extend([
             "--".into(),
             route.remote,
