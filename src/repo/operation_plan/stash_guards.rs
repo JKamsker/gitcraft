@@ -7,7 +7,7 @@ fn prefix(path: &Path, kind: &str) -> Vec<String> {
         "symref" => super::super::expect_symref("HEAD", "refs/heads/main"),
         "tree" => super::super::expect_tree(
             "HEAD",
-            &git::run(Some(path), &["rev-parse", "HEAD^{tree}"])
+            git::run(Some(path), &["rev-parse", "HEAD^{tree}"])
                 .unwrap_or_default()
                 .trim(),
         ),

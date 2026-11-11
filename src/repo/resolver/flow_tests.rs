@@ -453,7 +453,7 @@ fn apply_retained_run(h: &mut H<'_>, repo: &Repo, dir: &Path, id: &str) -> Resul
             .is_some_and(|c| c.hash == crate::repo::WIP_HASH)),
         "its changes selected"
     );
-    assert!(merging(&dir));
+    assert!(merging(dir));
     assert_eq!(
         repo.git(&["symbolic-ref", "--short", "HEAD"])?.trim(),
         "main"
@@ -478,6 +478,6 @@ fn apply_retained_run(h: &mut H<'_>, repo: &Repo, dir: &Path, id: &str) -> Resul
     );
     let a = std::fs::read_to_string(dir.join("a.txt")).map_err(|e| e.to_string())?;
     assert_eq!(a.trim_end(), RESOLVED);
-    assert!(merging(&dir), "the merge goes on, to be committed");
+    assert!(merging(dir), "the merge goes on, to be committed");
     Ok(())
 }
