@@ -19,7 +19,7 @@ mod tests;
 
 use std::collections::HashSet;
 
-use egui::{RichText, Ui};
+use egui::Ui;
 
 use super::InsightsAct;
 use super::common::{self, Slot, SlotState};
