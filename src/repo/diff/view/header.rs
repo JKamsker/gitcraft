@@ -335,7 +335,7 @@ impl RepoTab {
                             change_steps(ui, acts);
                             ui.add_space(8.0);
                         }
-                        if self.split_toggle(ui) {
+                        if self.split_toggle(ui, acts) {
                             ui.add_space(8.0);
                         }
                         for &kind in rich_kinds.iter().rev() {
