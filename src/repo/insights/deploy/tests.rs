@@ -6,6 +6,7 @@ use crate::ci::deployments::{Artifact, DeployState, Deployment, Deployments, Env
 use crate::ci::{CheckState, Project, Run};
 use crate::insights::Provenance;
 use crate::insights::deploy::environments;
+use crate::repo::insights::test_support::required;
 use crate::repo::insights::{InsightsAct, Kind};
 
 impl crate::repo::insights::context::namespace_tests::Fixture for State {
@@ -177,16 +178,16 @@ fn only_current_deployment_completion_changes_availability_and_picture() {
         let ctx = egui::Context::default();
         let mut tab = RepoTab::new_deferred("/nonexistent/deploy-completions".into(), &ctx);
         tab.insights = Some(Box::new(super::super::InsightsView::new(Kind::Deploy)));
-        let initial = tab.insights.as_mut().unwrap().deploy.flow.start();
+        let initial = required(tab.insights.as_mut()).deploy.flow.start();
         tab.deploy_read(initial, Ok(flow()), &ctx);
         let (old, current) = {
-            let state = &mut tab.insights.as_mut().unwrap().deploy;
+            let state = &mut required(tab.insights.as_mut()).deploy;
             state.selected = Some(Target::Run(0));
             (state.flow.start(), state.flow.start())
         };
         // A rejected error preserves loading, data and the current presentation.
         tab.deploy_read(old, Err(error.into()), &ctx);
-        let state = &tab.insights.as_ref().unwrap().deploy;
+        let state = &required(tab.insights.as_ref()).deploy;
         assert!(state.flow.loading);
         assert!(state.flow.ready().is_some());
         assert!(state.unavailable.is_none());
@@ -195,7 +196,7 @@ fn only_current_deployment_completion_changes_availability_and_picture() {
 
         tab.deploy_read(current, Ok(flow()), &ctx);
         tab.deploy_read(old, Err(error.into()), &ctx);
-        let state = &tab.insights.as_ref().unwrap().deploy;
+        let state = &required(tab.insights.as_ref()).deploy;
         assert!(!state.flow.loading);
         assert!(state.flow.ready().is_some());
         assert!(state.unavailable.is_none());
@@ -203,10 +204,10 @@ fn only_current_deployment_completion_changes_availability_and_picture() {
         assert_eq!(state.picture.as_ref().map(|p| p.graph.nodes.len()), Some(7));
 
         // A stale success must also preserve a current tool error.
-        let current = tab.insights.as_mut().unwrap().deploy.flow.start();
+        let current = required(tab.insights.as_mut()).deploy.flow.start();
         tab.deploy_read(current, Err(error.into()), &ctx);
         tab.deploy_read(old, Ok(flow()), &ctx);
-        let state = &tab.insights.as_ref().unwrap().deploy;
+        let state = &required(tab.insights.as_ref()).deploy;
         assert!(!state.flow.loading);
         assert_eq!(state.flow.error(), Some(error));
         assert_eq!(
@@ -214,9 +215,9 @@ fn only_current_deployment_completion_changes_availability_and_picture() {
             Some(error)
         );
 
-        let current = tab.insights.as_mut().unwrap().deploy.flow.start();
+        let current = required(tab.insights.as_mut()).deploy.flow.start();
         tab.deploy_read(current, Ok(flow()), &ctx);
-        let state = &tab.insights.as_ref().unwrap().deploy;
+        let state = &required(tab.insights.as_ref()).deploy;
         assert!(state.unavailable.is_none());
         assert!(state.flow.ready().is_some());
         assert_eq!(state.picture.as_ref().map(|p| p.graph.nodes.len()), Some(7));

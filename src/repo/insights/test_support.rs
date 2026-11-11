@@ -4,6 +4,17 @@ use crate::forge::{Forge, Hosting};
 use crate::git::Remote;
 use crate::repo::{RepoTab, messages};
 
+#[track_caller]
+pub(in crate::repo::insights) fn required<T>(value: Option<T>) -> T {
+    assert!(value.is_some(), "required fixture value is missing");
+    match value {
+        Some(value) => value,
+        None => unreachable!(),
+    }
+}
+
+type Completion = Box<dyn FnOnce(&mut RepoTab, &egui::Context)>;
+
 pub(super) const TRANSITIONS: [&str; 6] = [
     "forge",
     "forge-aba",
@@ -33,12 +44,16 @@ pub(super) fn tab(ctx: &egui::Context, kind: Kind) -> RepoTab {
     tab.take_forge_selection(false, ctx);
     tab.refs.head = "a".repeat(40);
     tab.insights = Some(Box::new(InsightsView::new(kind)));
-    tab.insights.as_mut().unwrap().loaded.insert(kind);
+    required(tab.insights.as_mut()).loaded.insert(kind);
     tab.sync_insights_context(ctx);
     tab
 }
 
 pub(super) fn transition(tab: &mut RepoTab, ctx: &egui::Context, how: &str) {
+    assert!(
+        TRANSITIONS.contains(&how),
+        "unknown context transition: {how}"
+    );
     messages::record_jobs(|| match how {
         "forge" => tab.set_primary_forge(Some("fork".into()), ctx),
         "forge-aba" => {
@@ -63,7 +78,7 @@ pub(super) fn transition(tab: &mut RepoTab, ctx: &egui::Context, how: &str) {
             }
         }
         "signin" => tab.invalidate_https_challenge(),
-        _ => panic!("unknown context transition"),
+        _ => unreachable!(),
     });
     tab.sync_insights_context(ctx);
 }
@@ -74,17 +89,17 @@ pub(super) fn reply<T: Send + 'static>(
     ctx: &egui::Context,
     value: T,
     complete: impl FnOnce(&mut RepoTab, T, &egui::Context) + Send + 'static,
-) -> Box<dyn FnOnce(&mut RepoTab, &egui::Context)> {
+) -> Completion {
     let sender = tab.forge_sender();
     let (_, mut jobs) = tab
         .connection_context
         .run(|| messages::record_jobs(|| tab.insight_forge_then(ctx, move || value, complete)));
     assert_eq!(jobs.len(), 1);
-    let job = jobs.pop().unwrap();
+    let job = required(jobs.pop());
     Box::new(move |tab, ctx| {
         let connection = tab.connection_context.clone();
         connection.run(|| {
-            sender.send(job()).unwrap();
+            assert!(sender.send(job()).is_ok());
             messages::record_jobs(|| tab.poll(ctx));
         });
     })
@@ -96,6 +111,6 @@ pub(super) fn reload_from_frame(tab: &mut RepoTab, ctx: &egui::Context) {
     let (_, jobs) =
         connection.run(|| messages::record_jobs(|| super::tests::draw(tab, ctx, 900.0)));
     assert_eq!(jobs.len(), 1, "visible invalidated page must reload once");
-    let view = tab.insights.as_ref().unwrap();
+    let view = required(tab.insights.as_ref());
     assert!(view.loaded.contains(&view.kind));
 }

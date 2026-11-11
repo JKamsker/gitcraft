@@ -1,8 +1,9 @@
 use super::*;
+use crate::repo::insights::test_support::required;
 use crate::repo::insights::{Kind, test_support as schedule};
 
 fn assert_retired(tab: &RepoTab) {
-    let view = tab.insights.as_ref().unwrap();
+    let view = required(tab.insights.as_ref());
     let state = &view.ci_path;
     assert!(!view.loaded.contains(&Kind::CiPath));
     assert!(state.subject.is_none());
@@ -20,7 +21,7 @@ fn context_switches_retire_both_ci_stages_and_reload_the_visible_page() {
             let ctx = egui::Context::default();
             let mut tab = schedule::tab(&ctx, Kind::CiPath);
             let (runs, explorer) = {
-                let state = &mut tab.insights.as_mut().unwrap().ci_path;
+                let state = &mut required(tab.insights.as_mut()).ci_path;
                 state.selected = Some(0);
                 state.expanded.insert(0);
                 let initial = state.explorer.start();
@@ -49,32 +50,28 @@ fn context_switches_retire_both_ci_stages_and_reload_the_visible_page() {
             old_run(&mut tab, &ctx);
             assert_retired(&tab);
             schedule::reload_from_frame(&mut tab, &ctx);
-            assert!(tab.insights.as_ref().unwrap().ci_path.runs.loading);
-            let current = tab.insights.as_mut().unwrap().ci_path.runs.start();
+            assert!(required(tab.insights.as_ref()).ci_path.runs.loading);
+            let current = required(tab.insights.as_mut()).ci_path.runs.start();
             let fresh =
                 schedule::reply(&tab, &ctx, Ok(Runs::default()), move |tab, result, ctx| {
                     tab.ci_path_runs(current, result, ctx);
                 });
             fresh(&mut tab, &ctx);
             assert!(
-                tab.insights
-                    .as_ref()
-                    .unwrap()
+                required(tab.insights.as_ref())
                     .ci_path
                     .runs
                     .ready()
                     .is_some()
             );
-            let current = tab.insights.as_mut().unwrap().ci_path.explorer.start();
+            let current = required(tab.insights.as_mut()).ci_path.explorer.start();
             let fresh =
                 schedule::reply(&tab, &ctx, Ok(tests::explorer()), move |tab, result, _| {
                     tab.ci_path_run(current, result);
                 });
             fresh(&mut tab, &ctx);
             assert!(
-                tab.insights
-                    .as_ref()
-                    .unwrap()
+                required(tab.insights.as_ref())
                     .ci_path
                     .explorer
                     .ready()
@@ -90,7 +87,7 @@ fn unavailable_ci_subjects_retire_outstanding_runs_and_explorers() {
         let ctx = egui::Context::default();
         let mut tab = schedule::tab(&ctx, Kind::CiPath);
         let (runs, explorer) = {
-            let state = &mut tab.insights.as_mut().unwrap().ci_path;
+            let state = &mut required(tab.insights.as_mut()).ci_path;
             (state.runs.start(), state.explorer.start())
         };
         tab.remotes.clear();
@@ -100,7 +97,7 @@ fn unavailable_ci_subjects_retire_outstanding_runs_and_explorers() {
         crate::repo::messages::record_jobs(|| tab.ci_path_load(&ctx));
         tab.ci_path_runs(runs, Ok(Runs::default()), &ctx);
         tab.ci_path_run(explorer, Ok(tests::explorer()));
-        let state = &tab.insights.as_ref().unwrap().ci_path;
+        let state = &required(tab.insights.as_ref()).ci_path;
         assert!(state.unavailable.is_some());
         assert!(!state.runs.loading && state.runs.value.is_none());
         assert!(!state.explorer.loading && state.explorer.value.is_none());

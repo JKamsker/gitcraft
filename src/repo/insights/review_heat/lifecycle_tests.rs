@@ -1,4 +1,5 @@
 use super::*;
+use crate::repo::insights::test_support::required;
 use crate::repo::insights::{Kind, test_support as schedule};
 
 #[test]
@@ -9,7 +10,7 @@ fn context_changes_forget_the_previous_forges_review_and_opened_pr() {
             let ctx = egui::Context::default();
             let mut tab = schedule::tab(&ctx, Kind::ReviewHeat);
             let old = {
-                let view = tab.insights.as_mut().unwrap();
+                let view = required(tab.insights.as_mut());
                 view.pr = Some(7);
                 let state = &mut view.review_heat;
                 state.number = Some(7);
@@ -29,7 +30,7 @@ fn context_changes_forget_the_previous_forges_review_and_opened_pr() {
             });
             schedule::transition(&mut tab, &ctx, transition);
             old(&mut tab, &ctx);
-            let view = tab.insights.as_ref().unwrap();
+            let view = required(tab.insights.as_ref());
             assert!(!view.loaded.contains(&Kind::ReviewHeat));
             assert!(view.pr.is_none());
             let state = &view.review_heat;
@@ -37,15 +38,13 @@ fn context_changes_forget_the_previous_forges_review_and_opened_pr() {
             assert!(state.expanded.is_empty());
             assert!(!state.data.loading && state.data.value.is_none());
             // The new context's same-number PR can start and finish independently.
-            let current = tab.insights.as_mut().unwrap().review_heat.data.start();
+            let current = required(tab.insights.as_mut()).review_heat.data.start();
             let fresh = schedule::reply(&tab, &ctx, Ok(Heat::default()), move |tab, result, _| {
                 tab.review_heat_reply(current, result);
             });
             fresh(&mut tab, &ctx);
             assert!(
-                tab.insights
-                    .as_ref()
-                    .unwrap()
+                required(tab.insights.as_ref())
                     .review_heat
                     .data
                     .ready()

@@ -1,4 +1,5 @@
 use super::*;
+use crate::repo::insights::test_support::required;
 use crate::repo::insights::{InsightsView, test_support as schedule};
 use crate::repo::{Msg, messages};
 use std::time::Instant;
@@ -56,7 +57,7 @@ fn queued(tab: &RepoTab, ctx: &egui::Context, error: bool) -> Reply {
         );
     });
     assert_eq!(jobs.len(), 1);
-    jobs.pop().unwrap()
+    required(jobs.pop())
 }
 
 fn change_namespace(tab: &mut RepoTab, ctx: &egui::Context, how: &str) {
@@ -88,7 +89,7 @@ fn change_namespace(tab: &mut RepoTab, ctx: &egui::Context, how: &str) {
 }
 
 fn assert_retired(tab: &mut RepoTab, kind: Kind) {
-    let view = tab.insights.as_mut().unwrap();
+    let view = required(tab.insights.as_mut());
     assert!(view.loaded.is_empty());
     assert_eq!(view.kind, kind);
     assert!(view.table);
@@ -110,7 +111,7 @@ fn all_insights_retire_repository_slots_without_losing_page_or_safe_preferences(
             for error in [false, true] {
                 let ctx = egui::Context::default();
                 let mut tab = schedule::tab(&ctx, kind);
-                let view = tab.insights.as_mut().unwrap();
+                let view = required(tab.insights.as_mut());
                 view.table = true;
                 fixture(view, kind).seed();
                 let old = queued(&tab, &ctx, error);
@@ -156,14 +157,14 @@ fn abandoned_first_stages_cannot_start_build_or_layout_work_in_another_namespace
                 );
             });
             if complete_first {
-                let (_, next) = messages::record_jobs(|| tab.handle(first.pop().unwrap()(), &ctx));
+                let (_, next) = messages::record_jobs(|| tab.handle(required(first.pop())(), &ctx));
                 assert_eq!(next.len(), 1);
                 first = next;
             }
             change_namespace(&mut tab, &ctx, "route");
             let connection = tab.connection_context.clone();
             let (_, later) = connection
-                .run(|| messages::record_jobs(|| tab.handle(first.pop().unwrap()(), &ctx)));
+                .run(|| messages::record_jobs(|| tab.handle(required(first.pop())(), &ctx)));
             assert!(
                 later.is_empty(),
                 "{kind:?} must discard before the second stage"
@@ -202,7 +203,7 @@ fn forge_only_changes_preserve_local_slots_and_their_valid_completions() {
         let mut tab = schedule::tab(&ctx, kind);
         let old = queued(&tab, &ctx, false);
         schedule::transition(&mut tab, &ctx, "forge");
-        assert!(tab.insights.as_ref().unwrap().loaded.contains(&kind));
+        assert!(required(tab.insights.as_ref()).loaded.contains(&kind));
         deliver(&mut tab, &ctx, old);
         assert!(tab.status.is_some());
     }
