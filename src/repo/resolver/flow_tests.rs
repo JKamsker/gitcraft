@@ -68,9 +68,11 @@ fn harness(path: PathBuf) -> H<'static> {
                         ..Settings::default()
                     }
                     .set(ui.ctx());
-                    crate::theme::install_fonts(ui.ctx());
                     RepoTab::new(path.clone(), ui.ctx())
                 });
+                if !crate::theme::test_paint::fonts_before_paint(ui.ctx()) {
+                    return;
+                }
                 tab.ui(ui);
             },
             None,

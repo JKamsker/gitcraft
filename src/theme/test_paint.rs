@@ -12,6 +12,21 @@ pub(crate) fn context() -> egui::Context {
     ctx
 }
 
+/// UI-state harnesses cannot configure their context before construction. Their first
+/// callback installs the fonts; painting must wait until egui starts the next pass.
+pub(crate) fn fonts_before_paint(ctx: &egui::Context) -> bool {
+    let key = egui::Id::new("headless-font-installation-pass");
+    let pass = ctx.cumulative_pass_nr();
+    if let Some(installed) = ctx.data(|data| data.get_temp::<u64>(key)) {
+        assert!(pass > installed, "custom fonts need a later painting pass");
+        true
+    } else {
+        super::install_fonts(ctx);
+        ctx.data_mut(|data| data.insert_temp(key, pass));
+        false
+    }
+}
+
 pub(crate) fn assert_text_aa(shapes: &[ClippedShape], base: Color32, label: &str, context: &str) {
     fn visit(
         shape: &Shape,

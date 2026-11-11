@@ -91,14 +91,15 @@ fn settle(harness: &mut H<'_>) {
 }
 
 #[test]
-fn first_frame_fonts_support_ready_and_pending_repository_content() {
+fn first_frame_fonts_support_ready_and_pending_repository_content() -> Result<(), String> {
     struct Content {
         ready: bool,
-        first_pass: Option<bool>,
+        first_pass: Option<(bool, u64)>,
     }
-    impl eframe::App for Content {
-        fn ui(&mut self, ui: &mut egui::Ui, _frame: &mut eframe::Frame) {
-            self.first_pass.get_or_insert(self.ready);
+    impl Content {
+        fn paint(&mut self, ui: &mut egui::Ui) {
+            self.first_pass
+                .get_or_insert((self.ready, ui.ctx().cumulative_pass_nr()));
             if self.ready {
                 ui.label(egui::RichText::new("Ready heading").font(crate::theme::semibold(16.0)));
                 ui.label(egui::RichText::new("Ready row").font(crate::theme::medium(13.0)));
@@ -107,21 +108,47 @@ fn first_frame_fonts_support_ready_and_pending_repository_content() {
             }
         }
     }
-    for ready in [false, true] {
-        let mut harness = prepared_harness(move |_| Content {
-            ready,
-            first_pass: None,
-        });
-        assert_eq!(harness.state().first_pass, Some(ready));
-        if !ready {
-            harness.get_by_label("Pending repository read");
-            assert!(harness.query_by_label("Ready heading").is_none());
-            harness.state_mut().ready = true;
-            harness.step();
+    impl eframe::App for Content {
+        fn ui(&mut self, ui: &mut egui::Ui, _frame: &mut eframe::Frame) {
+            self.paint(ui);
         }
-        harness.get_by_label("Ready heading");
-        harness.get_by_label("Ready row");
     }
+    for prepared in [false, true] {
+        for ready in [false, true] {
+            let content = Content {
+                ready,
+                first_pass: None,
+            };
+            let mut harness = if prepared {
+                prepared_harness(move |_| content)
+            } else {
+                Harness::builder().build_ui_state(
+                    |ui, content: &mut Content| {
+                        if crate::theme::test_paint::fonts_before_paint(ui.ctx()) {
+                            content.paint(ui);
+                        }
+                    },
+                    content,
+                )
+            };
+            let (first_ready, pass) = harness.state().first_pass.ok_or("first content paint")?;
+            assert_eq!(first_ready, ready);
+            if prepared {
+                assert_eq!(pass, 0, "prepared fonts allow painting on the first pass");
+            } else {
+                assert!(pass > 0, "callback font installation must finish first");
+            }
+            if !ready {
+                harness.get_by_label("Pending repository read");
+                assert!(harness.query_by_label("Ready heading").is_none());
+                harness.state_mut().ready = true;
+                harness.step();
+            }
+            harness.get_by_label("Ready heading");
+            harness.get_by_label("Ready row");
+        }
+    }
+    Ok(())
 }
 
 /// What a screen reader says of the widget with the keyboard: its name, else its text (a label
