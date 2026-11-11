@@ -134,36 +134,10 @@ impl RepoTab {
             }
             return;
         }
-        if view.structural.enabled {
-            match &view.structural.result {
-                None => {
-                    ui.centered_and_justified(|ui| ui.add(crate::spinner::Spinner::new()));
-                    return;
-                }
-                Some(Ok(data)) => {
-                    if self.find.open {
-                        self.find.rendered(
-                            ui,
-                            format!(
-                                "syntax:{:?}:{}:{}",
-                                view.key,
-                                view.request,
-                                view.structural.generation()
-                            ),
-                            |t| structural::search_document(data, t),
-                        );
-                    } else {
-                        structural::show(ui, data);
-                    }
-                    return;
-                }
-                Some(Err(reason)) => {
-                    ui.colored_label(t.warning, reason);
-                    ui.label(crate::i18n::text("repo-core-2354"));
-                    ui.separator();
-                }
-            }
+        if self.structural_content(ui) {
+            return;
         }
+        let Some(view) = &self.diff else { return };
         let Some(data) = ready_data(ui, view, ignore_ws, &t, &mut self.find, acts) else {
             return;
         };

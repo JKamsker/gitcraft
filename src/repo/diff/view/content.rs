@@ -3,6 +3,42 @@ use super::*;
 use crate::repo::diff::encrypted;
 
 impl RepoTab {
+    /// Structural errors explain the fallback, then allow ordinary diff rows below.
+    pub(super) fn structural_content(&mut self, ui: &mut Ui) -> bool {
+        let Some(view) = &self.diff else { return false };
+        if !view.structural.enabled {
+            return false;
+        }
+        match &view.structural.result {
+            None => {
+                ui.centered_and_justified(|ui| ui.add(crate::spinner::Spinner::new()));
+            }
+            Some(Ok(data)) => {
+                if self.find.open {
+                    self.find.rendered(
+                        ui,
+                        format!(
+                            "syntax:{:?}:{}:{}",
+                            view.key,
+                            view.request,
+                            view.structural.generation()
+                        ),
+                        |t| structural::search_document(data, t),
+                    );
+                } else {
+                    structural::show(ui, data);
+                }
+            }
+            Some(Err(reason)) => {
+                ui.colored_label(Tokens::get(ui.ctx()).warning, reason);
+                ui.label(crate::i18n::text("repo-core-2354"));
+                ui.separator();
+                return false;
+            }
+        }
+        true
+    }
+
     pub(super) fn markdown_content(&mut self, ui: &mut Ui, path: &str, as_file: bool) {
         let t = Tokens::get(ui.ctx());
         let Some(view) = &mut self.diff else { return };
