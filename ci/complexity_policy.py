@@ -90,7 +90,8 @@ def main(argv=None):
         # Cargo config names are case-insensitive on Windows. Preserve the size
         # checker's exact extension policy while scanning policy inputs broadly.
         sources = tracked_contents(root, staged=args.staged, revision=args.revision,
-                                   suffix=(b".rs", b".toml", b".cargo/config"), ignore_case=True)
+                                   suffix=(b".rs", b".toml", b".cargo/config", b".cargo"),
+                                   ignore_case=True, reject_symlinks=True)
         errors = policy_errors(sources)
         for error in errors:
             print(f"error: {error}")

@@ -2,12 +2,14 @@
 
 import os
 import json
+import contextlib
+import io
 from pathlib import Path
 import subprocess
 import tempfile
 import unittest
 
-from complexity_policy import policy_errors
+from complexity_policy import main, policy_errors
 
 
 def branching(count):
@@ -16,6 +18,70 @@ def branching(count):
 
 
 class CompilerTests(unittest.TestCase):
+    def test_cargo_follows_config_file_and_directory_links_but_policy_rejects_them(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            (root / "src").mkdir()
+            (root / "Cargo.toml").write_text('''[package]
+name="complexity-symlink-fixture"
+version="0.0.0"
+edition="2024"
+[workspace]
+[lints.clippy]
+cognitive_complexity="forbid"
+''')
+            (root / "clippy.toml").write_text("cognitive-complexity-threshold=25\n")
+            (root / "src/lib.rs").write_text(
+                f"pub fn score(value: usize) -> usize {{ {branching(25)} }}\n"
+            )
+            env = dict(os.environ, CARGO_TARGET_DIR=str(root / "target"), CLIPPY_CONF_DIR=str(root))
+
+            def clippy():
+                return subprocess.run(
+                    ["cargo", "clippy", "--offline", "--all-targets", "--", "-D", "warnings"],
+                    cwd=root, env=env, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True,
+                )
+
+            def git(*args):
+                return subprocess.check_output(["git", "-C", temp, *args], stderr=subprocess.PIPE)
+
+            baseline = clippy()
+            self.assertNotEqual(baseline.returncode, 0, baseline.stdout)
+            self.assertIn("cognitive_complexity", baseline.stdout)
+            git("init", "-q")
+            git("config", "core.symlinks", "true")
+            git("add", "Cargo.toml", "clippy.toml", "src/lib.rs")
+            for relative in (".cargo/config", ".cargo/config.toml", ".cargo"):
+                with self.subTest(path=relative):
+                    path = root / relative
+                    directory = relative == ".cargo"
+                    if directory:
+                        path.rmdir()
+                        target = root / "cargo-store"
+                        target.mkdir()
+                        config = target / "config"
+                    else:
+                        path.parent.mkdir(exist_ok=True)
+                        target = path.parent / "[env]"
+                        config = target
+                    config.write_text('[build]\nrustflags=["--cap-lints=allow"]\n')
+                    try:
+                        os.symlink(os.path.relpath(target, path.parent), path, target_is_directory=directory)
+                    except OSError as error:
+                        self.skipTest(f"symlink creation unavailable: {error}")
+                    git("add", relative)
+                    try:
+                        capped = clippy()
+                        self.assertEqual(capped.returncode, 0, capped.stdout)
+                        with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
+                            self.assertEqual(main(["--root", temp]), 2)
+                            self.assertEqual(main(["--root", temp, "--staged"]), 2)
+                    finally:
+                        path.unlink()
+                        git("update-index", "--force-remove", relative)
+                        config.unlink()
+            self.assertNotEqual(clippy().returncode, 0)
+
     def test_real_cargo_lint_caps_and_redirects_require_snapshot_policy_protection(self):
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
