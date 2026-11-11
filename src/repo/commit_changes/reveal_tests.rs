@@ -121,11 +121,42 @@ fn passive_same_row_restoration_preserves_a_closed_diff_and_detail_preference() 
     tab.selected = Some(0);
     let mut settings = crate::settings::Settings::get(&ctx);
     settings.show_detail = false;
-    settings.set(&ctx);
+    settings.put_for_test(&ctx);
     tab.select(0, &ctx);
     assert!(tab.diff.is_none());
     assert!(!tab.commit_changes.follows_history());
     assert!(!crate::settings::Settings::get(&ctx).show_detail);
+}
+
+#[test]
+fn responsive_collapse_reveals_new_selection_even_with_an_old_diff_and_saved_visibility() {
+    for beside in [false, true] {
+        let ctx = egui::Context::default();
+        let mut tab = RepoTab::new_deferred("/recording-only/responsive-reveal".into(), &ctx);
+        for hash in ["a".repeat(40), "b".repeat(40)] {
+            tab.commits.push(std::sync::Arc::new(crate::git::Commit {
+                hash,
+                ..Default::default()
+            }));
+        }
+        tab.selected = Some(0);
+        tab.diff = Some(DiffView::new(key(&"a".repeat(40))));
+        let mut settings = crate::settings::Settings::get(&ctx);
+        settings.show_detail = true;
+        settings.diff_beside_graph = beside;
+        settings.put_for_test(&ctx);
+        ctx.data_mut(|data| {
+            data.insert_temp(egui::Id::new("repo_detail").with("auto-collapsed"), true)
+        });
+        crate::repo::messages::record_jobs(|| tab.select_history(1, &ctx));
+        assert!(tab.diff.is_none());
+        assert_eq!(
+            tab.commit_changes.pending.as_deref(),
+            Some("b".repeat(40).as_str())
+        );
+        assert!(tab.commit_changes.follows_history());
+        assert!(crate::settings::Settings::get(&ctx).show_detail);
+    }
 }
 
 #[test]
@@ -172,7 +203,7 @@ fn hidden_or_already_selected_commit_requests_reveal_without_rewriting_diff_pref
             settings.show_detail = false;
             settings.diff_split = split;
             settings.diff_beside_graph = beside;
-            settings.set(&ctx);
+            settings.put_for_test(&ctx);
             tab.select_history(0, &ctx); // No detail: records intent without running Git.
             let selected = &tab.commits[0].hash;
             assert_eq!(
@@ -233,7 +264,7 @@ fn automatic_reveal_renders_actual_diff_without_forcing_a_narrow_side_panel() {
                     settings.show_branches = false;
                     settings.show_detail = true;
                     settings.diff_beside_graph = false;
-                    settings.set(ui.ctx());
+                    settings.put_for_test(ui.ctx());
                     styled = true;
                     return;
                 }

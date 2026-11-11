@@ -62,7 +62,9 @@ impl RepoTab {
             && !hash.starts_with('\u{0}')
             && (self.commit_changes.follows_history()
                 || self.diff.is_none()
-                || !crate::settings::Settings::get(ctx).show_detail);
+                || !crate::settings::Settings::get(ctx).show_detail
+                // Responsive collapse retains the saved visibility preference.
+                || ctx.data(|data| data.get_temp::<bool>(egui::Id::new("repo_detail").with("auto-collapsed"))).unwrap_or(false));
         if !reveal {
             self.commit_changes.stop();
             self.select(row, ctx);
