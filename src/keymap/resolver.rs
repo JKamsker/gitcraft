@@ -163,7 +163,8 @@ pub(crate) fn queued(ctx: &Context, command: Command) -> bool {
 /// Whether a native semantic event may use an already resolved command context.
 /// Native Copy has no Key event on some platforms and must respect the same modal gate.
 pub(super) fn permitted(ctx: &Context, command: Command) -> bool {
-    ctx.data(|d| d.get_temp::<Resolver>(id(ctx, command.scope())))
+    let key = id(ctx, command.scope());
+    ctx.data(|d| d.get_temp::<Resolver>(key))
         .is_some_and(|r| r.eligible(command))
 }
 
@@ -277,13 +278,14 @@ fn take_scope(commands: &mut Vec<Command>, scope: Scope) -> Vec<Command> {
 
 pub(crate) fn which_key(ctx: &Context, refused: impl Fn(Command) -> Option<String>) {
     for scope in [Scope::Window] {
-        let r = ctx.data(|d| d.get_temp::<Resolver>(id(ctx, scope)));
+        let key = id(ctx, scope);
+        let r = ctx.data(|d| d.get_temp::<Resolver>(key));
         let Some(r) =
             r.filter(|r| !r.prefix.is_empty() && ctx.input(|i| i.focused && i.time <= r.deadline))
         else {
             continue;
         };
-        egui::Area::new(id(ctx, scope).with("which-key"))
+        egui::Area::new(key.with("which-key"))
             .order(egui::Order::Tooltip)
             .anchor(egui::Align2::CENTER_BOTTOM, [0.0, -28.0])
             .show(ctx, |ui| {
@@ -326,3 +328,6 @@ mod owner_tests;
 
 #[cfg(test)]
 mod modal_chord_tests;
+
+#[cfg(test)]
+mod context_tests;
