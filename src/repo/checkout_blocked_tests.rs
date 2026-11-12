@@ -31,8 +31,8 @@ fn blocked(blockers: Blockers) -> BlockedCheckout {
 }
 
 #[test]
-fn both_lists_are_read_and_anything_else_is_not_a_blocked_checkout() {
-    let (changed, listed) = parse(BOTH).expect("blocked");
+fn both_lists_are_read_and_anything_else_is_not_a_blocked_checkout() -> Result<(), String> {
+    let (changed, listed) = parse(BOTH).ok_or("not read as a blocked checkout")?;
     assert_eq!(changed, ["src/a.rs", "sp ace.txt"]);
     assert_eq!(listed, ["src/site/data.json", "new/file.txt"]);
     let only = "error: The following untracked working tree files would be removed by \
@@ -43,18 +43,20 @@ fn both_lists_are_read_and_anything_else_is_not_a_blocked_checkout() {
         parse("error: pathspec 'x' did not match any file(s) known to git"),
         None
     );
+    Ok(())
 }
 
 #[test]
-fn untracked_files_status_does_not_show_are_the_ignored_ones() {
+fn untracked_files_status_does_not_show_are_the_ignored_ones() -> Result<(), String> {
     let work = WorkStatus {
         unstaged: vec![untracked("new/")],
         ..Default::default()
     };
-    let (changed, listed) = parse(BOTH).expect("blocked");
+    let (changed, listed) = parse(BOTH).ok_or("not read as a blocked checkout")?;
     let b = Blockers::sort(changed, listed, &work);
     assert_eq!(b.untracked, ["new/file.txt"]);
     assert_eq!(b.ignored, ["src/site/data.json"]);
+    Ok(())
 }
 
 #[test]
