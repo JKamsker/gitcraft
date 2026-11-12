@@ -1,6 +1,72 @@
 use super::*;
 use crate::git::{Branch, Refs};
 
+#[test]
+fn primary_and_stacked_branch_pills_select_details_without_row_selection() {
+    use crate::repo::graph_view::readability_tests::painted_text_center;
+    use egui::{Event, Modifiers, PointerButton};
+    for stacked in [false, true] {
+        let ctx = egui::Context::default();
+        crate::theme::install_fonts(&ctx);
+        let mut tab = RepoTab::new_deferred("/recording-only/pill-click".into(), &ctx);
+        tab.commits.push(std::sync::Arc::new(crate::git::Commit {
+            hash: "a".repeat(40),
+            refs: vec!["topic".into()],
+            ..Default::default()
+        }));
+        tab.graph = crate::graph::layout(&tab.commits);
+        let badge = Badge {
+            local: true,
+            ..remote_pill("topic", "origin")
+        };
+        let mut frame = |events| {
+            let mut acts = Vec::new();
+            let mut output = ctx.run_ui(
+                egui::RawInput {
+                    screen_rect: Some(Rect::from_min_size(Pos2::ZERO, vec2(1200.0, 800.0))),
+                    events,
+                    ..Default::default()
+                },
+                |ui| {
+                    egui::CentralPanel::default().show(ui, |ui| {
+                        if stacked {
+                            let resp = ui.button("topic");
+                            tab.stack_slot_clicks(resp, &badge, 0, &mut acts);
+                        } else {
+                            tab.graph_view(ui, &mut acts);
+                        }
+                    });
+                },
+            );
+            output.textures_delta.clear();
+            (acts, output.shapes)
+        };
+        frame(Vec::new());
+        let (_, shapes) = frame(Vec::new());
+        let point = painted_text_center(&shapes, "topic");
+        frame(vec![Event::PointerMoved(point)]);
+        let button = |pressed| Event::PointerButton {
+            pos: point,
+            button: PointerButton::Primary,
+            pressed,
+            modifiers: Modifiers::NONE,
+        };
+        frame(vec![button(true)]);
+        let (acts, _) = frame(vec![button(false)]);
+        assert_eq!(
+            acts.iter()
+                .filter(|a| matches!(a, Action::SelectBranchTip(0)))
+                .count(),
+            1
+        );
+        assert!(
+            !acts
+                .iter()
+                .any(|a| matches!(a, Action::Select(_) | Action::OpenCommitChanges(_)))
+        );
+    }
+}
+
 fn tab(refs: Refs) -> RepoTab {
     let ctx = egui::Context::default();
     let mut tab = RepoTab::new_deferred("/nonexistent/pills-test".into(), &ctx);

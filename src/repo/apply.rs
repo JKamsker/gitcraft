@@ -73,10 +73,14 @@ impl RepoTab {
             Action::Story(act) => self.story_act(act, ctx),
             Action::Freshness(act) => self.freshness_act(act, ctx),
             Action::Review(act) => self.review_act(act, ctx),
-            Action::Select(row) => {
+            Action::Select(row) | Action::SelectBranchTip(row) => {
                 self.leave_pages();
                 self.doctor = None;
-                self.select_history(row, ctx);
+                if matches!(action, Action::SelectBranchTip(_)) {
+                    self.select_branch_tip(row, ctx);
+                } else {
+                    self.select_history(row, ctx);
+                }
                 self.hint_after_select(row, ctx);
             }
             Action::ActivityCommit(hash) => self.activity_commit(hash, ctx),

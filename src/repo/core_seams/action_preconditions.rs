@@ -12,6 +12,7 @@ impl RepoTab {
             && !matches!(
                 &action,
                 Action::Select(_)
+                    | Action::SelectBranchTip(_)
                     | Action::SelectHash(_)
                     | Action::OpenCommitChanges(_)
                     | Action::OpenDiff(_)
@@ -61,6 +62,7 @@ impl RepoTab {
         if matches!(
             &action,
             Action::Select(_)
+                | Action::SelectBranchTip(_)
                 | Action::SelectHash(_)
                 | Action::SelectStash(_)
                 | Action::OpenPr(_)
@@ -94,6 +96,7 @@ impl RepoTab {
                 | Action::FileView { .. }
                 | Action::OpenPr(_)
                 | Action::Select(_)
+                | Action::SelectBranchTip(_)
                 | Action::SelectHash(_)
                 | Action::SelectPr(_)
                 | Action::SelectStash(_)

@@ -51,6 +51,20 @@ fn completed(
     })
 }
 impl RepoTab {
+    /// A branch pill reveals commit details without requesting an automatic file diff.
+    pub(super) fn select_branch_tip(&mut self, row: usize, ctx: &egui::Context) {
+        if row >= self.commits.len() {
+            return;
+        }
+        self.commit_changes.stop();
+        self.select(row, ctx);
+        crate::settings::Settings::set_show_detail(ctx, true);
+        // Give details priority just as an explicit reopen of the folded sidebar does.
+        ctx.data_mut(|data| {
+            data.insert_temp(egui::Id::new("repo_detail").with("reopen-small"), true);
+        });
+    }
+
     /// User history navigation reveals a diff; passive selection restoration during
     /// reload keeps the ordinary select path and must not reopen closed views.
     pub(super) fn select_history(&mut self, row: usize, ctx: &egui::Context) {

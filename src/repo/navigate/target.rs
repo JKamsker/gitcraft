@@ -36,6 +36,7 @@ impl RepoTab {
             && matches!(
                 action,
                 Action::Select(_)
+                    | Action::SelectBranchTip(_)
                     | Action::SelectHash(_)
                     | Action::SelectStash(_)
                     | Action::SelectPr(_)

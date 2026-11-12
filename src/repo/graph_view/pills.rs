@@ -346,7 +346,11 @@ impl RepoTab {
                 acts.push(act);
             }
         } else if resp.clicked() {
-            acts.push(Action::Select(i));
+            acts.push(if b.kind == BadgeKind::Branch {
+                Action::SelectBranchTip(i)
+            } else {
+                Action::Select(i)
+            });
         }
         // The same menu as right-clicking the row's own pill.
         let branch = (b.kind == BadgeKind::Branch).then(|| b.git_ref());
