@@ -7,6 +7,7 @@
 //! [`snapshot`], noticing moves made elsewhere is [`observe`], the tab's side is [`tab`] and
 //! the view is [`view`].
 
+pub(super) mod palette;
 mod retention;
 
 pub(super) mod observe;

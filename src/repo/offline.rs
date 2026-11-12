@@ -180,6 +180,23 @@ impl RepoTab {
     }
 }
 
+/// The available intent is the inverse of the current network pause.
+pub(super) fn palette_item(paused: bool) -> super::actions::PaletteContribution {
+    if paused {
+        (
+            "Go online".into(),
+            "network offline".into(),
+            Action::SetOffline(false),
+        )
+    } else {
+        (
+            "Go offline".into(),
+            "network offline metered".into(),
+            Action::SetOffline(true),
+        )
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use std::path::PathBuf;

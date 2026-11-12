@@ -3,7 +3,6 @@
 use crate::repo::terminals::TerminalAct;
 use std::path::PathBuf;
 
-use super::dialogs::StashChoice;
 use super::pull::PullMode;
 use super::{
     Dialog, DiffKey, Refresh, RepoTab, Undo, branch_visibility, ci_view, diff, doctor, drag_drop,
