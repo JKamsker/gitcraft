@@ -59,6 +59,7 @@ pub(crate) enum Action {
     /// Turn offline mode on or off.
     SetOffline(bool),
     Select(usize),
+    SelectBranchTip(usize),
     DvcPull,
     OpenFileComparison(super::file_comparison::Page),
     RefreshFileComparison,

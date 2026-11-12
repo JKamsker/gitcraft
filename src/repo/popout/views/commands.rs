@@ -181,6 +181,7 @@ impl RepoTab {
                 None
             }
             Action::Select(_)
+            | Action::SelectBranchTip(_)
             | Action::SelectHash(_)
             | Action::OpenCommitChanges(_)
             | Action::SelectPr(_)
