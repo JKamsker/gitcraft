@@ -29,7 +29,7 @@
 # Local builds
 
 - Run every local Rust toolchain command (`cargo build`/`check`/`test`/`clippy`, `rustc`) at the lowest OS priority so it never competes with the user's work. Windows: `cmd /c start "" /low /b /wait cargo build --release` (child `rustc`/linker processes inherit the idle class). Unix: `nice -n 19 cargo …`.
-- On Windows, antivirus may block freshly compiled build-script executables under `target/debug/build`. Prefer the `release` profile, whose dependency build scripts are already compiled and approved, over new debug builds.
+- On Windows, antivirus may block freshly compiled build-script executables under `target/debug/build`. When `target/release` already holds build scripts that ran, prefer the `release` profile: cargo reuses them instead of compiling new ones. This is a workaround only — after `cargo clean` or a dependency change they are compiled again and may be blocked too.
 
 # Process-test safety
 

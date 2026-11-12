@@ -106,14 +106,22 @@ impl Blockers {
         !self.changed.is_empty() || !self.untracked.is_empty()
     }
 
-    /// The choices that get the checkout through, the one to suggest first.
+    /// The choices that get the checkout through, the one to suggest first. Carrying would
+    /// have to delete untracked files git status shows, so it isn't offered with them in the
+    /// way; a stash doesn't take ignored files, so it isn't offered with those.
     pub(in crate::repo) fn choices(&self) -> Vec<Choice> {
-        let mut choices = vec![Choice::Carry];
+        let mut choices = Vec::new();
+        if self.untracked.is_empty() {
+            choices.push(Choice::Carry);
+        }
         if !self.local_work() {
             choices.push(Choice::OverwriteIgnored);
         }
+        if self.local_work() && self.ignored.is_empty() {
+            choices.push(Choice::Stash);
+        }
         if self.local_work() {
-            choices.extend([Choice::Stash, Choice::Force]);
+            choices.push(Choice::Force);
         }
         choices
     }
@@ -124,7 +132,7 @@ impl BlockedCheckout {
     /// saved first (see [`RepoTab::carry_checkout`]).
     pub(in crate::repo) fn retry(&self, choice: Choice) -> Vec<Vec<String>> {
         let mut ops = self.ops.clone();
-        let overwrite = choice == Choice::Force || !self.blockers.ignored.is_empty();
+        let overwrite = matches!(choice, Choice::Force | Choice::OverwriteIgnored);
         let flag = match choice {
             Choice::Carry => return self.carry(&carry::Carried::default()),
             Choice::Force => Some("-f"),
@@ -153,6 +161,16 @@ impl BlockedCheckout {
     }
 }
 
+/// Whether `ops` can run again with its checkout changed: steps that ran before it (a fork's
+/// `remote add`) would run a second time, so only checks may come first.
+fn retryable(ops: &[Vec<String>]) -> bool {
+    carry::checkout_at(ops).is_some_and(|at| {
+        ops[..at]
+            .iter()
+            .all(|step| super::operations::is_expectation(step))
+    })
+}
+
 impl RepoTab {
     /// Opens the dialog for a checkout git refused because of files in the way; whether it
     /// did.
@@ -163,11 +181,7 @@ impl RepoTab {
         let Some(op) = self.last_op.as_ref().filter(|op| op.label == label) else {
             return false;
         };
-        if !op
-            .ops
-            .iter()
-            .any(|op| op.first().is_some_and(|c| c == "checkout"))
-        {
+        if !retryable(&op.ops) {
             return false;
         }
         let undo = match &op.kind {

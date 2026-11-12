@@ -110,17 +110,29 @@ fn changes_can_come_along_be_stashed_or_be_discarded() {
 }
 
 #[test]
-fn ignored_files_are_replaced_by_every_retry_but_carrying() {
-    let b = blocked(Blockers {
+fn untracked_files_rule_out_carrying_and_ignored_ones_rule_out_stashing() {
+    let both = blocked(Blockers {
         changed: vec!["a.rs".into()],
         untracked: vec!["new.txt".into()],
         ignored: vec!["data.json".into()],
     });
+    assert_eq!(both.blockers.choices(), [Choice::Force]);
+    let ignored = blocked(Blockers {
+        changed: vec!["a.rs".into()],
+        ignored: vec!["data.json".into()],
+        ..Default::default()
+    });
+    assert_eq!(ignored.blockers.choices(), [Choice::Carry, Choice::Force]);
+    let untracked = blocked(Blockers {
+        untracked: vec!["new.txt".into()],
+        ..Default::default()
+    });
+    assert_eq!(untracked.blockers.choices(), [Choice::Stash, Choice::Force]);
+    // Only overwriting and forcing let the checkout replace ignored files.
     assert_eq!(
-        b.blockers.choices(),
-        [Choice::Carry, Choice::Stash, Choice::Force]
+        ignored.retry(Choice::Stash)[1],
+        ["checkout", "--no-overwrite-ignore", "develop", "--"]
     );
-    assert_eq!(b.retry(Choice::Stash)[1], ["checkout", "develop", "--"]);
 }
 
 #[test]
@@ -144,4 +156,20 @@ fn the_checkout_step_is_changed_wherever_it_is_and_the_rest_kept() {
     let forced = b.retry(Choice::Force);
     assert_eq!(forced[0][..3], ["checkout", "-f", "-b"]);
     assert_eq!(forced[1], ["pull", "--ff-only"]);
+}
+
+#[test]
+fn a_checkout_after_steps_that_change_the_repository_offers_no_retry() {
+    let checkout = ["checkout", "--no-overwrite-ignore", "develop", "--"];
+    assert!(retryable(&ops(&[&checkout])));
+    let check = crate::repo::operations::expect_ref("refs/heads/develop");
+    assert!(retryable(&[
+        vec![check],
+        checkout.map(str::to_owned).to_vec()
+    ]));
+    assert!(!retryable(&ops(&[
+        &["remote", "add", "fork", "https://example.invalid/fork.git"],
+        &checkout,
+    ])));
+    assert!(!retryable(&ops(&[&["pull", "--ff-only"]])));
 }
