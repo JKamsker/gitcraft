@@ -56,6 +56,8 @@ impl RepoTab {
         if row >= self.commits.len() {
             return;
         }
+        self.leave_pages();
+        self.doctor = None;
         self.commit_changes.stop();
         self.select(row, ctx);
         crate::settings::Settings::set_show_detail(ctx, true);
@@ -63,6 +65,7 @@ impl RepoTab {
         ctx.data_mut(|data| {
             data.insert_temp(egui::Id::new("repo_detail").with("reopen-small"), true);
         });
+        self.hint_after_select(row, ctx);
     }
 
     /// User history navigation reveals a diff; passive selection restoration during
