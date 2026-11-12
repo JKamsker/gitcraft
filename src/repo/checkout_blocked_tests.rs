@@ -163,10 +163,7 @@ fn a_checkout_after_steps_that_change_the_repository_offers_no_retry() {
     let checkout = ["checkout", "--no-overwrite-ignore", "develop", "--"];
     assert!(retryable(&ops(&[&checkout])));
     let check = crate::repo::operations::expect_ref("refs/heads/develop");
-    assert!(retryable(&[
-        vec![check],
-        checkout.map(str::to_owned).to_vec()
-    ]));
+    assert!(retryable(&[check, checkout.map(str::to_owned).to_vec()]));
     assert!(!retryable(&ops(&[
         &["remote", "add", "fork", "https://example.invalid/fork.git"],
         &checkout,
