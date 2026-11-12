@@ -1,40 +1,11 @@
 //! Context matrices exercise the composed palette, not its extraction boundaries.
+use super::palette_shortcuts::{
+    ShortcutContext, context as shortcut_context, expected as expected_shortcut,
+};
 use super::*;
-use crate::keymap::Stroke;
 use crate::repo::{offline, partial_stash, push, timeline};
 
-fn shortcut_context(mode: usize) -> egui::Context {
-    let ctx = egui::Context::default();
-    let mut settings = crate::settings::Settings::default();
-    for (command, key) in [
-        (Command::Fetch, egui::Key::F6),
-        (Command::Pull, egui::Key::F7),
-        (Command::Push, egui::Key::F8),
-        (Command::Undo, egui::Key::F9),
-        (Command::Redo, egui::Key::F10),
-        (Command::Timeline, egui::Key::F11),
-        (Command::Stash, egui::Key::F12),
-    ] {
-        match mode {
-            1 => {
-                settings.key_bindings.insert(
-                    command.id().into(),
-                    vec![Stroke::new(key, egui::Modifiers::NONE)],
-                );
-            }
-            2 => {
-                settings
-                    .key_bindings
-                    .insert(command.id().into(), Vec::new());
-            }
-            _ => {}
-        }
-    }
-    settings.put_for_test(&ctx);
-    ctx
-}
-
-fn transport_case(review: bool, paused: bool, shortcuts: usize) {
+fn transport_case(review: bool, paused: bool, shortcuts: ShortcutContext) {
     let ctx = shortcut_context(shortcuts);
     let entries = push::palette::items(&ctx, review);
     let mut expected = vec![
@@ -64,7 +35,7 @@ fn transport_case(review: bool, paused: bool, shortcuts: usize) {
             .take(3)
             .zip([Command::Fetch, Command::Pull, Command::Push])
     {
-        assert_eq!(hint, &label(&ctx, command));
+        assert_eq!(hint, &expected_shortcut(shortcuts, command));
         assert!(matches!(
             (command, action),
             (Command::Fetch, Action::Fetch)
@@ -111,25 +82,19 @@ fn transport_case(review: bool, paused: bool, shortcuts: usize) {
             .iter()
             .zip([Command::Undo, Command::Redo, Command::Timeline])
     {
-        assert_eq!(hint, &label(&ctx, command));
+        assert_eq!(hint, &expected_shortcut(shortcuts, command));
     }
     assert_eq!(
         partial_stash::palette::stash(&ctx)[0].1,
-        label(&ctx, Command::Stash)
+        expected_shortcut(shortcuts, Command::Stash)
     );
-    if shortcuts == 1 {
-        assert_eq!(entries[0].1, "F6");
-    }
-    if shortcuts == 2 {
-        assert!(entries.iter().take(3).all(|(_, hint, _)| hint.is_empty()));
-    }
 }
 
 #[test]
 fn transport_intents_and_shortcuts_follow_review_pause_and_keymap_contexts() {
     for review in [false, true] {
         for paused in [false, true] {
-            for shortcuts in 0..3 {
+            for shortcuts in ShortcutContext::ALL {
                 transport_case(review, paused, shortcuts);
             }
         }

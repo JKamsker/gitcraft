@@ -274,3 +274,7 @@ mod palette_contexts;
 #[cfg(test)]
 #[path = "palette_contracts.rs"]
 mod palette_contracts;
+
+#[cfg(test)]
+#[path = "palette_shortcuts.rs"]
+mod palette_shortcuts;
