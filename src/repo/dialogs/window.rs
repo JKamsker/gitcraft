@@ -251,6 +251,7 @@ impl RepoTab {
                 Dialog::Fold(plan) => fold::fold(ui, plan),
                 Dialog::Custom(custom) => custom::custom(ui, enter, custom),
                 Dialog::KeepDetached(keep) => keep_detached::keep_detached(ui, enter, keep, local),
+                Dialog::CheckoutBlocked(blocked) => checkout_blocked::checkout_blocked(ui, blocked),
                 Dialog::Cleanup(dialog) => cleanup::cleanup(ui, dialog),
                 Dialog::StartBisect {
                     hash,

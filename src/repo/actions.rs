@@ -153,6 +153,8 @@ pub(crate) enum Action {
     Checkout(String),
     /// What the detached HEAD's banner and dialog ask for.
     Detached(super::detached::DetachedAct),
+    /// Run a refused checkout again, carrying the files that were in its way over.
+    CarryCheckout(Box<super::checkout_blocked::BlockedCheckout>),
     /// Checks out a local branch behind its upstream, then fast-forwards it.
     CheckoutPull(String),
     CheckoutRemote(String),
