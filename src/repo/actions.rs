@@ -3,7 +3,6 @@
 use crate::repo::terminals::TerminalAct;
 use std::path::PathBuf;
 
-use super::dialogs::StashChoice;
 use super::pull::PullMode;
 use super::{
     Dialog, DiffKey, Refresh, RepoTab, Undo, branch_visibility, ci_view, diff, doctor, drag_drop,
@@ -253,6 +252,7 @@ pub(crate) enum Action {
     DiffAsFile(bool),
     /// Markdown files show rendered in diffs, or as text.
     DiffRendered(bool),
+    DiffBesideGraph(bool),
     /// Diffs show as this rich view (prose…), for the files it reads, or as their lines.
     DiffRich(Option<diff::rich::RichKind>),
     /// Back from a rich view to the plain diff, at the line numbered `old` before the change

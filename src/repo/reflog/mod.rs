@@ -5,6 +5,7 @@
 //! done in the terminal, in another client or before gitcraft was opened.
 
 mod menu;
+pub(super) mod palette;
 #[cfg(test)]
 mod tests;
 mod view;

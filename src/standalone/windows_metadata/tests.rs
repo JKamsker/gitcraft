@@ -33,20 +33,7 @@ fn metadata_protocol_records_only_constant_script_and_literal_native_path_data()
     );
     assert!(!SCRIPT.contains("source ' $()"));
     assert!(!SCRIPT.contains("Invoke-Expression"));
-    let env = cmd.get_envs().collect::<std::collections::HashMap<_, _>>();
-    assert_eq!(
-        env.get(std::ffi::OsStr::new("GITCRAFT_ACL_SOURCE")),
-        Some(&Some(source.as_os_str()))
-    );
-    assert_eq!(
-        env.get(std::ffi::OsStr::new("GITCRAFT_ACL_TARGET")),
-        Some(&Some(target.as_os_str()))
-    );
-    assert_eq!(env.get(std::ffi::OsStr::new("PSModulePath")), Some(&None));
-    assert_eq!(
-        env.get(std::ffi::OsStr::new("GITCRAFT_ACL_SNAPSHOT")),
-        Some(&None)
-    );
+    assert_literal_path_environment(&cmd, source, target);
     assert!(SCRIPT.contains("AllPolicy = 0x000001ff"));
     assert!(SCRIPT.contains("SACL|LABEL|ATTRIBUTE|SCOPE|PROCESS_TRUST_LABEL|ACCESS_FILTER"));
     assert!(SCRIPT.contains("BasicPolicy = 0x00000007"));
@@ -65,4 +52,21 @@ fn metadata_protocol_records_only_constant_script_and_literal_native_path_data()
     assert!(SCRIPT.contains("if ($snapshot)"));
     assert!(SCRIPT.find("if ($snapshot)") < SCRIPT.rfind("[GitcraftNativePolicy]::Copy"));
     Ok(())
+}
+
+fn assert_literal_path_environment(cmd: &Command, source: &Path, target: &Path) {
+    let env = cmd.get_envs().collect::<std::collections::HashMap<_, _>>();
+    assert_eq!(
+        env.get(std::ffi::OsStr::new("GITCRAFT_ACL_SOURCE")),
+        Some(&Some(source.as_os_str()))
+    );
+    assert_eq!(
+        env.get(std::ffi::OsStr::new("GITCRAFT_ACL_TARGET")),
+        Some(&Some(target.as_os_str()))
+    );
+    assert_eq!(env.get(std::ffi::OsStr::new("PSModulePath")), Some(&None));
+    assert_eq!(
+        env.get(std::ffi::OsStr::new("GITCRAFT_ACL_SNAPSHOT")),
+        Some(&None)
+    );
 }

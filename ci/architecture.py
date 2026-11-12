@@ -112,6 +112,14 @@ def source_metrics(path, source):
     return code, functions, structs
 
 
+def central_declaration(items, name, paths):
+    """Follow the known ownership moves without selecting unrelated test helpers."""
+    found = [item for item in items if item["name"] == name and item["path"] in paths]
+    if len(found) != 1:
+        raise ValueError(f"Expected one {name} declaration in {paths!r}; found {len(found)}")
+    return found[0]
+
+
 def sources_at(revision):
     # Read raw blobs, not an archive: export-ignore/export-subst must not change
     # the source being measured. Object IDs also handle paths with spaces/newlines.
@@ -177,10 +185,14 @@ def report(revision, count):
         codes[path] = code
         functions.extend(found_functions)
         structs.extend(found_structs)
-    tab = next(s for s in structs if s["path"] == "src/repo/mod.rs" and s["name"] == "RepoTab")
+    tab = central_declaration(structs, "RepoTab", (
+        "src/repo/mod.rs", "src/repo/tab_owner/model.rs",
+    ))
     fields = tab["fields"]
-    constructor = next(f for f in functions if f["path"] == "src/repo/mod.rs" and f["name"] == "new_deferred")
-    dispatch = next(f for f in functions if f["path"] == "src/repo/apply.rs" and f["name"] == "apply")
+    constructor = central_declaration(functions, "new_deferred", (
+        "src/repo/mod.rs", "src/repo/tab_owner/construction.rs",
+    ))
+    dispatch = central_declaration(functions, "apply", ("src/repo/apply.rs",))
     action_code = next(decl for decl in declarations(codes["src/repo/actions.rs"], "enum")
                        if decl["name"] == "Action")["body"]
     action_variants = re.findall(r"^    (\w+)(?:\s*[,({])", action_code, re.M)

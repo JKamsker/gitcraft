@@ -66,39 +66,7 @@ fn fluent_partition_doctor_actual_selection_keeps_confirmation_and_argv_in_both_
             let expected_label = format!("Turn on: {}", titles[index].to_lowercase());
             match action {
                 Action::Doctor(DoctorAct::Confirm(confirmation)) if index == 1 => {
-                    let (title, body, button) = confirmation.displayed();
-                    assert_eq!(
-                        title,
-                        if language == "de" {
-                            "Wartung planen?"
-                        } else {
-                            "Schedule maintenance?"
-                        }
-                    );
-                    assert_eq!(
-                        button,
-                        if language == "de" {
-                            "Planen"
-                        } else {
-                            "Schedule"
-                        }
-                    );
-                    assert!(body.starts_with("git maintenance start "));
-                    assert!(body.contains(if language == "de" {
-                        "trägt dieses Repository"
-                    } else {
-                        "adds this repository"
-                    }));
-                    for literal in [
-                        "maintenance.repo",
-                        "maintenance.auto=false",
-                        "maintenance.strategy=incremental",
-                        "refs/prefetch",
-                        "git maintenance unregister",
-                        "git maintenance stop",
-                    ] {
-                        assert!(body.contains(literal), "missing literal {literal}");
-                    }
+                    assert_maintenance_confirmation(confirmation.displayed(), language);
                     assert_eq!(confirmation.label, expected_label);
                     assert_eq!(confirmation.ops, expected_ops[index]);
                 }
@@ -138,4 +106,40 @@ fn fluent_partition_doctor_actual_selection_keeps_confirmation_and_argv_in_both_
     }
     crate::i18n::set_language("en-US");
     Ok(())
+}
+
+fn assert_maintenance_confirmation(shown: (String, String, String), language: &str) {
+    let (title, body, button) = shown;
+    assert_eq!(
+        title,
+        if language == "de" {
+            "Wartung planen?"
+        } else {
+            "Schedule maintenance?"
+        }
+    );
+    assert_eq!(
+        button,
+        if language == "de" {
+            "Planen"
+        } else {
+            "Schedule"
+        }
+    );
+    assert!(body.starts_with("git maintenance start "));
+    assert!(body.contains(if language == "de" {
+        "trägt dieses Repository"
+    } else {
+        "adds this repository"
+    }));
+    for literal in [
+        "maintenance.repo",
+        "maintenance.auto=false",
+        "maintenance.strategy=incremental",
+        "refs/prefetch",
+        "git maintenance unregister",
+        "git maintenance stop",
+    ] {
+        assert!(body.contains(literal), "missing literal {literal}");
+    }
 }

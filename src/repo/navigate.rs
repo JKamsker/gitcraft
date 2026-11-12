@@ -7,9 +7,12 @@ mod diff_navigation;
 #[path = "core_seams/file_navigation.rs"]
 mod file_navigation;
 
+mod target;
+pub(super) use target::PendingGoto;
+
 use super::{
-    Compare, CompareData, DiffKey, DiffView, MAX_HISTORY, Msg, RepoTab, WIP_HASH, conflict, diff,
-    file_text, file_view, spawn,
+    Compare, CompareData, DiffKey, DiffView, Msg, RepoTab, WIP_HASH, conflict, diff, file_text,
+    file_view, spawn,
 };
 use crate::git;
 use crate::settings::Settings;
@@ -76,7 +79,7 @@ impl RepoTab {
     }
 
     pub(super) fn load_detail(&mut self, hash: String, ctx: &egui::Context) {
-        self.pending_commit_diff = None;
+        self.commit_changes.cancel_pending();
         // A row of no commit (the changes row, a merge put aside): nothing for git to read.
         if hash.starts_with('\u{0}') {
             return;
@@ -199,50 +202,6 @@ impl RepoTab {
         self.load_detail(hash, ctx);
     }
 
-    pub(super) fn select_hash(&mut self, hash: &str, ctx: &egui::Context) {
-        match self.index.get(hash).copied() {
-            Some(row) => {
-                self.select(row, ctx);
-                self.scroll_to = Some(row);
-            }
-            None => {
-                self.status = Some(crate::repo::Notice::plain((
-                    crate::i18n::message(
-                        "repo-core-2900",
-                        &[("hash", hash.get(..8).unwrap_or(hash).to_string().into())],
-                    ),
-                    true,
-                )));
-            }
-        }
-    }
-
-    /// Selects `hash`, loading more history first if it's further down.
-    pub(super) fn goto(&mut self, hash: &str, ctx: &egui::Context) {
-        // Nothing read to look in yet: once it is (see `rebuild`).
-        if self.sleeping() || self.resuming {
-            self.pending_goto = Some(hash.to_owned());
-            return;
-        }
-        if !self.index.contains_key(hash) && self.history.iter().any(|c| c.hash == hash) {
-            self.history_filter.revealed.insert(hash.to_owned());
-            let previous = self.selected_hash();
-            self.rebuild_rows();
-            self.selected = previous.and_then(|h| self.index.get(&h).copied());
-        }
-        if self.index.contains_key(hash) {
-            self.pending_goto = None;
-            self.select_hash(hash, ctx);
-            self.history_filter.revealed.remove(hash);
-        } else if self.has_more && self.history.len() < MAX_HISTORY {
-            self.pending_goto = Some(hash.to_owned());
-            self.load_more(ctx);
-        } else {
-            self.pending_goto = None;
-            self.select_hash(hash, ctx);
-        }
-    }
-
     /// Closes the diff of a file between two commits (opened from a comparison).
     pub(super) fn close_range_diff(&mut self) {
         if matches!(
@@ -331,121 +290,6 @@ impl RepoTab {
                 },
                 ctx,
             );
-        }
-    }
-
-    pub(super) fn run_search(&mut self, ctx: &egui::Context) {
-        let query = self.search.query.trim().to_owned();
-        self.search.edited = None;
-        self.search.problem = None;
-        let code = self.search.code;
-        let plan = if query.is_empty() {
-            None
-        } else {
-            match git::search_query::prepare(&query, code) {
-                Ok(plan) => Some(plan),
-                Err(e) => {
-                    self.search.problem = Some(e.message);
-                    None
-                }
-            }
-        };
-        let Some(plan) = plan else {
-            // One still being read answers a query that is gone (or can't be searched).
-            self.search.running = false;
-            self.history_minimap.dirty = true;
-            self.search.results.clear();
-            self.search.matches = Default::default();
-            self.search.searched.clear();
-            return;
-        };
-        self.search.running = true;
-        let path = self.path.clone();
-        // In the branches the graph shows.
-        let from = self.log_from.clone();
-        let order = self.log_order;
-        let excluded = super::history_filter::rules(ctx, self.repo_key()).excludes();
-        // Answered all the same if it panics: the search runs until it is.
-        let failed = {
-            let query = query.clone();
-            let excluded = excluded.clone();
-            move |e| Msg::Search(excluded, query, code, Err(e))
-        };
-        super::messages::spawn_or(&self.tx, ctx, failed, move || {
-            let result = (|| {
-                let roots = git::history_scope::search_roots(&path, from.as_deref(), &excluded)?;
-                git::search_query::run_with_order(&path, Some(&roots), order, &plan)
-            })();
-            Msg::Search(excluded, query, code, result)
-        });
-    }
-
-    /// Takes in the commits a search found (if it's still the search asked for), and goes to
-    /// the first.
-    pub(super) fn search_done(
-        &mut self,
-        query: String,
-        code: bool,
-        result: Result<Vec<String>, String>,
-        ctx: &egui::Context,
-    ) {
-        // Closed since, the search shows nothing (nor jumps to its first find).
-        if !self.search.open || query != self.search.query.trim() || code != self.search.code {
-            return;
-        }
-        self.search.running = false;
-        self.history_minimap.dirty = true;
-        self.search.searched = query;
-        match result {
-            Ok(hashes) => {
-                self.search.problem = None;
-                self.search.matches = hashes
-                    .iter()
-                    .cloned()
-                    .collect::<std::collections::HashSet<_>>()
-                    .into();
-                self.search.results = hashes;
-                self.search.current = 0;
-                if let Some(first) = self.search.results.first().cloned() {
-                    self.goto(&first, ctx);
-                }
-            }
-            Err(e) => {
-                self.search.results.clear();
-                self.search.matches = Default::default();
-                self.search.problem = Some(e);
-            }
-        }
-    }
-
-    pub(super) fn search_step(&mut self, delta: i32, ctx: &egui::Context) {
-        let n = self.search.results.len();
-        if n == 0 {
-            return;
-        }
-        let cur = self.search.current as i32 + delta;
-        self.search.current = cur.rem_euclid(n as i32) as usize;
-        if let Some(hash) = self.search.results.get(self.search.current).cloned() {
-            self.goto(&hash, ctx);
-        }
-    }
-
-    pub(super) fn toggle_search(&mut self) {
-        self.history_minimap.dirty = true;
-        self.search.open = !self.search.open;
-        self.search.focus = self.search.open;
-        if !self.search.open {
-            self.authorship.filter = false;
-            self.search.running = false;
-            self.history_minimap.dirty = true;
-            // Nor does a query typed just before closing start a search once it's closed.
-            self.search.edited = None;
-            self.search.matches = Default::default();
-            self.search.results.clear();
-            self.search.searched.clear();
-            self.search.problem = None;
-            // Read again next time: history and files may have changed by then.
-            self.search.suggest.reset();
         }
     }
 }

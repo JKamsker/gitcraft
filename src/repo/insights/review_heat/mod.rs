@@ -9,6 +9,8 @@ use presentation::{bar, legend, seen_line, threads};
 
 mod grid;
 #[cfg(test)]
+mod lifecycle_tests;
+#[cfg(test)]
 mod tests;
 
 use std::collections::HashSet;
@@ -112,21 +114,22 @@ impl RepoTab {
                 let details = pages.details(&path, &hosting, number)?;
                 heat::analyze(&path, &details, key.as_deref())
             },
-            move |tab, result, _| {
-                let Some(state) = tab.review_heat_state() else {
-                    return;
-                };
-                let paths = |h: &Heat| -> Vec<String> {
-                    h.files.iter().map(|f| f.file.path.clone()).collect()
-                };
-                let before = state.data.ready().map(paths);
-                if state.data.accept(request, result) && state.data.ready().map(paths) != before {
-                    // The files opened and picked were by place: places of other files now.
-                    state.expanded.clear();
-                    state.selected = None;
-                }
-            },
+            move |tab, result, _| tab.review_heat_reply(request, result),
         );
+    }
+
+    fn review_heat_reply(&mut self, request: u64, result: Result<Heat, String>) {
+        let Some(state) = self.review_heat_state() else {
+            return;
+        };
+        let paths =
+            |h: &Heat| -> Vec<String> { h.files.iter().map(|f| f.file.path.clone()).collect() };
+        let before = state.data.ready().map(paths);
+        if state.data.accept(request, result) && state.data.ready().map(paths) != before {
+            // The files opened and picked were by place: places of other files now.
+            state.expanded.clear();
+            state.selected = None;
+        }
     }
 
     pub(super) fn review_heat_act(&mut self, act: Act, ctx: &egui::Context) {

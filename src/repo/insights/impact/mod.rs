@@ -41,6 +41,31 @@ pub(crate) struct State {
     selected: Option<Pick>,
 }
 
+impl State {
+    pub(super) fn retire_repository(&mut self) {
+        *self = Self {
+            ask: self.ask.take(),
+            filter: std::mem::take(&mut self.filter),
+            force: self.force,
+            ..Self::default()
+        };
+    }
+
+    pub(super) fn invalidate_forge(&mut self) -> bool {
+        if !matches!(self.ask, Some(Ask::Pr { .. }))
+            && !matches!(self.read_ask, Some(Ask::Pr { .. }))
+        {
+            return false;
+        }
+        self.ask = None;
+        self.read_ask = None;
+        self.data = Slot::default();
+        self.layout = Slot::default();
+        self.selected = None;
+        true
+    }
+}
+
 /// What the view asks for.
 #[derive(Clone, Debug)]
 pub(crate) enum Act {

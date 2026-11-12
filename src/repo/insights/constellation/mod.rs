@@ -45,6 +45,13 @@ pub(crate) struct State {
     forge_read: Option<u64>,
 }
 
+impl State {
+    pub(super) fn invalidate_forge(&mut self) {
+        // Keep the local snapshot, disk measurements and picks; rebuild before drawing.
+        self.forge_read = None;
+    }
+}
+
 /// The constellation drawn from what was read and what the forge said.
 struct Built {
     model: Model,

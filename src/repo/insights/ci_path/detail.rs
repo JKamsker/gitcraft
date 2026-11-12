@@ -362,14 +362,7 @@ pub(super) fn job(
     let header = ["Step", "State", "Ran", "Before", "Change", "Log"].map(str::to_owned);
     common::table_row(ui, &widths, &header, true, false);
     for (n, step) in job.steps.iter().enumerate() {
-        let sd = delta.and_then(|d| {
-            d.steps.iter().filter(|s| s.name == step.name).nth(
-                job.steps[..n]
-                    .iter()
-                    .filter(|s| s.name == step.name)
-                    .count(),
-            )
-        });
+        let sd = delta.and_then(|d| d.steps.iter().find(|step| step.index == Some(n)));
         let took = step.started.zip(step.finished).map(|(s, f)| (f - s).max(0));
         let cells = [
             step.name.clone(),

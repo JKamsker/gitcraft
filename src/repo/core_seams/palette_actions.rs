@@ -1,72 +1,22 @@
 use super::*;
 use crate::repo::toolbar::reveal_label;
 
+/// A feature contributes an intent with its displayed label and searchable hint.
+pub(crate) type PaletteContribution = (String, String, Action);
+
 impl RepoTab {
     /// What the command palette offers for this repository.
-    pub(crate) fn additional_palette_items(
-        &self,
-        ctx: &egui::Context,
-    ) -> Vec<(String, String, Action)> {
-        let mut items: Vec<(String, String, Action)> = vec![
-            (
-                "DVC: Pull".into(),
-                "data download remote".into(),
-                Action::DvcPull,
-            ),
-            (
-                "Code moved across files".into(),
-                "refactor moved block".into(),
-                Action::OpenFileComparison(crate::repo::file_comparison::Page::CodeMoves),
-            ),
-            (
-                "File migration map".into(),
-                "files".into(),
-                Action::OpenFileComparison(crate::repo::file_comparison::Page::Migration),
-            ),
-            (
-                "Three-state staging lens".into(),
-                "staging".into(),
-                Action::OpenFileComparison(crate::repo::file_comparison::Page::Lens),
-            ),
-            (
-                "File versions across branches".into(),
-                "files".into(),
-                Action::OpenFileComparison(crate::repo::file_comparison::Page::Matrix),
-            ),
-            ("Fetch".into(), label(ctx, Command::Fetch), Action::Fetch),
-            ("Pull".into(), label(ctx, Command::Pull), Action::Pull),
-            (
-                if self.gerrit.is_some() {
-                    "Push for review"
-                } else {
-                    "Push"
-                }
-                .into(),
-                label(ctx, Command::Push),
-                Action::Push,
-            ),
-            (
-                "Sync (pull, then push)".into(),
-                "remote".into(),
-                Action::Sync,
-            ),
-            (
-                if self.gerrit.is_some() {
-                    "Push for review, skipping hooks"
-                } else {
-                    "Push, skipping hooks"
-                }
-                .into(),
-                "--no-verify".into(),
-                Action::PushSkippingHooks,
-            ),
-        ];
-        if self.gerrit.is_some() {
-            items.retain(|(_, _, action)| !matches!(action, Action::Sync));
-        }
-        items.extend(
-            PullMode::ALL.map(|m| (m.label().into(), "remote".into(), Action::PullWith(m))),
-        );
+    pub(crate) fn additional_palette_items(&self, ctx: &egui::Context) -> Vec<PaletteContribution> {
+        let mut items = vec![(
+            "DVC: Pull".into(),
+            "data download remote".into(),
+            Action::DvcPull,
+        )];
+        items.extend(crate::repo::file_comparison::palette::items());
+        items.extend(crate::repo::push::palette::items(
+            ctx,
+            self.gerrit.is_some(),
+        ));
         items.extend([
             (
                 "Behaviour timeline…".into(),
@@ -88,33 +38,16 @@ impl RepoTab {
                 "offline exchange".into(),
                 Action::OpenBundleInspect,
             ),
-            (
-                "Stash only what is staged…".into(),
-                "stash".into(),
-                Action::Dialog(Dialog::stash_as(StashChoice::Staged)),
-            ),
-            (
-                "Save snapshot (stash, keep the changes)…".into(),
-                "stash".into(),
-                Action::Dialog(Dialog::stash_as(StashChoice::Snapshot)),
-            ),
-            (
-                "Distribute staged fixes…".into(),
-                "absorb".into(),
-                Action::OpenAbsorb,
-            ),
-            ("Undo".into(), label(ctx, Command::Undo), Action::Undo),
-            ("Redo".into(), label(ctx, Command::Redo), Action::Redo),
-            (
-                "Timeline and undo tree".into(),
-                label(ctx, Command::Timeline),
-                Action::ToggleTimeline,
-            ),
-            (
-                "Stash changes…".into(),
-                label(ctx, Command::Stash),
-                Action::Dialog(Dialog::stash()),
-            ),
+        ]);
+        items.extend(crate::repo::partial_stash::palette::snapshots());
+        items.push((
+            "Distribute staged fixes…".into(),
+            "absorb".into(),
+            Action::OpenAbsorb,
+        ));
+        items.extend(crate::repo::timeline::palette::items(ctx));
+        items.extend(crate::repo::partial_stash::palette::stash(ctx));
+        items.extend([
             (
                 "Stage all changes".into(),
                 label(ctx, Command::StageAll),
@@ -130,30 +63,13 @@ impl RepoTab {
                 label(ctx, Command::Search),
                 Action::ToggleSearch,
             ),
-            (
-                "Reflog".into(),
-                "recovery".into(),
-                Action::Reflog(reflog::ReflogAct::Show(reflog::Source::head())),
-            ),
-            (
-                "Find lost commits".into(),
-                "recovery".into(),
-                Action::Reflog(reflog::ReflogAct::FindLost),
-            ),
-            crate::repo::terminals::toggle_palette_item(ctx),
-            if crate::network::refused().is_some() {
-                (
-                    "Go online".into(),
-                    "network offline".into(),
-                    Action::SetOffline(false),
-                )
-            } else {
-                (
-                    "Go offline".into(),
-                    "network offline metered".into(),
-                    Action::SetOffline(true),
-                )
-            },
+        ]);
+        items.extend(crate::repo::reflog::palette::items());
+        items.push(crate::repo::terminals::toggle_palette_item(ctx));
+        items.push(crate::repo::offline::palette_item(
+            crate::network::refused().is_some(),
+        ));
+        items.extend([
             (
                 "Activity: operations and their output".into(),
                 "log".into(),
@@ -166,85 +82,9 @@ impl RepoTab {
                 "branch".into(),
                 Action::SelectStaleBranches,
             ),
-            (
-                "Conflicts that can wait: isolated rebase and restack…".into(),
-                "Deferred rewrites".into(),
-                Action::RepositoryTools(crate::repo::repository_tools::Act::Deferred),
-            ),
-            (
-                "Parallel branches in this folder: hunk ownership…".into(),
-                "Virtual branches".into(),
-                Action::RepositoryTools(crate::repo::repository_tools::Act::Virtuals),
-            ),
-            (
-                "Inspect state publication receipts…".into(),
-                "Working-state transaction recovery".into(),
-                Action::RepositoryTools(crate::repo::repository_tools::Act::StateReceipts),
-            ),
-            (
-                "Named changelists: messages, commit and shelve…".into(),
-                "Working changes".into(),
-                Action::RepositoryTools(crate::repo::repository_tools::Act::Lists),
-            ),
-            (
-                "Push outbox: queue exact commit or send selected entries…".into(),
-                "Offline publication".into(),
-                Action::RepositoryTools(crate::repo::repository_tools::Act::Outbox),
-            ),
-            (
-                "Subtrees: register, update, inspect and publish vendored folders…".into(),
-                "Vendored source history".into(),
-                Action::RepositoryTools(
-                    crate::repo::repository_tools::Act::Subtrees(String::new()),
-                ),
-            ),
-            (
-                "Shared and borrowed objects".into(),
-                "Inspect shared Git directories and donors; make a clone independent".into(),
-                Action::RepositoryTools(crate::repo::repository_tools::Act::Sharing),
-            ),
-            (
-                "Publish submodule dependencies before parent…".into(),
-                "submodules publish remote".into(),
-                Action::RepositoryTools(crate::repo::repository_tools::Act::Dependencies),
-            ),
-            (
-                "Pull and push routes…".into(),
-                "triangular upstream ahead behind".into(),
-                Action::RepositoryTools(crate::repo::repository_tools::Act::Routes(String::new())),
-            ),
-            (
-                "Publish to several hosts…".into(),
-                "publication group retry mirrors".into(),
-                Action::RepositoryTools(crate::repo::repository_tools::Act::Publication(
-                    String::new(),
-                )),
-            ),
-            (
-                "Remote URLs, refspecs and mirror policy…".into(),
-                "fetch push mapping prune".into(),
-                Action::RepositoryTools(crate::repo::repository_tools::Act::Remote(String::new())),
-            ),
-            (
-                "Replace refs and temporary history joins…".into(),
-                "grafts original effective history".into(),
-                Action::RepositoryTools(crate::repo::repository_tools::Act::Replacements),
-            ),
-            (
-                "Ref storage and reftable migration…".into(),
-                "refs compatibility".into(),
-                Action::RepositoryTools(crate::repo::repository_tools::Act::Reftable),
-            ),
-            (
-                "How an object is stored…".into(),
-                "objects pack delta file version".into(),
-                Action::RepositoryTools(crate::repo::repository_tools::Act::Object("HEAD".into())),
-            ),
-            (
-                "All refs and namespace history…".into(),
-                "refs internals".into(),
-                Action::RepositoryTools(crate::repo::repository_tools::Act::AllRefs(String::new())),
-            ),
+        ]);
+        items.extend(crate::repo::repository_tools::palette::items());
+        items.extend([
             (
                 "Repository doctor".into(),
                 "doctor".into(),
@@ -427,3 +267,14 @@ impl RepoTab {
         items
     }
 }
+
+#[cfg(test)]
+#[path = "palette_contexts.rs"]
+mod palette_contexts;
+#[cfg(test)]
+#[path = "palette_contracts.rs"]
+mod palette_contracts;
+
+#[cfg(test)]
+#[path = "palette_shortcuts.rs"]
+mod palette_shortcuts;

@@ -124,6 +124,14 @@ mod tests {
     assert_eq!(find("COUNT")?.kind, ItemKind::Static);
     assert_eq!(find("Alias")?.kind, ItemKind::Type);
     assert!(items.iter().all(|i| i.name != "N"));
+    assert_macro_and_test_placement(&items, find)?;
+    Ok(())
+}
+
+fn assert_macro_and_test_placement<'a>(
+    items: &[Item],
+    find: impl Fn(&str) -> Result<&'a Item, String>,
+) -> Result<(), String> {
     let twice = find("twice")?;
     assert_eq!((twice.kind, twice.end), (ItemKind::Macro, 40));
     assert_eq!(find("Mode")?.end, 42);
@@ -133,17 +141,17 @@ mod tests {
     let works = find("tests::it_works")?;
     assert!(works.test);
     assert!(!find("Thing::new")?.test);
-    assert!(scan::in_test(&items, 49));
-    assert!(!scan::in_test(&items, 22));
+    assert!(scan::in_test(items, 49));
+    assert!(!scan::in_test(items, 22));
     assert_eq!(
-        scan::innermost(&items, 22).map(|i| items[i].path.as_str()),
+        scan::innermost(items, 22).map(|i| items[i].path.as_str()),
         Some("Thing::new")
     );
     assert_eq!(
-        scan::innermost(&items, 20).map(|i| items[i].path.as_str()),
+        scan::innermost(items, 20).map(|i| items[i].path.as_str()),
         Some("impl Thing")
     );
-    assert_eq!(scan::innermost(&items, 2), None);
+    assert_eq!(scan::innermost(items, 2), None);
     Ok(())
 }
 

@@ -2,6 +2,7 @@
 //! saves a stash and leaves every change where it is. Each goes through the undo history: undo
 //! pops the stash back (or, for a snapshot, drops it), redo makes it again.
 
+pub(super) mod palette;
 mod selection;
 pub(crate) use selection::*;
 mod cleanup;

@@ -1,4 +1,5 @@
 use super::*;
+mod budget;
 // These pure records use synthetic absolute paths without touching the filesystem.
 fn fixture_path(path: &str) -> PathBuf {
     if cfg!(windows) {
@@ -207,6 +208,33 @@ fn pure_prompt_checkpoint_offset_keeps_recorded_cwd_but_does_not_attribute_earli
     );
     assert!(s.is_empty());
     assert!(!n.is_empty());
+}
+
+#[test]
+fn pure_prompt_context_inheritance_and_invalid_time_retirement_cover_each_record_dialect() {
+    for metadata in [
+        r#"{"cwd":"/synthetic/root","timestamp":"2026-11-08T00:00:00Z"}"#,
+        r#"{"payload":{"cwd":"/synthetic/root","timestamp":"2026-11-08T00:00:00Z"}}"#,
+        r#"{"v":1,"agent":"fixture","cwd":"/synthetic/root","ts":"2026-11-08T00:00:00Z"}"#,
+    ] {
+        let bytes = format!(
+            "{metadata}\n{}\n{}\n{}\n",
+            r#"{"type":"user","message":{"role":"user","content":"inherited"}}"#,
+            r#"{"timestamp":"invalid"}"#,
+            r#"{"type":"user","message":{"role":"user","content":"must stay excluded"}}"#,
+        );
+        let (steps, notices) = parse::records(
+            &fixture_records(bytes.as_bytes()),
+            &fixture_path("/synthetic/root"),
+            0,
+            i64::MAX,
+            false,
+            &|p| Some(PathBuf::from(p)),
+        );
+        assert!(notices.is_empty());
+        assert_eq!(steps.len(), 1, "{metadata}: {steps:?}");
+        assert_eq!(steps[0].text, "inherited");
+    }
 }
 
 #[test]

@@ -470,7 +470,7 @@ pub use credentials::run_unattended;
 pub use credentials::run_unattended_within;
 pub use credentials::run_with;
 pub use credentials::stored_credentials;
-#[cfg(test)]
+#[cfg(all(test, unix))]
 use credentials::unattended;
 use credentials::unattended_extra;
 

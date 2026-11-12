@@ -379,7 +379,7 @@ use local::local_create;
 
 #[cfg(unix)]
 pub(crate) use local::parent;
-#[cfg(windows)]
+#[cfg(all(test, windows))]
 use local::physical_ancestors;
 #[cfg(windows)]
 pub(crate) use local::windows_parent;

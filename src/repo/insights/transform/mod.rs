@@ -39,6 +39,27 @@ pub(crate) struct State {
     hide_once: bool,
 }
 
+impl State {
+    pub(super) fn retire_repository(&mut self) {
+        *self = Self {
+            of: self.of,
+            hide_once: self.hide_once,
+            ..Self::default()
+        };
+    }
+
+    pub(super) fn invalidate_forge(&mut self) -> bool {
+        if !matches!(self.of, Of::Pr(_)) && !matches!(self.asked, Some((Of::Pr(_), _))) {
+            return false;
+        }
+        self.of = Of::Commit;
+        self.read = Slot::default();
+        self.asked = None;
+        self.selected = None;
+        true
+    }
+}
+
 /// What the view asks for.
 #[derive(Clone, Debug)]
 pub(crate) enum Act {

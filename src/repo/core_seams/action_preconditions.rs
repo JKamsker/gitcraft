@@ -16,6 +16,7 @@ impl RepoTab {
                     | Action::OpenCommitChanges(_)
                     | Action::OpenDiff(_)
                     | Action::CloseDiff
+                    | Action::DiffBesideGraph(_)
                     | Action::FileView { .. }
                     | Action::CloseFileView
                     | Action::Reload
@@ -34,9 +35,16 @@ impl RepoTab {
             action => action,
         };
         let action = self.popout_intercept(action, ctx)?;
+        self.retire_navigation_restore(&action);
         // Any later user action supersedes a pending automatic backlink diff opening.
         if !matches!(&action, Action::OpenCommitChanges(_)) {
-            self.pending_commit_diff = None;
+            self.commit_changes.cancel_pending();
+        }
+        if matches!(
+            &action,
+            Action::CloseDiff | Action::OpenDiff(_) | Action::OpenCommitChanges(_)
+        ) {
+            self.commit_changes.stop();
         }
         if matches!(
             &action,

@@ -125,10 +125,18 @@ impl RepoTab {
                     accepted = Some(*action);
                 }
             });
-        harness.run();
-        harness.get_by_label(&button).click();
-        harness.run();
-        drop(harness);
+        crate::repo::hang_diagnostics::run(format_args!("settle confirmation harness"), || {
+            harness.run()
+        });
+        crate::repo::hang_diagnostics::run(format_args!("click confirmation button"), || {
+            harness.get_by_label(&button).click()
+        });
+        crate::repo::hang_diagnostics::run(format_args!("settle clicked confirmation"), || {
+            harness.run()
+        });
+        crate::repo::hang_diagnostics::run(format_args!("drop confirmation harness"), || {
+            drop(harness)
+        });
         accepted.ok_or_else(|| "the reviewed rebase button emitted no action".into())
     }
 }

@@ -122,13 +122,15 @@ fn a_restack_stopped_on_conflicts_continues_or_aborts_from_the_tab() -> Result<(
 /// layers it moved back too, and redo moves them again.
 #[test]
 fn undoing_a_rebase_that_updated_dependent_branches_puts_them_back() -> Result<(), String> {
+    use crate::repo::hang_diagnostics::{run, trace};
+    let _trace = trace("stack-update-refs-undo");
     let repo = TestRepo::new("tab update refs undo")?;
     repo.stack(&["schema", "api", "ui"])?;
     repo.commit("m2.txt", "2\n", "main moves on")?;
     repo.checkout("ui")?;
     let before = (repo.tip("schema")?, repo.tip("api")?, repo.tip("ui")?);
     let ctx = egui::Context::default();
-    let mut tab = open(&repo, &ctx)?;
+    let mut tab = run(format_args!("open stack tab"), || open(&repo, &ctx))?;
     let onto = repo.tip("main")?;
     tab.apply(
         Action::InteractiveRebase {
@@ -150,8 +152,12 @@ fn undoing_a_rebase_that_updated_dependent_branches_puts_them_back() -> Result<(
             .iter()
             .map(|e| format!("todo: Pick {} {}", e.commit.hash, e.message)),
     );
-    tab.apply(Action::RunRebase, &ctx);
-    tab.review_rebase_for_test(&ctx, "ui", &before.2, &onto)?;
+    run(format_args!("prepare interactive rebase"), || {
+        tab.apply(Action::RunRebase, &ctx)
+    });
+    run(format_args!("review interactive rebase"), || {
+        tab.review_rebase_for_test(&ctx, "ui", &before.2, &onto)
+    })?;
     let Some(crate::repo::Dialog::Confirm { preview, .. }) = &tab.dialog else {
         return Err("no interactive confirmation".into());
     };
@@ -165,8 +171,10 @@ fn undoing_a_rebase_that_updated_dependent_branches_puts_them_back() -> Result<(
         (repo.tip("schema")?, repo.tip("api")?, repo.tip("ui")?),
         before
     );
-    let accepted = tab.accept_rebase_for_test(&ctx, "ui", &before.2, &onto)?;
-    tab.apply(accepted, &ctx);
+    let accepted = run(format_args!("click interactive confirmation"), || {
+        tab.accept_rebase_for_test(&ctx, "ui", &before.2, &onto)
+    })?;
+    run(format_args!("start confirmed rebase"), || tab.apply(accepted, &ctx));
     settle(&mut tab, &ctx, |t| t.rebase.is_none() && t.status.is_some())?;
     assert!(is_ancestor(&repo, "main", "schema") && is_ancestor(&repo, "main", "api"));
     let tips = || -> Result<(String, String, String), String> {
@@ -189,6 +197,8 @@ fn undoing_a_rebase_that_updated_dependent_branches_puts_them_back() -> Result<(
         t.status.as_deref().is_some_and(|s| s.0.starts_with("Undo"))
     })?;
     assert_eq!(tips()?, before, "{:?}", tab.status);
+    run(format_args!("drop stack tab"), || drop(tab));
+    run(format_args!("drop stack fixture"), || drop(repo));
     Ok(())
 }
 

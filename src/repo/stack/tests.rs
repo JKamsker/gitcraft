@@ -15,7 +15,7 @@ pub(crate) fn settle(
 ) -> Result<(), String> {
     let deadline = Instant::now() + Duration::from_secs(30);
     loop {
-        tab.poll(ctx);
+        crate::repo::hang_diagnostics::poll(tab, ctx);
         if done(tab) && !tab.is_busy() {
             return Ok(());
         }

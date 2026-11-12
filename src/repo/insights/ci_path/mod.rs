@@ -4,18 +4,26 @@
 //! workflow. A bar opens the run in the CI view, the job's or step's log on the forge, and the
 //! commit.
 
+mod controls;
 mod detail;
+mod diagnostic_view;
+mod reads;
 mod waterfall;
 
+#[cfg(test)]
+mod lifecycle_tests;
+#[cfg(test)]
+mod snapshot_tests;
 #[cfg(test)]
 mod tests;
 
 use std::collections::HashSet;
 
-use egui::{RichText, Ui};
+use egui::Ui;
 
 use super::InsightsAct;
 use super::common::{self, Slot, SlotState};
+use crate::ci::timing::history::RunKey;
 use crate::ci::{self, CheckState, Project, Run};
 use crate::insights::ci_path::{self as analysis, Baseline, Explorer};
 use crate::repo::{Action, RepoTab, WIP_HASH, short};
@@ -40,11 +48,42 @@ pub(crate) struct State {
     explorer: Slot<Explorer>,
     /// The run shown, by its project and id.
     run: Option<(Project, u64)>,
+    /// Once resolved, refresh keeps this exact attempt rather than following reruns.
+    pinned: Option<RunKey>,
+    workflow: Option<u64>,
     baseline: Baseline,
     /// The job picked, by index.
     selected: Option<usize>,
     /// The jobs whose steps are shown.
     expanded: HashSet<usize>,
+}
+
+impl State {
+    fn accepts(&self, explorer: &Explorer) -> bool {
+        self.run
+            .as_ref()
+            .is_none_or(|(project, id)| *project == explorer.project && *id == explorer.run.info.id)
+            && self
+                .subject
+                .as_ref()
+                .is_none_or(|(_, sha)| !sha.is_empty() && *sha == explorer.run.info.sha)
+            && self
+                .pinned
+                .is_none_or(|key| key == RunKey::of(&explorer.run.info))
+            && self
+                .workflow
+                .is_none_or(|id| Some(id) == explorer.run.info.workflow_id)
+            && match (self.baseline, &explorer.compared) {
+                (Baseline::Attempt(key), Some(compared)) => key == RunKey::of(&compared.run.info),
+                _ => true,
+            }
+    }
+    fn unavailable(&mut self, title: &str, why: String) {
+        let subject = self.subject.take();
+        *self = Self::default();
+        self.subject = subject;
+        self.unavailable = Some((title.to_owned(), why));
+    }
 }
 
 /// What the view asks for.
@@ -53,6 +92,7 @@ pub(crate) enum Act {
     /// Show this run of the commit (an index into its runs).
     PickRun(usize),
     PickBaseline(Baseline),
+    PickAttempt(RunKey),
     /// Pick a job, or none.
     Select(Option<usize>),
     /// Show a job's steps, or hide them.
@@ -85,131 +125,6 @@ impl RepoTab {
         (!self.refs.head.is_empty()).then(|| ("HEAD".to_owned(), self.refs.head.clone()))
     }
 
-    /// Reads what the view shows (again): the runs of the commit, then the one shown.
-    pub(super) fn ci_path_load(&mut self, ctx: &egui::Context) {
-        let subject = self.ci_path_subject();
-        let projects = subject
-            .as_ref()
-            .map(|(_, sha)| self.ci_projects_for(sha))
-            .unwrap_or_default();
-        let forge = self.forge();
-        let path = self.path.clone();
-        let Some(state) = self.insights.as_mut().map(|v| &mut v.ci_path) else {
-            return;
-        };
-        state.subject = subject.clone();
-        state.unavailable = None;
-        let Some((_, sha)) = subject else {
-            state.unavailable = Some((
-                "No commit".to_owned(),
-                "Select a commit, or open a repository with one, to see its CI runs.".to_owned(),
-            ));
-            return;
-        };
-        if projects.is_empty() {
-            let why = match forge {
-                None => "This repository has no remote on GitHub or GitLab: runs are read \
-                         through gh or glab from the repository's forge."
-                    .to_owned(),
-                Some(forge) => format!(
-                    "gitcraft reads CI runs from GitHub and GitLab only; {} isn't supported yet.",
-                    forge.name()
-                ),
-            };
-            state.unavailable = Some(("No CI to read".to_owned(), why));
-            return;
-        }
-        let request = state.runs.start();
-        self.insight_then(
-            ctx,
-            move || {
-                let mut runs = Runs::default();
-                let mut answered = false;
-                for project in projects {
-                    match ci::runs(&path, &project, &sha) {
-                        Ok(list) => {
-                            answered = true;
-                            runs.list
-                                .extend(list.into_iter().map(|run| (project.clone(), run)));
-                        }
-                        Err(e) => runs.errors.push(format!("{}: {e}", project.path)),
-                    }
-                }
-                if answered {
-                    Ok(runs)
-                } else {
-                    Err(runs.errors.join("; "))
-                }
-            },
-            move |tab, result: Result<Runs, String>, ctx| tab.ci_path_runs(request, result, ctx),
-        );
-    }
-
-    /// The runs of the commit arrived: the one shown before stays, else the newest.
-    fn ci_path_runs(&mut self, request: u64, result: Result<Runs, String>, ctx: &egui::Context) {
-        let Some(state) = self.insights.as_mut().map(|v| &mut v.ci_path) else {
-            return;
-        };
-        if let Err(e) = &result
-            && tool_problem(e)
-        {
-            state.runs.accept(request, Err(e.clone()));
-            state.unavailable = Some(("The forge's tool is needed".to_owned(), e.clone()));
-            return;
-        }
-        if !state.runs.accept(request, result) {
-            return;
-        }
-        let Some(runs) = state.runs.ready() else {
-            return;
-        };
-        let keep = runs
-            .list
-            .iter()
-            .find(|(p, r)| state.run.as_ref() == Some(&(p.clone(), r.id)));
-        let pick = keep
-            .or_else(|| runs.list.first())
-            .map(|(p, r)| (p.clone(), r.id));
-        if pick != state.run {
-            state.selected = None;
-            state.expanded.clear();
-        }
-        state.run = pick;
-        if state.run.is_some() {
-            self.ci_path_read_run(ctx);
-        }
-    }
-
-    /// Reads the run shown, its dependencies and the earlier run it is compared with.
-    fn ci_path_read_run(&mut self, ctx: &egui::Context) {
-        let path = self.path.clone();
-        let Some(state) = self.insights.as_mut().map(|v| &mut v.ci_path) else {
-            return;
-        };
-        let (Some((project, run)), Some((name, sha))) = (state.run.clone(), state.subject.clone())
-        else {
-            return;
-        };
-        let baseline = state.baseline;
-        let request = state.explorer.start();
-        self.insight_then(
-            ctx,
-            move || analysis::read(&path, &project, run, baseline, (&name, &sha)),
-            move |tab, result: Result<Explorer, String>, _ctx| {
-                let Some(state) = tab.insights.as_mut().map(|v| &mut v.ci_path) else {
-                    return;
-                };
-                if state.explorer.accept(request, result)
-                    && let Some(explorer) = state.explorer.ready()
-                {
-                    let jobs = explorer.run.jobs.len();
-                    state.selected = state.selected.filter(|&i| i < jobs);
-                    state.expanded.retain(|&i| i < jobs);
-                }
-            },
-        );
-    }
-
     pub(super) fn ci_path_act(&mut self, act: Act, ctx: &egui::Context) {
         let Some(state) = self.insights.as_mut().map(|v| &mut v.ci_path) else {
             return;
@@ -220,8 +135,19 @@ impl RepoTab {
                     return;
                 };
                 let pick = Some((pick.0.clone(), pick.1.id));
+                let pinned =
+                    state
+                        .runs
+                        .ready()
+                        .and_then(|runs| runs.list.get(i))
+                        .map(|(_, run)| RunKey {
+                            run: run.id,
+                            attempt: run.attempt.max(1),
+                        });
                 if pick != state.run {
                     state.run = pick;
+                    state.pinned = pinned;
+                    state.workflow = None;
                     state.selected = None;
                     state.expanded.clear();
                     state.baseline = Baseline::Latest;
@@ -231,6 +157,23 @@ impl RepoTab {
             Act::PickBaseline(baseline) => {
                 if baseline != state.baseline {
                     state.baseline = baseline;
+                    self.ci_path_read_run(ctx);
+                }
+            }
+            Act::PickAttempt(key) => {
+                let valid = state.explorer.ready().is_some_and(|explorer| {
+                    key.run == explorer.run.info.id
+                        && explorer
+                            .history
+                            .runs
+                            .iter()
+                            .any(|run| RunKey::of(&run.info) == key)
+                });
+                if valid && state.pinned != Some(key) {
+                    state.pinned = Some(key);
+                    state.baseline = Baseline::Latest;
+                    state.selected = None;
+                    state.expanded.clear();
                     self.ci_path_read_run(ctx);
                 }
             }
@@ -282,7 +225,7 @@ impl RepoTab {
             common::empty(ui, &text);
             return;
         }
-        header(ui, state, runs, acts);
+        controls::header(ui, state, runs, acts);
         match common::slot_state(ui, &state.explorer, "the run") {
             SlotState::Ready => {}
             SlotState::Retry => {
@@ -312,6 +255,7 @@ impl RepoTab {
         common::provenance(ui, &provenance);
         legend(ui, explorer.compared.is_some());
         detail::summary(ui, explorer);
+        diagnostic_view::summary(ui, explorer);
         egui::ScrollArea::vertical()
             .id_salt("ci-path-scroll")
             .auto_shrink([false, false])
@@ -323,6 +267,7 @@ impl RepoTab {
                 }
                 if let Some(job) = state.selected {
                     detail::job(ui, explorer, job, state.expanded.contains(&job), acts);
+                    diagnostic_view::job(ui, explorer, job);
                 } else {
                     ui.add_space(6.0);
                     common::empty(
@@ -333,100 +278,6 @@ impl RepoTab {
                 }
             });
     }
-}
-
-/// The run picker, the earlier run picker and the commit.
-fn header(ui: &mut Ui, state: &State, runs: &Runs, acts: &mut Vec<Action>) {
-    let t = Tokens::get(ui.ctx());
-    ui.horizontal_wrapped(|ui| {
-        if let Some((name, sha)) = &state.subject {
-            ui.label(RichText::new(format!("{name}:")).color(t.text_dim));
-            if ui
-                .link(short(sha))
-                .on_hover_text("Select this commit in the graph")
-                .clicked()
-            {
-                acts.push(Action::SelectHash(sha.clone()));
-            }
-        }
-        ui.add_space(8.0);
-        let shown = runs
-            .list
-            .iter()
-            .position(|(p, r)| state.run.as_ref() == Some(&(p.clone(), r.id)));
-        let label = |(p, r): &(Project, Run)| {
-            format!(
-                "{} #{} · {} · {}",
-                r.name,
-                r.number,
-                state_word(r.state),
-                p.path
-            )
-        };
-        egui::ComboBox::from_id_salt("ci-path-run")
-            .selected_text(shown.map_or("Pick a run".to_owned(), |i| label(&runs.list[i])))
-            .width(260.0)
-            .show_ui(ui, |ui| {
-                for (i, entry) in runs.list.iter().enumerate() {
-                    if ui
-                        .selectable_label(Some(i) == shown, label(entry))
-                        .clicked()
-                    {
-                        acts.push(act(Act::PickRun(i)));
-                    }
-                }
-            });
-        let Some(explorer) = state.explorer.ready() else {
-            return;
-        };
-        ui.label(RichText::new("against").color(t.text_dim));
-        let picked = match (state.baseline, &explorer.compared) {
-            (Baseline::None, _) => "nothing".to_owned(),
-            (_, Some(c)) => format!("#{} ({})", c.run.info.number, short(&c.run.info.sha)),
-            (_, None) => "no earlier successful run".to_owned(),
-        };
-        egui::ComboBox::from_id_salt("ci-path-baseline")
-            .selected_text(picked)
-            .width(220.0)
-            .show_ui(ui, |ui| {
-                if ui
-                    .selectable_label(state.baseline == Baseline::Latest, "Latest earlier success")
-                    .clicked()
-                {
-                    acts.push(act(Act::PickBaseline(Baseline::Latest)));
-                }
-                if ui
-                    .selectable_label(state.baseline == Baseline::None, "Nothing")
-                    .clicked()
-                {
-                    acts.push(act(Act::PickBaseline(Baseline::None)));
-                }
-                for b in &explorer.baselines {
-                    let text = format!(
-                        "#{} · {} · {}",
-                        b.number,
-                        short(&b.sha),
-                        b.finished
-                            .zip(b.started)
-                            .map_or("?".to_owned(), |(f, s)| ci::duration_label(f - s))
-                    );
-                    let on = state.baseline == Baseline::Run(b.id);
-                    if ui.selectable_label(on, text).clicked() {
-                        acts.push(act(Act::PickBaseline(Baseline::Run(b.id))));
-                    }
-                }
-            });
-        if ui
-            .button("Open in CI view")
-            .on_hover_text("The run's jobs, logs and actions")
-            .clicked()
-        {
-            acts.push(Action::OpenCi {
-                sha: explorer.run.info.sha.clone(),
-                run: Some(explorer.run.info.id),
-            });
-        }
-    });
 }
 
 /// What a state is called, in words.

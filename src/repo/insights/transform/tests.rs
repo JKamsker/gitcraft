@@ -6,6 +6,42 @@ use std::time::{Duration, Instant};
 use super::*;
 use crate::repo::insights::{InsightsAct, Kind, tests::draw};
 
+impl crate::repo::insights::context::namespace_tests::Fixture for State {
+    fn seed(&mut self) {
+        crate::repo::insights::context::namespace_tests::seed_slot(&mut self.read);
+        self.of = Of::Branch;
+        self.hide_once = true;
+    }
+    fn assert_retired(&self) {
+        crate::repo::insights::context::namespace_tests::assert_slot_retired(&self.read);
+        assert!(self.asked.is_none() && self.selected.is_none());
+        assert_eq!(self.of, Of::Branch);
+        assert!(self.hide_once);
+    }
+}
+
+#[test]
+fn forge_retirement_clears_only_pr_owned_reads_and_preserves_display_options() {
+    for of in [Of::Commit, Of::Branch, Of::Pr(7)] {
+        let mut state = State {
+            of,
+            asked: Some((of, None)),
+            hide_once: true,
+            ..Default::default()
+        };
+        let old = state.read.start();
+        let pr_owned = matches!(of, Of::Pr(_));
+        assert_eq!(state.invalidate_forge(), pr_owned);
+        assert_eq!(
+            state.read.accept(old, Err("old PR reply".into())),
+            !pr_owned
+        );
+        assert!(state.hide_once);
+        assert_eq!(state.of, if pr_owned { Of::Commit } else { of });
+        assert_eq!(state.read.value.is_none(), pr_owned);
+    }
+}
+
 fn wait(tab: &mut RepoTab, ctx: &egui::Context, done: impl Fn(&RepoTab) -> bool) {
     let start = Instant::now();
     while !done(tab) {

@@ -89,10 +89,8 @@ fn windows_identity(
         return Err("Filesystem did not provide a stable file identity".into());
     }
     let mut identity = vec![info.VolumeSerialNumber, meta.creation_time()];
-    for chunk in info.FileId.Identifier.chunks_exact(8) {
-        identity.push(u64::from_le_bytes(
-            chunk.try_into().map_err(|_| "Invalid file ID")?,
-        ));
+    for chunk in info.FileId.Identifier.as_chunks::<8>().0 {
+        identity.push(u64::from_le_bytes(*chunk));
     }
     Ok((identity, meta.file_attributes()))
 }

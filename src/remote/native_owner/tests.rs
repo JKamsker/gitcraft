@@ -117,25 +117,7 @@ fn owned_runtime_endpoint_roundtrip() -> Result<(), Box<dyn std::error::Error>> 
             assert_eq!(output.stdout, fixture::stdout(b"finite-stdout\0\xff\n"));
             assert_eq!(output.stderr, b"finite-stderr\0\xfe\n");
         }
-        let receipt_bytes = endpoint.terminal()?;
-        endpoint.stop()?;
-        endpoint.stop()?; // Atomic terminal proof makes repeated stop idempotent.
-        let receipt: Receipt = serde_json::from_slice(&receipt_bytes)?;
-        assert!(endpoint.confirms(&receipt_bytes));
-        assert_eq!(receipt.endpoint, endpoint);
-        assert_eq!(receipt.state, "stopped");
-        assert_eq!(receipt.code, if cancelled { 125 } else { 7 });
-        assert_eq!(receipt.complete, !cancelled);
-        assert!(!endpoint.path.join("terminal.new").exists());
-        assert_eq!(std::fs::read(&record)?, record_bytes);
-        assert_eq!(super::super::recover_owner(&record)?, record_bytes);
-        let mut wrong_receipt = receipt_bytes.clone();
-        wrong_receipt.push(b'x');
-        assert!(endpoint.retire_proven(&wrong_receipt).is_err());
-        assert_eq!(endpoint.terminal()?, receipt_bytes);
-        endpoint.retire_proven(&receipt_bytes)?;
-        endpoint.retire_proven(&receipt_bytes)?;
-        assert!(!endpoint.path.join("terminal").exists());
+        verify_terminal_record(&endpoint, &record, &record_bytes, cancelled)?;
         if cancelled {
             std::thread::sleep(fixture::EFFECT_DELAY + Duration::from_millis(100));
             assert!(!directory.join("unexpected-effect").exists());
@@ -218,5 +200,34 @@ fn recording_native_words_roundtrip_without_loss() -> Result<(), String> {
         let word = OsStr::from_bytes(b"invalid-\xff");
         assert_eq!(Word::capture(word).restore()?, word);
     }
+    Ok(())
+}
+
+#[cfg(unix)]
+fn verify_terminal_record(
+    endpoint: &Endpoint,
+    record: &Path,
+    record_bytes: &[u8],
+    cancelled: bool,
+) -> Result<(), Box<dyn std::error::Error>> {
+    let receipt_bytes = endpoint.terminal()?;
+    endpoint.stop()?;
+    endpoint.stop()?; // Atomic terminal proof makes repeated stop idempotent.
+    let receipt: Receipt = serde_json::from_slice(&receipt_bytes)?;
+    assert!(endpoint.confirms(&receipt_bytes));
+    assert_eq!(&receipt.endpoint, endpoint);
+    assert_eq!(receipt.state, "stopped");
+    assert_eq!(receipt.code, if cancelled { 125 } else { 7 });
+    assert_eq!(receipt.complete, !cancelled);
+    assert!(!endpoint.path.join("terminal.new").exists());
+    assert_eq!(std::fs::read(record)?, record_bytes);
+    assert_eq!(super::super::recover_owner(record)?, record_bytes);
+    let mut wrong_receipt = receipt_bytes.clone();
+    wrong_receipt.push(b'x');
+    assert!(endpoint.retire_proven(&wrong_receipt).is_err());
+    assert_eq!(endpoint.terminal()?, receipt_bytes);
+    endpoint.retire_proven(&receipt_bytes)?;
+    endpoint.retire_proven(&receipt_bytes)?;
+    assert!(!endpoint.path.join("terminal").exists());
     Ok(())
 }

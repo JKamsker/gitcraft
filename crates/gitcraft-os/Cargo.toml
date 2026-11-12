@@ -7,6 +7,9 @@ license = "MIT OR Apache-2.0"
 description = "The few calls into the OS shell gitcraft makes (taskbar progress, jump list), behind a safe API"
 publish = false
 
+[lints.clippy]
+cognitive_complexity = "forbid"
+
 [target.'cfg(unix)'.dependencies]
 libc = "0.2"
 

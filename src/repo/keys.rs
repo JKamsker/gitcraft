@@ -172,10 +172,8 @@ impl RepoTab {
         if self.selected != Some(row) {
             self.select(row, ctx);
         }
-        let mut settings = Settings::get(ctx);
-        if !settings.show_detail {
-            settings.show_detail = true;
-            settings.set(ctx);
+        if !Settings::get(ctx).show_detail {
+            Settings::set_show_detail(ctx, true);
         }
         self.focus_commit_summary = true;
     }

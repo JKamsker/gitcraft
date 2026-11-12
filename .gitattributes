@@ -1,0 +1,2 @@
+# Unix scripts are embedded and sent to Unix hosts from Windows builds too.
+*.sh text eol=lf

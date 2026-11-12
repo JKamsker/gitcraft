@@ -400,7 +400,7 @@ pub(crate) use storage::bundle_digest;
 pub(crate) use storage::bundle_git_path;
 pub use storage::read_bundle_file;
 pub use storage::save_bundle_file;
-#[cfg(any(windows, test))]
+#[cfg(test)]
 use storage::windows_bundle_path;
 
 mod header;

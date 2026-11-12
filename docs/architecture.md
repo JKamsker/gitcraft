@@ -1,10 +1,12 @@
 # Architecture and change amplification
 
 Issue [#178](https://github.com/JKamsker/gitcraft/issues/178) is an incremental
-refactoring program. The first slice establishes this survey and makes the
-terminal panel an owning feature. Typed operation plans/persistence migration,
-other feature extractions, settings composition and shared request utilities
-remain separate phases. Keep those phases independently reviewable.
+refactoring program. PR #179 established this survey and terminal ownership;
+PR #200 delivered the principal hotspot decompositions, typed plan boundaries,
+private feature owners and scoped requests. Follow-up work should validate and
+harden those implementations, preserving legacy undo data and recovery safety.
+The open issues track remaining cross-feature and platform validation; the
+historical inventory below is a baseline, not an instruction to redo shipped work.
 
 ## Mandatory Rust file-size policy
 
@@ -30,6 +32,39 @@ feature ownership with #194, async lifetimes with #195, diff work with #196,
 and CI reliability with #190.
 
 ## Reproduce the survey
+
+### Enforced compiler complexity budget
+
+`python ci/clippy_packages.py` runs locked, strict all-target Clippy for every
+tracked Cargo package, selecting each manifest and package explicitly. It enforces
+`clippy::cognitive_complexity` with a threshold of **25**, configured in the
+repository's single `clippy.toml` and forbidden in every package manifest.
+Independent workspaces and nondefault members cannot escape the compiler gate;
+the recovery harness uses its explicit `recovery_recording` profile. PR lint,
+Windows validation, and release builds run it. This is Clippy's branching score, not a
+measurement of human comprehension. It is separate from the advisory lexical
+survey below and the unconditional full-tree 500-line cap above.
+
+Clippy analyzes the code compiled for that platform/features; inactive cfg
+branches and macro-generated bodies are not a complete source inventory.
+Use all-target builds on supported platforms and preserve behavioral tests.
+`ci/complexity_policy.py` checks all tracked Rust sources and Cargo/Clippy
+configuration, including inactive branches, to reject per-item threshold
+overrides, nested configurations and packages missing the forbidden lint.
+Local `allow` attributes cannot override `forbid`. Do not move complex behavior
+into macros to avoid analysis or split functions without clear responsibilities.
+
+With Python 3.11+, check working contents, the complete index, or an immutable
+candidate using `python3 ci/complexity_policy.py`, `--staged`, or
+`--revision HEAD`. The shared CI gate runs policy checks and dependency-free
+compiler fixtures: score 25 passes, score 26 fails, including closures, async
+bodies and nested functions. Run those with:
+
+```sh
+python3 -m unittest discover -s ci -p 'test_complexity*.py' -v
+```
+
+### Advisory history and lexical measurements
 
 From the repository root, with Python 3.10+ and Git:
 

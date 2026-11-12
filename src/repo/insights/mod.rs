@@ -5,9 +5,12 @@
 //! worktree behind what is clicked. None changes anything.
 
 pub(crate) mod common;
+mod context;
 pub(crate) mod graph;
 pub(crate) mod heat_grid;
 mod page;
+#[cfg(test)]
+mod test_support;
 #[cfg(test)]
 mod tests;
 
@@ -141,6 +144,10 @@ pub(crate) struct InsightsView {
     pub(crate) table: bool,
     /// The views read once already: showing one again doesn't read it again.
     loaded: HashSet<Kind>,
+    /// Shared preference lifetime last observed, including another tab's A→B→A.
+    forge_epoch: Option<u64>,
+    namespace: Option<context::Namespace>,
+    read_lifetime: std::sync::Arc<()>,
     /// The pull request the big area showed when the page was opened over it, which the
     /// views about a change take for theirs.
     pub(crate) pr: Option<u64>,
@@ -164,6 +171,9 @@ impl InsightsView {
             kind,
             table: false,
             loaded: HashSet::new(),
+            forge_epoch: None,
+            namespace: None,
+            read_lifetime: std::sync::Arc::new(()),
             pr: None,
             impact: Default::default(),
             ci_path: Default::default(),
@@ -293,6 +303,10 @@ impl RepoTab {
 
     /// Reads view `kind` (again).
     fn load_insight(&mut self, kind: Kind, ctx: &egui::Context) {
+        self.sync_insights_context(ctx);
+        if let Some(view) = &mut self.insights {
+            view.loaded.insert(kind);
+        }
         match kind {
             Kind::Impact => self.impact_load(ctx),
             Kind::CiPath => self.ci_path_load(ctx),
@@ -356,7 +370,17 @@ impl RepoTab {
         work: impl FnOnce() -> T + Send + 'static,
         then: impl FnOnce(&mut RepoTab, T, &egui::Context) + Send + 'static,
     ) {
-        self.then(ctx, move || crate::git::offline(work), then);
+        let request = context::Read::capture(self);
+        self.then(
+            ctx,
+            move || crate::git::offline(work),
+            move |tab, result, ctx| {
+                tab.sync_insights_context(ctx);
+                if request.current(tab) {
+                    then(tab, result, ctx);
+                }
+            },
+        );
     }
 
     /// [`RepoTab::forge_then`] for a view's read of the forge and the repository: the git it
@@ -367,7 +391,19 @@ impl RepoTab {
         work: impl FnOnce() -> T + Send + 'static,
         then: impl FnOnce(&mut RepoTab, T, &egui::Context) + Send + 'static,
     ) {
-        self.forge_then(ctx, move || crate::git::offline(work), then);
+        let (clock, epoch) = super::forge_selection::lifetime(ctx, self.repo_key());
+        let request = context::Read::capture(self);
+        self.forge_then(
+            ctx,
+            move || crate::git::offline(work),
+            move |tab, result, ctx| {
+                tab.sync_insights_context(ctx);
+                if clock.load(std::sync::atomic::Ordering::SeqCst) == epoch && request.current(tab)
+                {
+                    then(tab, result, ctx);
+                }
+            },
+        );
     }
 
     /// The palette's entries: one per view.

@@ -1,6 +1,9 @@
 //! Resolution responsibilities for echo push.
 use super::*;
 
+#[path = "resolution/arguments.rs"]
+mod arguments;
+
 pub(super) fn config(repo: &Reads<'_>, key: &str) -> Result<Vec<String>, String> {
     Ok(repo
         .ok_codes(&["config", "--get-all", key], &[0, 1])?
@@ -71,53 +74,12 @@ pub(super) fn resolved(
                 .then(|| pair[1].strip_prefix("push.default=").map(str::to_owned))
                 .flatten()
         });
-        let mut positional = vec![];
-        let mut options = true;
-        let mut all = false;
-        let mut tags = false;
-        let mut deleting = false;
-        for word in &step[at + 1..] {
-            if options && word == "--" {
-                options = false;
-                continue;
-            }
-            if options && word.starts_with('-') {
-                match word.as_str() {
-                    "--all" => all = true,
-                    "--tags" => tags = true,
-                    "--delete" | "-d" => deleting = true,
-                    "--porcelain"
-                    | "-u"
-                    | "--set-upstream"
-                    | "--no-verify"
-                    | "--atomic"
-                    | "--progress"
-                    | "-q"
-                    | "--quiet"
-                    | "-v"
-                    | "--verbose"
-                    | "-f"
-                    | "--force"
-                    | "--force-if-includes"
-                    | "--follow-tags"
-                    | "--no-follow-tags"
-                    | "--recurse-submodules=no"
-                    | "--recurse-submodules=check"
-                    | "--dry-run"
-                    | "-n"
-                    | "--force-with-lease" => {}
-                    w if w.starts_with("--force-with-lease=")
-                        || w.starts_with("--push-option=") => {}
-                    _ => {
-                        return Err(format!(
-                            "Reviewer echo cannot infer push option {word}; review this operation explicitly"
-                        ));
-                    }
-                }
-            } else {
-                positional.push(word.clone());
-            }
-        }
+        let arguments::PushArguments {
+            mut positional,
+            all,
+            tags,
+            deleting,
+        } = arguments::PushArguments::parse(&step[at + 1..])?;
         if deleting {
             continue;
         }

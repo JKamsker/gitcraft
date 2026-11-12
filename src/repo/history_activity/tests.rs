@@ -108,25 +108,7 @@ fn calendar_and_contributors_buttons_change_the_actual_view_and_select_commit() 
     harness.run();
     harness.get_by_label("1\n1 commit").click();
     harness.run_steps(2);
-    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(2);
-    while harness
-        .state()
-        .0
-        .history_activity
-        .as_ref()
-        .is_some_and(|v| v.loading)
-        && std::time::Instant::now() < deadline
-    {
-        std::thread::sleep(std::time::Duration::from_millis(5));
-        harness.run_steps(1);
-    }
-    let settled = harness.state().0.history_activity.as_ref().ok_or("view")?;
-    assert!(!settled.loading, "activity filter did not finish");
-    assert!(settled.error.is_none(), "{:?}", settled.error);
-    assert!(Arc::ptr_eq(
-        settled.history.as_ref().ok_or("history")?,
-        &history
-    ));
+    settle_activity(&mut harness, &history)?;
     let view = harness.state().0.history_activity.as_ref().ok_or("view")?;
     assert_eq!(view.query.from, Some(first));
     assert_eq!(view.query.through, Some(first));
@@ -148,25 +130,7 @@ fn calendar_and_contributors_buttons_change_the_actual_view_and_select_commit() 
     harness.run_steps(2);
     harness.drop_at(end);
     harness.run_steps(2);
-    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(2);
-    while harness
-        .state()
-        .0
-        .history_activity
-        .as_ref()
-        .is_some_and(|v| v.loading)
-        && std::time::Instant::now() < deadline
-    {
-        std::thread::sleep(std::time::Duration::from_millis(5));
-        harness.run_steps(1);
-    }
-    let settled = harness.state().0.history_activity.as_ref().ok_or("view")?;
-    assert!(!settled.loading, "activity filter did not finish");
-    assert!(settled.error.is_none(), "{:?}", settled.error);
-    assert!(Arc::ptr_eq(
-        settled.history.as_ref().ok_or("history")?,
-        &history
-    ));
+    settle_activity(&mut harness, &history)?;
     let view = harness
         .state()
         .0
@@ -203,25 +167,7 @@ fn calendar_and_contributors_buttons_change_the_actual_view_and_select_commit() 
     );
     harness.get_by_label("2026-01\n2 commits").click();
     harness.run_steps(2);
-    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(2);
-    while harness
-        .state()
-        .0
-        .history_activity
-        .as_ref()
-        .is_some_and(|v| v.loading)
-        && std::time::Instant::now() < deadline
-    {
-        std::thread::sleep(std::time::Duration::from_millis(5));
-        harness.run_steps(1);
-    }
-    let settled = harness.state().0.history_activity.as_ref().ok_or("view")?;
-    assert!(!settled.loading, "activity filter did not finish");
-    assert!(settled.error.is_none(), "{:?}", settled.error);
-    assert!(Arc::ptr_eq(
-        settled.history.as_ref().ok_or("history")?,
-        &history
-    ));
+    settle_activity(&mut harness, &history)?;
     assert_eq!(
         harness
             .state()
@@ -235,25 +181,7 @@ fn calendar_and_contributors_buttons_change_the_actual_view_and_select_commit() 
     );
     harness.get_by_label("Committer date").click();
     harness.run_steps(2);
-    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(2);
-    while harness
-        .state()
-        .0
-        .history_activity
-        .as_ref()
-        .is_some_and(|v| v.loading)
-        && std::time::Instant::now() < deadline
-    {
-        std::thread::sleep(std::time::Duration::from_millis(5));
-        harness.run_steps(1);
-    }
-    let settled = harness.state().0.history_activity.as_ref().ok_or("view")?;
-    assert!(!settled.loading, "activity filter did not finish");
-    assert!(settled.error.is_none(), "{:?}", settled.error);
-    assert!(Arc::ptr_eq(
-        settled.history.as_ref().ok_or("history")?,
-        &history
-    ));
+    settle_activity(&mut harness, &history)?;
     assert_eq!(
         harness
             .state()
@@ -289,5 +217,31 @@ fn calendar_and_contributors_buttons_change_the_actual_view_and_select_commit() 
             .author
             .is_some()
     );
+    Ok(())
+}
+
+fn settle_activity(
+    harness: &mut egui_kittest::Harness<'_, (RepoTab, bool)>,
+    history: &Arc<History>,
+) -> Result<(), String> {
+    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(2);
+    while harness
+        .state()
+        .0
+        .history_activity
+        .as_ref()
+        .is_some_and(|v| v.loading)
+        && std::time::Instant::now() < deadline
+    {
+        std::thread::sleep(std::time::Duration::from_millis(5));
+        harness.run_steps(1);
+    }
+    let settled = harness.state().0.history_activity.as_ref().ok_or("view")?;
+    assert!(!settled.loading, "activity filter did not finish");
+    assert!(settled.error.is_none(), "{:?}", settled.error);
+    assert!(Arc::ptr_eq(
+        settled.history.as_ref().ok_or("history")?,
+        history
+    ));
     Ok(())
 }

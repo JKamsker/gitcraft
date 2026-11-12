@@ -13,8 +13,8 @@ impl RepoTab {
         self.restore_selection(previous, ctx);
         self.take_prepared_message();
         self.refresh_work_diff(ctx);
-        if let Some(hash) = self.pending_goto.clone() {
-            self.goto(&hash, ctx);
+        if let Some(target) = self.pending_goto.clone() {
+            self.goto_target(target, ctx);
         }
     }
 
@@ -43,7 +43,11 @@ impl RepoTab {
         let selected_hash = self.selected_hash();
         let mut protected = self.history_filter.revealed.clone();
         protected.extend(self.selected_hash());
-        protected.extend(self.pending_goto.clone());
+        protected.extend(
+            self.pending_goto
+                .as_ref()
+                .map(|target| target.hash().to_owned()),
+        );
         protected.extend(self.search.matches.iter().cloned());
         protected.insert(self.refs.head.clone());
         protected.extend(self.stashes.iter().map(|s| s.base.clone()));

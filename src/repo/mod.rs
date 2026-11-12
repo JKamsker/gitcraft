@@ -30,6 +30,7 @@ pub(crate) mod columns;
 mod commands;
 mod commit_actions;
 mod commit_changes;
+mod commit_search;
 pub(crate) mod conflict;
 mod conflict_check;
 mod content_recovery;

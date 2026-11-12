@@ -1,5 +1,6 @@
 mod deferred;
 mod lists;
+pub(super) mod palette;
 mod receipts;
 pub(super) use deferred::Cache as DeferredCache;
 mod outbox;

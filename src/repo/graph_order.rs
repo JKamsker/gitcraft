@@ -72,6 +72,7 @@ impl RepoTab {
     pub(super) fn set_log_order(&mut self, order: LogOrder, ctx: &egui::Context) {
         store(ctx, self.repo_key(), order);
         if order != self.log_order {
+            self.search.retire();
             self.reload(ctx);
         }
     }
@@ -80,6 +81,9 @@ impl RepoTab {
     /// repository differs (changed while it was read, or read before the repository was known:
     /// a worktree's is its main worktree's).
     pub(super) fn take_order(&mut self, read_in: LogOrder, ctx: &egui::Context) {
+        if self.log_order != read_in {
+            self.search.retire();
+        }
         if load(ctx, self.repo_key()) != read_in {
             self.reload_again = true;
         }

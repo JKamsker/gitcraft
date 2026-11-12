@@ -22,7 +22,8 @@ impl RepoTab {
             return false;
         };
         let conflicted = matches!(&diff.key, DiffKey::Work(f) if f.area == git::Area::Conflicted);
-        !conflicted
+        self.docked(super::popout::Panel::Diff)
+            && !conflicted
             && self.conflict.is_none()
             && self.rebase.is_none()
             && self.file_view.is_none()
@@ -32,7 +33,12 @@ impl RepoTab {
 
     /// The diff shows below the graph now.
     pub(super) fn diff_beside_graph(&self, ctx: &egui::Context) -> bool {
-        Settings::get(ctx).diff_beside_graph && self.diff_can_split()
+        self.diff_can_split()
+            && (Settings::get(ctx).diff_beside_graph
+                || self
+                    .diff
+                    .as_ref()
+                    .is_some_and(|view| self.commit_changes.graph_with_diff(&view.key)))
     }
 
     /// The graph on top, the diff below, the border between them dragged to resize (egui keeps
@@ -68,13 +74,12 @@ impl RepoTab {
 
     /// The header's button putting the diff below the graph, or back in its place. Only for
     /// the diffs that can show there (whether it showed).
-    pub(super) fn split_toggle(&self, ui: &mut Ui) -> bool {
+    pub(super) fn split_toggle(&self, ui: &mut Ui, acts: &mut Vec<Action>) -> bool {
         if !self.diff_can_split() {
             return false;
         }
         let t = Tokens::get(ui.ctx());
-        let mut settings = Settings::get(ui.ctx());
-        let on = settings.diff_beside_graph;
+        let on = self.diff_beside_graph(ui.ctx());
         let tip = if on {
             crate::i18n::text("repo-core-2414")
         } else {
@@ -85,10 +90,15 @@ impl RepoTab {
             widgets::active_underline(ui, button.rect, t.accent);
         }
         if button.clicked() {
-            settings.diff_beside_graph = !on;
-            settings.set(ui.ctx());
+            acts.push(Action::DiffBesideGraph(!on));
         }
         true
+    }
+
+    /// An explicit layout choice replaces automatic history-follow presentation.
+    pub(super) fn set_diff_beside_graph(&mut self, on: bool, ctx: &egui::Context) {
+        self.commit_changes.stop();
+        Settings::set_diff_beside_graph(ctx, on);
     }
 
     /// Leaves a pull request's or a commit's builds page (or the insights) for the graph: a
@@ -106,3 +116,6 @@ impl RepoTab {
         self.ci_view = None;
     }
 }
+
+#[cfg(test)]
+mod tests;

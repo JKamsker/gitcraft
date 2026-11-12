@@ -1,5 +1,6 @@
 //! The constellation in a tab: a real repository read and drawn, and one that isn't there.
 
+use crate::repo::insights::test_support::required;
 use std::time::{Duration, Instant};
 
 use super::*;
@@ -7,8 +8,45 @@ use crate::git::fixture::Repo;
 use crate::repo::insights::tests::draw;
 use crate::repo::insights::{InsightsAct, Kind as View};
 
+impl crate::repo::insights::context::namespace_tests::Fixture for State {
+    fn seed(&mut self) {
+        use crate::repo::insights::context::namespace_tests::seed_slot;
+        seed_slot(&mut self.read);
+        seed_slot(&mut self.disk);
+        self.selected = Some(7);
+    }
+    fn assert_retired(&self) {
+        use crate::repo::insights::context::namespace_tests::assert_slot_retired;
+        assert_slot_retired(&self.read);
+        assert_slot_retired(&self.disk);
+        assert!(self.built.is_none() && self.selected.is_none() && self.other.is_none());
+    }
+}
+
 fn state(tab: &RepoTab) -> Option<&State> {
     tab.insights.as_ref().map(|v| &v.constellation)
+}
+
+#[test]
+fn forge_retirement_rebuilds_equal_forge_data_while_retaining_local_snapshot() {
+    let ctx = egui::Context::default();
+    crate::theme::install_fonts(&ctx);
+    let mut tab = super::super::test_support::tab(&ctx, View::Constellation);
+    let initial = &mut required(tab.insights.as_mut()).constellation;
+    let request = initial.read.start();
+    initial.read.accept(request, Ok(Snapshot::default()));
+    tab.constellation_build();
+    let fingerprint = tab.constellation_forge_read();
+    tab.invalidate_forge_insights();
+    let retired = required(state(&tab));
+    assert!(retired.read.ready().is_some());
+    assert!(retired.built.is_some());
+    assert!(retired.forge_read.is_none());
+    assert_eq!(tab.constellation_forge_read(), fingerprint);
+    draw(&mut tab, &ctx, 900.0);
+    let state = required(state(&tab));
+    assert!(state.read.ready().is_some());
+    assert_eq!(state.forge_read, Some(fingerprint));
 }
 
 /// Takes in background work until `done` holds, drawing the page each time.

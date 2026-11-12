@@ -5,6 +5,7 @@
 
 mod commands;
 mod completion;
+pub(super) mod palette;
 pub(super) use commands::*;
 
 mod banner;
