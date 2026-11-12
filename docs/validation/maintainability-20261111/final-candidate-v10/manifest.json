@@ -1,0 +1,2585 @@
+{
+  "commit": "4212389c6ce69ee6dba14a31a9972a54d5a2266d",
+  "tree": "5ae3781e43d4d97c4ed3190020da15bd07d0ffaf",
+  "fixture_source": "e831e401bff29ea90991469abe6185dcf31d5cfa",
+  "fixture_blobs": {
+    "src/repo/navigation/manual_history.rs": "c72fc781aa77f79fb4b35909b2c8f47adffe6427",
+    "src/repo/navigation/tests.rs": "0647eb9a4ce4088738809b4664982ddc6cc76134",
+    "src/repo/navigation/tests_repository.rs": "ca42f1c2209c77d05ca0d3aa1f5748925409bd02"
+  },
+  "parent": "205d7528a82e464a6ebbfe0cc022bb6047fdff2f",
+  "history_units": 27,
+  "palette_source": "412d1118fb43af6ecc35a7755e5366949aeda511",
+  "palette_baseline": "f177144f0a16741ef5016cb3029ab6857e125ae3",
+  "palette_candidate": "92656fb7d7c49a728824df9548cccf2c35325ad4",
+  "palette_tree": "8f188f3aa5feab6597f1bdc0a9bf735c4604384c",
+  "correction_paths": [
+    "src/git/file_comparison/index_transaction/tests.rs",
+    "src/git/file_comparison/index_transaction/tests/policy.rs",
+    "src/repo/core_seams/palette_actions.rs",
+    "src/repo/core_seams/palette_contexts.rs",
+    "src/repo/core_seams/palette_shortcuts.rs"
+  ],
+  "previous_ci_head": "0622a2ac1237311e29f6dcc94788b30f5b094bb4",
+  "historical_926_failed_results_sha256": "25971817dd914e348848b627d7b31408716ff9e34e704a6ba6819804d7d56786",
+  "historical_926_incomplete_results_sha256": "b50dfde33be67a1a76ccf496a1cab11fe66077b1e8eb4d674fbfbe6984ee2130",
+  "historical_580_failed_results_sha256": "08e0fdc0fd69da6a18bfc2eed44a540fb5afbfa6d0addd80e2343d95ac101bd8",
+  "artifacts": [
+    {
+      "path": "results.json.gz",
+      "source": "/mnt/e/private/gitcraft-build/validation-4212389c-m5vblon3/results.json",
+      "sha256": "782e2f7425617a7fc8d69f54747ac7107e3966c1f5f7fb38f77524262d4e6238",
+      "gzip_sha256": "897adb29504575e7b73d8878f55d39113e4934b121d7c5fdc10ed520c1335630",
+      "bytes": 131173,
+      "gzip_bytes": 8499
+    },
+    {
+      "path": "logs/rust_file_size-working.log.gz",
+      "source": "/mnt/e/private/gitcraft-build/validation-4212389c-m5vblon3/rust_file_size-working.log",
+      "sha256": "3a4a1a126361bd9171ea99b1511c5fe6dc0d6f2fa63c679ab28ecb3bc64e6662",
+      "gzip_sha256": "27f6f9e6e7ad8469be63fc108b75e42cbd5be78d538e3a6ad6f221aa8d048718",
+      "bytes": 100557,
+      "gzip_bytes": 7050
+    },
+    {
+      "path": "logs/rust_file_size-index.log.gz",
+      "source": "/mnt/e/private/gitcraft-build/validation-4212389c-m5vblon3/rust_file_size-index.log",
+      "sha256": "3a4a1a126361bd9171ea99b1511c5fe6dc0d6f2fa63c679ab28ecb3bc64e6662",
+      "gzip_sha256": "27f6f9e6e7ad8469be63fc108b75e42cbd5be78d538e3a6ad6f221aa8d048718",
+      "bytes": 100557,
+      "gzip_bytes": 7050
+    },
+    {
+      "path": "logs/rust_file_size-revision.log.gz",
+      "source": "/mnt/e/private/gitcraft-build/validation-4212389c-m5vblon3/rust_file_size-revision.log",
+      "sha256": "3a4a1a126361bd9171ea99b1511c5fe6dc0d6f2fa63c679ab28ecb3bc64e6662",
+      "gzip_sha256": "27f6f9e6e7ad8469be63fc108b75e42cbd5be78d538e3a6ad6f221aa8d048718",
+      "bytes": 100557,
+      "gzip_bytes": 7050
+    },
+    {
+      "path": "logs/complexity_policy-working.log.gz",
+      "source": "/mnt/e/private/gitcraft-build/validation-4212389c-m5vblon3/complexity_policy-working.log",
+      "sha256": "063a0839c2404fb83c50dfae8f32887c68da2eb01f14c6b467dfd1f3355623fb",
+      "gzip_sha256": "c28e864992000547e256db8136d2b761ba63d0d762297136ffd329e74f1e6386",
+      "bytes": 59,
+      "gzip_bytes": 76
+    },
+    {
+      "path": "logs/complexity_policy-index.log.gz",
+      "source": "/mnt/e/private/gitcraft-build/validation-4212389c-m5vblon3/complexity_policy-index.log",
+      "sha256": "063a0839c2404fb83c50dfae8f32887c68da2eb01f14c6b467dfd1f3355623fb",
+      "gzip_sha256": "c28e864992000547e256db8136d2b761ba63d0d762297136ffd329e74f1e6386",
+      "bytes": 59,
+      "gzip_bytes": 76
+    },
+    {
+      "path": "logs/complexity_policy-revision.log.gz",
+      "source": "/mnt/e/private/gitcraft-build/validation-4212389c-m5vblon3/complexity_policy-revision.log",
+      "sha256": "063a0839c2404fb83c50dfae8f32887c68da2eb01f14c6b467dfd1f3355623fb",
+      "gzip_sha256": "c28e864992000547e256db8136d2b761ba63d0d762297136ffd329e74f1e6386",
+      "bytes": 59,
+      "gzip_bytes": 76
+    },
+    {
+      "path": "logs/tooling-regressions.log.gz",
+      "source": "/mnt/e/private/gitcraft-build/validation-4212389c-m5vblon3/tooling-regressions.log",
+      "sha256": "0963f11a339116cb68b398bcc7f219a21575e096c7a6ac983463d2d55758e032",
+      "gzip_sha256": "9f154b29d26ad623c19644f993f39e27ce97ea4cdea53578cc893013bfdee79f",
+      "bytes": 37832,
+      "gzip_bytes": 3344
+    },
+    {
+      "path": "logs/fmt.log.gz",
+      "source": "/mnt/e/private/gitcraft-build/validation-4212389c-m5vblon3/fmt.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "gzip_sha256": "9ceffb7310338057cfe71a4ae1e2c98d2c485d81cdef906532a801f457a38d64",
+      "bytes": 0,
+      "gzip_bytes": 20
+    },
+    {
+      "path": "logs/check.log.gz",
+      "source": "/mnt/e/private/gitcraft-build/validation-4212389c-m5vblon3/check.log",
+      "sha256": "aabc2611c6c9840ea530b9c5126807511f6780750366fe3d302039d155638520",
+      "gzip_sha256": "f9576ad123f834eab360477c46cf50c4bddf5503243197d85284ed6c99b135f9",
+      "bytes": 160,
+      "gzip_bytes": 151
+    },
+    {
+      "path": "logs/clippy-packages.log.gz",
+      "source": "/mnt/e/private/gitcraft-build/validation-4212389c-m5vblon3/clippy-packages.log",
+      "sha256": "6543d152929e62062f9d9da56894963c3a41c78be48b679cf3d958973c21291f",
+      "gzip_sha256": "3f6d4cf63a2d9fd4d8c4ba1de0776ebaf2116a93894e599d532b920e85779b33",
+      "bytes": 512,
+      "gzip_bytes": 245
+    },
+    {
+      "path": "logs/windows-cross-clippy-packages.log.gz",
+      "source": "/mnt/e/private/gitcraft-build/validation-4212389c-m5vblon3/windows-cross-clippy-packages.log",
+      "sha256": "910805e9e82a70d485c61f00179dfbf8a61987affad94352e7e504112f8ea9da",
+      "gzip_sha256": "85de51d4f9087bca8823f6d4ac8eeac1c3fc5f4b0e8e682bb5030364ff4c7791",
+      "bytes": 512,
+      "gzip_bytes": 244
+    },
+    {
+      "path": "logs/build-tests.log.gz",
+      "source": "/mnt/e/private/gitcraft-build/validation-4212389c-m5vblon3/build-tests.log",
+      "sha256": "2bffafb15890455dad9690df42c6a03c349d513dfff7f5b5222a729f569f40d2",
+      "gzip_sha256": "84d0a71ded40a2942c1b9560e1d4e7a8cee2e3b351418b921db9fbad9bc4c014",
+      "bytes": 527279,
+      "gzip_bytes": 37855
+    },
+    {
+      "path": "logs/frame-font-readiness.log.gz",
+      "source": "/mnt/e/private/gitcraft-build/validation-4212389c-m5vblon3/frame-font-readiness.log",
+      "sha256": "0d5cd21d85bf9eb6cbb1101e9522eb460aaf67b9157d59be1609c2763e45dacd",
+      "gzip_sha256": "214b6a387bfd5ad167241f5650ca6a9db51ef8049dae05b0fa1d3eeea5fb73f4",
+      "bytes": 214,
+      "gzip_bytes": 169
+    },
+    {
+      "path": "logs/frame-accessibility.log.gz",
+      "source": "/mnt/e/private/gitcraft-build/validation-4212389c-m5vblon3/frame-accessibility.log",
+      "sha256": "a90aa3c3f930173e65d9ecef8f8f733fa4188048f0e0756ed4a15bd9426dfb23",
+      "gzip_sha256": "d63c04d1c70316b49d72857ae47c6577564bca8c201cb3c3bf0617c7f662cf1a",
+      "bytes": 196,
+      "gzip_bytes": 160
+    },
+    {
+      "path": "logs/frame-layout-profile.log.gz",
+      "source": "/mnt/e/private/gitcraft-build/validation-4212389c-m5vblon3/frame-layout-profile.log",
+      "sha256": "0939c821115d6a96b61e269bac56cd3316d2e5d38638621bbfe58ce6e2e58541",
+      "gzip_sha256": "d16baeb648c6218a078fb1554e3555bfb9990709c7f0b0c0453204e3b4957eb5",
+      "bytes": 222,
+      "gzip_bytes": 177
+    },
+    {
+      "path": "logs/frame-settings-profile.log.gz",
+      "source": "/mnt/e/private/gitcraft-build/validation-4212389c-m5vblon3/frame-settings-profile.log",
+      "sha256": "c77b2c1ad983d787650626ddf2641c2d7ad2c17c37ad741eaa5e737800683c59",
+      "gzip_sha256": "0ec2928d53e228c1d41f95b622730b4532c0a16fcd70af119691ac1faf2f23ff",
+      "bytes": 236,
+      "gzip_bytes": 178
+    },
+    {
+      "path": "logs/recording-pipes.log.gz",
+      "source": "/mnt/e/private/gitcraft-build/validation-4212389c-m5vblon3/recording-pipes.log",
+      "sha256": "f2aec843949f54365c12106b53a84fcef40ac01866fec9a7b5105c428ad583db",
+      "gzip_sha256": "191a7a39ffe16fd4e5c3cf13c9bc404164326b461fe144174168093b1d7727fd",
+      "bytes": 769,
+      "gzip_bytes": 340
+    },
+    {
+      "path": "logs/recording-outcomes.log.gz",
+      "source": "/mnt/e/private/gitcraft-build/validation-4212389c-m5vblon3/recording-outcomes.log",
+      "sha256": "8f07555ef82b0b9d9182575f63b59a04cb9b6aa3f9ca9a3e3eca5e4da32f909a",
+      "gzip_sha256": "0b5fff8f85cadada3a2748e2a55215c5b653a5f0089e71529e761e564ef900fa",
+      "bytes": 429,
+      "gzip_bytes": 245
+    },
+    {
+      "path": "logs/recording-resolver.log.gz",
+      "source": "/mnt/e/private/gitcraft-build/validation-4212389c-m5vblon3/recording-resolver.log",
+      "sha256": "29d33ea04dfebcbaafdcf7951db61e5db2b7b1d9803f1dfd80291ddd2c254022",
+      "gzip_sha256": "4abca2af82c573e6f8c896a122ca31d87263d86e4dc6d142c2e0bd53d8f7a018",
+      "bytes": 206,
+      "gzip_bytes": 160
+    },
+    {
+      "path": "logs/nav-recording-manual-history.log.gz",
+      "source": "/mnt/e/private/gitcraft-build/validation-4212389c-m5vblon3/nav-recording-manual-history.log",
+      "sha256": "643e2aac8f14efcd8f27ef99cdc05722e05a14d83b2c369166aeb90df543ba64",
+      "gzip_sha256": "69b851d86f0b18582fa3a23212fb5107d55d94c51269e885b599c7aa9f2a0fba",
+      "bytes": 234,
+      "gzip_bytes": 175
+    },
+    {
+      "path": "logs/nav-recording-user-selection.log.gz",
+      "source": "/mnt/e/private/gitcraft-build/validation-4212389c-m5vblon3/nav-recording-user-selection.log",
+      "sha256": "3ae3b8bdc40f1417c6446cb9f7d98b4afc7c68f12063e65db3b025b617dc266d",
+      "gzip_sha256": "0a7fa5f255a3a3f4bf3ff03bbfbac3264866a01c12f0bc8ad9fc728397d94e88",
+      "bytes": 242,
+      "gzip_bytes": 186
+    },
+    {
+      "path": "logs/nav-recording-forward-history.log.gz",
+      "source": "/mnt/e/private/gitcraft-build/validation-4212389c-m5vblon3/nav-recording-forward-history.log",
+      "sha256": "d734dcda4a009e5cc32226cf2c880ea4364512f9fe2a0ca276348844cc92e319",
+      "gzip_sha256": "53b56ca41beecf86bb497a5c7b1ab576e1b5945eecc09da488869d0e1f91e884",
+      "bytes": 243,
+      "gzip_bytes": 185
+    },
+    {
+      "path": "logs/nav-history-walk.log.gz",
+      "source": "/mnt/e/private/gitcraft-build/validation-4212389c-m5vblon3/nav-history-walk.log",
+      "sha256": "1a9b3f279a919ed1dc1caf1e0cc6be78411c367b5866a6914b96b4fc8a75d2a6",
+      "gzip_sha256": "0b1872e0db0f4d0decd87b987c6c4aa1585f72b5521605ba1f60c9b5931c0b27",
+      "bytes": 190,
+      "gzip_bytes": 157
+    },
+    {
+      "path": "logs/nav-history-selection.log.gz",
+      "source": "/mnt/e/private/gitcraft-build/validation-4212389c-m5vblon3/nav-history-selection.log",
+      "sha256": "9e54f2ee1a33b3df48d9e93ebed0a9e80202a2510b6def6392d0fc7f28184a44",
+      "gzip_sha256": "c29e4b959ee192eb7df423276d0653f2ac3b1e723c1a14eeb449dcd8d96597ae",
+      "bytes": 192,
+      "gzip_bytes": 156
+    },
+    {
+      "path": "logs/nav-history-links.log.gz",
+      "source": "/mnt/e/private/gitcraft-build/validation-4212389c-m5vblon3/nav-history-links.log",
+      "sha256": "fc49bb1b852816283940fc3bdb21396b7ed485381d96efc815343d81dba5542f",
+      "gzip_sha256": "5146f37aba9768aa4b2c1dd66484edce00d925f91435b4c4fa60d866b6dc2cb1",
+      "bytes": 189,
+      "gzip_bytes": 154
+    },
+    {
+      "path": "logs/build-recovery-recording.log.gz",
+      "source": "/mnt/e/private/gitcraft-build/validation-4212389c-m5vblon3/build-recovery-recording.log",
+      "sha256": "5d9870eeb45280b47b95ca7808ca7bf8f515baf08dbc81424a87f347e151658a",
+      "gzip_sha256": "8cb7ade7bfae77cb71b216bd74af39ec87e2729ccb309dfc8af32cff968b6ed7",
+      "bytes": 26730,
+      "gzip_bytes": 2426
+    },
+    {
+      "path": "logs/list-recovery-recording.log.gz",
+      "source": "/mnt/e/private/gitcraft-build/validation-4212389c-m5vblon3/list-recovery-recording.log",
+      "sha256": "7d6afd45fe437b8b01cd11771c2567cb5de44df66bf85bb137d7628904931949",
+      "gzip_sha256": "39111f9ba0a63b50f8dcfb167e131cee7d2867e662465ad753cc96206936ff2b",
+      "bytes": 2850,
+      "gzip_bytes": 911
+    },
+    {
+      "path": "logs/recovery-recording.log.gz",
+      "source": "/mnt/e/private/gitcraft-build/validation-4212389c-m5vblon3/recovery-recording.log",
+      "sha256": "1d5d8d0acf7872f80ba580d31d0e76dd458716393254dc534eef1dbbf33770c5",
+      "gzip_sha256": "5fb4e844781fbb746ebb5cde91541a194cc10e5aabf21543894a235a7f8304dc",
+      "bytes": 59204,
+      "gzip_bytes": 1601
+    },
+    {
+      "path": "logs/runtime-gitcraft_os-lib.log.gz",
+      "source": "/mnt/e/private/gitcraft-build/validation-4212389c-m5vblon3/runtime-gitcraft_os-lib.log",
+      "sha256": "81ed85f799f09a59943498bab6574fb0c0f1fc4d3251b8c22c61cd927979d0d5",
+      "gzip_sha256": "2c2ddd786d65bf4d08fae2472cea6a4627496e47c6a409ee2e04370f51db5942",
+      "bytes": 2565,
+      "gzip_bytes": 982
+    },
+    {
+      "path": "logs/runtime-standalone_cli-standalone_cli.log.gz",
+      "source": "/mnt/e/private/gitcraft-build/validation-4212389c-m5vblon3/runtime-standalone_cli-standalone_cli.log",
+      "sha256": "7fd0b17511a8d5981abba55b3e1d441ea8f211e78b94fd18bac256bc41cbf2cc",
+      "gzip_sha256": "769fccf243ce01d601ea1dbdf3a7792993b94c6b55a716754664fbd60fbebe8e",
+      "bytes": 358,
+      "gzip_bytes": 232
+    },
+    {
+      "path": "logs/runtime-checkpoint_cli-checkpoint_cli.log.gz",
+      "source": "/mnt/e/private/gitcraft-build/validation-4212389c-m5vblon3/runtime-checkpoint_cli-checkpoint_cli.log",
+      "sha256": "b06a248ce86dcf4a5319eaaadc3526805877cd6f4aa0631bf91b35ea1e6691b2",
+      "gzip_sha256": "8ffda7404bca4f93ef0dcdb3f97eddd6adfa5538e97c9fbc775fab48fe6becf1",
+      "bytes": 175,
+      "gzip_bytes": 145
+    },
+    {
+      "path": "logs/runtime-mcp_stdio-mcp_stdio.log.gz",
+      "source": "/mnt/e/private/gitcraft-build/validation-4212389c-m5vblon3/runtime-mcp_stdio-mcp_stdio.log",
+      "sha256": "d5ce5f125980638c83afce9463420f4f29e5e9dc76e9f057fffdd176a5ac62e3",
+      "gzip_sha256": "3d4fc2bb1e720e03c14d66d09b1ffdb336f8feec330cf917f5a97da9811fb61c",
+      "bytes": 444,
+      "gzip_bytes": 252
+    },
+    {
+      "path": "logs/runtime-gitcraft-main.log.gz",
+      "source": "/mnt/e/private/gitcraft-build/validation-4212389c-m5vblon3/runtime-gitcraft-main.log",
+      "sha256": "c7b6fe37f81eb9817b531214b73ce39fef7500366ba42fb246007bf18b94315b",
+      "gzip_sha256": "2df8ef4f2b20db1f35dfac2b97e8aa0651a1d4b71a63bd07042aa8a80c2d4a12",
+      "bytes": 113,
+      "gzip_bytes": 103
+    },
+    {
+      "path": "logs/runtime-gitcraft-lib.log.gz",
+      "source": "/mnt/e/private/gitcraft-build/validation-4212389c-m5vblon3/runtime-gitcraft-lib.log",
+      "sha256": "a965b3ba0fc4056b8f02a827f0ff35b9e7e2733782d28780f5288d9789f3cbbf",
+      "gzip_sha256": "b176a7ab63efe23fea9e194247c1d2875b7d1742e6de322b86737279cafefab0",
+      "bytes": 478873,
+      "gzip_bytes": 111490
+    },
+    {
+      "path": "logs/bisect-isolated.log.gz",
+      "source": "/mnt/e/private/gitcraft-build/validation-4212389c-m5vblon3/bisect-isolated.log",
+      "sha256": "9021ead2eea811c06067c8281ddf5725edb41cf95b4436060c82e7554cb42601",
+      "gzip_sha256": "3a25dfe8edec9b8553b6c523c375bd48b4c46821de9f300641a6f3f1cacae56a",
+      "bytes": 196,
+      "gzip_bytes": 153
+    },
+    {
+      "path": "logs/acl-save.log.gz",
+      "source": "/mnt/e/private/gitcraft-build/validation-4212389c-m5vblon3/acl-save.log",
+      "sha256": "6c54abe3e8546d4a809ee3f5fa2141df559f78b2fce52e25ede4ec50ec7083bb",
+      "gzip_sha256": "21e02b3d2b96f1152fdbf91323fbb33288b50883f3ac27730fb445aa9345e3b9",
+      "bytes": 240,
+      "gzip_bytes": 183
+    },
+    {
+      "path": "logs/acl-index.log.gz",
+      "source": "/mnt/e/private/gitcraft-build/validation-4212389c-m5vblon3/acl-index.log",
+      "sha256": "704636189dec59f9058167f3767e99fe7d64c385c938a10fede3b21c781e8382",
+      "gzip_sha256": "0d9a0337deb0ee6d81fa0e0a93abeeab33390f5ded6d1e3ff8da58931f203606",
+      "bytes": 244,
+      "gzip_bytes": 184
+    },
+    {
+      "path": "logs/palette-isolated.log.gz",
+      "source": "/mnt/e/private/gitcraft-build/validation-4212389c-m5vblon3/palette-isolated.log",
+      "sha256": "9e9f63a3e6965b6f0a554f49af8d41fda323621c98ee6287661829d181f266fd",
+      "gzip_sha256": "2bc8a6ca8c1875cce632404ed83e8538961f5fbca0cba462cc69d5dc68906f86",
+      "bytes": 194,
+      "gzip_bytes": 157
+    },
+    {
+      "path": "logs/doc-tests.log.gz",
+      "source": "/mnt/e/private/gitcraft-build/validation-4212389c-m5vblon3/doc-tests.log",
+      "sha256": "d4adc200321181c0fa4cf54f3703a63713730be096a388773061c36cf25084d9",
+      "gzip_sha256": "f3ceceaec5570a09e00e5e16ebf440552c9c51bd600a66bc824e4422bbc78618",
+      "bytes": 347,
+      "gzip_bytes": 178
+    },
+    {
+      "path": "provenance/run-final-candidate-v5.py.gz",
+      "source": "/mnt/e/private/gitcraft-build/run-final-candidate-v5.py",
+      "sha256": "d0f64d5404cf755e988bf634d203d7e9d97896490ad62b0c0f42f51db8a4508a",
+      "gzip_sha256": "7f2b8e4b56ff4e9f3493ba031d069c09fd57d63af244cbcd08673c3ad5694866",
+      "bytes": 17297,
+      "gzip_bytes": 5892
+    },
+    {
+      "path": "provenance/preserve-palette-candidate-evidence-v5.py.gz",
+      "source": "/mnt/e/private/gitcraft-build/preserve-palette-candidate-evidence-v5.py",
+      "sha256": "f9e91f531c43fd7f4e6d57ca146d12dc47daf347e5be3ba268917c84d072c5b1",
+      "gzip_sha256": "f6a388ffe7743de92580d449036e670a79a2ce0c8ffecc2da91962c481bc02f6",
+      "bytes": 24791,
+      "gzip_bytes": 8405
+    },
+    {
+      "path": "provenance/final-92656fb7-progress.log.gz",
+      "source": "/mnt/e/private/gitcraft-build/final-92656fb7-progress.log",
+      "sha256": "92c473cef525a439aef55266c59a238bcbbb713308543f386b008ed8ac1ea38c",
+      "gzip_sha256": "a038cc62ea424f9cd6cd53b3e25d0629657d4df091258f4e500adbe19a0de8a9",
+      "bytes": 365,
+      "gzip_bytes": 195
+    },
+    {
+      "path": "provenance/nav-ci-fixture-e831e401.md.gz",
+      "source": "/mnt/e/private/gitcraft-build/nav-ci-fixture-e831e401.md",
+      "sha256": "46e063970d832456173717bf620797b3af283306ea5eaff231049ecf33d609cb",
+      "gzip_sha256": "7303de5d41bcf617152f215b0d686bd32e01e011fb88ed40da21d8efe5a2c498",
+      "bytes": 2748,
+      "gzip_bytes": 1437
+    },
+    {
+      "path": "provenance/nav-v3-candidate-remote.txt.gz",
+      "source": "/mnt/e/private/gitcraft-build/nav-v3-candidate-remote.txt",
+      "sha256": "8c130ad7fcf0c9318464d339d136432af476c1767ce49613f1effa37d70509fd",
+      "gzip_sha256": "53ac8e3b78333f54d50460ef4fe7b8dcfe419eed6f0f56aea4183601558de451",
+      "bytes": 82,
+      "gzip_bytes": 95
+    },
+    {
+      "path": "provenance/ci-followup-archive-remote.txt.gz",
+      "source": "/mnt/e/private/gitcraft-build/ci-followup-archive-remote.txt",
+      "sha256": "19eb8c7231285a844be8f750b809b6680ab9047125dec9df25ae8f841878be5a",
+      "gzip_sha256": "91f67228503edf167af1d9d855850f1f28b16d153cce9de2af69c35a1bfc42eb",
+      "bytes": 82,
+      "gzip_bytes": 95
+    },
+    {
+      "path": "provenance/combined-nav-v3-size-working.log.gz",
+      "source": "/mnt/e/private/gitcraft-build/combined-nav-v3-size-working.log",
+      "sha256": "a1985bc7da9298fa2ea14e87a42694dfd8cb2b47807ac3754b8c8caa99fb230f",
+      "gzip_sha256": "ec0e2a8560bb4869f5549b4cf8b5b52bbb0e2af7d55c66d75db2edd0dfec4b68",
+      "bytes": 101617,
+      "gzip_bytes": 7067
+    },
+    {
+      "path": "provenance/combined-nav-v3-size-index.log.gz",
+      "source": "/mnt/e/private/gitcraft-build/combined-nav-v3-size-index.log",
+      "sha256": "a1985bc7da9298fa2ea14e87a42694dfd8cb2b47807ac3754b8c8caa99fb230f",
+      "gzip_sha256": "ec0e2a8560bb4869f5549b4cf8b5b52bbb0e2af7d55c66d75db2edd0dfec4b68",
+      "bytes": 101617,
+      "gzip_bytes": 7067
+    },
+    {
+      "path": "provenance/ci-followup-size-working.log.gz",
+      "source": "/mnt/e/private/gitcraft-build/ci-followup-size-working.log",
+      "sha256": "8718dff80d98c0091a881943eea9149fbd33e08de180dd58fd74c40ac6a936a5",
+      "gzip_sha256": "f45024e4ea120e0bf003de3a84625d9925ab4be6b3d2728437659a6679d67a4a",
+      "bytes": 100855,
+      "gzip_bytes": 7065
+    },
+    {
+      "path": "provenance/ci-followup-size-index.log.gz",
+      "source": "/mnt/e/private/gitcraft-build/ci-followup-size-index.log",
+      "sha256": "8718dff80d98c0091a881943eea9149fbd33e08de180dd58fd74c40ac6a936a5",
+      "gzip_sha256": "f45024e4ea120e0bf003de3a84625d9925ab4be6b3d2728437659a6679d67a4a",
+      "bytes": 100855,
+      "gzip_bytes": 7065
+    },
+    {
+      "path": "provenance/ci-43109642223-lint-job.json.gz",
+      "source": "/mnt/e/private/gitcraft-build/ci-43109642223-lint-job.json",
+      "sha256": "bc937cbd6c3663c857d85515ba4d4d449176b128b4b957b52c2b1437502d35c7",
+      "gzip_sha256": "7d3eca9e6eb0c4f8e774286fdb18709fff89bd0255943463cebb054b752c8dab",
+      "bytes": 2845,
+      "gzip_bytes": 681
+    },
+    {
+      "path": "provenance/ci-43109642223-lint.log.gz",
+      "source": "/mnt/e/private/gitcraft-build/ci-43109642223-lint.log",
+      "sha256": "1fcb3c7d276592e142283f6c7ed78efdef78b290ae07eca42316ee2f4a796648",
+      "gzip_sha256": "28643fcbe6e76d3034c5db8bc51679e34df1321a05a3784cf62fa1ac0d1d0d68",
+      "bytes": 185813,
+      "gzip_bytes": 36513
+    },
+    {
+      "path": "provenance/test_final_digest_v5_d0f64d54.py.gz",
+      "source": "/mnt/e/private/gitcraft-build/test_final_digest_v5_d0f64d54.py",
+      "sha256": "37695afa3685a5ab036df7ac63fc14b7bfaa756894c42389809fbd0278cb9028",
+      "gzip_sha256": "33bd4f9d45018c9fd830de52bd266c524ae6d00ead28cf6707ddde5170b7ce5a",
+      "bytes": 10178,
+      "gzip_bytes": 3019
+    },
+    {
+      "path": "provenance/digest-v5-d0f64d54-results.json.gz",
+      "source": "/mnt/e/private/gitcraft-build/digest-v5-d0f64d54-results.json",
+      "sha256": "c97d30769a701a094a93d87d9a0fd72ada29043c9bacd34977d7809455671943",
+      "gzip_sha256": "242b6df14d23814c795aacc90a987c41eda94214241d72b69a755c51728c32c4",
+      "bytes": 1541,
+      "gzip_bytes": 839
+    },
+    {
+      "path": "provenance/digest-v5-d0f64d54-regressions.log.gz",
+      "source": "/mnt/e/private/gitcraft-build/digest-v5-d0f64d54-regressions.log",
+      "sha256": "839c98d2f234932cfc49cd9202608882cd0e60b25198da1be11c6f2f59e947e5",
+      "gzip_sha256": "98a86509ee82ce2daed7121b0eedc09b7503d31f0547bfd6c91791f98e24a146",
+      "bytes": 1393,
+      "gzip_bytes": 385
+    },
+    {
+      "path": "reviews/review-navigation-e831e401.md.gz",
+      "source": "/mnt/e/private/gitcraft-build/review-navigation-e831e401.md",
+      "sha256": "8298aa0c63f53634b13155b7d9ecad87c69ed2d41ae1955375b4c61f5d6b954b",
+      "gzip_sha256": "5bf80b10c4a147d359d71201cce7167aaa2a9d71e3a2ce9236781ca38f83f868",
+      "bytes": 3533,
+      "gzip_bytes": 1748
+    },
+    {
+      "path": "reviews/review-nav-fixture-e831e401-lifecycle.md.gz",
+      "source": "/mnt/e/private/gitcraft-build/review-nav-fixture-e831e401-lifecycle.md",
+      "sha256": "4c5ce0ece77a68cb21b10a5061c3f82dd343d7da804caf6210968425d73046e2",
+      "gzip_sha256": "1f6a1e387a547974cdcec5e1e379c432419ca4dd7164ea7ab3ba26b489509309",
+      "bytes": 3206,
+      "gzip_bytes": 1530
+    },
+    {
+      "path": "reviews/review-palette-evidence-helper-v5-root.md.gz",
+      "source": "/mnt/e/private/gitcraft-build/review-palette-evidence-helper-v5-root.md",
+      "sha256": "a2217eb6a5e883a53076b483906e525d19f5c11b22e234fd22a8fcb3f99cdbee",
+      "gzip_sha256": "8929157f5970026597ac0ae019b501dac6a9de5213490655aa21e6bcdc23473e",
+      "bytes": 3368,
+      "gzip_bytes": 1743
+    },
+    {
+      "path": "reviews/review-palette-evidence-helper-v5-adversarial.md.gz",
+      "source": "/mnt/e/private/gitcraft-build/review-palette-evidence-helper-v5-adversarial.md",
+      "sha256": "f8b608580984e85dcb94ee779a571df0bdfd887bc5d144d4861279cf72df7420",
+      "gzip_sha256": "d418f5093547af750a6de732d8bad40296a08531e92fee92ac25124d8f602574",
+      "bytes": 5612,
+      "gzip_bytes": 2773
+    },
+    {
+      "path": "reviews/review-final-documentation-0622a2ac.md.gz",
+      "source": "/mnt/e/private/gitcraft-build/review-final-documentation-0622a2ac.md",
+      "sha256": "7fe2d20e2bdb4db420a213a0e389ba33f230d3ba9b88d189251d289b07a95f11",
+      "gzip_sha256": "6dbf5ec60ad8e9380b375fd3714e892953d3aaf4a5013b93c58ea2cc5c59554d",
+      "bytes": 4122,
+      "gzip_bytes": 2042
+    },
+    {
+      "path": "reviews/review-final-runner-v5-d0f64d54.md.gz",
+      "source": "/mnt/e/private/gitcraft-build/review-final-runner-v5-d0f64d54.md",
+      "sha256": "da49490d418b8f16c6bb8537586b5757936a363fea7bb829a2cde8528973b151",
+      "gzip_sha256": "4994c9bbc5b45053ddab0665c1a48304f74f9a38cbdb80fd9ff40ab97b8d7fe4",
+      "bytes": 2666,
+      "gzip_bytes": 1458
+    },
+    {
+      "path": "reviews/review-nav-fixture-e831e401-fresh.md.gz",
+      "source": "/mnt/e/private/gitcraft-build/review-nav-fixture-e831e401-fresh.md",
+      "sha256": "f7fc3a36e73d14a2e0b5d05cb74e2cfc4fdc911f9f88ce7504e6a5f2b12cf162",
+      "gzip_sha256": "400252850d8cc299a4d92dde504f08733686068555fd66a8e75fe0bd4d8f985b",
+      "bytes": 8236,
+      "gzip_bytes": 3547
+    },
+    {
+      "path": "reviews/review-nav-fixture-f177144f-fresh.md.gz",
+      "source": "/mnt/e/private/gitcraft-build/review-nav-fixture-f177144f-fresh.md",
+      "sha256": "1ed8e8d2653c968367fd2375a9f7dea735d78ed2356543ac449f91efc640d2cf",
+      "gzip_sha256": "3c8736c942124826d184c9f518a94ff1524c945b78c5fb4322d3830a9c723955",
+      "bytes": 3933,
+      "gzip_bytes": 2158
+    },
+    {
+      "path": "source-review-stop/results.json.gz",
+      "source": "/mnt/e/private/gitcraft-build/validation-97a6aba4-uaq5w87z/results.json",
+      "sha256": "b8fa957bb4400ce69a04e968a05dd2a5053f6bd383bc1a47f3e78c02d51faef7",
+      "gzip_sha256": "76e801e3aed531caee8420be8dc7040df8c1012a587fba98febc056955fd7f4d",
+      "bytes": 32790,
+      "gzip_bytes": 2635
+    },
+    {
+      "path": "source-review-stop/build-tests.log.gz",
+      "source": "/mnt/e/private/gitcraft-build/validation-97a6aba4-uaq5w87z/build-tests.log",
+      "sha256": "256779fa4d47f7becaba1cfe28834e1b7b3fa54735e32c47cd281e75dded9a29",
+      "gzip_sha256": "410ac466a1e3edf2171742ebc691e0ffc4ad62f54e75c72c4276056b20b9c4c7",
+      "bytes": 527270,
+      "gzip_bytes": 37954
+    },
+    {
+      "path": "source-review-stop/check.log.gz",
+      "source": "/mnt/e/private/gitcraft-build/validation-97a6aba4-uaq5w87z/check.log",
+      "sha256": "ec54cc9986cbf8f1c1f12fe5083a683b1a50b6f052a6c04f0b8e4e85292dc17e",
+      "gzip_sha256": "2368ff367d61504dab75e1a304243f9f2eab17bf1cfde4b2793fed04af0da488",
+      "bytes": 160,
+      "gzip_bytes": 150
+    },
+    {
+      "path": "source-review-stop/clippy-packages.log.gz",
+      "source": "/mnt/e/private/gitcraft-build/validation-97a6aba4-uaq5w87z/clippy-packages.log",
+      "sha256": "1db52d2fb923201dd1496a219676b5eb963ecdd512e662cd35d637fca27edda2",
+      "gzip_sha256": "a46b5f6c96e5fd78b90bf29b1371982c1f5c980a83616146afa35ba05b1a8044",
+      "bytes": 512,
+      "gzip_bytes": 245
+    },
+    {
+      "path": "source-review-stop/complexity_policy-index.log.gz",
+      "source": "/mnt/e/private/gitcraft-build/validation-97a6aba4-uaq5w87z/complexity_policy-index.log",
+      "sha256": "063a0839c2404fb83c50dfae8f32887c68da2eb01f14c6b467dfd1f3355623fb",
+      "gzip_sha256": "c28e864992000547e256db8136d2b761ba63d0d762297136ffd329e74f1e6386",
+      "bytes": 59,
+      "gzip_bytes": 76
+    },
+    {
+      "path": "source-review-stop/complexity_policy-revision.log.gz",
+      "source": "/mnt/e/private/gitcraft-build/validation-97a6aba4-uaq5w87z/complexity_policy-revision.log",
+      "sha256": "063a0839c2404fb83c50dfae8f32887c68da2eb01f14c6b467dfd1f3355623fb",
+      "gzip_sha256": "c28e864992000547e256db8136d2b761ba63d0d762297136ffd329e74f1e6386",
+      "bytes": 59,
+      "gzip_bytes": 76
+    },
+    {
+      "path": "source-review-stop/complexity_policy-working.log.gz",
+      "source": "/mnt/e/private/gitcraft-build/validation-97a6aba4-uaq5w87z/complexity_policy-working.log",
+      "sha256": "063a0839c2404fb83c50dfae8f32887c68da2eb01f14c6b467dfd1f3355623fb",
+      "gzip_sha256": "c28e864992000547e256db8136d2b761ba63d0d762297136ffd329e74f1e6386",
+      "bytes": 59,
+      "gzip_bytes": 76
+    },
+    {
+      "path": "source-review-stop/fmt.log.gz",
+      "source": "/mnt/e/private/gitcraft-build/validation-97a6aba4-uaq5w87z/fmt.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "gzip_sha256": "9ceffb7310338057cfe71a4ae1e2c98d2c485d81cdef906532a801f457a38d64",
+      "bytes": 0,
+      "gzip_bytes": 20
+    },
+    {
+      "path": "source-review-stop/rust_file_size-index.log.gz",
+      "source": "/mnt/e/private/gitcraft-build/validation-97a6aba4-uaq5w87z/rust_file_size-index.log",
+      "sha256": "042878fd80128f4eba86d06d66b7877b0a6fcd732a28034dcebbd1808337cf75",
+      "gzip_sha256": "f3765c225b044ef1896161aa5095f83c558613b0136385529c7ca883e55760fe",
+      "bytes": 100855,
+      "gzip_bytes": 7064
+    },
+    {
+      "path": "source-review-stop/rust_file_size-revision.log.gz",
+      "source": "/mnt/e/private/gitcraft-build/validation-97a6aba4-uaq5w87z/rust_file_size-revision.log",
+      "sha256": "042878fd80128f4eba86d06d66b7877b0a6fcd732a28034dcebbd1808337cf75",
+      "gzip_sha256": "f3765c225b044ef1896161aa5095f83c558613b0136385529c7ca883e55760fe",
+      "bytes": 100855,
+      "gzip_bytes": 7064
+    },
+    {
+      "path": "source-review-stop/rust_file_size-working.log.gz",
+      "source": "/mnt/e/private/gitcraft-build/validation-97a6aba4-uaq5w87z/rust_file_size-working.log",
+      "sha256": "042878fd80128f4eba86d06d66b7877b0a6fcd732a28034dcebbd1808337cf75",
+      "gzip_sha256": "f3765c225b044ef1896161aa5095f83c558613b0136385529c7ca883e55760fe",
+      "bytes": 100855,
+      "gzip_bytes": 7064
+    },
+    {
+      "path": "source-review-stop/tooling-regressions.log.gz",
+      "source": "/mnt/e/private/gitcraft-build/validation-97a6aba4-uaq5w87z/tooling-regressions.log",
+      "sha256": "4ac9108785d2af5d6928437e1eb6fac86b7a220189e70f8f07bad96d03739bc7",
+      "gzip_sha256": "b46f331fa2065068088c72e35f52db7a1dc9d9b7d00fa7133a177a2f6b31fca0",
+      "bytes": 37833,
+      "gzip_bytes": 3346
+    },
+    {
+      "path": "source-review-stop/windows-cross-clippy-packages.log.gz",
+      "source": "/mnt/e/private/gitcraft-build/validation-97a6aba4-uaq5w87z/windows-cross-clippy-packages.log",
+      "sha256": "8dbab9c14f4ecda593291c8d9b0a34397e55f1b1ed4000e880e82c013858cc0d",
+      "gzip_sha256": "6f9ed2e382a6d07a3e6e736fb31cec6b1603dbb02d51fe14f2611cce067e367e",
+      "bytes": 512,
+      "gzip_bytes": 244
+    },
+    {
+      "path": "source-review-stop/stopped-97a6aba4-source-review.json.gz",
+      "source": "/mnt/e/private/gitcraft-build/stopped-97a6aba4-source-review.json",
+      "sha256": "3d107fd6256ff2ebb5be9a7dd954cdc349000142724ccb771ebd60f35515841d",
+      "gzip_sha256": "65e589af354e4292cc15be37cb1b65532334bb2b984e98e7da43863016e2e72f",
+      "bytes": 924,
+      "gzip_bytes": 524
+    },
+    {
+      "path": "source-review-stop/late-97a6aba4-source-review.json.gz",
+      "source": "/mnt/e/private/gitcraft-build/late-97a6aba4-source-review.json",
+      "sha256": "3526efcf0909ce35c980ae8601a4ec89d07d93f00cdc9664f662d785a6cb3ce0",
+      "gzip_sha256": "939361a5ba55a38588923cdfa5d74148f1c9fd54394508dcaf44acb1848a29e2",
+      "bytes": 1217,
+      "gzip_bytes": 706
+    },
+    {
+      "path": "source-review-stop/final-97a6aba4-progress.log.gz",
+      "source": "/mnt/e/private/gitcraft-build/final-97a6aba4-progress.log",
+      "sha256": "75242529b8a369a95c7ff27b677955cb41f6a3d7f59a786c55ccc5a88b847cb3",
+      "gzip_sha256": "9ddaf252f785c60e6a0f078cdab3c602f28a684842c28b88b1eabd912e8572be",
+      "bytes": 289,
+      "gzip_bytes": 166
+    },
+    {
+      "path": "source-review-stop/preserve-navigation-candidate-evidence-v2-initial.py.gz",
+      "source": "/mnt/e/private/gitcraft-build/preserve-navigation-candidate-evidence-v2-initial.py",
+      "sha256": "3f30af2001b48b2264f1dfad550678d05ceada45af987780a10e1589595860c6",
+      "gzip_sha256": "78507f96ba5d02055a66e9a1311c0f47218fb3f8c0450519fc75fc76d0e586d2",
+      "bytes": 12582,
+      "gzip_bytes": 5121
+    },
+    {
+      "path": "source-review-stop/review-navigation-evidence-helper-v2-initial.md.gz",
+      "source": "/mnt/e/private/gitcraft-build/review-navigation-evidence-helper-v2-initial.md",
+      "sha256": "fb2891d4f314b02c8204ae9611816a813feb5838c1d75f511585145aa567d1ba",
+      "gzip_sha256": "e47b725e17eff35d184ddbb8d29a4720b443e476716eac69d6a9910e68af21fe",
+      "bytes": 8955,
+      "gzip_bytes": 4153
+    },
+    {
+      "path": "source-review-stop/review-navigation-evidence-helper-v2-supersession.md.gz",
+      "source": "/mnt/e/private/gitcraft-build/review-navigation-evidence-helper-v2-supersession.md",
+      "sha256": "52a30e9590b279b900890bb704b8384e940bf95d438207061138355f6d163c1e",
+      "gzip_sha256": "95adc325329d0efdf73f8fcaa1dba89288fa08ded93a8bb015f95e35e25f5a14",
+      "bytes": 6736,
+      "gzip_bytes": 3106
+    },
+    {
+      "path": "source-review-stop/preserve-navigation-candidate-evidence.py.gz",
+      "source": "/mnt/e/private/gitcraft-build/preserve-navigation-candidate-evidence.py",
+      "sha256": "162b09ea9dfdb7fb922f9495ee16fca7b6a0dcc3b499d5c7e903081205dba73b",
+      "gzip_sha256": "32d7205c64382833c11f9a1c25011141b19b7a97d1af648801ca301d855b2fb8",
+      "bytes": 10059,
+      "gzip_bytes": 4410
+    },
+    {
+      "path": "source-review-stop/review-navigation-evidence-helper.md.gz",
+      "source": "/mnt/e/private/gitcraft-build/review-navigation-evidence-helper.md",
+      "sha256": "03da917790bb0f4e453d5738572784d7b117041bcfae6444a8b3bc515abd7b91",
+      "gzip_sha256": "c32d727e0658e97a9eda8ab1cbce5b273cd71b6aa58f423a122b4921db1b4be5",
+      "bytes": 3320,
+      "gzip_bytes": 1769
+    },
+    {
+      "path": "source-review-stop/review-navigation-c7f59f40.md.gz",
+      "source": "/mnt/e/private/gitcraft-build/review-navigation-c7f59f40.md",
+      "sha256": "f46d5771d9355fd6ef7bdce0f4e57d87d649396389847d506418ba077394c45f",
+      "gzip_sha256": "f24741371304a956cd079032537b4ce5fbbacc226721e4fb333e8e92eca69801",
+      "bytes": 3207,
+      "gzip_bytes": 1611
+    },
+    {
+      "path": "source-review-stop/review-nav-fixture-c7f59f40-lifecycle.md.gz",
+      "source": "/mnt/e/private/gitcraft-build/review-nav-fixture-c7f59f40-lifecycle.md",
+      "sha256": "41456823437f77fb933fc7a325d650e9f80fd737d8c03d3679fc0e79f5fbfc6f",
+      "gzip_sha256": "265bc5191165d9bf3fa6b0e2f3cf20ab6a25488bc606828713dfdfd1c4bc860c",
+      "bytes": 2883,
+      "gzip_bytes": 1451
+    },
+    {
+      "path": "source-review-stop/review-nav-fixture-c7f59f40-lifecycle-correction.md.gz",
+      "source": "/mnt/e/private/gitcraft-build/review-nav-fixture-c7f59f40-lifecycle-correction.md",
+      "sha256": "8e2d608478e5b6d60490affb9c8e3ff34ea66c545be803f2620046b94a5eac7f",
+      "gzip_sha256": "f33beec2185019346ced9a44e4e4634c7c1ec19bf68f23363f934fb31a98b337",
+      "bytes": 1718,
+      "gzip_bytes": 915
+    },
+    {
+      "path": "source-review-stop/review-navigation-cached-forward-correction.md.gz",
+      "source": "/mnt/e/private/gitcraft-build/review-navigation-cached-forward-correction.md",
+      "sha256": "13758622b714a0074023316eedfa1999ceb80c596f4214279eaa5a177a83c2a4",
+      "gzip_sha256": "db521ea9ff6838e6704bce9400d3ee5df0380d16f0e640f0e4c8a6f7f1529be6",
+      "bytes": 3234,
+      "gzip_bytes": 1659
+    },
+    {
+      "path": "source-review-stop/nav-ci-fixture-c7f59f40.md.gz",
+      "source": "/mnt/e/private/gitcraft-build/nav-ci-fixture-c7f59f40.md",
+      "sha256": "66f8a17d7115b994697b2a22a46ab910fc247738507959e5285a43387c4dde59",
+      "gzip_sha256": "c67aa7bd82d2766c79d4250f1b1449f251c489ea869f769ff802e37a5c150316",
+      "bytes": 3183,
+      "gzip_bytes": 1710
+    },
+    {
+      "path": "source-review-stop/review-nav-candidate-gate.md.gz",
+      "source": "/mnt/e/private/gitcraft-build/review-nav-candidate-gate.md",
+      "sha256": "2d22e13f09f968a12b449f4d25d7ef9c657ad5a582d9b890b23c9dfbea7f1d4c",
+      "gzip_sha256": "a30e828fdaec26dc3f85e4c60344b8c3041db771aa4104ab18239ec3178bb11e",
+      "bytes": 4244,
+      "gzip_bytes": 2188
+    },
+    {
+      "path": "provenance/preserve-navigation-candidate-evidence-v2.py.gz",
+      "source": "/mnt/e/private/gitcraft-build/preserve-navigation-candidate-evidence-v2.py",
+      "sha256": "9b8684e9766f35e03a3b586aa6ba1131f36a3340e6dd996b178421f4736894d5",
+      "gzip_sha256": "6ca0c5062867321114b8475c199096b1bcbff69834304ccb5e74653a7fd1d51d",
+      "bytes": 15751,
+      "gzip_bytes": 5989
+    },
+    {
+      "path": "provenance/review-navigation-evidence-helper-v2.md.gz",
+      "source": "/mnt/e/private/gitcraft-build/review-navigation-evidence-helper-v2.md",
+      "sha256": "fb2891d4f314b02c8204ae9611816a813feb5838c1d75f511585145aa567d1ba",
+      "gzip_sha256": "e47b725e17eff35d184ddbb8d29a4720b443e476716eac69d6a9910e68af21fe",
+      "bytes": 8955,
+      "gzip_bytes": 4153
+    },
+    {
+      "path": "provenance/test_navigation_stopped_guard_v2.py.gz",
+      "source": "/mnt/e/private/gitcraft-build/test_navigation_stopped_guard_v2.py",
+      "sha256": "be98382fde4788c4d8c4e2912f9ad6ab924b21ea65b2920d02bec2a559c0f65f",
+      "gzip_sha256": "f8198760dd50ce21520e224bfcb6edaeb56efb5b15e0d6ab07fd7c8c0ac828f4",
+      "bytes": 10216,
+      "gzip_bytes": 3469
+    },
+    {
+      "path": "provenance/navigation-stopped-guard-v2-results.json.gz",
+      "source": "/mnt/e/private/gitcraft-build/navigation-stopped-guard-v2-results.json",
+      "sha256": "aeb9b3a0eccaba9595bc7e91da70c88859f210a8c79faa966cb44bf645fd3b6e",
+      "gzip_sha256": "fa23521b6e2084f9dd97ebeffbc89a6690e82caa07f668b839ae8751e8b420f8",
+      "bytes": 1437,
+      "gzip_bytes": 754
+    },
+    {
+      "path": "provenance/navigation-stopped-guard-v2-regressions.log.gz",
+      "source": "/mnt/e/private/gitcraft-build/navigation-stopped-guard-v2-regressions.log",
+      "sha256": "5457b999437dc969174a7182d377ffbf9967d41556115580bb9ed30684e821fd",
+      "gzip_sha256": "666ffd4a3e8d0a9059f907af812db199ce59fa2b6dded0cfc480c606f343365f",
+      "bytes": 832,
+      "gzip_bytes": 277
+    },
+    {
+      "path": "provenance/test_navigation_archive_guards_v3.py.gz",
+      "source": "/mnt/e/private/gitcraft-build/test_navigation_archive_guards_v3.py",
+      "sha256": "61f792692a135685f7011bd9ec13b7b5c7dca91edab8b2061532c3c9b51b4635",
+      "gzip_sha256": "f9335ae5a7a0d73d54c89843e986c43eff0b0b7a88c7bec81dd67f7317d89bcc",
+      "bytes": 19870,
+      "gzip_bytes": 5215
+    },
+    {
+      "path": "provenance/navigation-archive-guards-v3-results.json.gz",
+      "source": "/mnt/e/private/gitcraft-build/navigation-archive-guards-v3-results.json",
+      "sha256": "0ac4bce6364fa97d6b1b4b99e93fe09d1b54abe199a0686e051f2c5ea477af6c",
+      "gzip_sha256": "3245680a214e64aa0a7222f895ee68f6f48a0070d68c10833832200e7718db17",
+      "bytes": 2636,
+      "gzip_bytes": 1103
+    },
+    {
+      "path": "provenance/navigation-archive-guards-v3-regressions.log.gz",
+      "source": "/mnt/e/private/gitcraft-build/navigation-archive-guards-v3-regressions.log",
+      "sha256": "e76f654511005e4d364cfd816ffbfb29546b006e9bf7865e6d9c87d97c457cbd",
+      "gzip_sha256": "a3c545dcd403149aff6f1ef6155d63aab83446769b8c825b354ffcf1b501f4f4",
+      "bytes": 1547,
+      "gzip_bytes": 407
+    },
+    {
+      "path": "provenance/review-navigation-evidence-helper-v3-owner-correction.md.gz",
+      "source": "/mnt/e/private/gitcraft-build/review-navigation-evidence-helper-v3-owner-correction.md",
+      "sha256": "db94e1117fa3a60ef9677d2d7d2af8d68d4ec8288436a07dc54af732d12a6916",
+      "gzip_sha256": "a1db7faa47c6673a36113e85b641dcd85848e5d205567ef14852e1e29aaf39df",
+      "bytes": 7892,
+      "gzip_bytes": 3755
+    },
+    {
+      "path": "clippy-source-failure-c168/results.json.gz",
+      "source": "/mnt/e/private/gitcraft-build/validation-c16814db-n904yq7m/results.json",
+      "sha256": "45204a6d9d5ae0f4efff791d29a1d023311a5502606693de8e00a94e54df3c10",
+      "gzip_sha256": "ef4fb53bb8c1f1045a6533234816934bc2d0892a8eca4e5221c8ba74115ddf3a",
+      "bytes": 27778,
+      "gzip_bytes": 2360
+    },
+    {
+      "path": "clippy-source-failure-c168/rust_file_size-working.log.gz",
+      "source": "/mnt/e/private/gitcraft-build/validation-c16814db-n904yq7m/rust_file_size-working.log",
+      "sha256": "3a43b610e4a0dfdbc743f3e1a896ed118ba4700ed5576e1c21faa4132206977a",
+      "gzip_sha256": "54488079bcdf354d682f82caeaa3cb83d33548962a76ffee185b7226ce96b5ca",
+      "bytes": 100855,
+      "gzip_bytes": 7066
+    },
+    {
+      "path": "clippy-source-failure-c168/rust_file_size-index.log.gz",
+      "source": "/mnt/e/private/gitcraft-build/validation-c16814db-n904yq7m/rust_file_size-index.log",
+      "sha256": "3a43b610e4a0dfdbc743f3e1a896ed118ba4700ed5576e1c21faa4132206977a",
+      "gzip_sha256": "54488079bcdf354d682f82caeaa3cb83d33548962a76ffee185b7226ce96b5ca",
+      "bytes": 100855,
+      "gzip_bytes": 7066
+    },
+    {
+      "path": "clippy-source-failure-c168/rust_file_size-revision.log.gz",
+      "source": "/mnt/e/private/gitcraft-build/validation-c16814db-n904yq7m/rust_file_size-revision.log",
+      "sha256": "3a43b610e4a0dfdbc743f3e1a896ed118ba4700ed5576e1c21faa4132206977a",
+      "gzip_sha256": "54488079bcdf354d682f82caeaa3cb83d33548962a76ffee185b7226ce96b5ca",
+      "bytes": 100855,
+      "gzip_bytes": 7066
+    },
+    {
+      "path": "clippy-source-failure-c168/complexity_policy-working.log.gz",
+      "source": "/mnt/e/private/gitcraft-build/validation-c16814db-n904yq7m/complexity_policy-working.log",
+      "sha256": "063a0839c2404fb83c50dfae8f32887c68da2eb01f14c6b467dfd1f3355623fb",
+      "gzip_sha256": "c28e864992000547e256db8136d2b761ba63d0d762297136ffd329e74f1e6386",
+      "bytes": 59,
+      "gzip_bytes": 76
+    },
+    {
+      "path": "clippy-source-failure-c168/complexity_policy-index.log.gz",
+      "source": "/mnt/e/private/gitcraft-build/validation-c16814db-n904yq7m/complexity_policy-index.log",
+      "sha256": "063a0839c2404fb83c50dfae8f32887c68da2eb01f14c6b467dfd1f3355623fb",
+      "gzip_sha256": "c28e864992000547e256db8136d2b761ba63d0d762297136ffd329e74f1e6386",
+      "bytes": 59,
+      "gzip_bytes": 76
+    },
+    {
+      "path": "clippy-source-failure-c168/complexity_policy-revision.log.gz",
+      "source": "/mnt/e/private/gitcraft-build/validation-c16814db-n904yq7m/complexity_policy-revision.log",
+      "sha256": "063a0839c2404fb83c50dfae8f32887c68da2eb01f14c6b467dfd1f3355623fb",
+      "gzip_sha256": "c28e864992000547e256db8136d2b761ba63d0d762297136ffd329e74f1e6386",
+      "bytes": 59,
+      "gzip_bytes": 76
+    },
+    {
+      "path": "clippy-source-failure-c168/tooling-regressions.log.gz",
+      "source": "/mnt/e/private/gitcraft-build/validation-c16814db-n904yq7m/tooling-regressions.log",
+      "sha256": "775da4a620df5d30ab30d7ee56cfa0bb4cf3d3f38a8310cac836d80a80e31365",
+      "gzip_sha256": "06cf718e7955463d51334ab7fc0fd0abae3fb294dae19896463e1aeb4c2ae1d3",
+      "bytes": 37833,
+      "gzip_bytes": 3349
+    },
+    {
+      "path": "clippy-source-failure-c168/fmt.log.gz",
+      "source": "/mnt/e/private/gitcraft-build/validation-c16814db-n904yq7m/fmt.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "gzip_sha256": "9ceffb7310338057cfe71a4ae1e2c98d2c485d81cdef906532a801f457a38d64",
+      "bytes": 0,
+      "gzip_bytes": 20
+    },
+    {
+      "path": "clippy-source-failure-c168/check.log.gz",
+      "source": "/mnt/e/private/gitcraft-build/validation-c16814db-n904yq7m/check.log",
+      "sha256": "2a830aed9faf74993bb6842369a63102207e5c51015b1836d4fdf8ac0ded18fd",
+      "gzip_sha256": "7886b53505ef18e85367b3cdf61870b25082c37ae5d12c2c254207863c580cd4",
+      "bytes": 160,
+      "gzip_bytes": 151
+    },
+    {
+      "path": "clippy-source-failure-c168/clippy-packages.log.gz",
+      "source": "/mnt/e/private/gitcraft-build/validation-c16814db-n904yq7m/clippy-packages.log",
+      "sha256": "5847541645c5f2900f8b11caf7c301456c2fdda8456e8975066bcf2ae8ca0c0b",
+      "gzip_sha256": "fedc604a6caeefca75b36ab540f93a93ba9193eb886ba83db16b6690bf3ec454",
+      "bytes": 1019,
+      "gzip_bytes": 580
+    },
+    {
+      "path": "clippy-source-failure-c168/final-c16814db-progress.log.gz",
+      "source": "/mnt/e/private/gitcraft-build/final-c16814db-progress.log",
+      "sha256": "edd2281c793b34f4f5aa9ed7dcad5512a4cd42d6306c8e8ff750f269ef1f5694",
+      "gzip_sha256": "8732b955bb7c4af105fc115d3e7c1fea7a07e4495aa8b21588cea89ff69790ec",
+      "bytes": 319,
+      "gzip_bytes": 190
+    },
+    {
+      "path": "clippy-source-failure-c168/nav-v2-candidate-remote.txt.gz",
+      "source": "/mnt/e/private/gitcraft-build/nav-v2-candidate-remote.txt",
+      "sha256": "8ae22d180e3746de284ed6634dddf24e8f969749b6ef094be7224db13bff3e38",
+      "gzip_sha256": "03a88757b97675f6aab9d821a16fa49e6c4272a447bcab07baacaa260a738422",
+      "bytes": 82,
+      "gzip_bytes": 94
+    },
+    {
+      "path": "clippy-source-failure-c168/combined-nav-v2-size-working.log.gz",
+      "source": "/mnt/e/private/gitcraft-build/combined-nav-v2-size-working.log",
+      "sha256": "3a43b610e4a0dfdbc743f3e1a896ed118ba4700ed5576e1c21faa4132206977a",
+      "gzip_sha256": "54488079bcdf354d682f82caeaa3cb83d33548962a76ffee185b7226ce96b5ca",
+      "bytes": 100855,
+      "gzip_bytes": 7066
+    },
+    {
+      "path": "clippy-source-failure-c168/combined-nav-v2-size-index.log.gz",
+      "source": "/mnt/e/private/gitcraft-build/combined-nav-v2-size-index.log",
+      "sha256": "3a43b610e4a0dfdbc743f3e1a896ed118ba4700ed5576e1c21faa4132206977a",
+      "gzip_sha256": "54488079bcdf354d682f82caeaa3cb83d33548962a76ffee185b7226ce96b5ca",
+      "bytes": 100855,
+      "gzip_bytes": 7066
+    },
+    {
+      "path": "palette/review-maintainability-scope-c16814db.md.gz",
+      "source": "/mnt/e/private/gitcraft-build/review-maintainability-scope-c16814db.md",
+      "sha256": "3c477da2b310e3f00a42337fb82fcd719de30bdb8b4400b652074dae7459dec1",
+      "gzip_sha256": "aff7669557cca50c3501c5e977f16eec7d5f9e3f25fe180cc041bf12bf1bf25f",
+      "bytes": 9720,
+      "gzip_bytes": 4545
+    },
+    {
+      "path": "palette/review-remaining-hotspots-f177144f.md.gz",
+      "source": "/mnt/e/private/gitcraft-build/review-remaining-hotspots-f177144f.md",
+      "sha256": "35ebd99a59eec3f48f89e852a3f4bcf877900116974ef6c37e0b2c0e0201764c",
+      "gzip_sha256": "c4358e815d31a60479f5d9b34411dbf9f5776dbbfebcfee084f7d17fd41093cc",
+      "bytes": 6183,
+      "gzip_bytes": 2950
+    },
+    {
+      "path": "palette/review-palette-423758ee-nav.md.gz",
+      "source": "/mnt/e/private/gitcraft-build/review-palette-423758ee-nav.md",
+      "sha256": "984b0d728e742084b180616ef39398b269e37f465f68e849adbb0e82244b1480",
+      "gzip_sha256": "b01c7aaf29ef2f5063080f36190ffb0c3253e3900aa3564c42ae51b105f55e6c",
+      "bytes": 2193,
+      "gzip_bytes": 1196
+    },
+    {
+      "path": "palette/review-palette-5b571106-nav.md.gz",
+      "source": "/mnt/e/private/gitcraft-build/review-palette-5b571106-nav.md",
+      "sha256": "f3b4f6545267c0766b1732c2887ec504483deec6181cd00449f6fb6e53725665",
+      "gzip_sha256": "0ce61387553b832b24e0c52168305eb98fdaf38860e5f386eb8b6a0978de36ad",
+      "bytes": 6771,
+      "gzip_bytes": 3250
+    },
+    {
+      "path": "palette/review-palette-5b571106-root.md.gz",
+      "source": "/mnt/e/private/gitcraft-build/review-palette-5b571106-root.md",
+      "sha256": "4c62fa1f598c9f3ecb904108042af2dd0f77ba852467f5d72371d40b0ce5289c",
+      "gzip_sha256": "d7538c8cb4ec9455a247d66b4cdbeaaad8073d3ecbb68972cb14100d8828cf20",
+      "bytes": 2366,
+      "gzip_bytes": 1254
+    },
+    {
+      "path": "palette/review-final-source-92656fb7.md.gz",
+      "source": "/mnt/e/private/gitcraft-build/review-final-source-92656fb7.md",
+      "sha256": "3765448cc72a4a23f324cbdf31eac89c5969cb213a915209d59f55850e59d568",
+      "gzip_sha256": "0a9534bd686e70d239ebfb3adc70bf249f0df575f9ac5ab2a43530a874034b87",
+      "bytes": 3491,
+      "gzip_bytes": 1779
+    },
+    {
+      "path": "palette/palette-owners-source-parity-5b571106.json.gz",
+      "source": "/mnt/e/private/gitcraft-build/palette-owners-source-parity-5b571106.json",
+      "sha256": "62cd925cc3f8a87e1199f158f63453295b57f57d7ca65cfbc06ec8d6eaba8d2a",
+      "gzip_sha256": "2285e924fd87d0d71854996ad8df999c3c3d339cfd4c379d7a1118ce15e46146",
+      "bytes": 1062,
+      "gzip_bytes": 414
+    },
+    {
+      "path": "palette/palette-owners-size-working.log.gz",
+      "source": "/mnt/e/private/gitcraft-build/palette-owners-size-working.log",
+      "sha256": "1f213661c78a9ff1619593d8864eeb7f8ac16dcd027831899348f5e4d5313892",
+      "gzip_sha256": "b94199496f37f499f0fddd71691cbad1215e9a7c356b7a352718ed4ed0078545",
+      "bytes": 101473,
+      "gzip_bytes": 7060
+    },
+    {
+      "path": "palette/palette-owners-size-staged.log.gz",
+      "source": "/mnt/e/private/gitcraft-build/palette-owners-size-staged.log",
+      "sha256": "1f213661c78a9ff1619593d8864eeb7f8ac16dcd027831899348f5e4d5313892",
+      "gzip_sha256": "b94199496f37f499f0fddd71691cbad1215e9a7c356b7a352718ed4ed0078545",
+      "bytes": 101473,
+      "gzip_bytes": 7060
+    },
+    {
+      "path": "palette/combined-palette-v8-size-working.log.gz",
+      "source": "/mnt/e/private/gitcraft-build/combined-palette-v8-size-working.log",
+      "sha256": "1f213661c78a9ff1619593d8864eeb7f8ac16dcd027831899348f5e4d5313892",
+      "gzip_sha256": "b94199496f37f499f0fddd71691cbad1215e9a7c356b7a352718ed4ed0078545",
+      "bytes": 101473,
+      "gzip_bytes": 7060
+    },
+    {
+      "path": "palette/combined-palette-v8-size-index.log.gz",
+      "source": "/mnt/e/private/gitcraft-build/combined-palette-v8-size-index.log",
+      "sha256": "1f213661c78a9ff1619593d8864eeb7f8ac16dcd027831899348f5e4d5313892",
+      "gzip_sha256": "b94199496f37f499f0fddd71691cbad1215e9a7c356b7a352718ed4ed0078545",
+      "bytes": 101473,
+      "gzip_bytes": 7060
+    },
+    {
+      "path": "palette/palette-v8-final-candidate-remote.txt.gz",
+      "source": "/mnt/e/private/gitcraft-build/palette-v8-final-candidate-remote.txt",
+      "sha256": "08c7f2c4b2707a917509e2573de62b899c8547cfc924804b2a4f166bf886af00",
+      "gzip_sha256": "aa5dc14150c176824b75dfd1421bf955e4d6b9f7f137a02c57ce350ef135c4f2",
+      "bytes": 82,
+      "gzip_bytes": 95
+    },
+    {
+      "path": "palette/preserve-navigation-candidate-evidence-v3.py.gz",
+      "source": "/mnt/e/private/gitcraft-build/preserve-navigation-candidate-evidence-v3.py",
+      "sha256": "1d3d9722455ac6f2f4fb6f7fed4cca775e63c4879c25cc0c8251d0008f10762f",
+      "gzip_sha256": "66df7f02b72499da4ac63419ec5e1ca9583f31c9b74f9d3b7a236e7398026fcb",
+      "bytes": 20293,
+      "gzip_bytes": 7152
+    },
+    {
+      "path": "palette/test_palette_archive_guards_v5.py.gz",
+      "source": "/mnt/e/private/gitcraft-build/test_palette_archive_guards_v5.py",
+      "sha256": "863095d98db41390a2042555648075ad65c1a214e4d461c694fc06ab7ed77913",
+      "gzip_sha256": "7edfcbd3d80c6053080c4f07485951e6f22d5ef1e8e13f0f5436f87897fb7a94",
+      "bytes": 19861,
+      "gzip_bytes": 5217
+    },
+    {
+      "path": "palette/palette-archive-guards-v5-results.json.gz",
+      "source": "/mnt/e/private/gitcraft-build/palette-archive-guards-v5-results.json",
+      "sha256": "4087ec187707c97fbacb7712220c49ba399f11e72cfb05b0ef6b73de51881f86",
+      "gzip_sha256": "1c83fd9f2f9c3e39ae878dccd3fce024d121a427ea40570621c7b804b53ecde9",
+      "bytes": 2633,
+      "gzip_bytes": 1104
+    },
+    {
+      "path": "palette/palette-archive-guards-v5-regressions.log.gz",
+      "source": "/mnt/e/private/gitcraft-build/palette-archive-guards-v5-regressions.log",
+      "sha256": "b299424a455a4fe2f62298889e78c23065d931a17f10d38a0cc70b31b8aa8bf7",
+      "gzip_sha256": "3c6da6ffd413e0f48df9f0ab8ae5dfc20befcc7a2ae4e42d5410c441a2dd73ad",
+      "bytes": 1547,
+      "gzip_bytes": 406
+    },
+    {
+      "path": "palette/prepare-palette-evidence-v4.py.gz",
+      "source": "/mnt/e/private/gitcraft-build/prepare-palette-evidence-v4.py",
+      "sha256": "b54c57920c46d696bed4bc6ef5896430e35ba9954326b6cb121256543e56d3d4",
+      "gzip_sha256": "345dfb7ce560652c9a385f07e3c70135e30914388f4c527d7a7e98592e1452e4",
+      "bytes": 5467,
+      "gzip_bytes": 2175
+    },
+    {
+      "path": "intermediate-navigation/results.json.gz",
+      "source": "/mnt/e/private/gitcraft-build/validation-f177144f-91pjrzai/results.json",
+      "sha256": "42c30bc0deebeaea78a9e3ea0385331dca2a5f5cf7e069252b024d630eb779f0",
+      "gzip_sha256": "a00dca2ae0ca9c6248fde18d40728a7f448a093026f362bbe625323f9bafb0b0",
+      "bytes": 131173,
+      "gzip_bytes": 8495
+    },
+    {
+      "path": "intermediate-navigation/acl-index.log.gz",
+      "source": "/mnt/e/private/gitcraft-build/validation-f177144f-91pjrzai/acl-index.log",
+      "sha256": "e429ae62502592b8a49d170930cf70e3e82b3abe1e292f1a9d07249bee079a7d",
+      "gzip_sha256": "ff3ee73481a84d4306eb9aedf67a6e7f9975a4401196e1f87ed0cfab79319302",
+      "bytes": 244,
+      "gzip_bytes": 181
+    },
+    {
+      "path": "intermediate-navigation/acl-save.log.gz",
+      "source": "/mnt/e/private/gitcraft-build/validation-f177144f-91pjrzai/acl-save.log",
+      "sha256": "0d35b3c31760e3457baf69ad77bcc0509bf6159fcdf15ebbe22e82389b7f2a42",
+      "gzip_sha256": "17fd208c4f3d454edf7da6ba53dcc9a04b727357bcf9c8be845db630fb6429a1",
+      "bytes": 240,
+      "gzip_bytes": 183
+    },
+    {
+      "path": "intermediate-navigation/bisect-isolated.log.gz",
+      "source": "/mnt/e/private/gitcraft-build/validation-f177144f-91pjrzai/bisect-isolated.log",
+      "sha256": "339b942d359a45e3055dea5c4dbe00077af04df85847d6243557f8be71427b7c",
+      "gzip_sha256": "da99bfc6a58ea2a659e7f94be92e896cf1a577c694e352ed3bbd874709d5df20",
+      "bytes": 196,
+      "gzip_bytes": 154
+    },
+    {
+      "path": "intermediate-navigation/build-recovery-recording.log.gz",
+      "source": "/mnt/e/private/gitcraft-build/validation-f177144f-91pjrzai/build-recovery-recording.log",
+      "sha256": "b975d17645c8bab44425c6c55085f109f2c76d3901daabe8af2b8119af808a2d",
+      "gzip_sha256": "cd9674cef0e307cffb5a9be9e6e03cd1afdc71de13c8ee588b409aa4f3471dbb",
+      "bytes": 26729,
+      "gzip_bytes": 2424
+    },
+    {
+      "path": "intermediate-navigation/build-tests.log.gz",
+      "source": "/mnt/e/private/gitcraft-build/validation-f177144f-91pjrzai/build-tests.log",
+      "sha256": "70e737fb0ec60b149236d30935ac7b620b2cc72832a40bf3878d162cfcdc481a",
+      "gzip_sha256": "7f87b218847c8aee46f78eff9b2d6ecea6430f86f7824f21880834ea1a5a5ab4",
+      "bytes": 527270,
+      "gzip_bytes": 37881
+    },
+    {
+      "path": "intermediate-navigation/check.log.gz",
+      "source": "/mnt/e/private/gitcraft-build/validation-f177144f-91pjrzai/check.log",
+      "sha256": "50eaa766e18ae8160574078f1888b0511f8b6c209e7aab220f3ddfd035b30be4",
+      "gzip_sha256": "4a16337931b7541fb2048b0c2dac06857bfaaf31c215f00579cb827e4bdc079c",
+      "bytes": 160,
+      "gzip_bytes": 152
+    },
+    {
+      "path": "intermediate-navigation/clippy-packages.log.gz",
+      "source": "/mnt/e/private/gitcraft-build/validation-f177144f-91pjrzai/clippy-packages.log",
+      "sha256": "ef986ffe68632c50ecec01968ba4db15ae634a5d39e70e69169de6cdd99bde2a",
+      "gzip_sha256": "71847bdbeab260c8dca3d5805eeba539ce0cfeb47e09704ab2ba19d79dfec4f0",
+      "bytes": 512,
+      "gzip_bytes": 243
+    },
+    {
+      "path": "intermediate-navigation/complexity_policy-index.log.gz",
+      "source": "/mnt/e/private/gitcraft-build/validation-f177144f-91pjrzai/complexity_policy-index.log",
+      "sha256": "063a0839c2404fb83c50dfae8f32887c68da2eb01f14c6b467dfd1f3355623fb",
+      "gzip_sha256": "c28e864992000547e256db8136d2b761ba63d0d762297136ffd329e74f1e6386",
+      "bytes": 59,
+      "gzip_bytes": 76
+    },
+    {
+      "path": "intermediate-navigation/complexity_policy-revision.log.gz",
+      "source": "/mnt/e/private/gitcraft-build/validation-f177144f-91pjrzai/complexity_policy-revision.log",
+      "sha256": "063a0839c2404fb83c50dfae8f32887c68da2eb01f14c6b467dfd1f3355623fb",
+      "gzip_sha256": "c28e864992000547e256db8136d2b761ba63d0d762297136ffd329e74f1e6386",
+      "bytes": 59,
+      "gzip_bytes": 76
+    },
+    {
+      "path": "intermediate-navigation/complexity_policy-working.log.gz",
+      "source": "/mnt/e/private/gitcraft-build/validation-f177144f-91pjrzai/complexity_policy-working.log",
+      "sha256": "063a0839c2404fb83c50dfae8f32887c68da2eb01f14c6b467dfd1f3355623fb",
+      "gzip_sha256": "c28e864992000547e256db8136d2b761ba63d0d762297136ffd329e74f1e6386",
+      "bytes": 59,
+      "gzip_bytes": 76
+    },
+    {
+      "path": "intermediate-navigation/doc-tests.log.gz",
+      "source": "/mnt/e/private/gitcraft-build/validation-f177144f-91pjrzai/doc-tests.log",
+      "sha256": "c93d2af0225aac7bcc806ba1881ab04d3fb9a1a7c313fd073fe5d98185b0762f",
+      "gzip_sha256": "d9c71e7e9de6496aeccd8109f7b3b7cf53c23ec5ab90600f0913c35b75336940",
+      "bytes": 347,
+      "gzip_bytes": 177
+    },
+    {
+      "path": "intermediate-navigation/fmt.log.gz",
+      "source": "/mnt/e/private/gitcraft-build/validation-f177144f-91pjrzai/fmt.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "gzip_sha256": "9ceffb7310338057cfe71a4ae1e2c98d2c485d81cdef906532a801f457a38d64",
+      "bytes": 0,
+      "gzip_bytes": 20
+    },
+    {
+      "path": "intermediate-navigation/frame-accessibility.log.gz",
+      "source": "/mnt/e/private/gitcraft-build/validation-f177144f-91pjrzai/frame-accessibility.log",
+      "sha256": "6ccece46da58405a6525cde7d1bace5f3dbaa59caca5ab8f7979882d2bbbc53a",
+      "gzip_sha256": "80179534b48bdd137acbe274d2d79c703e76b7c287f928a7b335c06bdec07871",
+      "bytes": 196,
+      "gzip_bytes": 160
+    },
+    {
+      "path": "intermediate-navigation/frame-font-readiness.log.gz",
+      "source": "/mnt/e/private/gitcraft-build/validation-f177144f-91pjrzai/frame-font-readiness.log",
+      "sha256": "ce4e902b6cb15e2be914719e0a4e347bdac21f49d5b26138ef4595c8886a882d",
+      "gzip_sha256": "5c9650fe91bb690308aed6e96aef058fdff94c15c6bda224dbc259914988db23",
+      "bytes": 214,
+      "gzip_bytes": 170
+    },
+    {
+      "path": "intermediate-navigation/frame-layout-profile.log.gz",
+      "source": "/mnt/e/private/gitcraft-build/validation-f177144f-91pjrzai/frame-layout-profile.log",
+      "sha256": "32b0c213d01673e4b4324c5e42da097bf05201b54689a98b262a5dbb87897d5c",
+      "gzip_sha256": "b1c89fd11f792d228f2ddf5824fcd90c1e3172d777b8002da5d3c3dd1fe0ac82",
+      "bytes": 222,
+      "gzip_bytes": 176
+    },
+    {
+      "path": "intermediate-navigation/frame-settings-profile.log.gz",
+      "source": "/mnt/e/private/gitcraft-build/validation-f177144f-91pjrzai/frame-settings-profile.log",
+      "sha256": "db8b70f844fab713be1edf23d8742229f3d1a68439eefa0637e1eb2eb9de9bd5",
+      "gzip_sha256": "d32ab88adb724b67ea08acb89c6cb5fcba90c3f6f47c8ff1d58609f541765601",
+      "bytes": 236,
+      "gzip_bytes": 179
+    },
+    {
+      "path": "intermediate-navigation/list-recovery-recording.log.gz",
+      "source": "/mnt/e/private/gitcraft-build/validation-f177144f-91pjrzai/list-recovery-recording.log",
+      "sha256": "7d6afd45fe437b8b01cd11771c2567cb5de44df66bf85bb137d7628904931949",
+      "gzip_sha256": "39111f9ba0a63b50f8dcfb167e131cee7d2867e662465ad753cc96206936ff2b",
+      "bytes": 2850,
+      "gzip_bytes": 911
+    },
+    {
+      "path": "intermediate-navigation/nav-history-links.log.gz",
+      "source": "/mnt/e/private/gitcraft-build/validation-f177144f-91pjrzai/nav-history-links.log",
+      "sha256": "42bb28865ee3be91c96a370ddb2d2ab14610fe004b75b08b62a0c84be32e511e",
+      "gzip_sha256": "7ae92f7f37fc16744cdc7c87e1de0cde91015c1be686ceb26b280a27408340bb",
+      "bytes": 189,
+      "gzip_bytes": 154
+    },
+    {
+      "path": "intermediate-navigation/nav-history-selection.log.gz",
+      "source": "/mnt/e/private/gitcraft-build/validation-f177144f-91pjrzai/nav-history-selection.log",
+      "sha256": "eb393678a8bd32b9cdf347368a56397beaecad9bbdd0626c2adef131fdf71305",
+      "gzip_sha256": "b5cd513578600070082bdade7be2f7e4a50ad575cc948ea046188ac39fc0bdfd",
+      "bytes": 192,
+      "gzip_bytes": 156
+    },
+    {
+      "path": "intermediate-navigation/nav-history-walk.log.gz",
+      "source": "/mnt/e/private/gitcraft-build/validation-f177144f-91pjrzai/nav-history-walk.log",
+      "sha256": "128865cc3f834dad652f60bf7a10b5f5a730a78b4ca92649cbe459ba1866358f",
+      "gzip_sha256": "95d98f5cc1b449f7d60c22cd96d35110f82bf07771570048ce1f0d401c2ab086",
+      "bytes": 190,
+      "gzip_bytes": 157
+    },
+    {
+      "path": "intermediate-navigation/nav-recording-forward-history.log.gz",
+      "source": "/mnt/e/private/gitcraft-build/validation-f177144f-91pjrzai/nav-recording-forward-history.log",
+      "sha256": "9b738e44b6c563fd5649e595d7e0f85317437e6f79cab5b056caeb9056c26ce6",
+      "gzip_sha256": "a6a79486631687dd58bbac2772d9650be1db7260940f1b224559028b21ae8474",
+      "bytes": 243,
+      "gzip_bytes": 185
+    },
+    {
+      "path": "intermediate-navigation/nav-recording-manual-history.log.gz",
+      "source": "/mnt/e/private/gitcraft-build/validation-f177144f-91pjrzai/nav-recording-manual-history.log",
+      "sha256": "856acb94314a29984590845720855ce80146a4e4b2779fe3703fd1dbac09f99d",
+      "gzip_sha256": "3b8148c9f7919081d4b92fa8a3c9e0544f7dbfad1c011499e8ebcfc768b25e26",
+      "bytes": 234,
+      "gzip_bytes": 174
+    },
+    {
+      "path": "intermediate-navigation/nav-recording-user-selection.log.gz",
+      "source": "/mnt/e/private/gitcraft-build/validation-f177144f-91pjrzai/nav-recording-user-selection.log",
+      "sha256": "f909151134cdacca196de6d3c92f1f160c937990c3af2af83d5babeac55daa9d",
+      "gzip_sha256": "e9d3e338864ac6719ee99dde02ae3573c3777d13de1231b27e52cd7905c48ddd",
+      "bytes": 242,
+      "gzip_bytes": 187
+    },
+    {
+      "path": "intermediate-navigation/palette-isolated.log.gz",
+      "source": "/mnt/e/private/gitcraft-build/validation-f177144f-91pjrzai/palette-isolated.log",
+      "sha256": "bbdac7871596875052b7aa51a7d6222a239e82c41c82cf7fd6aeb6339968ac1b",
+      "gzip_sha256": "261bb7fd856b11a237e8fa0b244ef8212614b68bee1f16a595829be2f040bb8c",
+      "bytes": 194,
+      "gzip_bytes": 156
+    },
+    {
+      "path": "intermediate-navigation/recording-outcomes.log.gz",
+      "source": "/mnt/e/private/gitcraft-build/validation-f177144f-91pjrzai/recording-outcomes.log",
+      "sha256": "a7c1f662842969837b8940bdef1b20eb88c0153963a80cbbc3c2d7dcaa8d4d63",
+      "gzip_sha256": "33234afa7704de3baabd977db696e1a81e1e407939b38d61eeb03189b2ea84e9",
+      "bytes": 429,
+      "gzip_bytes": 244
+    },
+    {
+      "path": "intermediate-navigation/recording-pipes.log.gz",
+      "source": "/mnt/e/private/gitcraft-build/validation-f177144f-91pjrzai/recording-pipes.log",
+      "sha256": "04842d5aeb5ab2f03d7ad48deb096c249c035b928136080b41d5f6f5d4e63521",
+      "gzip_sha256": "8be8ba710aee116d50d7e23dfe69462a8cfcd6d42641baeed35c3e927d9f83d2",
+      "bytes": 769,
+      "gzip_bytes": 340
+    },
+    {
+      "path": "intermediate-navigation/recording-resolver.log.gz",
+      "source": "/mnt/e/private/gitcraft-build/validation-f177144f-91pjrzai/recording-resolver.log",
+      "sha256": "4095f3f9604ec18e09fac340e802d2b131a7c8acea3832e782d88e0a3f6d1110",
+      "gzip_sha256": "af1a3525ded38fb2ea3ceb4544bb9522a87ab789c14c546ea158b20e48385682",
+      "bytes": 206,
+      "gzip_bytes": 160
+    },
+    {
+      "path": "intermediate-navigation/recovery-recording.log.gz",
+      "source": "/mnt/e/private/gitcraft-build/validation-f177144f-91pjrzai/recovery-recording.log",
+      "sha256": "60914a1ab89933451b540ca09bedd572933986ebacd3b179aaecf697259a2bb0",
+      "gzip_sha256": "c54a2d347100f63e3bdbc8a6e5e0f63faa68925207c5fa130c0205155f2c68ec",
+      "bytes": 59203,
+      "gzip_bytes": 1600
+    },
+    {
+      "path": "intermediate-navigation/runtime-checkpoint_cli-checkpoint_cli.log.gz",
+      "source": "/mnt/e/private/gitcraft-build/validation-f177144f-91pjrzai/runtime-checkpoint_cli-checkpoint_cli.log",
+      "sha256": "fd10978744853faea42aaa578b18ef913848e3f2c2d0b98ad41ef9f1361dac5a",
+      "gzip_sha256": "28e7a600dede96790be49be9997522a0df3e93209d4a72b823f71b85f599d9df",
+      "bytes": 175,
+      "gzip_bytes": 145
+    },
+    {
+      "path": "intermediate-navigation/runtime-gitcraft-lib.log.gz",
+      "source": "/mnt/e/private/gitcraft-build/validation-f177144f-91pjrzai/runtime-gitcraft-lib.log",
+      "sha256": "2441fe143c57c39392cd8c426cbf5a5c2170200b4eea60db23c4264180a1673c",
+      "gzip_sha256": "7e72bc505b0bc61f643b71501dffcbe4eac53cfb4b48bf43ca3843ad1d8ca34a",
+      "bytes": 477977,
+      "gzip_bytes": 111277
+    },
+    {
+      "path": "intermediate-navigation/runtime-gitcraft-main.log.gz",
+      "source": "/mnt/e/private/gitcraft-build/validation-f177144f-91pjrzai/runtime-gitcraft-main.log",
+      "sha256": "df166913f47ff1f04202cae9b31df67ed272d692d99a0023a8117dc3029100dd",
+      "gzip_sha256": "f0ed99741b9770e8ceb40c2a30b6572ad71b1c7deab058782593701d2fd7c5fe",
+      "bytes": 113,
+      "gzip_bytes": 102
+    },
+    {
+      "path": "intermediate-navigation/runtime-gitcraft_os-lib.log.gz",
+      "source": "/mnt/e/private/gitcraft-build/validation-f177144f-91pjrzai/runtime-gitcraft_os-lib.log",
+      "sha256": "605ec739b60e749a3acf370ffee33956aeb725f7f9ed50a5c2d4308d3aebd29e",
+      "gzip_sha256": "83ea9342e17c7b81825cdcf0d1544a459e01042d7245ccee1a6e5d601f7f8b81",
+      "bytes": 2565,
+      "gzip_bytes": 991
+    },
+    {
+      "path": "intermediate-navigation/runtime-mcp_stdio-mcp_stdio.log.gz",
+      "source": "/mnt/e/private/gitcraft-build/validation-f177144f-91pjrzai/runtime-mcp_stdio-mcp_stdio.log",
+      "sha256": "79d507ce48ad478a02de7acbe8ee10de992d0bb610ee16a086661aed9d370898",
+      "gzip_sha256": "375213ee187bc01dddec3b1628a44dff0fbeaec62b365e2155a401a2c9a4fc52",
+      "bytes": 443,
+      "gzip_bytes": 253
+    },
+    {
+      "path": "intermediate-navigation/runtime-standalone_cli-standalone_cli.log.gz",
+      "source": "/mnt/e/private/gitcraft-build/validation-f177144f-91pjrzai/runtime-standalone_cli-standalone_cli.log",
+      "sha256": "2edf29012b348b7b996d972b08f484b24d72048a2ae14f4d3a02a73dc251714c",
+      "gzip_sha256": "a8803d0099cc7a13386b2e4c3a456c9dd5bb791684ee3eac2c661a82fdbf1bb8",
+      "bytes": 358,
+      "gzip_bytes": 233
+    },
+    {
+      "path": "intermediate-navigation/rust_file_size-index.log.gz",
+      "source": "/mnt/e/private/gitcraft-build/validation-f177144f-91pjrzai/rust_file_size-index.log",
+      "sha256": "3a43b610e4a0dfdbc743f3e1a896ed118ba4700ed5576e1c21faa4132206977a",
+      "gzip_sha256": "54488079bcdf354d682f82caeaa3cb83d33548962a76ffee185b7226ce96b5ca",
+      "bytes": 100855,
+      "gzip_bytes": 7066
+    },
+    {
+      "path": "intermediate-navigation/rust_file_size-revision.log.gz",
+      "source": "/mnt/e/private/gitcraft-build/validation-f177144f-91pjrzai/rust_file_size-revision.log",
+      "sha256": "3a43b610e4a0dfdbc743f3e1a896ed118ba4700ed5576e1c21faa4132206977a",
+      "gzip_sha256": "54488079bcdf354d682f82caeaa3cb83d33548962a76ffee185b7226ce96b5ca",
+      "bytes": 100855,
+      "gzip_bytes": 7066
+    },
+    {
+      "path": "intermediate-navigation/rust_file_size-working.log.gz",
+      "source": "/mnt/e/private/gitcraft-build/validation-f177144f-91pjrzai/rust_file_size-working.log",
+      "sha256": "3a43b610e4a0dfdbc743f3e1a896ed118ba4700ed5576e1c21faa4132206977a",
+      "gzip_sha256": "54488079bcdf354d682f82caeaa3cb83d33548962a76ffee185b7226ce96b5ca",
+      "bytes": 100855,
+      "gzip_bytes": 7066
+    },
+    {
+      "path": "intermediate-navigation/tooling-regressions.log.gz",
+      "source": "/mnt/e/private/gitcraft-build/validation-f177144f-91pjrzai/tooling-regressions.log",
+      "sha256": "13c2d4b8811a714ed8d50f9aea61274ff387a7af8c686c11c7d93f4cd729e297",
+      "gzip_sha256": "3f7da83c11c2c63425538c05ec830f3e2c5cdad0df1408963e14770d6126f49f",
+      "bytes": 37833,
+      "gzip_bytes": 3344
+    },
+    {
+      "path": "intermediate-navigation/windows-cross-clippy-packages.log.gz",
+      "source": "/mnt/e/private/gitcraft-build/validation-f177144f-91pjrzai/windows-cross-clippy-packages.log",
+      "sha256": "4649c8ba47911903d5610f2802dc7a3db4c72b353c1db2b86492b3e9d96cc8ab",
+      "gzip_sha256": "762ae7e3bb5a04ab44d0cb267828db644454dc3e1b59db2c959543a4d53e96f5",
+      "bytes": 512,
+      "gzip_bytes": 240
+    },
+    {
+      "path": "intermediate-navigation/progress.log.gz",
+      "source": "/mnt/e/private/gitcraft-build/final-f177144f-progress.log",
+      "sha256": "eec08058fb6e1269abea3332519ee2d2f01d51b6d84c3a413eaeb9f26de58edc",
+      "gzip_sha256": "9497309c8f61e9549e28d0df30f077f1cdf66f7fc66794f937acc9eb9ee264c8",
+      "bytes": 2991,
+      "gzip_bytes": 537
+    },
+    {
+      "path": "layout-correction/review-palette-item-layout-correction.md.gz",
+      "source": "/mnt/e/private/gitcraft-build/review-palette-item-layout-correction.md",
+      "sha256": "90362747364e12d11493a380aeece7dad623fc759d5e51b9e00d773f9f412a13",
+      "gzip_sha256": "3b483e5b9be7b4e926e890ee21e113349118b28bbc866044fd217ab224750f17",
+      "bytes": 3030,
+      "gzip_bytes": 1499
+    },
+    {
+      "path": "layout-correction/review-palette-412d1118-nav.md.gz",
+      "source": "/mnt/e/private/gitcraft-build/review-palette-412d1118-nav.md",
+      "sha256": "52506241f932ea58ee4116ec6f373d8222d362dcb89c5d5fb376a5774db968b8",
+      "gzip_sha256": "177983c06bfc480bad7838306537d3a2cd6ffc2c7d120edc6ce16bce88365d0d",
+      "bytes": 4394,
+      "gzip_bytes": 2259
+    },
+    {
+      "path": "layout-correction/review-final-source-02a5c7ce.md.gz",
+      "source": "/mnt/e/private/gitcraft-build/review-final-source-02a5c7ce.md",
+      "sha256": "9ec8fc6b344d693f5dabc352636eaa552cec53d0ae81960f4114819765c3ee57",
+      "gzip_sha256": "31ae621a73693db1b57f18887519d129533ef05f7fd65c4360eb99125d7bf8a5",
+      "bytes": 3483,
+      "gzip_bytes": 1696
+    },
+    {
+      "path": "layout-correction/palette-final-candidate-remote.txt.gz",
+      "source": "/mnt/e/private/gitcraft-build/palette-final-candidate-remote.txt",
+      "sha256": "67bbd03c078b64c440fec1e88dd5a087ec5f9e26e86c5f170a37aa997851692c",
+      "gzip_sha256": "b2710c057adbe72cd5ad6e162e6289ed1eb4eecbc182ad2fa9fd766c22bf3f71",
+      "bytes": 82,
+      "gzip_bytes": 95
+    },
+    {
+      "path": "layout-correction/palette-owners-layout-size-working.log.gz",
+      "source": "/mnt/e/private/gitcraft-build/palette-owners-layout-size-working.log",
+      "sha256": "1f213661c78a9ff1619593d8864eeb7f8ac16dcd027831899348f5e4d5313892",
+      "gzip_sha256": "b94199496f37f499f0fddd71691cbad1215e9a7c356b7a352718ed4ed0078545",
+      "bytes": 101473,
+      "gzip_bytes": 7060
+    },
+    {
+      "path": "layout-correction/palette-owners-layout-size-staged.log.gz",
+      "source": "/mnt/e/private/gitcraft-build/palette-owners-layout-size-staged.log",
+      "sha256": "1f213661c78a9ff1619593d8864eeb7f8ac16dcd027831899348f5e4d5313892",
+      "gzip_sha256": "b94199496f37f499f0fddd71691cbad1215e9a7c356b7a352718ed4ed0078545",
+      "bytes": 101473,
+      "gzip_bytes": 7060
+    },
+    {
+      "path": "layout-correction/clippy-item-layout-probe.rs.gz",
+      "source": "/mnt/e/private/gitcraft-build/clippy-item-layout-probe.rs",
+      "sha256": "40a591a0f3f839528281be075831cef44a4b7346b4aff3e37f02d54aa644b293",
+      "gzip_sha256": "a1592d8ed66ba7e38db3d649f1b99ec33ab34939436d85b6d0da1b2068c900df",
+      "bytes": 194,
+      "gzip_bytes": 146
+    },
+    {
+      "path": "layout-correction/clippy-item-layout-probe.log.gz",
+      "source": "/mnt/e/private/gitcraft-build/clippy-item-layout-probe.log",
+      "sha256": "6ecbc0d65fa0366eb7d04aa9ff415363547cde0244094716c3cd6abd2cf7eacb",
+      "gzip_sha256": "ec44f83879227cd57bd350c14b36263513419e018cdca85203c610a8a1410562",
+      "bytes": 615,
+      "gzip_bytes": 356
+    },
+    {
+      "path": "layout-correction/clippy-item-layout-fixed-probe.rs.gz",
+      "source": "/mnt/e/private/gitcraft-build/clippy-item-layout-fixed-probe.rs",
+      "sha256": "ddf50250e69598d74e6dd941d405ab47280b57da4c6dbbc22f61fbe43d93cb40",
+      "gzip_sha256": "f6ff63c0df15a60118e39f2927cf8aac29a8afa5aa05135f0837edf269490dbe",
+      "bytes": 194,
+      "gzip_bytes": 146
+    },
+    {
+      "path": "layout-correction/clippy-item-layout-fixed-probe.log.gz",
+      "source": "/mnt/e/private/gitcraft-build/clippy-item-layout-fixed-probe.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "gzip_sha256": "9ceffb7310338057cfe71a4ae1e2c98d2c485d81cdef906532a801f457a38d64",
+      "bytes": 0,
+      "gzip_bytes": 20
+    },
+    {
+      "path": "layout-correction/clippy-item-layout-fixed-probe-result.txt.gz",
+      "source": "/mnt/e/private/gitcraft-build/clippy-item-layout-fixed-probe-result.txt",
+      "sha256": "96702204ae72240763acdf2f70a191a59dfa017569f5a4d18d01d51a8f43fc9e",
+      "gzip_sha256": "1b5b3714094918033c168144fa4700255876e949f12ae5284a52a3f49be367a6",
+      "bytes": 31,
+      "gzip_bytes": 51
+    },
+    {
+      "path": "layout-correction/preserve-palette-candidate-evidence-v4.py.gz",
+      "source": "/mnt/e/private/gitcraft-build/preserve-palette-candidate-evidence-v4.py",
+      "sha256": "461e8f16d7a7926ac841e067769799d41316e054a13287ee31c06bfc55b501cc",
+      "gzip_sha256": "7d162714ae0741826e29c65cbf6a94bca52425a94d6a46fcf5a888330e2d959d",
+      "bytes": 23295,
+      "gzip_bytes": 8007
+    },
+    {
+      "path": "layout-correction/test_palette_archive_guards_v4.py.gz",
+      "source": "/mnt/e/private/gitcraft-build/test_palette_archive_guards_v4.py",
+      "sha256": "0525f508fe4dc4d7a1c23fea70f74648ef9ceae0e7f14bde52818ed6336dadfa",
+      "gzip_sha256": "3923bc7cb15a064ca532a6931f19f63e6af019f92faec1f1603f40eab0da2afb",
+      "bytes": 19861,
+      "gzip_bytes": 5211
+    },
+    {
+      "path": "layout-correction/palette-archive-guards-v4-results.json.gz",
+      "source": "/mnt/e/private/gitcraft-build/palette-archive-guards-v4-results.json",
+      "sha256": "64ea982252d2e0215e12aebf70c32d7b22e08b0e7ec93df1ca001010c3e58a11",
+      "gzip_sha256": "ac37f9908c220b2ed7ee25a42c73ec02bb9f5084cef9c7cf586c23ea31b3e832",
+      "bytes": 2633,
+      "gzip_bytes": 1103
+    },
+    {
+      "path": "layout-correction/palette-archive-guards-v4-regressions.log.gz",
+      "source": "/mnt/e/private/gitcraft-build/palette-archive-guards-v4-regressions.log",
+      "sha256": "aa70383fbec7198a413bc6788ea07633787be07119f86449618ccaf091a7eb11",
+      "gzip_sha256": "e44b5e66158c3c21fb0c77e29af6f61b2d1713a13e3163feb84a260fe1f47749",
+      "bytes": 1547,
+      "gzip_bytes": 406
+    },
+    {
+      "path": "layout-correction/review-palette-evidence-helper-v4-root.md.gz",
+      "source": "/mnt/e/private/gitcraft-build/review-palette-evidence-helper-v4-root.md",
+      "sha256": "2ab883d342de9ef9bebdc569548d4fc2ddbc02b77f883a8e7ada4720fed2c9c8",
+      "gzip_sha256": "cb11a3d54f91737534f3077f2a822912211bb554cc63d0d487a1101fe85e5bef",
+      "bytes": 2829,
+      "gzip_bytes": 1497
+    },
+    {
+      "path": "layout-correction/review-palette-evidence-helper-v4-adversarial.md.gz",
+      "source": "/mnt/e/private/gitcraft-build/review-palette-evidence-helper-v4-adversarial.md",
+      "sha256": "10b3f36486065a16180443f67b15c5766943ffc70223bf4bbaabfc6149a820ea",
+      "gzip_sha256": "5beb327f465f7d3f54df8e08e4f7c605ccb7a87190e78186ecf2872d4b00270a",
+      "bytes": 5849,
+      "gzip_bytes": 2804
+    },
+    {
+      "path": "layout-correction/prepare-palette-evidence-v5.py.gz",
+      "source": "/mnt/e/private/gitcraft-build/prepare-palette-evidence-v5.py",
+      "sha256": "340fdc378c628270af6086abb5a6ffbd09b0c1109b1912c0e46baf99d01c8387",
+      "gzip_sha256": "9aec71e16f0b82c007951aa8498efc1e731f79adf9914fdba6000d10b8e9b9f1",
+      "bytes": 4278,
+      "gzip_bytes": 1573
+    },
+    {
+      "path": "failed-926/FAILED/results.json.gz",
+      "source": "/mnt/e/private/gitcraft-build/validation-92656fb7-85l0p9nv/results.json",
+      "sha256": "25971817dd914e348848b627d7b31408716ff9e34e704a6ba6819804d7d56786",
+      "gzip_sha256": "692677de7c99ee17ab8429475128c853129fa6affd4abaffb11e39406c3d786a",
+      "bytes": 110470,
+      "gzip_bytes": 7527
+    },
+    {
+      "path": "failed-926/FAILED/rust_file_size-working.log.gz",
+      "source": "/mnt/e/private/gitcraft-build/validation-92656fb7-85l0p9nv/rust_file_size-working.log",
+      "sha256": "ba28ae475e1b836c390066e140835fc8b0c755e087d2f32e486cc243c0173085",
+      "gzip_sha256": "219fb715e572dd4b4cd37bc337b193efe6a6132233cb5ba64fba52c107fd2377",
+      "bytes": 100712,
+      "gzip_bytes": 7059
+    },
+    {
+      "path": "failed-926/FAILED/rust_file_size-index.log.gz",
+      "source": "/mnt/e/private/gitcraft-build/validation-92656fb7-85l0p9nv/rust_file_size-index.log",
+      "sha256": "ba28ae475e1b836c390066e140835fc8b0c755e087d2f32e486cc243c0173085",
+      "gzip_sha256": "219fb715e572dd4b4cd37bc337b193efe6a6132233cb5ba64fba52c107fd2377",
+      "bytes": 100712,
+      "gzip_bytes": 7059
+    },
+    {
+      "path": "failed-926/FAILED/rust_file_size-revision.log.gz",
+      "source": "/mnt/e/private/gitcraft-build/validation-92656fb7-85l0p9nv/rust_file_size-revision.log",
+      "sha256": "ba28ae475e1b836c390066e140835fc8b0c755e087d2f32e486cc243c0173085",
+      "gzip_sha256": "219fb715e572dd4b4cd37bc337b193efe6a6132233cb5ba64fba52c107fd2377",
+      "bytes": 100712,
+      "gzip_bytes": 7059
+    },
+    {
+      "path": "failed-926/FAILED/complexity_policy-working.log.gz",
+      "source": "/mnt/e/private/gitcraft-build/validation-92656fb7-85l0p9nv/complexity_policy-working.log",
+      "sha256": "063a0839c2404fb83c50dfae8f32887c68da2eb01f14c6b467dfd1f3355623fb",
+      "gzip_sha256": "c28e864992000547e256db8136d2b761ba63d0d762297136ffd329e74f1e6386",
+      "bytes": 59,
+      "gzip_bytes": 76
+    },
+    {
+      "path": "failed-926/FAILED/complexity_policy-index.log.gz",
+      "source": "/mnt/e/private/gitcraft-build/validation-92656fb7-85l0p9nv/complexity_policy-index.log",
+      "sha256": "063a0839c2404fb83c50dfae8f32887c68da2eb01f14c6b467dfd1f3355623fb",
+      "gzip_sha256": "c28e864992000547e256db8136d2b761ba63d0d762297136ffd329e74f1e6386",
+      "bytes": 59,
+      "gzip_bytes": 76
+    },
+    {
+      "path": "failed-926/FAILED/complexity_policy-revision.log.gz",
+      "source": "/mnt/e/private/gitcraft-build/validation-92656fb7-85l0p9nv/complexity_policy-revision.log",
+      "sha256": "063a0839c2404fb83c50dfae8f32887c68da2eb01f14c6b467dfd1f3355623fb",
+      "gzip_sha256": "c28e864992000547e256db8136d2b761ba63d0d762297136ffd329e74f1e6386",
+      "bytes": 59,
+      "gzip_bytes": 76
+    },
+    {
+      "path": "failed-926/FAILED/tooling-regressions.log.gz",
+      "source": "/mnt/e/private/gitcraft-build/validation-92656fb7-85l0p9nv/tooling-regressions.log",
+      "sha256": "4a75f1ea172b7e086439679aad13c41443aec27523c0a8aab608da0300eed3a1",
+      "gzip_sha256": "055a0b7be79d2343c43c60415c244aa08eac39e6dffa317e5372c4563baf898d",
+      "bytes": 37959,
+      "gzip_bytes": 3347
+    },
+    {
+      "path": "failed-926/FAILED/fmt.log.gz",
+      "source": "/mnt/e/private/gitcraft-build/validation-92656fb7-85l0p9nv/fmt.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "gzip_sha256": "9ceffb7310338057cfe71a4ae1e2c98d2c485d81cdef906532a801f457a38d64",
+      "bytes": 0,
+      "gzip_bytes": 20
+    },
+    {
+      "path": "failed-926/FAILED/check.log.gz",
+      "source": "/mnt/e/private/gitcraft-build/validation-92656fb7-85l0p9nv/check.log",
+      "sha256": "f89d2e98d417db272dda70a6e0b5abf4886b3cf9fb16fd63ab49170317604dea",
+      "gzip_sha256": "870749204b5d486a90c4d466c6a619902d97fe3fe41e1588173e2a0fb46071c1",
+      "bytes": 73,
+      "gzip_bytes": 92
+    },
+    {
+      "path": "failed-926/FAILED/clippy-packages.log.gz",
+      "source": "/mnt/e/private/gitcraft-build/validation-92656fb7-85l0p9nv/clippy-packages.log",
+      "sha256": "e612ebcbceb078fafe0f4e90a3de83c41b831413722bd7d044590f2572b4c7df",
+      "gzip_sha256": "986f54b4b14f3defcf7a6772a1a657243c18fe7003f6be4198d81d9977db6c56",
+      "bytes": 425,
+      "gzip_bytes": 190
+    },
+    {
+      "path": "failed-926/FAILED/windows-cross-clippy-packages.log.gz",
+      "source": "/mnt/e/private/gitcraft-build/validation-92656fb7-85l0p9nv/windows-cross-clippy-packages.log",
+      "sha256": "4adec042a981b167df16bc8147f1a881ae49f99a26d485b63282b1872b6abf4d",
+      "gzip_sha256": "e835832d3103b4ee38c5c2b422fa0e59af699471fec51689263fa71b5c507bb5",
+      "bytes": 425,
+      "gzip_bytes": 191
+    },
+    {
+      "path": "failed-926/FAILED/build-tests.log.gz",
+      "source": "/mnt/e/private/gitcraft-build/validation-92656fb7-85l0p9nv/build-tests.log",
+      "sha256": "d3276bc979757142c7534ffaf6a7a51550ce35932a7031ba85384960167d95e2",
+      "gzip_sha256": "d7f5747354d9ead1b378f5d859fadb1ca1c63089a7b76030b132f88d54cd4f5a",
+      "bytes": 527182,
+      "gzip_bytes": 37917
+    },
+    {
+      "path": "failed-926/FAILED/frame-font-readiness.log.gz",
+      "source": "/mnt/e/private/gitcraft-build/validation-92656fb7-85l0p9nv/frame-font-readiness.log",
+      "sha256": "7b661cc5f2ed7222ffbf533517a40ba61d940d0386c78702656e33a24f5de9ab",
+      "gzip_sha256": "094abd93e9d6e5ed12a6c1cc8827be91e9dd576813221c24ec7ec59bb0ab1050",
+      "bytes": 214,
+      "gzip_bytes": 169
+    },
+    {
+      "path": "failed-926/FAILED/frame-accessibility.log.gz",
+      "source": "/mnt/e/private/gitcraft-build/validation-92656fb7-85l0p9nv/frame-accessibility.log",
+      "sha256": "46222e946f68285a2352d4a84e53add129e4ce42801c5d94ebe6395ba9abf14a",
+      "gzip_sha256": "977e5969b4bdba765f46af4c96393ea3b93d2a36a1489da4bf4f3b1b5781276d",
+      "bytes": 196,
+      "gzip_bytes": 159
+    },
+    {
+      "path": "failed-926/FAILED/frame-layout-profile.log.gz",
+      "source": "/mnt/e/private/gitcraft-build/validation-92656fb7-85l0p9nv/frame-layout-profile.log",
+      "sha256": "265427287c9155636557124fed6e1ef57909c19a4d7536e348bca13e32e9c0d0",
+      "gzip_sha256": "f5d9ad2a46ade56717b3c5633947aa3ca99b1c4aa9085850ebb2c39ef0a95988",
+      "bytes": 222,
+      "gzip_bytes": 176
+    },
+    {
+      "path": "failed-926/FAILED/frame-settings-profile.log.gz",
+      "source": "/mnt/e/private/gitcraft-build/validation-92656fb7-85l0p9nv/frame-settings-profile.log",
+      "sha256": "5bb192b890e759576270024de96b5f5aa0589305123ac6b838aa6f01516726f3",
+      "gzip_sha256": "5e5d7515a4083bcfe0d0d06694f67f2527fc6b19a8ed43329b252c6f3b7c9d63",
+      "bytes": 236,
+      "gzip_bytes": 179
+    },
+    {
+      "path": "failed-926/FAILED/recording-pipes.log.gz",
+      "source": "/mnt/e/private/gitcraft-build/validation-92656fb7-85l0p9nv/recording-pipes.log",
+      "sha256": "3e79a519c59bd1d5193a123e9c87687cbac2d9033215a318e058f6ddd3fa7961",
+      "gzip_sha256": "7763d867956803c087bb7c053f23b37ce829542cc177a4e1140bd4a13fcc9764",
+      "bytes": 769,
+      "gzip_bytes": 340
+    },
+    {
+      "path": "failed-926/FAILED/recording-outcomes.log.gz",
+      "source": "/mnt/e/private/gitcraft-build/validation-92656fb7-85l0p9nv/recording-outcomes.log",
+      "sha256": "18f0ebde37702656233f47f55b69b481703b70fca459a977273f44f941333f18",
+      "gzip_sha256": "8ecd0e9d9a7c980a62c3ca0134b67fc0975d1b125c13c5038ae1b1e8706a93c2",
+      "bytes": 429,
+      "gzip_bytes": 244
+    },
+    {
+      "path": "failed-926/FAILED/recording-resolver.log.gz",
+      "source": "/mnt/e/private/gitcraft-build/validation-92656fb7-85l0p9nv/recording-resolver.log",
+      "sha256": "9431b9a783ca252d05a73effc6f7f237e556a2c84ca9f153329fdb1d7d01fe5f",
+      "gzip_sha256": "d1598f74f215707dbca3fd2ee3dd3760640ef4fb510ed90644c90124468cc9dc",
+      "bytes": 206,
+      "gzip_bytes": 160
+    },
+    {
+      "path": "failed-926/FAILED/nav-recording-manual-history.log.gz",
+      "source": "/mnt/e/private/gitcraft-build/validation-92656fb7-85l0p9nv/nav-recording-manual-history.log",
+      "sha256": "e899606e9d878dcc191b655465b3d699114527f48cae9ec73b0ba907d4482009",
+      "gzip_sha256": "31eda22c39175440b2da40985e5ae1c2ca9d99c97aec909d4253b8049bfca94d",
+      "bytes": 234,
+      "gzip_bytes": 175
+    },
+    {
+      "path": "failed-926/FAILED/nav-recording-user-selection.log.gz",
+      "source": "/mnt/e/private/gitcraft-build/validation-92656fb7-85l0p9nv/nav-recording-user-selection.log",
+      "sha256": "f5256e444284b1c41bbc5a9788bcacd99f3fb23d6d726cdb2e1587e05db1ae1f",
+      "gzip_sha256": "931f22a0732a4be27c3aa3bc4150596a6a0078eba7b2cf677c0663bf0e7f5607",
+      "bytes": 242,
+      "gzip_bytes": 187
+    },
+    {
+      "path": "failed-926/FAILED/nav-recording-forward-history.log.gz",
+      "source": "/mnt/e/private/gitcraft-build/validation-92656fb7-85l0p9nv/nav-recording-forward-history.log",
+      "sha256": "8000f87f6438304ff35dc31f9c4a7282f69c134880439906d913142a89983da3",
+      "gzip_sha256": "69976ef515d8f7e81d5d2f7ce63b9aecd049337ddfb1ac57b6d82901903a17d0",
+      "bytes": 243,
+      "gzip_bytes": 185
+    },
+    {
+      "path": "failed-926/FAILED/nav-history-walk.log.gz",
+      "source": "/mnt/e/private/gitcraft-build/validation-92656fb7-85l0p9nv/nav-history-walk.log",
+      "sha256": "981de1f1f582f880189fb188cbc9c68d807bcd1f8c60192e53cd5224945006d0",
+      "gzip_sha256": "21e11baa892e2df86fb8fce92d31cba260c85afdd65076769ad536394d7be917",
+      "bytes": 190,
+      "gzip_bytes": 156
+    },
+    {
+      "path": "failed-926/FAILED/nav-history-selection.log.gz",
+      "source": "/mnt/e/private/gitcraft-build/validation-92656fb7-85l0p9nv/nav-history-selection.log",
+      "sha256": "488c61990d14e1c5b576fda547517d04445fd07d22e8931c32e9c2ff620e60de",
+      "gzip_sha256": "3287fc5ffad5aab5554fabaa3c3cea4e9601244033d04c552856c40fce6c7b13",
+      "bytes": 192,
+      "gzip_bytes": 156
+    },
+    {
+      "path": "failed-926/FAILED/nav-history-links.log.gz",
+      "source": "/mnt/e/private/gitcraft-build/validation-92656fb7-85l0p9nv/nav-history-links.log",
+      "sha256": "1c10d95b53b190e5277b5d903d78c3db812aad661d90a43933562b90f677b648",
+      "gzip_sha256": "39c116e047734832b3720ceee51d827c04ffb119a91a3e828d711221eef69e2e",
+      "bytes": 189,
+      "gzip_bytes": 154
+    },
+    {
+      "path": "failed-926/FAILED/build-recovery-recording.log.gz",
+      "source": "/mnt/e/private/gitcraft-build/validation-92656fb7-85l0p9nv/build-recovery-recording.log",
+      "sha256": "3474d8b9fbfb5a044ba961ab32215f02ae4627e9eda4c5088e241bd31a0ce4be",
+      "gzip_sha256": "136ff82e1970e99c03c4f1cee005473e3c17021987cac58ffbc87620fe39fdc3",
+      "bytes": 26730,
+      "gzip_bytes": 2433
+    },
+    {
+      "path": "failed-926/FAILED/list-recovery-recording.log.gz",
+      "source": "/mnt/e/private/gitcraft-build/validation-92656fb7-85l0p9nv/list-recovery-recording.log",
+      "sha256": "7d6afd45fe437b8b01cd11771c2567cb5de44df66bf85bb137d7628904931949",
+      "gzip_sha256": "39111f9ba0a63b50f8dcfb167e131cee7d2867e662465ad753cc96206936ff2b",
+      "bytes": 2850,
+      "gzip_bytes": 911
+    },
+    {
+      "path": "failed-926/FAILED/recovery-recording.log.gz",
+      "source": "/mnt/e/private/gitcraft-build/validation-92656fb7-85l0p9nv/recovery-recording.log",
+      "sha256": "a3698ba2879808cafd02f25be41e92dc91e83da1c05e38d403d0b1cbc5a1baa1",
+      "gzip_sha256": "b4fd8219fe663ffb594d4f43036ac9e000ffeb4620d8b7fcf2591c2c0b5032f2",
+      "bytes": 59203,
+      "gzip_bytes": 1600
+    },
+    {
+      "path": "failed-926/FAILED/runtime-gitcraft_os-lib.log.gz",
+      "source": "/mnt/e/private/gitcraft-build/validation-92656fb7-85l0p9nv/runtime-gitcraft_os-lib.log",
+      "sha256": "8e61c844e29730998d5bdf8d8a959225fc3286580bbfa47fedff8eb8c011a18c",
+      "gzip_sha256": "7e0425d7d99dd375c65934aa1780da261f8816d1c9beb6a81f37aeeda6180198",
+      "bytes": 2565,
+      "gzip_bytes": 982
+    },
+    {
+      "path": "failed-926/FAILED/runtime-gitcraft-main.log.gz",
+      "source": "/mnt/e/private/gitcraft-build/validation-92656fb7-85l0p9nv/runtime-gitcraft-main.log",
+      "sha256": "9190e73c20d848ea75e951c055cd73213b98cdb10458e1f8a9db997d8fc602fc",
+      "gzip_sha256": "fc3072010ef09664f95b3b2f0a0dadee7361bd082ebe2f942d0bcc4a141692aa",
+      "bytes": 113,
+      "gzip_bytes": 102
+    },
+    {
+      "path": "failed-926/FAILED/runtime-standalone_cli-standalone_cli.log.gz",
+      "source": "/mnt/e/private/gitcraft-build/validation-92656fb7-85l0p9nv/runtime-standalone_cli-standalone_cli.log",
+      "sha256": "ff963ef34c98d6db1f146e1cf7190683e3beb560844483c72d706081e4de10d1",
+      "gzip_sha256": "a0536b2ce3f529c08f86ed73df2fd5c8512e3e15dc849f4220963ca4d6cb49dd",
+      "bytes": 358,
+      "gzip_bytes": 232
+    },
+    {
+      "path": "failed-926/FAILED/runtime-mcp_stdio-mcp_stdio.log.gz",
+      "source": "/mnt/e/private/gitcraft-build/validation-92656fb7-85l0p9nv/runtime-mcp_stdio-mcp_stdio.log",
+      "sha256": "5923198453bee89a8cdff7ad49e1c832ebfae2c68514a709058dcaa83f25618b",
+      "gzip_sha256": "dfd471201bc76e5cbfc71f4ff2ecb556cbed99bfcc14602366da79f3959059c6",
+      "bytes": 443,
+      "gzip_bytes": 253
+    },
+    {
+      "path": "failed-926/FAILED/runtime-gitcraft-lib.log.gz",
+      "source": "/mnt/e/private/gitcraft-build/validation-92656fb7-85l0p9nv/runtime-gitcraft-lib.log",
+      "sha256": "8de107f989a8e93a5998991e907588d55869974948daa4dcdbc55909e98c8e51",
+      "gzip_sha256": "2c057d246f9a1f5e30b090341d3bc12e2e9526c87320785c416df5a672d77f34",
+      "bytes": 479653,
+      "gzip_bytes": 111828
+    },
+    {
+      "path": "driver-recovery/INCOMPLETE/results.json.gz",
+      "source": "/mnt/e/private/gitcraft-build/validation-92656fb7-y7ydkc5v/results.json",
+      "sha256": "b50dfde33be67a1a76ccf496a1cab11fe66077b1e8eb4d674fbfbe6984ee2130",
+      "gzip_sha256": "67de21d6f318c12b1703974f4c1c5466ee76564a63e7a7459f755d0e59cc1637",
+      "bytes": 48766,
+      "gzip_bytes": 3965
+    },
+    {
+      "path": "driver-recovery/INCOMPLETE/rust_file_size-working.log.gz",
+      "source": "/mnt/e/private/gitcraft-build/validation-92656fb7-y7ydkc5v/rust_file_size-working.log",
+      "sha256": "ba28ae475e1b836c390066e140835fc8b0c755e087d2f32e486cc243c0173085",
+      "gzip_sha256": "219fb715e572dd4b4cd37bc337b193efe6a6132233cb5ba64fba52c107fd2377",
+      "bytes": 100712,
+      "gzip_bytes": 7059
+    },
+    {
+      "path": "driver-recovery/INCOMPLETE/rust_file_size-index.log.gz",
+      "source": "/mnt/e/private/gitcraft-build/validation-92656fb7-y7ydkc5v/rust_file_size-index.log",
+      "sha256": "ba28ae475e1b836c390066e140835fc8b0c755e087d2f32e486cc243c0173085",
+      "gzip_sha256": "219fb715e572dd4b4cd37bc337b193efe6a6132233cb5ba64fba52c107fd2377",
+      "bytes": 100712,
+      "gzip_bytes": 7059
+    },
+    {
+      "path": "driver-recovery/INCOMPLETE/rust_file_size-revision.log.gz",
+      "source": "/mnt/e/private/gitcraft-build/validation-92656fb7-y7ydkc5v/rust_file_size-revision.log",
+      "sha256": "ba28ae475e1b836c390066e140835fc8b0c755e087d2f32e486cc243c0173085",
+      "gzip_sha256": "219fb715e572dd4b4cd37bc337b193efe6a6132233cb5ba64fba52c107fd2377",
+      "bytes": 100712,
+      "gzip_bytes": 7059
+    },
+    {
+      "path": "driver-recovery/INCOMPLETE/complexity_policy-working.log.gz",
+      "source": "/mnt/e/private/gitcraft-build/validation-92656fb7-y7ydkc5v/complexity_policy-working.log",
+      "sha256": "063a0839c2404fb83c50dfae8f32887c68da2eb01f14c6b467dfd1f3355623fb",
+      "gzip_sha256": "c28e864992000547e256db8136d2b761ba63d0d762297136ffd329e74f1e6386",
+      "bytes": 59,
+      "gzip_bytes": 76
+    },
+    {
+      "path": "driver-recovery/INCOMPLETE/complexity_policy-index.log.gz",
+      "source": "/mnt/e/private/gitcraft-build/validation-92656fb7-y7ydkc5v/complexity_policy-index.log",
+      "sha256": "063a0839c2404fb83c50dfae8f32887c68da2eb01f14c6b467dfd1f3355623fb",
+      "gzip_sha256": "c28e864992000547e256db8136d2b761ba63d0d762297136ffd329e74f1e6386",
+      "bytes": 59,
+      "gzip_bytes": 76
+    },
+    {
+      "path": "driver-recovery/INCOMPLETE/complexity_policy-revision.log.gz",
+      "source": "/mnt/e/private/gitcraft-build/validation-92656fb7-y7ydkc5v/complexity_policy-revision.log",
+      "sha256": "063a0839c2404fb83c50dfae8f32887c68da2eb01f14c6b467dfd1f3355623fb",
+      "gzip_sha256": "c28e864992000547e256db8136d2b761ba63d0d762297136ffd329e74f1e6386",
+      "bytes": 59,
+      "gzip_bytes": 76
+    },
+    {
+      "path": "driver-recovery/INCOMPLETE/tooling-regressions.log.gz",
+      "source": "/mnt/e/private/gitcraft-build/validation-92656fb7-y7ydkc5v/tooling-regressions.log",
+      "sha256": "bc72d977a1ed18796659bfe6e561f1687341fe1fff865f6196b0ae53a850e345",
+      "gzip_sha256": "22b27d858cb22e52f9b1274e410e2e9b9352fe38b538b31eb55ae8dd859111db",
+      "bytes": 37959,
+      "gzip_bytes": 3346
+    },
+    {
+      "path": "driver-recovery/INCOMPLETE/fmt.log.gz",
+      "source": "/mnt/e/private/gitcraft-build/validation-92656fb7-y7ydkc5v/fmt.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "gzip_sha256": "9ceffb7310338057cfe71a4ae1e2c98d2c485d81cdef906532a801f457a38d64",
+      "bytes": 0,
+      "gzip_bytes": 20
+    },
+    {
+      "path": "driver-recovery/INCOMPLETE/check.log.gz",
+      "source": "/mnt/e/private/gitcraft-build/validation-92656fb7-y7ydkc5v/check.log",
+      "sha256": "616fb41c8a66f392114224653c4df18190c239ea17975f74c905c244cf00f81b",
+      "gzip_sha256": "479f1892668c815d4b061491d2dea95d204e634446758d883453d511467ab4d1",
+      "bytes": 160,
+      "gzip_bytes": 151
+    },
+    {
+      "path": "driver-recovery/INCOMPLETE/clippy-packages.log.gz",
+      "source": "/mnt/e/private/gitcraft-build/validation-92656fb7-y7ydkc5v/clippy-packages.log",
+      "sha256": "f641ba3444cdea382b95155d1eb3219e61fce17465cc6a9d93c0cfa8a6569e41",
+      "gzip_sha256": "c39abecb19c267ef83005b5199efc1ac1ebef5403a58f5e966c163e57ac0bba6",
+      "bytes": 512,
+      "gzip_bytes": 243
+    },
+    {
+      "path": "driver-recovery/INCOMPLETE/windows-cross-clippy-packages.log.gz",
+      "source": "/mnt/e/private/gitcraft-build/validation-92656fb7-y7ydkc5v/windows-cross-clippy-packages.log",
+      "sha256": "5fd5b2acbb1f5cf7a8dde4e13747bd7e7e4e00460c0f7d9492cb329eac7fb755",
+      "gzip_sha256": "4225439dac4814543f9bc38f6baf7ff7f90c00d71d1639c0de618ab3c50d9a55",
+      "bytes": 512,
+      "gzip_bytes": 246
+    },
+    {
+      "path": "driver-recovery/INCOMPLETE/build-tests.log.gz",
+      "source": "/mnt/e/private/gitcraft-build/validation-92656fb7-y7ydkc5v/build-tests.log",
+      "sha256": "57052087d0a020c282cea393fac8e7f5d85a26069539870078d09304fd17b5cf",
+      "gzip_sha256": "d2c0352d0bb8c1c04dc5b56fd2ecf419cacc0d950f40e91582d72b4e17e8165b",
+      "bytes": 527280,
+      "gzip_bytes": 37878
+    },
+    {
+      "path": "driver-recovery/INCOMPLETE/frame-font-readiness.log.gz",
+      "source": "/mnt/e/private/gitcraft-build/validation-92656fb7-y7ydkc5v/frame-font-readiness.log",
+      "sha256": "aca29873bed24c4886ebf01fee561e9847488f06839e4784328b29b93f2932fc",
+      "gzip_sha256": "e1a70f4f442ea7fdd3e31cd30e5bba4520ef5f7d240f8ad73972727a0fdcf99c",
+      "bytes": 215,
+      "gzip_bytes": 172
+    },
+    {
+      "path": "driver-recovery/INCOMPLETE/frame-accessibility.log.gz",
+      "source": "/mnt/e/private/gitcraft-build/validation-92656fb7-y7ydkc5v/frame-accessibility.log",
+      "sha256": "1ff5f8d5dd828b13fa356f15cfae72e2f65f84aebc5085a348aa7b26dd5e667b",
+      "gzip_sha256": "8d9865aae3a503d10fe068242bc60e77c8d49166ac24b3feb4239026693fee79",
+      "bytes": 197,
+      "gzip_bytes": 161
+    },
+    {
+      "path": "driver-recovery/INCOMPLETE/frame-layout-profile.log.gz",
+      "source": "/mnt/e/private/gitcraft-build/validation-92656fb7-y7ydkc5v/frame-layout-profile.log",
+      "sha256": "264cdd0897b6796a952be5772f9dd298bc2d5f7fa04bff8398af75718b04c704",
+      "gzip_sha256": "5432a73f62629506bcabda2d965d7220088104663535b8167037ded2dd03673a",
+      "bytes": 222,
+      "gzip_bytes": 176
+    },
+    {
+      "path": "driver-recovery/INCOMPLETE/frame-settings-profile.log.gz",
+      "source": "/mnt/e/private/gitcraft-build/validation-92656fb7-y7ydkc5v/frame-settings-profile.log",
+      "sha256": "88f25600e32f8e4709c17eac5afd00db2245a9d18a8318936edadb1cb2e694af",
+      "gzip_sha256": "bb12d1e3cb402af569e8ca0312a0264e2c546a18b628c7c483013a30f2fa8e77",
+      "bytes": 236,
+      "gzip_bytes": 179
+    },
+    {
+      "path": "failed-580/FAILED/results.json.gz",
+      "source": "/mnt/e/private/gitcraft-build/validation-580542bf-eqpc2kb4/results.json",
+      "sha256": "08e0fdc0fd69da6a18bfc2eed44a540fb5afbfa6d0addd80e2343d95ac101bd8",
+      "gzip_sha256": "5912724e855b9e8c9a600f709053799ebd172354980bf088c2b50452f657a866",
+      "bytes": 27778,
+      "gzip_bytes": 2362
+    },
+    {
+      "path": "failed-580/FAILED/rust_file_size-working.log.gz",
+      "source": "/mnt/e/private/gitcraft-build/validation-580542bf-eqpc2kb4/rust_file_size-working.log",
+      "sha256": "3a4a1a126361bd9171ea99b1511c5fe6dc0d6f2fa63c679ab28ecb3bc64e6662",
+      "gzip_sha256": "27f6f9e6e7ad8469be63fc108b75e42cbd5be78d538e3a6ad6f221aa8d048718",
+      "bytes": 100557,
+      "gzip_bytes": 7050
+    },
+    {
+      "path": "failed-580/FAILED/rust_file_size-index.log.gz",
+      "source": "/mnt/e/private/gitcraft-build/validation-580542bf-eqpc2kb4/rust_file_size-index.log",
+      "sha256": "3a4a1a126361bd9171ea99b1511c5fe6dc0d6f2fa63c679ab28ecb3bc64e6662",
+      "gzip_sha256": "27f6f9e6e7ad8469be63fc108b75e42cbd5be78d538e3a6ad6f221aa8d048718",
+      "bytes": 100557,
+      "gzip_bytes": 7050
+    },
+    {
+      "path": "failed-580/FAILED/rust_file_size-revision.log.gz",
+      "source": "/mnt/e/private/gitcraft-build/validation-580542bf-eqpc2kb4/rust_file_size-revision.log",
+      "sha256": "3a4a1a126361bd9171ea99b1511c5fe6dc0d6f2fa63c679ab28ecb3bc64e6662",
+      "gzip_sha256": "27f6f9e6e7ad8469be63fc108b75e42cbd5be78d538e3a6ad6f221aa8d048718",
+      "bytes": 100557,
+      "gzip_bytes": 7050
+    },
+    {
+      "path": "failed-580/FAILED/complexity_policy-working.log.gz",
+      "source": "/mnt/e/private/gitcraft-build/validation-580542bf-eqpc2kb4/complexity_policy-working.log",
+      "sha256": "063a0839c2404fb83c50dfae8f32887c68da2eb01f14c6b467dfd1f3355623fb",
+      "gzip_sha256": "c28e864992000547e256db8136d2b761ba63d0d762297136ffd329e74f1e6386",
+      "bytes": 59,
+      "gzip_bytes": 76
+    },
+    {
+      "path": "failed-580/FAILED/complexity_policy-index.log.gz",
+      "source": "/mnt/e/private/gitcraft-build/validation-580542bf-eqpc2kb4/complexity_policy-index.log",
+      "sha256": "063a0839c2404fb83c50dfae8f32887c68da2eb01f14c6b467dfd1f3355623fb",
+      "gzip_sha256": "c28e864992000547e256db8136d2b761ba63d0d762297136ffd329e74f1e6386",
+      "bytes": 59,
+      "gzip_bytes": 76
+    },
+    {
+      "path": "failed-580/FAILED/complexity_policy-revision.log.gz",
+      "source": "/mnt/e/private/gitcraft-build/validation-580542bf-eqpc2kb4/complexity_policy-revision.log",
+      "sha256": "063a0839c2404fb83c50dfae8f32887c68da2eb01f14c6b467dfd1f3355623fb",
+      "gzip_sha256": "c28e864992000547e256db8136d2b761ba63d0d762297136ffd329e74f1e6386",
+      "bytes": 59,
+      "gzip_bytes": 76
+    },
+    {
+      "path": "failed-580/FAILED/tooling-regressions.log.gz",
+      "source": "/mnt/e/private/gitcraft-build/validation-580542bf-eqpc2kb4/tooling-regressions.log",
+      "sha256": "74afd6dabb1acf6f077158cbc9a12c4b0f4a1c36aede59f19e8bb3c3ab674f64",
+      "gzip_sha256": "8ddc6e3ec54a44f80d06da38a9950e65697e35f098ac1b1c07604a61d932c42f",
+      "bytes": 37959,
+      "gzip_bytes": 3346
+    },
+    {
+      "path": "failed-580/FAILED/fmt.log.gz",
+      "source": "/mnt/e/private/gitcraft-build/validation-580542bf-eqpc2kb4/fmt.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "gzip_sha256": "9ceffb7310338057cfe71a4ae1e2c98d2c485d81cdef906532a801f457a38d64",
+      "bytes": 0,
+      "gzip_bytes": 20
+    },
+    {
+      "path": "failed-580/FAILED/check.log.gz",
+      "source": "/mnt/e/private/gitcraft-build/validation-580542bf-eqpc2kb4/check.log",
+      "sha256": "a6a2af71d8af0eb91aae6ae5195f57af03ad595a5d3b245bd818245431cc4ae1",
+      "gzip_sha256": "2feec9c77510abab1713aa7d30a65cc528caeb3e8e319b3d1e613256a91086a4",
+      "bytes": 160,
+      "gzip_bytes": 151
+    },
+    {
+      "path": "failed-580/FAILED/clippy-packages.log.gz",
+      "source": "/mnt/e/private/gitcraft-build/validation-580542bf-eqpc2kb4/clippy-packages.log",
+      "sha256": "ffd53319b474858317452d8d32eaeca982ebf516ad8a1867e6f730c25c222606",
+      "gzip_sha256": "524b794a452a392d403720744b1df3faeea9583576adf03eb78441ae451a6112",
+      "bytes": 1000,
+      "gzip_bytes": 572
+    },
+    {
+      "path": "failed-580/final-580542bf-progress.log.gz",
+      "source": "/mnt/e/private/gitcraft-build/final-580542bf-progress.log",
+      "sha256": "2539d87fc749ddc6ad97afb856f66dbc79648e2311593b6a0ae7bb3346375a6d",
+      "gzip_sha256": "3624066f3931596ed3cca105580a887cd9b72b7ab6c0a82553b9aaa31963655a",
+      "bytes": 308,
+      "gzip_bytes": 186
+    },
+    {
+      "path": "failed-580/watch-owned-580-worker-v3.log.gz",
+      "source": "/mnt/e/private/gitcraft-build/watch-owned-580-worker-v3.log",
+      "sha256": "9c16823f7f61fe8fda9fd0a449162465238b59abf5f67d29b3eb229d0e15a8d3",
+      "gzip_sha256": "f64f57524793412b854f98dd75d2ba93090ab5c7d286051cdbe27e7c8d43b033",
+      "bytes": 1073,
+      "gzip_bytes": 311
+    },
+    {
+      "path": "driver-recovery/launch-final-926-linux.sh.gz",
+      "source": "/mnt/e/private/gitcraft-build/launch-final-926-linux.sh",
+      "sha256": "6bd496a4416ce43359dcbd0fb53c4370a6159007020148159207c93734ac737f",
+      "gzip_sha256": "dc54c9ac757a8cc16998e378b872ddbeb27fd0f2a37a922f023945174287856b",
+      "bytes": 340,
+      "gzip_bytes": 220
+    },
+    {
+      "path": "driver-recovery/final-926-worker.pid.gz",
+      "source": "/mnt/e/private/gitcraft-build/final-926-worker.pid",
+      "sha256": "9b0ccc8d14755d9ab91ed53ce74aaf22580efccffbe4bcc1670ce78e907d7925",
+      "gzip_sha256": "fe8f3f85b082e7d9128689cdf222d39f3925337a034fbffdac46ef385a2ffea2",
+      "bytes": 8,
+      "gzip_bytes": 28
+    },
+    {
+      "path": "driver-recovery/final-92656fb7-wrapper-lost-progress.log.gz",
+      "source": "/mnt/e/private/gitcraft-build/final-92656fb7-wrapper-lost-progress.log",
+      "sha256": "92c473cef525a439aef55266c59a238bcbbb713308543f386b008ed8ac1ea38c",
+      "gzip_sha256": "a038cc62ea424f9cd6cd53b3e25d0629657d4df091258f4e500adbe19a0de8a9",
+      "bytes": 365,
+      "gzip_bytes": 195
+    },
+    {
+      "path": "driver-recovery/final-92656fb7-linux-progress.log.gz",
+      "source": "/mnt/e/private/gitcraft-build/final-92656fb7-linux-progress.log",
+      "sha256": "81a673898c4ab9528c40f2fb572d59b231271e68e5cf62b855ecd691d3909d6f",
+      "gzip_sha256": "2d84eac9066791c58e5b1957355e906e8dbb9830ded7b054d6eb4a4758cb996e",
+      "bytes": 2251,
+      "gzip_bytes": 476
+    },
+    {
+      "path": "driver-recovery/describe-owned-926-identity.py.gz",
+      "source": "/mnt/e/private/gitcraft-build/describe-owned-926-identity.py",
+      "sha256": "e77a71e02717ed636a659672fefbb13c95e45efd39c15e2acdd76f7b11af6f60",
+      "gzip_sha256": "1e1544fb1e97b5b6e95aab42cc3a12b5a1500abe52c1375b39cfdddc4088c892",
+      "bytes": 798,
+      "gzip_bytes": 465
+    },
+    {
+      "path": "driver-recovery/owned-926-identity.json.gz",
+      "source": "/mnt/e/private/gitcraft-build/owned-926-identity.json",
+      "sha256": "37517e5f3dc66819f61f5a7bb8ace1921282415f10551d2defa5c3eb0985b570",
+      "gzip_sha256": "abc129be8d26e8d4afe9ce45f9d5a73c8ed9aa62810ca24ee789fe4581dc4a80",
+      "bytes": 3,
+      "gzip_bytes": 23
+    },
+    {
+      "path": "driver-recovery/watch-owned-926-worker.py.gz",
+      "source": "/mnt/e/private/gitcraft-build/watch-owned-926-worker.py",
+      "sha256": "48e84b4271492a6d050280e9d7248933ecdefae9963a11eac69a3e10fe9169de",
+      "gzip_sha256": "60b683ee0709ec852dd923480b6f96c69c0071f72e6ad5e524d5514873a92187",
+      "bytes": 11077,
+      "gzip_bytes": 3579
+    },
+    {
+      "path": "driver-recovery/watch-owned-926-worker.log.gz",
+      "source": "/mnt/e/private/gitcraft-build/watch-owned-926-worker.log",
+      "sha256": "677b69ea88d4ab9347423baaacda5d994ffc51f294a687de77a91c5e944be49f",
+      "gzip_sha256": "548be170486d3dbbb9a235b54cede45e96fded7a260155f1c208097a11d779dc",
+      "bytes": 641,
+      "gzip_bytes": 310
+    },
+    {
+      "path": "driver-recovery/watch-owned-926-selftests.json.gz",
+      "source": "/mnt/e/private/gitcraft-build/watch-owned-926-selftests.json",
+      "sha256": "e309059e813255bb4f32c332faa50c8f5610ce12bbff7420d217e0e1bc791532",
+      "gzip_sha256": "1b5168d5a9d3987889d99bf9861a262ca6ac3fa3a6146568304ec13da0986092",
+      "bytes": 386,
+      "gzip_bytes": 279
+    },
+    {
+      "path": "driver-recovery/watch-owned-926-selftests.log.gz",
+      "source": "/mnt/e/private/gitcraft-build/watch-owned-926-selftests.log",
+      "sha256": "e9a7107a2f5ff726d7cde2e3ccf298c7d7e6c3017656679d2ec101aaedd25178",
+      "gzip_sha256": "b5fba4daf4734db00225be93a384878437eebf5d92043c53114876f32e91c775",
+      "bytes": 876,
+      "gzip_bytes": 269
+    },
+    {
+      "path": "driver-recovery/watch-owned-926-owner-note.md.gz",
+      "source": "/mnt/e/private/gitcraft-build/watch-owned-926-owner-note.md",
+      "sha256": "3d01a8cbbe3889457df786eb4a8f171a8b821e095cb281cf39d0ff3f995ae114",
+      "gzip_sha256": "a0fdfe8188bc12e3513cc81cea6883fdc09a65a6d53414578f90491ea1819061",
+      "bytes": 4360,
+      "gzip_bytes": 2094
+    },
+    {
+      "path": "driver-recovery/review-watch-owned-926-root.md.gz",
+      "source": "/mnt/e/private/gitcraft-build/review-watch-owned-926-root.md",
+      "sha256": "85165706f0705ee52a23682e6a2594042d423d2ceb911901eaf945e548831c84",
+      "gzip_sha256": "9133fa42bec784e09a00a6346e26f672993ffbb4d243d50b85770a408e684467",
+      "bytes": 1859,
+      "gzip_bytes": 997
+    },
+    {
+      "path": "driver-recovery/watch-owned-926-worker-v2.py.gz",
+      "source": "/mnt/e/private/gitcraft-build/watch-owned-926-worker-v2.py",
+      "sha256": "ed8243da6ef61b6091cbe2b4169edd9715c7201503d26a139dd33f8b088a2ce7",
+      "gzip_sha256": "86782943c387865347089ccbf8babea7fb8347b2b9d081f3891c3adba737b8bd",
+      "bytes": 13396,
+      "gzip_bytes": 4070
+    },
+    {
+      "path": "driver-recovery/watch-owned-926-worker-v2.log.gz",
+      "source": "/mnt/e/private/gitcraft-build/watch-owned-926-worker-v2.log",
+      "sha256": "04fba667638e12629e341dd3a8a471d17e046384c97df57a4481fde72fc445cc",
+      "gzip_sha256": "9ef8507cfab1a4211d710f9b3afd37eec1451e613689c480ec44473fcdb85acf",
+      "bytes": 4161,
+      "gzip_bytes": 612
+    },
+    {
+      "path": "driver-recovery/watch-owned-926-v2-selftests.json.gz",
+      "source": "/mnt/e/private/gitcraft-build/watch-owned-926-v2-selftests.json",
+      "sha256": "cf07d03ee46b4cc6e9564060f1a00f4acdd4e299bb94b9269632b5d190e92d1b",
+      "gzip_sha256": "050a20f5486306cea7b2219059045670f5088da7126b1491859f9bb858aa6101",
+      "bytes": 386,
+      "gzip_bytes": 280
+    },
+    {
+      "path": "driver-recovery/watch-owned-926-v2-selftests.log.gz",
+      "source": "/mnt/e/private/gitcraft-build/watch-owned-926-v2-selftests.log",
+      "sha256": "53fb78c9ea38d233f7c66a1e09bbc9a635b670c5c76c9fe09ecf23aab7b4b70e",
+      "gzip_sha256": "9fdd9e2d1b3a0ed77fa286847011856208a84db88b2274cdaf660737cd2b7d75",
+      "bytes": 999,
+      "gzip_bytes": 291
+    },
+    {
+      "path": "driver-recovery/watch-owned-926-v2-owner-note.md.gz",
+      "source": "/mnt/e/private/gitcraft-build/watch-owned-926-v2-owner-note.md",
+      "sha256": "523295e852183d8fdb6e1bfa4fbce1094981d6cbc1f5cfc9bb536d002d3c82f3",
+      "gzip_sha256": "dd7b2cb2413e770afeda61ac46dd33c07179767ebb750c2cdf9404191b6b9fbc",
+      "bytes": 4098,
+      "gzip_bytes": 2052
+    },
+    {
+      "path": "driver-recovery/review-watch-owned-926-v2-root.md.gz",
+      "source": "/mnt/e/private/gitcraft-build/review-watch-owned-926-v2-root.md",
+      "sha256": "88ba68e977a0f9c33187eafbe3446d821f5aa8c2f18deebdf9c3203f1726a6e0",
+      "gzip_sha256": "3ca16ca66c3b9624cc7e34f3faf7588552b37ae72eb886f5080b6cfa6cb860a5",
+      "bytes": 960,
+      "gzip_bytes": 570
+    },
+    {
+      "path": "driver-recovery/validation-driver-recovery.md.gz",
+      "source": "/mnt/e/private/gitcraft-build/validation-driver-recovery.md",
+      "sha256": "d1dbff92bc92f45d5eb22929843ca0290ea554c581070dc8077f476eda413840",
+      "gzip_sha256": "c2a79cda835b84b399b0326bfcaa140f7053b97267be2cb86655d472623b25b7",
+      "bytes": 2149,
+      "gzip_bytes": 1167
+    },
+    {
+      "path": "driver-recovery/failed-92656fb7-runtime-receipt.json.gz",
+      "source": "/mnt/e/private/gitcraft-build/failed-92656fb7-runtime-receipt.json",
+      "sha256": "7ed8ca6240dc798085c73c0eda8c31f9a0e7a6ae56ac32064b6718a43d2bc80c",
+      "gzip_sha256": "b7a5be8119a164fe60df2818045a67e529392db37146e8be9e1ad4417db18634",
+      "bytes": 864,
+      "gzip_bytes": 479
+    },
+    {
+      "path": "driver-recovery/test_driver_supplement_input_order.py.gz",
+      "source": "/mnt/e/private/gitcraft-build/test_driver_supplement_input_order.py",
+      "sha256": "d4fbdc8bfd85fc075eef64678952d16661d5c788c16ecd9b3fd66e7d05ce3f34",
+      "gzip_sha256": "b90a215b29d605a470558e418d29444f27454ae2431230d147ba6c5a0d1cc465",
+      "bytes": 8007,
+      "gzip_bytes": 2576
+    },
+    {
+      "path": "driver-recovery/driver-supplement-input-order-results.json.gz",
+      "source": "/mnt/e/private/gitcraft-build/driver-supplement-input-order-results.json",
+      "sha256": "e3ec6119d8f6a5468c962aa83fdce8de74fbe0c09adfdcf9edd47c03619c2cf2",
+      "gzip_sha256": "a491f33f7737cd99eca87b416f6d8c227439a3a4fe9042c1d5645cfd4378f75e",
+      "bytes": 725,
+      "gzip_bytes": 482
+    },
+    {
+      "path": "driver-recovery/driver-supplement-input-order-tests.log.gz",
+      "source": "/mnt/e/private/gitcraft-build/driver-supplement-input-order-tests.log",
+      "sha256": "0c1c89678c34acf026cf619a0655dc59cbc2605c682e5ac48394d9adf1411fad",
+      "gzip_sha256": "7bfe13f1c01da06eae7e61a2aaf16a134266601ea706957a5a3f38447b146048",
+      "bytes": 1090,
+      "gzip_bytes": 268
+    },
+    {
+      "path": "superseded-UNEXECUTED/supplement-final-926-driver-evidence.py.gz",
+      "source": "/mnt/e/private/gitcraft-build/supplement-final-926-driver-evidence.py",
+      "sha256": "c572b1d78321edcdf4f2d59116288e8e8d3439f5e000a09505fdda6815010406",
+      "gzip_sha256": "b55ef3f151ba085b56e7bf2fe29aaf9ae55280bbb9b04fae8e821a3b6da35a53",
+      "bytes": 5231,
+      "gzip_bytes": 2072
+    },
+    {
+      "path": "superseded-UNEXECUTED/supplement-final-926-driver-evidence-before-readme-fix.py.gz",
+      "source": "/mnt/e/private/gitcraft-build/supplement-final-926-driver-evidence-before-readme-fix.py",
+      "sha256": "33ede6b79e44c0c1e38d9ef589c303fa6361a683583163b81a581d5effbac9a8",
+      "gzip_sha256": "15a39ae2430577c5490a750f2a0414f9ea3f5502a2b22312db63750797432610",
+      "bytes": 5205,
+      "gzip_bytes": 2065
+    },
+    {
+      "path": "superseded-UNEXECUTED/append-reviewed-driver-notes.py.gz",
+      "source": "/mnt/e/private/gitcraft-build/append-reviewed-driver-notes.py",
+      "sha256": "c650ed6271dde74673db4dbfd716f0ff5286bd5887d28373682c1c5db98ed7ee",
+      "gzip_sha256": "e342722da02834771e55233dc7f45bdf80a6763e7d83fbc5fa3e2906d64a5c86",
+      "bytes": 3192,
+      "gzip_bytes": 1372
+    },
+    {
+      "path": "superseded-UNEXECUTED/review-final-926-driver-supplement-adversarial.md.gz",
+      "source": "/mnt/e/private/gitcraft-build/review-final-926-driver-supplement-adversarial.md",
+      "sha256": "aaf8206c97e1c3a35964bf076f59163cebe362f378c3c203cbf4ee821b9c2582",
+      "gzip_sha256": "d843f1e9eb188fb944d63eed09817094357ed213868d4b34c308e17241592f67",
+      "bytes": 4368,
+      "gzip_bytes": 2065
+    },
+    {
+      "path": "superseded-UNEXECUTED/review-final-926-driver-supplement-corrected-adversarial.md.gz",
+      "source": "/mnt/e/private/gitcraft-build/review-final-926-driver-supplement-corrected-adversarial.md",
+      "sha256": "c5e4b413bc229c259f25dff727a73b3e0b822f7f3b81581034aab3e12b159015",
+      "gzip_sha256": "4070438c3683f5f077441209f0778d4549a22cd5827131ca7ef129ed3633ac7f",
+      "bytes": 3500,
+      "gzip_bytes": 1766
+    },
+    {
+      "path": "final-correction/review-final-source-580542bf.md.gz",
+      "source": "/mnt/e/private/gitcraft-build/review-final-source-580542bf.md",
+      "sha256": "23877b12e49857a4e8bc945efee00d8ebb7fc9644e8d333ef8f9c5734d2d6468",
+      "gzip_sha256": "861a70df022ca543459f8d2b7d8b8d3d8c0ca3a7cecdce8a9961b47f307d8f69",
+      "bytes": 6078,
+      "gzip_bytes": 2972
+    },
+    {
+      "path": "final-correction/review-permission-fixtures-205d7528-nav.md.gz",
+      "source": "/mnt/e/private/gitcraft-build/review-permission-fixtures-205d7528-nav.md",
+      "sha256": "2c670c14920a8af9b90927466c7eca3baf481ce8f78d0002ec4834b585b17844",
+      "gzip_sha256": "e401426ca6375fc57554c2280a7b47e4f8066d838f884fc2730f63507265773a",
+      "bytes": 4791,
+      "gzip_bytes": 2301
+    },
+    {
+      "path": "final-correction/review-permission-fixtures-92656fb7.md.gz",
+      "source": "/mnt/e/private/gitcraft-build/review-permission-fixtures-92656fb7.md",
+      "sha256": "7529f4c958efc10dc09bd122826acae49d2a0bd775dd54657d207a432e9752a1",
+      "gzip_sha256": "ed73992a2bfa5ccfec0490bb73b7372438a9ef1c613ffc1f9e4c062f324756ca",
+      "bytes": 4791,
+      "gzip_bytes": 2280
+    },
+    {
+      "path": "final-correction/review-index-policy-92656fb7.md.gz",
+      "source": "/mnt/e/private/gitcraft-build/review-index-policy-92656fb7.md",
+      "sha256": "882dd4b1cc96264457973b17f70d60cad20bcc6bc152cd8c6377c8d88400cd4e",
+      "gzip_sha256": "5389e4fcf6f4a1e6ea580440d589eb2b07e86262085790399eacc3f8530e7a09",
+      "bytes": 5176,
+      "gzip_bytes": 2449
+    },
+    {
+      "path": "final-correction/permission-fixtures-size-working.log.gz",
+      "source": "/mnt/e/private/gitcraft-build/permission-fixtures-size-working.log",
+      "sha256": "b2095c0fae82ddd16eaa247c14d851aed8a90080fc757d6c30bddf03fbd2073b",
+      "gzip_sha256": "12c0a132f17810768bc07fa93c1f426d33c9668602c4a238bbc6f28b83911fe2",
+      "bytes": 100557,
+      "gzip_bytes": 7050
+    },
+    {
+      "path": "final-correction/permission-fixtures-size-index.log.gz",
+      "source": "/mnt/e/private/gitcraft-build/permission-fixtures-size-index.log",
+      "sha256": "b2095c0fae82ddd16eaa247c14d851aed8a90080fc757d6c30bddf03fbd2073b",
+      "gzip_sha256": "12c0a132f17810768bc07fa93c1f426d33c9668602c4a238bbc6f28b83911fe2",
+      "bytes": 100557,
+      "gzip_bytes": 7050
+    },
+    {
+      "path": "final-correction/permission-fixtures-remote.txt.gz",
+      "source": "/mnt/e/private/gitcraft-build/permission-fixtures-remote.txt",
+      "sha256": "0b540b34bb760d15145aebbbea6876b658bd633d5fee886b3d0e12b86ad1392e",
+      "gzip_sha256": "070aff7e3b19792e35190d38a9c4021686933520f5d7e16e39db9c419aa74642",
+      "bytes": 321,
+      "gzip_bytes": 211
+    },
+    {
+      "path": "final-correction/palette-shortcuts-size-working.log.gz",
+      "source": "/mnt/e/private/gitcraft-build/palette-shortcuts-size-working.log",
+      "sha256": "3a4a1a126361bd9171ea99b1511c5fe6dc0d6f2fa63c679ab28ecb3bc64e6662",
+      "gzip_sha256": "27f6f9e6e7ad8469be63fc108b75e42cbd5be78d538e3a6ad6f221aa8d048718",
+      "bytes": 100557,
+      "gzip_bytes": 7050
+    },
+    {
+      "path": "final-correction/palette-shortcuts-size-index.log.gz",
+      "source": "/mnt/e/private/gitcraft-build/palette-shortcuts-size-index.log",
+      "sha256": "3a4a1a126361bd9171ea99b1511c5fe6dc0d6f2fa63c679ab28ecb3bc64e6662",
+      "gzip_sha256": "27f6f9e6e7ad8469be63fc108b75e42cbd5be78d538e3a6ad6f221aa8d048718",
+      "bytes": 100557,
+      "gzip_bytes": 7050
+    },
+    {
+      "path": "final-correction/palette-shortcuts-final-remote.txt.gz",
+      "source": "/mnt/e/private/gitcraft-build/palette-shortcuts-final-remote.txt",
+      "sha256": "584cd797f8c62707594af1cea9e097071b83eafdb8f3089a892fcd8e0bb7b203",
+      "gzip_sha256": "f3609ee5b77e026c9d12a8f47a298dc3f9555938f1f241b98f39691b9a2ceea5",
+      "bytes": 361,
+      "gzip_bytes": 238
+    },
+    {
+      "path": "final-correction/palette-shortcuts-v2-size-working.log.gz",
+      "source": "/mnt/e/private/gitcraft-build/palette-shortcuts-v2-size-working.log",
+      "sha256": "3a4a1a126361bd9171ea99b1511c5fe6dc0d6f2fa63c679ab28ecb3bc64e6662",
+      "gzip_sha256": "27f6f9e6e7ad8469be63fc108b75e42cbd5be78d538e3a6ad6f221aa8d048718",
+      "bytes": 100557,
+      "gzip_bytes": 7050
+    },
+    {
+      "path": "final-correction/palette-shortcuts-v2-size-index.log.gz",
+      "source": "/mnt/e/private/gitcraft-build/palette-shortcuts-v2-size-index.log",
+      "sha256": "3a4a1a126361bd9171ea99b1511c5fe6dc0d6f2fa63c679ab28ecb3bc64e6662",
+      "gzip_sha256": "27f6f9e6e7ad8469be63fc108b75e42cbd5be78d538e3a6ad6f221aa8d048718",
+      "bytes": 100557,
+      "gzip_bytes": 7050
+    },
+    {
+      "path": "final-correction/palette-shortcuts-v2-final-remote.txt.gz",
+      "source": "/mnt/e/private/gitcraft-build/palette-shortcuts-v2-final-remote.txt",
+      "sha256": "2b59387617860a3fa8dcbffd673e84f3bedd450f3c4fffa0cfe6c618718be39b",
+      "gzip_sha256": "bfffd0b09e7dc64737139778490117a1b87b2426b38e3ca1e73abb51b01c3db0",
+      "bytes": 362,
+      "gzip_bytes": 237
+    },
+    {
+      "path": "final-correction/review-final-source-4212389c.md.gz",
+      "source": "/mnt/e/private/gitcraft-build/review-final-source-4212389c.md",
+      "sha256": "53f87ad90dcbff238d41b14e6d361d8b3552f1f9a380eaa0fae162ef81225bb7",
+      "gzip_sha256": "95fe8a9c2800a060b29ec1b364724fd8319de7fbf0f91e39d8b1d917845730c2",
+      "bytes": 4216,
+      "gzip_bytes": 2067
+    },
+    {
+      "path": "failed-580/driver/launch-final-580-linux.sh.gz",
+      "source": "/mnt/e/private/gitcraft-build/launch-final-580-linux.sh",
+      "sha256": "13800161842c1046d5826805f99a76884195e795f87a135958ff82d0d6cc395b",
+      "gzip_sha256": "ef83e7946d2dc69722b33cfaf61c25c82ff943600b435f2b52d21e0c0a83bea1",
+      "bytes": 334,
+      "gzip_bytes": 217
+    },
+    {
+      "path": "failed-580/driver/watch-owned-580-worker-v3.py.gz",
+      "source": "/mnt/e/private/gitcraft-build/watch-owned-580-worker-v3.py",
+      "sha256": "f37918f86c73d591122e828e1da9000f02f19394d0044c46d43751af5e8d90ba",
+      "gzip_sha256": "7e5796ced46dafbd3b0f5e1da7ea089a748dc264bfd7154e79db7a480dd11382",
+      "bytes": 13396,
+      "gzip_bytes": 4068
+    },
+    {
+      "path": "failed-580/driver/watch-owned-580-v3-selftests.json.gz",
+      "source": "/mnt/e/private/gitcraft-build/watch-owned-580-v3-selftests.json",
+      "sha256": "b7bb43ab14528db6a174603238d865220180e74241daa2929bc55bb5c09edf39",
+      "gzip_sha256": "332956dc4412dd0fffeed7b3802456b5ecdb9b7a3adcdaad12be33812672a535",
+      "bytes": 386,
+      "gzip_bytes": 281
+    },
+    {
+      "path": "failed-580/driver/watch-owned-580-v3-selftests.log.gz",
+      "source": "/mnt/e/private/gitcraft-build/watch-owned-580-v3-selftests.log",
+      "sha256": "53fb78c9ea38d233f7c66a1e09bbc9a635b670c5c76c9fe09ecf23aab7b4b70e",
+      "gzip_sha256": "9fdd9e2d1b3a0ed77fa286847011856208a84db88b2274cdaf660737cd2b7d75",
+      "bytes": 999,
+      "gzip_bytes": 291
+    },
+    {
+      "path": "failed-580/driver/watch-owned-580-v3-owner-note.md.gz",
+      "source": "/mnt/e/private/gitcraft-build/watch-owned-580-v3-owner-note.md",
+      "sha256": "5dbe686b426f48e5f41dd4ec0bf19578e0ede4a95d13866bcce4d5dd6229144e",
+      "gzip_sha256": "337bb6385897f001b7a88070aa81d3cfe9eb902ace6aa08c0f18b0801bfdaf47",
+      "bytes": 4499,
+      "gzip_bytes": 2197
+    },
+    {
+      "path": "failed-580/driver/watch-owned-580-v3-rebind.diff.gz",
+      "source": "/mnt/e/private/gitcraft-build/watch-owned-580-v3-rebind.diff",
+      "sha256": "1354b0dae446812516e47178640d8a4d95f517f72e529d4fc5433516af005641",
+      "gzip_sha256": "a9c2db85bfce5cd273d241f2c7405a46d82f9f9eb96faf8880d73df003cc125c",
+      "bytes": 2823,
+      "gzip_bytes": 1235
+    },
+    {
+      "path": "failed-580/driver/review-watch-owned-580-v3-root.md.gz",
+      "source": "/mnt/e/private/gitcraft-build/review-watch-owned-580-v3-root.md",
+      "sha256": "3e618f1b928729a7504d60bcc89da7835f49177ce3abedb5be1fdbb88ee6de5b",
+      "gzip_sha256": "e0f4c3301bae3979684672a526562196a119ea0d963f336d9744152919c0e047",
+      "bytes": 566,
+      "gzip_bytes": 388
+    },
+    {
+      "path": "final-driver/launch-final-421-linux.sh.gz",
+      "source": "/mnt/e/private/gitcraft-build/launch-final-421-linux.sh",
+      "sha256": "b45079b6cd172b62507197577e04f017ac349d26292ac61491b18c8c3a433578",
+      "gzip_sha256": "8a56cf40353d76f218611fbb80d706a1c4e3e1cdd0cf9b1b4d4f719190279635",
+      "bytes": 334,
+      "gzip_bytes": 215
+    },
+    {
+      "path": "final-driver/final-421-worker.pid.gz",
+      "source": "/mnt/e/private/gitcraft-build/final-421-worker.pid",
+      "sha256": "79e6e9e36c3257ebd00a1d4e0aa86f57cabece2aa9c703671519a9bd1be79ab4",
+      "gzip_sha256": "41c222ce3b5d5775e2846496d522595395bd5c452dbb1b268804fa8644a42a98",
+      "bytes": 8,
+      "gzip_bytes": 28
+    },
+    {
+      "path": "final-driver/final-4212389c-progress.log.gz",
+      "source": "/mnt/e/private/gitcraft-build/final-4212389c-progress.log",
+      "sha256": "754eedeba7b826813984bdd3f0b206cb3848034e68d19a45cd172dbffabe4084",
+      "gzip_sha256": "a373df375f46b82234e8044cff462585121b76808861dd802e6b5ebe611d612b",
+      "bytes": 2951,
+      "gzip_bytes": 534
+    },
+    {
+      "path": "final-driver/watch-owned-421-worker-v4.py.gz",
+      "source": "/mnt/e/private/gitcraft-build/watch-owned-421-worker-v4.py",
+      "sha256": "97aa421e7291fd94695222a7b33c00bfda5e2fe9c9e56d518b96bd46e636819d",
+      "gzip_sha256": "067945a79b12eb1f68b3d4facc847edff77dc7ffbc16e504999395455b627f31",
+      "bytes": 13396,
+      "gzip_bytes": 4065
+    },
+    {
+      "path": "final-driver/watch-owned-421-worker-v4.log.gz",
+      "source": "/mnt/e/private/gitcraft-build/watch-owned-421-worker-v4.log",
+      "sha256": "e5340d5da50ed2ea9a2d2109e78b241211d405f9b60f1aaa185ca100d832f31e",
+      "gzip_sha256": "6e6a0e9f6f315b5e5140f6612d868839dcd9bbf7256b769d693b0d0b7e4b0f58",
+      "bytes": 4243,
+      "gzip_bytes": 634
+    },
+    {
+      "path": "final-driver/watch-owned-421-v4-selftests.json.gz",
+      "source": "/mnt/e/private/gitcraft-build/watch-owned-421-v4-selftests.json",
+      "sha256": "c2010e53e5816b40c91439dd826e916d6043f533ecb8ded0b38e0a94c95ee063",
+      "gzip_sha256": "c96a0dc29343bea335d4710658bf25919c5604d955a570c5f85885536a42901f",
+      "bytes": 386,
+      "gzip_bytes": 280
+    },
+    {
+      "path": "final-driver/watch-owned-421-v4-selftests.log.gz",
+      "source": "/mnt/e/private/gitcraft-build/watch-owned-421-v4-selftests.log",
+      "sha256": "53fb78c9ea38d233f7c66a1e09bbc9a635b670c5c76c9fe09ecf23aab7b4b70e",
+      "gzip_sha256": "9fdd9e2d1b3a0ed77fa286847011856208a84db88b2274cdaf660737cd2b7d75",
+      "bytes": 999,
+      "gzip_bytes": 291
+    },
+    {
+      "path": "final-driver/watch-owned-421-v4-owner-note.md.gz",
+      "source": "/mnt/e/private/gitcraft-build/watch-owned-421-v4-owner-note.md",
+      "sha256": "fbb7f693a3bc061adb84a88132343b628a0a42951d247e2745e7869b0a38d318",
+      "gzip_sha256": "416b2e168755637566378a404f5dca2768e62b699b34abaaa50cef0413cb66a2",
+      "bytes": 3987,
+      "gzip_bytes": 2053
+    },
+    {
+      "path": "final-driver/watch-owned-421-v4-rebind.diff.gz",
+      "source": "/mnt/e/private/gitcraft-build/watch-owned-421-v4-rebind.diff",
+      "sha256": "bd980eed38a02775099e798d3bce89de8a52d876193fbba8b4820999fd01be8b",
+      "gzip_sha256": "13170f07e622bf58bfd3f63b45c29dbcfd91e5783b22e6b36db95f9c2ccd5a9d",
+      "bytes": 2823,
+      "gzip_bytes": 1233
+    },
+    {
+      "path": "final-driver/review-watch-owned-421-v4-root.md.gz",
+      "source": "/mnt/e/private/gitcraft-build/review-watch-owned-421-v4-root.md",
+      "sha256": "8718e1d4b4d6cefa19a32e4841a55cb0c0b748b36ac992108f1e35cc1cbe384e",
+      "gzip_sha256": "be32364ae79bb95137d0abff04ba781287b803360c29b9eafa106e6109e1d863",
+      "bytes": 592,
+      "gzip_bytes": 398
+    },
+    {
+      "path": "final-helper/preserve-final-candidate-evidence-v6.py.gz",
+      "source": "/mnt/e/private/gitcraft-build/preserve-final-candidate-evidence-v6.py",
+      "sha256": "bfc6958f3cce9c20356b18f641952e2a95741d7e2347edcca9735e3feff1db90",
+      "gzip_sha256": "f85ec331c33cf7db475008f9946bf98cc23f02f72f9fd709a3655dc66b2cb9ed",
+      "bytes": 37922,
+      "gzip_bytes": 11527
+    },
+    {
+      "path": "final-helper/test_final_archive_guards_v6.py.gz",
+      "source": "/mnt/e/private/gitcraft-build/test_final_archive_guards_v6.py",
+      "sha256": "008d8e8eccdc68af8a65dbd31ed5377ec9870f5302c7047debcf9c2ba6f92d71",
+      "gzip_sha256": "0c07b4b4e35108df27916c8e6ef6bedd4e03e2137af2293a480659e2b60f02b8",
+      "bytes": 16818,
+      "gzip_bytes": 5087
+    },
+    {
+      "path": "final-helper/final-archive-guards-v6-results.json.gz",
+      "source": "/mnt/e/private/gitcraft-build/final-archive-guards-v6-results.json",
+      "sha256": "02d158c4a97f8a9aa5afc6443e23a2c6ce9b40d5b2d332682cd7556f45054064",
+      "gzip_sha256": "725b151d2b903e151e8c4d0425665488e691e85af76592fdc5ccfda1cf6f2483",
+      "bytes": 3673,
+      "gzip_bytes": 1200
+    },
+    {
+      "path": "final-helper/final-archive-guards-v6-regressions.log.gz",
+      "source": "/mnt/e/private/gitcraft-build/final-archive-guards-v6-regressions.log",
+      "sha256": "cd4be5d0c018ad83cdc4aedda5f34a6078a707551c2a1bdae7e810cbec922bba",
+      "gzip_sha256": "77ec122f7c14b5140fcd9ae59c09d65b44152f63e506837d25531e8963235e90",
+      "bytes": 920,
+      "gzip_bytes": 396
+    },
+    {
+      "path": "final-helper/review-final-evidence-helper-v6-adversarial.md.gz",
+      "source": "/mnt/e/private/gitcraft-build/review-final-evidence-helper-v6-adversarial.md",
+      "sha256": "126b95983931f2b9b283aea5702419029128d22abf9655065f3ed680c07dce1e",
+      "gzip_sha256": "6f8c205199dbdfa399458b372fc7c8e7dda826945f3df67391ade81188021ef1",
+      "bytes": 5610,
+      "gzip_bytes": 2658
+    }
+  ],
+  "generated": [
+    {
+      "path": "README.md",
+      "sha256": "7d2cc1ed0e29ee5ac9785ea2b6f2a3c1c6d885d6975dd89b0ac53836b73aa6a4",
+      "bytes": 6347
+    },
+    {
+      "path": "driver-recovery/CORRECTION.md",
+      "sha256": "2ae70f446a0f93cc75e9e65b29969c5193c9d3f4035945b9504bfc185d158b4b",
+      "bytes": 929
+    }
+  ]
+}
