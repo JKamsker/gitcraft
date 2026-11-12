@@ -4,6 +4,7 @@ mod behaviour;
 mod bisect;
 pub(super) mod branch;
 mod bundles;
+mod checkout_blocked;
 mod cleanup;
 mod confirm;
 mod constructors;
@@ -190,6 +191,8 @@ pub enum Dialog {
     Custom(Box<CustomDialog>),
     /// A checkout would leave the commits of a detached HEAD on no branch.
     KeepDetached(Box<super::detached::KeepDialog>),
+    /// Files here are in the way of a checkout git refused.
+    CheckoutBlocked(Box<super::checkout_blocked::BlockedCheckout>),
     /// Select stale or merged branches…
     Cleanup(Box<cleanup::CleanupDialog>),
     /// Start a bisect from the commit `hash`, good or bad, with the other end `other`.

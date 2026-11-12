@@ -21,6 +21,7 @@ mod branch_tree;
 mod branch_visibility;
 mod bundles;
 mod celebration;
+mod checkout_blocked;
 mod ci_status;
 mod ci_view;
 mod cleanup;

@@ -7659,3 +7659,28 @@ repo-workflows-partial_stash-outside-staged = „{ $path }“ ist außerhalb der
 repo-workflows-stash-selection-changed = Die ausgewählten Dateien haben sich seit der Vorbereitung geändert. Öffne Stash erneut, um die jetzt unversionierten Dateien einzuschließen.
 
 repo-workflows-partial_stash-unresolved-link = Für den ausgeschlossenen Pfad „{ $path }“ kann wegen eines nicht auflösbaren symbolischen Links kein sicheres Stashen gewährleistet werden. Löse den Link auf oder erstelle einen Snapshot.
+
+repo-checkout-blocked-title = Dateien hier stehen im Weg
+repo-checkout-blocked-explanation = { $label } würde sie überschreiben, daher hat git abgebrochen, bevor etwas geändert wurde.
+repo-checkout-blocked-changed = { $count ->
+        [one] Eine Datei mit lokalen Änderungen
+       *[other] { $count } Dateien mit lokalen Änderungen
+    }
+repo-checkout-blocked-untracked = { $count ->
+        [one] Eine nicht versionierte Datei
+       *[other] { $count } nicht versionierte Dateien
+    }
+repo-checkout-blocked-ignored = { $count ->
+        [one] Eine ignorierte Datei (generiert oder nur lokal), von der der Branch eine Version hat
+       *[other] { $count } ignorierte Dateien (generiert oder nur lokal), von denen der Branch Versionen hat
+    }
+repo-checkout-blocked-overwrite = Ignorierte Dateien überschreiben
+repo-checkout-blocked-overwrite-about = Checkt aus und ersetzt die ignorierten Dateien durch die Versionen des Branches, wie es ein einfaches git checkout tut.
+repo-checkout-blocked-stash = Stashen, dann auschecken
+repo-checkout-blocked-stash-about = Stasht zuerst alle Änderungen (auch nicht versionierte Dateien); sie bleiben in der Stash-Liste zum späteren Anwenden.
+repo-checkout-blocked-force = Änderungen verwerfen und auschecken
+repo-checkout-blocked-force-about = Checkt mit --force aus: lokale Änderungen an versionierten Dateien gehen verloren; nicht versionierte und ignorierte Dateien im Weg werden überschrieben.
+repo-checkout-blocked-carry = Dateien mitnehmen
+repo-checkout-blocked-carry-about = Behält diese Dateien so, wie sie hier sind: ignorierte Dateien werden nach dem Auschecken zurückgeschrieben und erscheinen dort als Änderungen; lokale Änderungen werden mitgemergt (Konflikte bleiben zum Auflösen).
+repo-checkout-blocked-save-failed = { $label }: Die mitzunehmenden Dateien konnten nicht gesichert werden ({ $error }). Es wurde nichts geändert.
+repo-checkout-blocked-link = { $path } ist ein symbolischer Link; nur Dateien können mitgenommen werden.

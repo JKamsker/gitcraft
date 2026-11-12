@@ -201,6 +201,7 @@ impl RepoTab {
             Action::CheckoutPull(name) => self.leave_to(Leave::CheckoutPull(name), ctx),
             Action::CheckoutRemote(name) => self.leave_to(Leave::CheckoutRemote(name), ctx),
             Action::Detached(act) => self.detached_act(act, ctx),
+            Action::CarryCheckout(blocked) => self.carry_checkout(*blocked, ctx),
             Action::Dialog(dialog) => self.open_dialog(dialog, ctx),
             Action::SelectStaleBranches => self.dialog = Some(self.cleanup_dialog(ctx)),
             Action::OpenCollisions => self.open_collisions(),

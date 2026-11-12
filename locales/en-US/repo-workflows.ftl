@@ -7661,3 +7661,28 @@ repo-workflows-partial_stash-outside-staged = “{ $path }” is staged outside 
 repo-workflows-stash-selection-changed = The selected files changed since this stash was prepared. Open Stash again to include the now untracked files.
 
 repo-workflows-partial_stash-unresolved-link = Cannot establish safe stash cleanup for excluded path “{ $path }” through an unresolved symbolic link. Resolve the link or use a snapshot.
+
+repo-checkout-blocked-title = Files here are in the way
+repo-checkout-blocked-explanation = { $label } would overwrite them, so git stopped before changing anything.
+repo-checkout-blocked-changed = { $count ->
+        [one] A file with local changes
+       *[other] { $count } files with local changes
+    }
+repo-checkout-blocked-untracked = { $count ->
+        [one] An untracked file
+       *[other] { $count } untracked files
+    }
+repo-checkout-blocked-ignored = { $count ->
+        [one] An ignored file (generated or local-only), which the branch has a version of
+       *[other] { $count } ignored files (generated or local-only), which the branch has versions of
+    }
+repo-checkout-blocked-overwrite = Overwrite ignored files
+repo-checkout-blocked-overwrite-about = Checks out, replacing the ignored files with the branch's versions, as plain git checkout does.
+repo-checkout-blocked-stash = Stash, then check out
+repo-checkout-blocked-stash-about = Stashes all changes (untracked files too) first; they stay in the stash list to apply later.
+repo-checkout-blocked-force = Discard changes and check out
+repo-checkout-blocked-force-about = Checks out with --force: local changes to tracked files are thrown away; untracked and ignored files in the way are overwritten.
+repo-checkout-blocked-carry = Carry files over
+repo-checkout-blocked-carry-about = Keeps these files as they are here: ignored files are written back after checking out and show as changes there; local changes are merged along (conflicts left to resolve).
+repo-checkout-blocked-save-failed = { $label }: couldn't save the files to carry over ({ $error }). Nothing was changed.
+repo-checkout-blocked-link = { $path } is a symbolic link; only files can be carried over.

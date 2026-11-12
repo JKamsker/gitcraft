@@ -116,7 +116,7 @@ impl RepoTab {
                     label: label.clone(),
                     error: Failure::capture(e, stack_failure.clone()),
                 }));
-                if !quiet {
+                if !quiet && !self.offer_blocked_checkout(&label, e) {
                     self.explain_failure(e, &label, ctx);
                 }
                 self.note_stopped_rewrite(&label, &kind, e);
