@@ -100,6 +100,13 @@ fn every_hunk_and_file_of_a_real_pull_request_is_one_unit_in_one_group() -> Resu
             .windows(2)
             .all(|w| order(&w[0].path) <= order(&w[1].path))
     );
+    what_each_unit_is(&u)?;
+    grouped(&u);
+    Ok(())
+}
+
+/// Renames, binaries, deletions, formatting and the repeated edit, as read.
+fn what_each_unit_is(u: &units::Units) -> Result<(), String> {
     let find = |p: &str| u.units.iter().find(|x| x.path == p).ok_or(p.to_owned());
     let moved = find("src/moved/name.rs")?;
     assert_eq!(moved.body, Body::File(Whole::NoLines));
@@ -116,8 +123,12 @@ fn every_hunk_and_file_of_a_real_pull_request_is_one_unit_in_one_group() -> Resu
     assert_eq!(u.repeated.len(), 1, "{:?}", u.repeated);
     assert_eq!(u.units.iter().filter(|x| x.repeated.is_some()).count(), 3);
     assert!(u.config.as_deref().is_some_and(|c| c.contains("Billing")));
+    Ok(())
+}
 
-    let p = propose::propose(&u, &lockfiles);
+/// The groups of the pull request, each change in one.
+fn grouped(u: &units::Units) {
+    let p = propose::propose(u, &lockfiles);
     let group = |title: &str| -> Vec<String> {
         p.groups
             .iter()
@@ -134,11 +145,10 @@ fn every_hunk_and_file_of_a_real_pull_request_is_one_unit_in_one_group() -> Resu
     assert_eq!(group("Tests"), ["tests/it.rs"]);
     assert_eq!(group("Formatting"), ["src/fmt.rs"]);
     assert_eq!(group("Documentation"), ["README.md"]);
-    let a = arrange::arrange(&p, &u, None);
-    assert_eq!(arrange::check(&a, &u), Ok(()));
+    let a = arrange::arrange(&p, u, None);
+    assert_eq!(arrange::check(&a, u), Ok(()));
     let listed: usize = a.groups.iter().map(|g| g.group.units.len()).sum();
     assert_eq!(listed, u.units.len());
-    Ok(())
 }
 
 #[test]
