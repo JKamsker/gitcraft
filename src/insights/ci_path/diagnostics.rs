@@ -102,17 +102,7 @@ pub fn observations(
         .runs
         .iter()
         .map(|run| {
-            let aligned = alignment::jobs(current, run, None, None);
-            let job = aligned
-                .iter()
-                .find(|pair| pair.now == Some(index))
-                .and_then(|pair| pair.before)
-                .and_then(|i| run.jobs.get(i))
-                .filter(|_| {
-                    !current.info.sha.is_empty()
-                        && current.info.sha == run.info.sha
-                        && crate::ci::timing::history::same_workflow(&current.info, &run.info)
-                });
+            let job = same_sha_job(current, index, run);
             let target = current.jobs.get(index);
             let (state, url) = match (step, target, job) {
                 (Some(index), Some(target), Some(job)) => step_observation(target, index, job),
@@ -126,6 +116,26 @@ pub fn observations(
             }
         })
         .collect()
+}
+
+/// Job `index` of `current` in `run`, only when `run` is the same workflow/branch at exactly the
+/// same SHA and the job aligns unambiguously.
+pub fn same_sha_job<'a>(
+    current: &TimedRun,
+    index: usize,
+    run: &'a TimedRun,
+) -> Option<&'a TimedJob> {
+    if current.info.sha.is_empty()
+        || current.info.sha != run.info.sha
+        || !crate::ci::timing::history::same_workflow(&current.info, &run.info)
+    {
+        return None;
+    }
+    alignment::jobs(current, run, None, None)
+        .iter()
+        .find(|pair| pair.now == Some(index))
+        .and_then(|pair| pair.before)
+        .and_then(|i| run.jobs.get(i))
 }
 
 fn step_observation(
@@ -153,7 +163,7 @@ pub fn intermittent(history: &[Observation]) -> bool {
 }
 
 /// Job success alone provides no evidence that individual tests passed or caches hit.
-pub const UNKNOWN_EVIDENCE: &str = "Individual test reports: unknown (not collected). Cache hits/misses: unknown. Toolchain versions: unknown. Step log contents: unknown (not downloaded); exact recorded log links are available. Runner metadata is shown only when recorded. Timing differences are observations, not causes.";
+pub const UNKNOWN_EVIDENCE: &str = "Individual test reports: unknown (not collected) until a job's logs are read. Cache hits/misses, toolchain versions and step log errors: unknown until then; exact recorded log links are available. Runner metadata is shown only when recorded. Timing differences are observations, not causes.";
 
 #[cfg(test)]
 mod tests;
