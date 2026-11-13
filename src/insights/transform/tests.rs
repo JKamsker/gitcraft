@@ -13,6 +13,7 @@ fn hunk(path: &str, line: u32, removed: &[&str], added: &[&str]) -> Hunk {
         new_len: added.len() as u32,
         removed: removed.iter().map(|s| (*s).to_owned()).collect(),
         added: added.iter().map(|s| (*s).to_owned()).collect(),
+        section: String::new(),
     }
 }
 

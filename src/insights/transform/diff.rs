@@ -60,6 +60,8 @@ pub struct Hunk {
     pub new_len: u32,
     pub removed: Vec<String>,
     pub added: Vec<String>,
+    /// What Git prints after the second `@@`: the function or section it is in, if any.
+    pub section: String,
 }
 
 /// The hunks of a `-U0` patch (with `a/` and `b/` prefixes), at most `max` of them: the hunks,
@@ -119,6 +121,10 @@ pub fn parse_patch(text: &str, max: usize) -> (Vec<Hunk>, bool) {
                 old_len,
                 new_start,
                 new_len,
+                section: header
+                    .split_once("@@")
+                    .map_or("", |(_, s)| s.trim())
+                    .to_owned(),
                 ..Hunk::default()
             });
         }
@@ -192,7 +198,8 @@ pub fn read(repo: &Path, base: &str, head: &str, limits: &Limits) -> Result<Read
         listed: listed.len(),
         ..Read::default()
     };
-    let mut paths: Vec<&str> = Vec::new();
+    // Each file read, with its old name: a rename is read as one, never split across commands.
+    let mut entries: Vec<Vec<&str>> = Vec::new();
     let mut taken = 0;
     for file in &listed {
         let Some(lines) = file.lines else {
@@ -208,11 +215,10 @@ pub fn read(repo: &Path, base: &str, head: &str, limits: &Limits) -> Result<Read
             continue;
         }
         taken += 1;
-        paths.push(&file.path);
-        paths.extend(file.old_path.as_deref());
+        entries.push([Some(file.path.as_str()), file.old_path.as_deref()].into_iter().flatten().collect());
     }
     // A few files at a time, so that the command line stays short.
-    for chunk in paths.chunks(80) {
+    for chunk in chunks(&entries, 80) {
         let left = limits.max_hunks.saturating_sub(out.hunks.len());
         if left == 0 {
             out.hunks_cut = true;
@@ -227,12 +233,24 @@ pub fn read(repo: &Path, base: &str, head: &str, limits: &Limits) -> Result<Read
         ];
         args.extend(PLAIN);
         args.extend([base, head, "--"]);
-        args.extend(chunk.iter().copied());
+        args.extend(chunk);
         let (hunks, cut) = parse_patch(&git::run(Some(repo), &args)?, left);
         out.hunks.extend(hunks);
         out.hunks_cut |= cut;
     }
     Ok(out)
+}
+
+/// The paths of `entries` in runs of at most `max`, each entry whole in one run.
+fn chunks<'a>(entries: &[Vec<&'a str>], max: usize) -> Vec<Vec<&'a str>> {
+    let mut out: Vec<Vec<&'a str>> = Vec::new();
+    for entry in entries {
+        match out.last_mut() {
+            Some(run) if run.len() + entry.len() <= max => run.extend(entry.iter().copied()),
+            _ => out.push(entry.clone()),
+        }
+    }
+    out
 }
 
 #[cfg(test)]
@@ -281,6 +299,8 @@ mod tests {
         assert_eq!((hunks[0].old_start, hunks[0].new_start), (3, 3));
         assert_eq!(hunks[0].removed, ["    foo(a);"]);
         assert_eq!(hunks[0].added, ["    foo(a, ctx);"]);
+        assert_eq!(hunks[0].section, "fn main() {");
+        assert_eq!(hunks[1].section, "");
         assert_eq!(hunks[1].removed.len(), 2);
         assert_eq!(hunks[1].new_len, 0);
         // A deleted file's hunk is under its old name; a removed line may start with `--`.
@@ -291,6 +311,19 @@ mod tests {
         let (few, cut) = parse_patch(patch, 2);
         assert_eq!(few.len(), 2);
         assert!(cut);
+    }
+
+    #[test]
+    fn a_rename_and_its_old_name_are_never_read_apart() {
+        let entries: Vec<Vec<&str>> = (0..79)
+            .map(|_| vec!["m.rs"])
+            .chain([vec!["new.rs", "old.rs"], vec!["z.rs"]])
+            .collect();
+        let runs = chunks(&entries, 80);
+        assert_eq!(runs.len(), 2);
+        assert_eq!(runs[0].len(), 79);
+        assert_eq!(runs[1], ["new.rs", "old.rs", "z.rs"]);
+        assert!(chunks(&[], 80).is_empty());
     }
 
     #[test]

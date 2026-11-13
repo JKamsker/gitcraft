@@ -2,6 +2,7 @@
 //! the base), then built-in ones on paths, file types, markers in the lines and the repeated
 //! edits found. Each placement says which rule made it.
 
+use super::glob;
 use super::units::{Body, Unit, Whole};
 
 /// What a change is for, in the order a reviewer is offered them.
@@ -88,11 +89,22 @@ pub(in crate::repo::insights) struct Rule {
     pub(in crate::repo::insights) line: usize,
 }
 
+/// The most of a rules file read, in bytes: a larger one is not used.
+pub(in crate::repo::insights) const MAX_FILE: u64 = 64 * 1024;
+/// The longest pattern used, and the most patterns, in bytes all told.
+const MAX_PATTERN: usize = 200;
+const MAX_PATTERNS: usize = 4096;
+/// The most matching done for one reading, in cells (see [`glob::cost`]): what is left once
+/// it is spent is placed by the built-in rules, and said.
+const MAX_WORK: usize = 200_000_000;
+
 /// Reads a rules file: `purpose: pattern…` or `group Name: pattern…` per line, `#` comments.
-/// Lines that aren't understood are said, not skipped silently.
+/// Lines that aren't understood are said, not skipped silently; so are patterns too long, and
+/// those beyond [`MAX_PATTERNS`] bytes of them.
 pub(in crate::repo::insights) fn parse(text: &str) -> (Vec<Rule>, Vec<String>) {
     let mut rules = Vec::new();
     let mut errors = Vec::new();
+    let mut total = 0;
     for (i, raw) in text.lines().enumerate() {
         let line = raw.split('#').next().unwrap_or("").trim();
         if line.is_empty() {
@@ -102,7 +114,24 @@ pub(in crate::repo::insights) fn parse(text: &str) -> (Vec<Rule>, Vec<String>) {
             errors.push(format!("line {}: no `:` in “{line}”", i + 1));
             continue;
         };
-        let patterns: Vec<String> = patterns.split_whitespace().map(str::to_owned).collect();
+        let mut patterns: Vec<String> = Vec::new();
+        for p in patterns.split_whitespace() {
+            if p.len() > MAX_PATTERN {
+                errors.push(format!(
+                    "line {}: a pattern longer than {MAX_PATTERN} bytes is not used",
+                    i + 1
+                ));
+            } else if total + p.len() > MAX_PATTERNS {
+                errors.push(format!(
+                    "line {}: past {MAX_PATTERNS} bytes of patterns, the rest are not used",
+                    i + 1
+                ));
+                break;
+            } else {
+                total += p.len();
+                patterns.push(p.to_owned());
+            }
+        }
         let head = head.trim();
         let target = match head.strip_prefix("group ") {
             Some(name) if !name.trim().is_empty() => Target::Named(name.trim().to_owned()),
@@ -125,36 +154,6 @@ pub(in crate::repo::insights) fn parse(text: &str) -> (Vec<Rule>, Vec<String>) {
         });
     }
     (rules, errors)
-}
-
-/// A pattern without `/` matches a file's name; with one, its path (a leading `/` ignored);
-/// ending in `/`, everything in that folder. `*` stays within a folder, `**` doesn't.
-pub(in crate::repo::insights) fn matches(pattern: &str, path: &str) -> bool {
-    if let Some(folder) = pattern.strip_suffix('/') {
-        return matches(&format!("{folder}/**"), path);
-    }
-    let name = path.rsplit('/').next().unwrap_or(path);
-    match pattern.strip_prefix('/') {
-        Some(rooted) => glob(rooted.as_bytes(), path.as_bytes()),
-        None if pattern.contains('/') => glob(pattern.as_bytes(), path.as_bytes()),
-        None => glob(pattern.as_bytes(), name.as_bytes()),
-    }
-}
-
-fn glob(p: &[u8], t: &[u8]) -> bool {
-    match p {
-        [] => t.is_empty(),
-        [b'*', b'*', b'/', rest @ ..] => {
-            glob(rest, t) || (0..t.len()).any(|i| t[i] == b'/' && glob(rest, &t[i + 1..]))
-        }
-        [b'*', b'*', rest @ ..] => (0..=t.len()).any(|i| glob(rest, &t[i..])),
-        [b'*', rest @ ..] => {
-            let within = t.iter().position(|&b| b == b'/').unwrap_or(t.len());
-            (0..=within).any(|i| glob(rest, &t[i..]))
-        }
-        [b'?', rest @ ..] => matches!(t.first(), Some(&c) if c != b'/') && glob(rest, &t[1..]),
-        [c, rest @ ..] => t.first() == Some(c) && glob(rest, &t[1..]),
-    }
 }
 
 /// Where the rules put a unit, and why.
@@ -226,21 +225,76 @@ fn in_dir(path: &str, dirs: &[&str]) -> Option<String> {
         .map(|d| format!("in a `{d}` folder"))
 }
 
-/// Where the rules put `unit`. `generated`: why the file folding rules fold its file, if they
-/// do (`linguist-generated`, a lockfile, a minified file, a pattern of the settings).
+/// The repository's rules and what they match: worked out with the units, off the UI thread.
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub(in crate::repo::insights) struct Ruled {
+    pub(in crate::repo::insights) rules: Vec<Rule>,
+    /// Lines not understood, patterns not used, matching left undone.
+    pub(in crate::repo::insights) errors: Vec<String>,
+    /// For each unit, the rule and the pattern of it that matched its path.
+    pub(in crate::repo::insights) hits: Vec<Option<(usize, usize)>>,
+}
+
+/// What the rules file `config` says of each of `paths`, each path matched once.
+pub(in crate::repo::insights) fn rule<'a>(
+    config: Option<&str>,
+    paths: impl IntoIterator<Item = &'a str>,
+) -> Ruled {
+    let (rules, mut errors) = config.map(parse).unwrap_or_default();
+    let mut work = 0usize;
+    let mut done: std::collections::HashMap<&str, Option<(usize, usize)>> = Default::default();
+    let mut out_of_work = false;
+    let mut hits = Vec::new();
+    for path in paths {
+        let hit = match done.get(path) {
+            Some(hit) => *hit,
+            None if out_of_work => None,
+            None => {
+                let mut hit = None;
+                'rules: for (r, rule) in rules.iter().enumerate() {
+                    for (p, pattern) in rule.patterns.iter().enumerate() {
+                        work += glob::cost(pattern, path);
+                        if work > MAX_WORK {
+                            out_of_work = true;
+                            break 'rules;
+                        }
+                        if glob::matches(pattern, path) {
+                            hit = Some((r, p));
+                            break 'rules;
+                        }
+                    }
+                }
+                if !out_of_work {
+                    done.insert(path, hit);
+                }
+                hit
+            }
+        };
+        hits.push(hit);
+    }
+    if out_of_work {
+        errors.push(format!(
+            "{}: too much to match against these paths; the built-in rules place the rest",
+            super::units::CONFIG
+        ));
+    }
+    Ruled { rules, errors, hits }
+}
+
+/// Where the rules put `unit`; `hit`: the repository's rule that matched it, and the pattern.
+/// `generated`: why the file folding rules fold its file, if they do (`linguist-generated`, a
+/// lockfile, a minified file, a pattern of the settings).
 pub(in crate::repo::insights) fn place(
     unit: &Unit,
-    rules: &[Rule],
+    hit: Option<(&Rule, &str)>,
     generated: Option<&str>,
 ) -> Placement {
     let path = unit.path.as_str();
-    for rule in rules {
-        if let Some(p) = rule.patterns.iter().find(|p| matches(p, path)) {
-            return Placement {
-                target: rule.target.clone(),
-                why: format!("`{p}` (line {} of {})", rule.line, super::units::CONFIG),
-            };
-        }
+    if let Some((rule, p)) = hit {
+        return Placement {
+            target: rule.target.clone(),
+            why: format!("`{p}` (line {} of {})", rule.line, super::units::CONFIG),
+        };
     }
     let name = path.rsplit('/').next().unwrap_or(path);
     if let Some(reason) = generated {

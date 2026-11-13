@@ -60,15 +60,18 @@ pub(in crate::repo::insights) fn propose(
     units: &Units,
     generated: &dyn Fn(&str) -> Option<String>,
 ) -> Proposal {
-    let (rules, errors) = units
-        .config
-        .as_deref()
-        .map(rules::parse)
-        .unwrap_or_default();
+    let ruled = &units.ruled;
+    let own = &ruled.rules;
+    let errors = ruled.errors.clone();
     let placements: Vec<rules::Placement> = units
         .units
         .iter()
-        .map(|u| rules::place(u, &rules, generated(&u.path).as_deref()))
+        .enumerate()
+        .map(|(i, u)| {
+            let hit = ruled.hits.get(i).copied().flatten();
+            let hit = hit.map(|(r, p)| (&own[r], own[r].patterns[p].as_str()));
+            rules::place(u, hit, generated(&u.path).as_deref())
+        })
         .collect();
     let mut reasons: Vec<String> = placements.iter().map(|p| p.why.clone()).collect();
     // Runtime files sharing a name across folders.
@@ -87,8 +90,7 @@ pub(in crate::repo::insights) fn propose(
             Target::Named(name) => (
                 (
                     0,
-                    rules
-                        .iter()
+                    own.iter()
                         .position(|r| r.target == placement.target)
                         .unwrap_or(0),
                 ),

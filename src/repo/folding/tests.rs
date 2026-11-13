@@ -322,7 +322,7 @@ fn gitattributes_are_read_from_a_real_repository() -> Result<(), String> {
     .iter()
     .map(|p| (*p).to_owned())
     .collect();
-    let (found, error) = git::fold_attributes(&repo.0, &paths, &|| true);
+    let (found, error) = git::fold_attributes(&repo.0, None, &paths, &|| true);
     assert_eq!(error, None);
     assert_eq!(found["gen/a/b.rs"], FoldAttr::Generated);
     assert_eq!(found["blob.dat"], FoldAttr::NoDiff);
@@ -332,9 +332,9 @@ fn gitattributes_are_read_from_a_real_repository() -> Result<(), String> {
     assert_eq!(found["plain.rs"], FoldAttr::Unspecified);
     assert_eq!(found["-starts-with-dash.rs"], FoldAttr::Unspecified);
     // Nothing asked, nothing run.
-    assert!(git::fold_attributes(&repo.0, &[], &|| true).0.is_empty());
+    assert!(git::fold_attributes(&repo.0, None, &[], &|| true).0.is_empty());
     // Not wanted any more: nothing is read.
-    let (none, error) = git::fold_attributes(&repo.0, &paths, &|| false);
+    let (none, error) = git::fold_attributes(&repo.0, None, &paths, &|| false);
     assert!(none.is_empty() && error.is_none());
     Ok(())
 }
@@ -346,7 +346,7 @@ fn thousands_of_paths_are_asked_in_a_few_commands() -> Result<(), String> {
     let paths: Vec<String> = (0..5000)
         .map(|i| format!("some/rather/deep/folder/file number {i}.gen"))
         .collect();
-    let (found, error) = git::fold_attributes(&repo.0, &paths, &|| true);
+    let (found, error) = git::fold_attributes(&repo.0, None, &paths, &|| true);
     assert_eq!(error, None);
     assert_eq!(found.len(), paths.len());
     assert!(found.values().all(|a| *a == FoldAttr::Generated));
@@ -357,7 +357,7 @@ fn thousands_of_paths_are_asked_in_a_few_commands() -> Result<(), String> {
 fn a_folder_that_is_no_repository_says_so() {
     let dir = std::env::temp_dir().join(format!("gitcraft-fold-none-{}", std::process::id()));
     let _ = std::fs::create_dir_all(&dir);
-    let (found, error) = git::fold_attributes(&dir.join("missing"), &["a".to_owned()], &|| true);
+    let (found, error) = git::fold_attributes(&dir.join("missing"), None, &["a".to_owned()], &|| true);
     let _ = std::fs::remove_dir_all(&dir);
     assert!(found.is_empty());
     let e = error.unwrap_or_default();

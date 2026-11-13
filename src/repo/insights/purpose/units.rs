@@ -8,7 +8,8 @@
 use std::collections::{HashMap, HashSet};
 use std::path::Path;
 
-use crate::git::ChangedFile;
+use super::rules::{self, Ruled};
+use crate::git::{ChangedFile, FoldAttr};
 use crate::insights::transform::{self, Limits, Shape, Subject, Transform, diff};
 
 /// What a unit is.
@@ -97,6 +98,19 @@ pub(in crate::repo::insights) struct Units {
     pub(in crate::repo::insights) notes: Vec<String>,
     /// The grouping rules of the repository at the base, if it has any.
     pub(in crate::repo::insights) config: Option<String>,
+    /// What they say of each unit (see [`Units::set_config`]).
+    pub(in crate::repo::insights) ruled: Ruled,
+    /// What `.gitattributes` at the base says about folding the files, by path; `None` when
+    /// Git can't read them there (before 2.40): the working tree's apply.
+    pub(in crate::repo::insights) attrs: Option<HashMap<String, FoldAttr>>,
+}
+
+impl Units {
+    /// Takes `config` as the repository's rules, and matches them against every unit.
+    pub(in crate::repo::insights) fn set_config(&mut self, config: Option<String>) {
+        self.ruled = rules::rule(config.as_deref(), self.units.iter().map(|u| u.path.as_str()));
+        self.config = config;
+    }
 }
 
 /// Where the repository keeps its own grouping rules.
@@ -119,20 +133,48 @@ pub(in crate::repo::insights) fn read(
         tips: Vec::new(),
     };
     let patterns = transform::analyze(subject, read.clone(), &limits);
-    let config = crate::git::run(Some(repo), &["show", &format!("{base}:{CONFIG}")]).ok();
-    let mut units = build(base, head, files, &read, &patterns);
-    units.config = config;
+    let mut units = build(base, head, files, &read, &patterns)?;
+    let (config, note) = config_at(repo, base);
+    units.notes.extend(note);
+    units.set_config(config);
+    let paths: Vec<String> = files.iter().map(|f| f.path.clone()).collect();
+    let source = format!("--source={base}");
+    units.attrs = match crate::git::fold_attributes(repo, Some(&source), &paths, &|| true) {
+        (found, None) => Some(found),
+        (_, Some(_)) => None,
+    };
     Ok(units)
 }
 
-/// The units of what was read: its hunks, then each file of `files` without a hunk.
+/// The rules file at `base`, if there is one not too large to read; and what to say if not.
+fn config_at(repo: &Path, base: &str) -> (Option<String>, Option<String>) {
+    let spec = format!("{base}:{CONFIG}");
+    let Ok(size) = crate::git::run(Some(repo), &["cat-file", "-s", &spec]) else {
+        return (None, None);
+    };
+    match size.trim().parse::<u64>() {
+        Ok(n) if n <= rules::MAX_FILE => {
+            (crate::git::run(Some(repo), &["cat-file", "blob", &spec]).ok(), None)
+        }
+        _ => (
+            None,
+            Some(format!(
+                "{CONFIG} is larger than {} KiB: its rules are not used",
+                rules::MAX_FILE / 1024
+            )),
+        ),
+    }
+}
+
+/// The units of what was read: its hunks, then each file of `files` without a hunk. A hunk of
+/// a file `files` doesn't list means the reading went wrong: there are no groups then.
 pub(in crate::repo::insights) fn build(
     base: &str,
     head: &str,
     files: &[ChangedFile],
     read: &diff::Read,
     patterns: &Transform,
-) -> Units {
+) -> Result<Units, String> {
     let mut hunks: Vec<(usize, &diff::Hunk)> = read.hunks.iter().enumerate().collect();
     let mut notes = Vec::new();
     // The file read last may be cut short among its hunks: it is shown whole instead.
@@ -163,12 +205,13 @@ pub(in crate::repo::insights) fn build(
     });
     let mut seen: HashMap<String, usize> = HashMap::new();
     let mut by_path: HashMap<&str, Vec<Unit>> = HashMap::new();
-    let mut strays = Vec::new();
     for (index, h) in hunks {
         let file = of_file.get(h.path.as_str());
+        // Its lines and where they are (the function or section Git names); the count
+        // only tells apart the same lines changed again in the same place.
         let digest = format!(
             "{:x}",
-            md5::compute(format!("{:?}{:?}", h.removed, h.added))
+            md5::compute(format!("{:?}{:?}{:?}", h.section, h.removed, h.added))
         );
         let n = seen.entry(format!("{}\0{digest}", h.path)).or_insert(0);
         *n += 1;
@@ -191,7 +234,12 @@ pub(in crate::repo::insights) fn build(
         };
         match file {
             Some(f) => by_path.entry(f.path.as_str()).or_default().push(unit),
-            None => strays.push(unit),
+            None => {
+                return Err(format!(
+                    "the diff read has a change to {}, which the pull request doesn't list",
+                    unit.path
+                ));
+            }
         }
     }
     let mut units = Vec::new();
@@ -214,15 +262,14 @@ pub(in crate::repo::insights) fn build(
             }
         }
     }
-    units.extend(strays);
-    Units {
+    Ok(Units {
         base: base.to_owned(),
         head: head.to_owned(),
         units,
         repeated,
         notes,
-        config: None,
-    }
+        ..Units::default()
+    })
 }
 
 fn whole(f: &ChangedFile, why: Whole) -> Unit {

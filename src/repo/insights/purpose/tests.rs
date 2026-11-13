@@ -1,8 +1,8 @@
 //! Review by purpose: the rules on synthetic units (a mixed pull request, a feature across
 //! folders, the repository's own rules), the reviewer's edits and their revisions, and where a
-//! change opens. Real repositories are in `tests/repo.rs`.
+//! change opens. Real repositories are in `tests/real.rs`.
 
-mod repo;
+mod real;
 
 use super::arrange::{self, Edit, Placed, Saved};
 use super::propose::{Proposal, propose};

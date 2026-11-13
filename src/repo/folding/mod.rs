@@ -214,7 +214,7 @@ impl super::RepoTab {
             ctx,
             move || {
                 let wanted = || now.load(Ordering::Relaxed) == epoch;
-                let found = crate::git::fold_attributes(&repo, &paths, &wanted);
+                let found = crate::git::fold_attributes(&repo, None, &paths, &wanted);
                 (paths, found)
             },
             move |tab, (paths, (found, error)), _| {
