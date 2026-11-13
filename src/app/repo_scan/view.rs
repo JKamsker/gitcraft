@@ -12,6 +12,13 @@ pub(super) fn stopped_message(stopped: Stopped, found: usize) -> String {
             "interaction-scan-folder-limit",
             &[("folders", LIMITS.max_dirs.into())],
         ),
+        Stopped::Entries => crate::i18n::message(
+            "interaction-scan-entry-limit",
+            &[("entries", LIMITS.max_entries.into())],
+        ),
+        Stopped::Time => {
+            crate::i18n::message("interaction-scan-time-limit", &[("found", found.into())])
+        }
         Stopped::Asked => {
             crate::i18n::message("interaction-scan-asked", &[("found", found.into())])
         }

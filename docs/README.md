@@ -8,7 +8,7 @@ any action by name.
 
 | Page | What's in it |
 | --- | --- |
-| [Repositories, tabs and profiles](guide/repositories-and-tabs.md) | the start page, workspaces, _Where's my work?_, the pull-request inbox, tabs, profiles, drafts that survive a crash |
+| [Repositories, tabs and profiles](guide/repositories-and-tabs.md) | the start page, repository roots and _All repositories_, workspaces, _Where's my work?_, the pull-request inbox, tabs, profiles, drafts that survive a crash |
 | [Command line, file manager and links](guide/command-line.md) | `gitcraft .`, `gitcraft log`, `blame`, `show`, `compare`; right-click menus; `gitcraft://` links |
 | [Remote repositories (WSL and SSH)](guide/remote-repositories.md) | git running on another machine while the window stays here; Teleport |
 | [The graph and history](guide/graph-and-history.md) | the commit graph, search operators, comparing, file history and blame, commit details |

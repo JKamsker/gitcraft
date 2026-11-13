@@ -1,103 +1,21 @@
 //! _Scan a folder for repositories_: the folders under one picked, walked in the background a
 //! few levels deep, and the repositories found there listed to open or add to the recent list.
 
+pub(super) mod engine;
 mod view;
+pub(super) use engine::*;
 use view::*;
 
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc::{Receiver, channel};
-use std::time::{Duration, Instant};
 
 use egui::{RichText, Stroke, vec2};
 
 use super::panels::Toast;
 use super::{App, MAX_RECENT};
 use crate::theme::{self, Tokens};
-
-/// Folders never looked in: what tools fill with thousands of folders of their own. One of
-/// them that is itself a repository is still found (a project called `build`).
-const SKIPPED: [&str; 10] = [
-    "node_modules",
-    "target",
-    "vendor",
-    "bower_components",
-    "__pycache__",
-    "venv",
-    "dist",
-    "build",
-    "obj",
-    "Pods",
-];
-
-/// How far a scan goes.
-#[derive(Clone, Copy, Debug)]
-pub(super) struct ScanLimits {
-    /// How many folders down from the one picked (its children are 1).
-    pub depth: usize,
-    /// The most repositories listed.
-    pub max_repos: usize,
-    /// The most folders looked in (and kept in memory to look in).
-    pub max_dirs: usize,
-}
-
-/// The limits the start page scans with.
-pub(super) const LIMITS: ScanLimits = ScanLimits {
-    depth: 4,
-    max_repos: 200,
-    max_dirs: 50_000,
-};
-
-/// Why a scan ended before it looked everywhere.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub(super) enum Stopped {
-    /// It found [`ScanLimits::max_repos`].
-    Repos,
-    /// It looked in [`ScanLimits::max_dirs`] folders.
-    Folders,
-    /// It was asked to stop.
-    Asked,
-}
-
-/// What a scan found.
-#[derive(Clone, Debug, Default, PartialEq, Eq)]
-pub(super) struct Found {
-    /// The repositories' folders, sorted.
-    pub repos: Vec<PathBuf>,
-    /// It stopped before it looked everywhere: there may be more.
-    pub stopped: Option<Stopped>,
-}
-
-/// How a scan is going, now and then.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
-pub(super) struct Progress {
-    pub folders: usize,
-    pub repos: usize,
-}
-
-/// Whether the folder `name` is looked in.
-fn walked(name: &str) -> bool {
-    !name.starts_with('.') && !SKIPPED.contains(&name)
-}
-
-/// Whether `dir` is a repository's top folder (it has a `.git` folder, or the `.git` file of a
-/// worktree or submodule).
-fn is_repo(dir: &Path) -> bool {
-    dir.join(".git").exists()
-}
-
-/// Why `dir` couldn't be looked in, in words.
-fn unreadable(dir: &Path, e: &std::io::Error) -> String {
-    let dir = crate::remote::display(dir);
-    match e.kind() {
-        std::io::ErrorKind::PermissionDenied => {
-            format!("gitcraft isn't allowed to look in {dir}.")
-        }
-        std::io::ErrorKind::NotFound => format!("{dir} isn't there any more."),
-        _ => format!("Could not look in {dir}: {e}"),
-    }
-}
 
 pub(super) fn display_error(raw: &str) -> Option<String> {
     if let Some(path) = raw
@@ -118,85 +36,6 @@ pub(super) fn display_error(raw: &str) -> Option<String> {
     raw.strip_prefix("Could not look in ").map(|detail| {
         crate::i18n::message("interaction-scan-read-error", &[("detail", detail.into())])
     })
-}
-
-/// The repositories in `root` and the folders under it, as far as `limits` go. Hidden folders,
-/// the [`SKIPPED`] ones and links (which could go round in circles) aren't looked in, though one
-/// of the first two that is a repository is found. Repositories inside repositories are found
-/// too. `progress` is told how it goes, now and then; `cancel` stops it, with what it found.
-pub(super) fn scan(
-    root: &Path,
-    limits: ScanLimits,
-    cancel: &AtomicBool,
-    progress: &mut dyn FnMut(Progress),
-) -> Result<Found, String> {
-    std::fs::read_dir(root).map_err(|e| unreadable(root, &e))?;
-    let mut found = Found::default();
-    // Each folder, and whether to look in it (not when it is only checked for being one).
-    let mut level = vec![(root.to_owned(), true)];
-    let mut seen = 0usize;
-    let mut told = Instant::now();
-    'walk: for depth in 0..=limits.depth {
-        let mut next = Vec::new();
-        for (dir, look_in) in level {
-            if cancel.load(Ordering::Relaxed) {
-                found.stopped = Some(Stopped::Asked);
-                break 'walk;
-            }
-            seen += 1;
-            if told.elapsed() >= Duration::from_millis(100) {
-                told = Instant::now();
-                progress(Progress {
-                    folders: seen,
-                    repos: found.repos.len(),
-                });
-            }
-            if is_repo(&dir) {
-                found.repos.push(dir.clone());
-                if found.repos.len() >= limits.max_repos {
-                    found.stopped = Some(Stopped::Repos);
-                    break 'walk;
-                }
-            }
-            if seen >= limits.max_dirs {
-                found.stopped = Some(Stopped::Folders);
-                break 'walk;
-            }
-            if depth == limits.depth || !look_in {
-                continue;
-            }
-            let Ok(entries) = std::fs::read_dir(&dir) else {
-                continue;
-            };
-            // In name order, whatever order the file system lists them in: which ones are kept
-            // when the limit cuts in is the same everywhere.
-            let mut children: Vec<_> = entries
-                .flatten()
-                // A link's own type: never followed.
-                .filter(|entry| entry.file_type().is_ok_and(|t| t.is_dir()))
-                .filter(|entry| entry.file_name() != ".git")
-                .map(|entry| {
-                    let walk = walked(&entry.file_name().to_string_lossy());
-                    (entry.path(), walk)
-                })
-                .collect();
-            children.sort();
-            // Never more kept than will be looked in.
-            let room = limits.max_dirs.saturating_sub(seen + next.len());
-            if children.len() > room {
-                found.stopped = Some(Stopped::Folders);
-                children.truncate(room);
-            }
-            next.extend(children);
-        }
-        level = next;
-    }
-    progress(Progress {
-        folders: seen,
-        repos: found.repos.len(),
-    });
-    found.repos.sort();
-    Ok(found)
 }
 
 /// Adds the `found` repositories missing from `recent` at its end, as many as there is room
@@ -243,7 +82,8 @@ fn added_message(added: usize, had: usize, no_room: usize) -> String {
 /// What the scan's thread sends.
 enum ScanMsg {
     Progress(Progress),
-    Done(Result<Found, String>),
+    /// How it ended, and how many folders down the deepest repository found was.
+    Done(Result<Found, String>, usize),
 }
 
 /// A scan under way or done, and its dialog.
@@ -252,6 +92,8 @@ pub(super) struct RepoScan {
     rx: Receiver<ScanMsg>,
     progress: Progress,
     result: Option<Result<Found, String>>,
+    /// How many folders down the deepest repository found is (what _Save as root_ keeps).
+    deepest: usize,
     cancel: Arc<AtomicBool>,
 }
 
@@ -265,11 +107,19 @@ impl RepoScan {
                 let _ = tx.send(ScanMsg::Progress(p));
                 ctx.request_repaint();
             };
+            let mut deepest = 0;
             let result = scan(&dir, LIMITS, &stop, &mut progress).map(|mut found| {
+                deepest = found
+                    .repos
+                    .iter()
+                    .filter_map(|repo| repo.strip_prefix(&dir).ok())
+                    .map(|rel| rel.components().count())
+                    .max()
+                    .unwrap_or(0);
                 found.repos = found.repos.into_iter().map(top_folder).collect();
                 found
             });
-            let _ = tx.send(ScanMsg::Done(result));
+            let _ = tx.send(ScanMsg::Done(result, deepest));
             ctx.request_repaint();
         });
         Self {
@@ -277,6 +127,7 @@ impl RepoScan {
             rx,
             progress: Progress::default(),
             result: None,
+            deepest: 0,
             cancel,
         }
     }
@@ -285,7 +136,10 @@ impl RepoScan {
         while let Ok(msg) = self.rx.try_recv() {
             match msg {
                 ScanMsg::Progress(p) => self.progress = p,
-                ScanMsg::Done(result) => self.result = Some(result),
+                ScanMsg::Done(result, deepest) => {
+                    self.result = Some(result);
+                    self.deepest = deepest;
+                }
             }
         }
     }
@@ -303,7 +157,7 @@ impl Drop for RepoScan {
 }
 
 /// A found repository's folder in the form the recent list keeps (as opening it would give).
-fn top_folder(dir: PathBuf) -> PathBuf {
+pub(super) fn top_folder(dir: PathBuf) -> PathBuf {
     if crate::remote::is_remote(&dir) {
         return dir;
     }
@@ -314,6 +168,7 @@ fn top_folder(dir: PathBuf) -> PathBuf {
 enum ScanClick {
     Open(PathBuf),
     AddAll,
+    SaveAsRoot,
     Stop,
     Close,
 }
@@ -385,6 +240,14 @@ impl App {
                     if add.clicked() {
                         click = Some(ScanClick::AddAll);
                     }
+                    if count > 0
+                        && ui
+                            .button(crate::i18n::text("interaction-library-save-root"))
+                            .on_hover_text(crate::i18n::text("interaction-library-save-root-tip"))
+                            .clicked()
+                    {
+                        click = Some(ScanClick::SaveAsRoot);
+                    }
                     let (label, what) = if done {
                         (
                             crate::i18n::text("interaction-scan-close"),
@@ -423,6 +286,11 @@ impl App {
                     ));
                 }
             }
+            Some(ScanClick::SaveAsRoot) => {
+                if let Some(scan) = self.repo_scan.take() {
+                    self.save_scan_as_root(scan.root.clone(), scan.deepest);
+                }
+            }
             Some(ScanClick::Stop) => {
                 if let Some(scan) = &self.repo_scan {
                     scan.stop();
@@ -434,6 +302,9 @@ impl App {
     }
 }
 
+#[cfg(test)]
+#[path = "repo_scan/engine_tests.rs"]
+mod engine_tests;
 #[cfg(test)]
 #[path = "repo_scan/localization_tests.rs"]
 mod localization_tests;
