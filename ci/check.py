@@ -45,8 +45,8 @@ def plan(tests=(), full=False):
 
 
 def low_priority(command):
-    """Cargo and the compilers it starts yield to interactive work (AGENTS.md)."""
-    if command[0] != "cargo":
+    """Cargo (also via the Clippy gate) and the compilers it starts yield to interactive work (AGENTS.md)."""
+    if command[0] != "cargo" and command[1:2] != ["ci/clippy_packages.py"]:
         return command, {}
     if WINDOWS:
         return command, {"creationflags": 0x40}  # IDLE_PRIORITY_CLASS, inherited by rustc

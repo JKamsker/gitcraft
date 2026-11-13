@@ -37,6 +37,8 @@ class PrePushTests(unittest.TestCase):
         command, extra = check.low_priority(["cargo", "test"])
         self.assertTrue(command[:3] == ["nice", "-n", "19"] or extra.get("creationflags") == 0x40)
         self.assertEqual(check.low_priority(["python3", "x.py"]), (["python3", "x.py"], {}))
+        command, extra = check.low_priority(["python3", "ci/clippy_packages.py"])
+        self.assertTrue(command[:3] == ["nice", "-n", "19"] or extra.get("creationflags") == 0x40)
 
     def test_dry_run_prints_without_running(self):
         self.assertEqual(check.main(["--dry-run", "--test", "x"]), 0)

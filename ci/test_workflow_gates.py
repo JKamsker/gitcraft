@@ -186,7 +186,8 @@ def aggregate_step(body):
     steps = [mapping("        " + block, 8) for block in blocks[1:]]
     require(bool(steps), "aggregate has no steps")
     last = steps[-1]
-    if last.get("run", (None,))[0] != AGGREGATE_CHECK or set(last) - {"name", "run", "env"}:
+    if (last.get("run", (None,))[0] != AGGREGATE_CHECK or last["run"][1].strip()
+            or set(last) - {"name", "run", "env"}):
         return False
     variables = nested(last, "env", 10) if "env" in last else {}
     return variables == {"NEEDS": ("${{ toJSON(needs) }}", "")}
@@ -356,6 +357,7 @@ class WorkflowGateTests(unittest.TestCase):
                          ("if: ${{ always() }}", "if: ${{ always() && !cancelled() }}"),
                          (AGGREGATE_CHECK, AGGREGATE_CHECK + " || true"),
                          (AGGREGATE_CHECK, AGGREGATE_CHECK + " --allow-skipped test"),
+                         (AGGREGATE_CHECK, AGGREGATE_CHECK + "\n          || true"),
                          ("NEEDS: ${{ toJSON(needs) }}\n        run: " + AGGREGATE_CHECK,
                           "NEEDS: '{}'\n        run: " + AGGREGATE_CHECK),
                          ("run: " + AGGREGATE_CHECK, "continue-on-error: true\n        run: " + AGGREGATE_CHECK)):

@@ -152,6 +152,13 @@ class SummaryTests(unittest.TestCase):
                                  "s::x": "unknown"})
         self.assertEqual(processes, ["infrastructure-or-environment", "infrastructure-or-environment"])
 
+    def test_a_hang_after_a_failed_test_is_still_reported(self):
+        panic = {"location": "src/a.rs:1:2", "message": "boom"}
+        tests, processes = self.classes(
+            report("repo-rest", 1, [process("timeout", ("r::failed", "failed", panic), running_at_timeout=[])]))
+        self.assertEqual(tests, {"r::failed": "deterministic-regression"})
+        self.assertEqual(processes, ["timeout-or-hang"])
+
     def test_a_passing_retry_marks_possible_flakiness_without_erasing_the_failure(self):
         panic = {"location": "src/a.rs:1:2", "message": "lock acquisition failed because the operation would block"}
         results, _ = ci_summary.classify([

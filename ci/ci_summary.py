@@ -79,7 +79,10 @@ def classify(reports):
                                                     "signature": key[1], "evidence": []})
                 cluster["evidence"].append({**evidence(report, process), "outcome": test["outcome"],
                                             "location": test.get("location")})
-            attributed = any(test["outcome"] in ("failed", "timeout") for test in tests)
+            # A hang after an earlier test failure is still a hang: only a test the
+            # watchdog stopped represents a timed-out or stalled process.
+            hung = process["outcome"] in ("timeout", "stalled")
+            attributed = any(test["outcome"] in (("timeout",) if hung else ("failed", "timeout")) for test in tests)
             if process["outcome"] not in ("passed",) and not attributed:
                 process_failures.append({**evidence(report, process),
                                          "class": classify_process(process),
