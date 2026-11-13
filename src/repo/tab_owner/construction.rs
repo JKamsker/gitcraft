@@ -144,6 +144,7 @@ impl RepoTab {
             tour: None,
             ssh_setup: None,
             insights: None,
+            review_purpose: Default::default(),
             pr_requests: 0,
             pr_drafts: HashMap::new(),
             compare_requests: 0,
