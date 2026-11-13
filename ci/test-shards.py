@@ -3,6 +3,11 @@
 
 Cargo builds all targets once in ci/windows-test-build.py. Every shard downloads
 that same artifact and uses the original libtest harness without recompiling.
+
+Each libtest process runs under ci/libtest_watchdog.py: the whole shard has a
+budget that ends before the Actions step timeout, and a process with no test
+starting or finishing for STALL_SECONDS is stopped. Either way the owned process
+tree is recorded and stopped, and ci-reports/<shard>/ names the unfinished tests.
 """
 
 import argparse
@@ -12,6 +17,15 @@ import re
 from pathlib import Path
 import subprocess
 import sys
+import time
+
+from libtest_watchdog import Report, run_process
+
+# windows-tests.yml gives the shard step 20 minutes; stop early enough to write
+# diagnostics and let the upload step run. Never raise these to hide a hang.
+SHARD_BUDGET_SECONDS = 18 * 60
+STALL_SECONDS = 10 * 60
+LIST_TIMEOUT_SECONDS = 120
 
 
 GIT_FIRST = [f"git::{letter}" for letter in "abcdefghijklm"]
@@ -120,6 +134,7 @@ def inventory(binaries, filters):
             [str(path), "--list", *filters],
             cwd=cwd,
             check=True,
+            timeout=LIST_TIMEOUT_SECONDS,
             stdout=subprocess.PIPE,
             text=True,
             encoding="utf-8",
@@ -232,45 +247,52 @@ def verify_partition(binaries):
     print(f"Verified complete, disjoint partition: {counts}; total={full.total()}", flush=True)
 
 
-def run_shard(binaries, shard):
+def shard_processes(binaries, shard):
+    """Every libtest process of a shard, in run order, with the tests it must run."""
     filters = SHARDS[shard]
-    print(f"Running precompiled Windows test shard {shard}", flush=True)
-    ran = 0
     for path, cwd in binaries:
         selected = inventory([(path, cwd)], filters)
-        if not selected:
-            continue
-        print(f"{path.name}: {selected.total()} tests", flush=True)
-        result = subprocess.run([str(path), "--nocapture", *filters], cwd=cwd)
-        if result.returncode:
-            return result.returncode
-        ran += selected.total()
-
+        if selected:
+            yield (f"{path.name}: {shard}", path, cwd, "parallel", selected,
+                   ["--nocapture", *filters])
     for group in SERIAL_GROUPS.get(shard, []):
         for path, cwd in binaries:
-            filters = serial_filters(shard, group)
-            selected = inventory([(path, cwd)], filters)
-            if not selected:
-                continue
-            print(f"Running serial group: {group}: {selected.total()} tests", flush=True)
-            result = subprocess.run(
-                [str(path), "--nocapture", *filters, "--test-threads=1"], cwd=cwd
-            )
-            if result.returncode:
-                return result.returncode
-            ran += selected.total()
-
+            group_filters = serial_filters(shard, group)
+            selected = inventory([(path, cwd)], group_filters)
+            if selected:
+                yield (f"{path.name}: serial {group}", path, cwd, "serial", selected,
+                       ["--nocapture", *group_filters, "--test-threads=1"])
     for name in ISOLATED.get(shard, []):
         for path, cwd in binaries:
-            if inventory([(path, cwd)], [name, "--exact"]):
-                print(f"Running isolated test: {name}", flush=True)
-                result = subprocess.run([str(path), "--nocapture", name, "--exact"], cwd=cwd)
-                if result.returncode:
-                    return result.returncode
-                ran += 1
+            selected = inventory([(path, cwd)], [name, "--exact"])
+            if selected:
+                yield (f"{path.name}: isolated {name}", path, cwd, "isolated", selected,
+                       ["--nocapture", name, "--exact"])
+
+
+def run_shard(binaries, shard, report_dir, budget=SHARD_BUDGET_SECONDS, stall=STALL_SECONDS):
+    print(f"Running precompiled Windows test shard {shard} (budget {budget:.0f}s, "
+          f"no-progress limit {stall:.0f}s)", flush=True)
+    report = Report(shard, report_dir)
+    started = time.monotonic()
+    ran = 0
+    for label, path, cwd, kind, selected, arguments in shard_processes(binaries, shard):
+        remaining = budget - (time.monotonic() - started)
+        if remaining <= 0:
+            print(f"::error title=watchdog: shard budget exhausted::{shard}: {label} did not start", flush=True)
+            report.finish("timeout")
+            return 1
+        print(f"{label}: {selected.total()} tests", flush=True)
+        record = run_process(report, label, [path, *arguments], cwd, binary=path.name, kind=kind,
+                             expected=selected, deadline=remaining, stall=stall)
+        if record["outcome"] != "passed":
+            report.finish(record["outcome"])
+            return record["exit_code"] or 1
+        ran += selected.total()
 
     if not ran:
         raise RuntimeError(f"Refusing empty shard {shard}")
+    report.finish("passed")
     print(f"Passed {ran} tests in {shard}", flush=True)
     return 0
 
@@ -279,6 +301,8 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("shard", nargs="?", choices=SHARDS)
     parser.add_argument("--check-only", action="store_true")
+    parser.add_argument("--report-dir", type=Path, default=Path("ci-reports"),
+                        help="the shard's report goes to <dir>/<shard>/")
     args = parser.parse_args()
     if not args.check_only and args.shard is None:
         parser.error("choose a shard or use --check-only")
@@ -287,7 +311,7 @@ def main():
     if args.check_only:
         verify_partition(binaries)
         return 0
-    return run_shard(binaries, args.shard)
+    return run_shard(binaries, args.shard, args.report_dir / args.shard)
 
 
 if __name__ == "__main__":
