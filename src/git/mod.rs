@@ -95,6 +95,7 @@ mod visualization_tests;
 pub(crate) use self::unity::tests as unity_tests;
 mod testlane;
 mod worktree;
+pub(crate) mod worktree_cleanup;
 mod worktree_location;
 
 pub use self::absorb::*;
