@@ -38,6 +38,7 @@ jobs:
       - name: Clippy and complexity gate
         run: python ci/clippy_packages.py
       - name: Build test binaries
+        id: build
         run: python ci/windows-test-build.py
       - name: Verify complete and disjoint Windows test shards
         run: python ci/test-shards.py --check-only
@@ -47,12 +48,13 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: windows-test-binaries
+          # The test executables and manifest come from the build step, which lists Cargo's
+          # reported paths (deps/ or the build-dir layout); a glob here misses them silently.
           path: |
-            target/debug/deps/*.exe
+            ${{ steps.build.outputs.upload-paths }}
             target/debug/deps/*.dll
             target/debug/*.exe
             target/debug/*.dll
-            ci/test-binaries.json
           if-no-files-found: error
           compression-level: 1
           retention-days: 1
