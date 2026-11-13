@@ -23,6 +23,7 @@ mod coverage;
 mod deploy;
 mod evolution;
 mod impact;
+pub(super) mod purpose;
 mod review_heat;
 mod ribbons;
 mod transform;
@@ -214,6 +215,8 @@ pub(crate) enum InsightsAct {
     Ribbons(ribbons::Act),
     Coverage(coverage::Act),
     Churn(churn::Act),
+    /// The files of the pull request shown, by purpose (#191).
+    Purpose(purpose::Act),
 }
 
 impl RepoTab {
@@ -248,6 +251,7 @@ impl RepoTab {
             InsightsAct::Ribbons(act) => self.ribbons_act(act, ctx),
             InsightsAct::Coverage(act) => self.coverage_act(act, ctx),
             InsightsAct::Churn(act) => self.churn_act(act, ctx),
+            InsightsAct::Purpose(act) => self.purpose_act(act, ctx),
         }
     }
 

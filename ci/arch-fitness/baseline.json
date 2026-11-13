@@ -3773,7 +3773,7 @@
     },
     "insights": {
       "domains": 15,
-      "exported": 293
+      "exported": 295
     },
     "os": {
       "domains": 4,
@@ -3789,7 +3789,7 @@
     },
     "repo-core": {
       "domains": 24,
-      "symbols": 608,
+      "symbols": 609,
       "exported": 91
     },
     "review": {

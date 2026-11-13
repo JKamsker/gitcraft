@@ -237,6 +237,9 @@ impl RepoTab {
                     },
                     acts,
                 );
+                if self.purpose_files(ui, acts, files) {
+                    return;
+                }
                 crate::repo::detail::files_header(ui, &files.files, None);
                 egui::ScrollArea::vertical()
                     .id_salt("pr-files")
