@@ -133,6 +133,11 @@ def verify_shared_gate(text):
     command = r"^\s+(?:- )?run: python3 ci/rust_file_size\.py --revision HEAD\s*$"
     require(re.search(command, text, re.M), "shared gate must check the complete immutable candidate")
     verify_required_commands(text, "check", (SIZE_CHECK, COMPLEXITY_CHECK, TOOLING_CHECK, ARCH_TESTS, ARCH_CHECK))
+    steps = job_steps(text, "check")
+    for command in (ARCH_TESTS, ARCH_CHECK):
+        step = next(step for step in steps if step.get("run", (None,))[0] == command)
+        limit = step.get("timeout-minutes", ("",))[0]
+        require(limit.isdigit() and 0 < int(limit) <= 15, f"architecture step needs a short timeout: {command}")
 
 
 def verify_callers(text):
@@ -246,6 +251,16 @@ class WorkflowGateTests(unittest.TestCase):
         for replacement in mutations:
             with self.subTest(replacement=replacement), self.assertRaisesRegex(ValueError, "exact command"):
                 verify_shared_gate(self.shared.replace(TOOLING_CHECK, replacement))
+
+    def test_shared_gate_bounds_the_architecture_steps(self):
+        verify_shared_gate(self.shared)
+        for command in (ARCH_TESTS, ARCH_CHECK):
+            for replacement in ("", "timeout-minutes: 360", "timeout-minutes: 0", "timeout-minutes: ${{ 360 }}"):
+                changed = self.shared.replace(f"timeout-minutes: 10\n        run: {command}",
+                                              f"{replacement}\n        run: {command}")
+                with self.subTest(command=command, replacement=replacement), self.assertRaisesRegex(ValueError, "short timeout"):
+                    self.assertNotEqual(changed, self.shared)
+                    verify_shared_gate(changed)
 
     def test_shared_gate_rejects_duplicate_tooling_discovery(self):
         duplicated = self.shared + f"\n      - name: Duplicate tooling check\n        run: {TOOLING_CHECK}\n"

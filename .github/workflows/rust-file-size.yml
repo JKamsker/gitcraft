@@ -29,6 +29,10 @@ jobs:
       - name: Prevent complexity policy overrides in the candidate tree
         run: python3 ci/complexity_policy.py --revision HEAD
       - name: Architecture fitness checker tests
+        # Healthy runs take well under a minute; a hang must fail fast, not hold the gate.
+        timeout-minutes: 10
         run: cargo test --locked --manifest-path ci/arch-fitness/Cargo.toml
       - name: Enforce architecture boundaries on the candidate tree
+        # Healthy runs take well under a minute; a hang must fail fast, not hold the gate.
+        timeout-minutes: 10
         run: cargo run --locked --release --manifest-path ci/arch-fitness/Cargo.toml -- check --revision HEAD --markdown "$GITHUB_STEP_SUMMARY"

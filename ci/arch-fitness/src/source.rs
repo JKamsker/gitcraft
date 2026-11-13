@@ -21,16 +21,30 @@ fn git(root: &Path, args: &[&str], input: Option<&[u8]>) -> Result<Vec<u8>, Stri
         .stderr(Stdio::piped())
         .spawn()
         .map_err(|e| format!("git: {e}"))?;
-    if let (Some(input), Some(mut stdin)) = (input, child.stdin.take()) {
-        stdin.write_all(input).map_err(|e| format!("git: {e}"))?;
-    }
+    // Feed stdin from a thread while stdout is drained: `cat-file --batch` answers as it
+    // reads, so writing every request first deadlocks once both pipe buffers fill (a
+    // 64 KiB Linux pipe is far smaller than the request list of a real tree).
+    let writer = match (input, child.stdin.take()) {
+        (Some(input), Some(mut stdin)) => {
+            let input = input.to_vec();
+            Some(std::thread::spawn(move || stdin.write_all(&input)))
+        }
+        _ => None,
+    };
     let output = child.wait_with_output().map_err(|e| format!("git: {e}"))?;
+    let written = writer.map(std::thread::JoinHandle::join);
+    // A failing git closes stdin early; its own error explains more than the broken pipe.
     if !output.status.success() {
         return Err(format!(
             "git {}: {}",
             args.join(" "),
             String::from_utf8_lossy(&output.stderr).trim()
         ));
+    }
+    if let Some(written) = written {
+        written
+            .map_err(|_| "git: stdin writer panicked".to_owned())?
+            .map_err(|e| format!("git: {e}"))?;
     }
     Ok(output.stdout)
 }
