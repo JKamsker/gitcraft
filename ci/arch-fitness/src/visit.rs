@@ -18,7 +18,8 @@ pub(crate) type Local = Option<bool>;
 #[derive(Default)]
 pub(crate) struct Frame {
     locals: HashMap<String, Local>,
-    uses: HashMap<String, Vec<Def>>,
+    /// Block-scoped imports per name space: `use a::f as T` names no type `T`.
+    uses: HashMap<(String, Ns), Vec<Def>>,
 }
 
 pub(crate) enum Place {
@@ -107,7 +108,9 @@ impl<'r, 'a> Visitor<'r, 'a> {
                     self.item(nested);
                 }
             }
-            other => self.frame(|v| visit::visit_item(v, other)),
+            other => self.scoped(crate::declare::item_attrs(other), |v| {
+                v.frame(|v| visit::visit_item(v, other));
+            }),
         }
     }
 
@@ -119,23 +122,22 @@ impl<'r, 'a> Visitor<'r, 'a> {
         let mut leaves = Vec::new();
         use_leaves(&u.tree, &mut Vec::new(), &mut leaves);
         for (name, path) in leaves {
-            let mut defs = Vec::new();
+            let mut all = Vec::new();
             for ns in [Ns::Type, Ns::Value, Ns::Macro] {
-                defs.extend(self.res.resolve(
-                    self.module,
-                    &path,
-                    ns,
-                    u.leading_colon.is_some(),
-                    &self.self_ty,
-                ));
+                let global = u.leading_colon.is_some();
+                let defs = self
+                    .res
+                    .resolve(self.module, &path, ns, global, &self.self_ty);
+                all.extend(defs.iter().copied());
+                if let (Some(name), false, Some(frame)) =
+                    (&name, defs.is_empty(), self.frames.last_mut())
+                {
+                    frame.uses.insert((name.clone(), ns), defs);
+                }
             }
-            defs.sort();
-            defs.dedup();
-            let written = path.join("::");
-            self.record(&defs, RefKind::Use, line_of(u), &written);
-            if let (Some(name), Some(frame)) = (name, self.frames.last_mut()) {
-                frame.uses.insert(name, defs);
-            }
+            all.sort();
+            all.dedup();
+            self.record(&all, RefKind::Use, line_of(u), &path.join("::"));
         }
     }
 
@@ -200,7 +202,7 @@ impl<'r, 'a> Visitor<'r, 'a> {
                 v.visit_expr(&c.expr);
             }),
             syn::ImplItem::Type(t) => self.scoped(&t.attrs, |v| v.visit_type(&t.ty)),
-            syn::ImplItem::Macro(m) => self.visit_macro(&m.mac),
+            syn::ImplItem::Macro(m) => self.scoped(&m.attrs, |v| v.visit_macro(&m.mac)),
             _ => {}
         }
     }
@@ -246,6 +248,23 @@ impl<'r, 'a> Visitor<'r, 'a> {
         }
     }
 
+    /// What a path names here: block-scoped imports of enclosing frames, then the module.
+    /// A path's first segment of several names a module or type.
+    pub(crate) fn lookup(&self, segs: &[String], ns: Ns, global: bool) -> Vec<Def> {
+        let first = (segs[0].clone(), if segs.len() == 1 { ns } else { Ns::Type });
+        let scoped = self
+            .frames
+            .iter()
+            .rev()
+            .find_map(|f| f.uses.get(&first).cloned());
+        match scoped {
+            Some(start) if !global => self.res.walk(start, &segs[1..], ns),
+            _ => self
+                .res
+                .resolve(self.module, segs, ns, global, &self.self_ty),
+        }
+    }
+
     /// Resolve and record one path; returns what it names.
     pub fn path(&mut self, path: &syn::Path, ns: Ns, kind: RefKind) -> Vec<Def> {
         let segs = syntax::path_idents(path);
@@ -254,17 +273,7 @@ impl<'r, 'a> Visitor<'r, 'a> {
         if !global && segs.len() == 1 && self.local(&segs[0]).is_some() {
             return Vec::new();
         }
-        let scoped = self
-            .frames
-            .iter()
-            .rev()
-            .find_map(|f| f.uses.get(&segs[0]).cloned());
-        let defs = match scoped {
-            Some(start) if !global => self.res.walk(start, &segs[1..], ns),
-            _ => self
-                .res
-                .resolve(self.module, &segs, ns, global, &self.self_ty),
-        };
+        let defs = self.lookup(&segs, ns, global);
         let written = segs.join("::");
         if defs.is_empty() && kind != RefKind::Macro {
             if segs.len() > 1 || ["crate", "self", "super"].contains(&segs[0].as_str()) {

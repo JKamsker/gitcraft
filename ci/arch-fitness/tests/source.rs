@@ -46,22 +46,32 @@ fn git(dir: &Path, args: &[&str], input: Option<&str>) -> Result<String, String>
     Ok(String::from_utf8_lossy(&out.stdout).trim().to_owned())
 }
 
-/// A repository whose single commit tracks `FILES` Rust files sharing one blob.
-fn large_repo() -> Result<(PathBuf, String), String> {
-    let dir = std::env::temp_dir().join(format!("arch-fitness-source-{}", std::process::id()));
-    if dir.exists() {
-        std::fs::remove_dir_all(&dir).map_err(|e| e.to_string())?;
+/// A temporary directory removed when dropped, also when setup or the test fails early.
+struct TempDir(PathBuf);
+
+impl Drop for TempDir {
+    fn drop(&mut self) {
+        let _ = std::fs::remove_dir_all(&self.0);
     }
-    std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
-    git(&dir, &["init", "-q"], None)?;
+}
+
+/// A repository whose single commit tracks `FILES` Rust files sharing one blob.
+fn large_repo() -> Result<(TempDir, String), String> {
+    let path = std::env::temp_dir().join(format!("arch-fitness-source-{}", std::process::id()));
+    if path.exists() {
+        std::fs::remove_dir_all(&path).map_err(|e| e.to_string())?;
+    }
+    std::fs::create_dir_all(&path).map_err(|e| e.to_string())?;
+    let dir = TempDir(path);
+    git(&dir.0, &["init", "-q"], None)?;
     let body = format!("pub fn f() {{}}\n{}\n", "//".repeat(BLOB_BYTES / 2));
-    let blob = git(&dir, &["hash-object", "-w", "--stdin"], Some(&body))?;
+    let blob = git(&dir.0, &["hash-object", "-w", "--stdin"], Some(&body))?;
     let index: String = (0..FILES)
         .map(|i| format!("100644 {blob}\tsrc/m{i}.rs\n"))
         .collect();
-    git(&dir, &["update-index", "--index-info"], Some(&index))?;
-    let tree = git(&dir, &["write-tree"], None)?;
-    let commit = git(&dir, &["commit-tree", &tree, "-m", "large"], None)?;
+    git(&dir.0, &["update-index", "--index-info"], Some(&index))?;
+    let tree = git(&dir.0, &["write-tree"], None)?;
+    let commit = git(&dir.0, &["commit-tree", &tree, "-m", "large"], None)?;
     Ok((dir, commit))
 }
 
@@ -69,14 +79,13 @@ fn large_repo() -> Result<(PathBuf, String), String> {
 fn large_revisions_are_read_without_a_pipe_deadlock() -> Result<(), String> {
     let (dir, commit) = large_repo()?;
     let (done, result) = mpsc::channel();
-    let root = dir.clone();
+    let root = dir.0.clone();
     std::thread::spawn(move || {
         let _ = done.send(source::revision(&root, &commit).map(|(files, _)| files));
     });
     let files = result
         .recv_timeout(Duration::from_secs(60))
         .map_err(|_| "reading the revision hung: git pipes deadlocked".to_owned())??;
-    let _ = std::fs::remove_dir_all(&dir);
     assert_eq!(files.len(), FILES);
     assert!(
         files

@@ -23,13 +23,7 @@ impl Visitor<'_, '_> {
             syn::Type::Paren(p) => self.tab_type(&p.elem),
             syn::Type::Path(p) if p.qself.is_none() => {
                 let segs = syntax::path_idents(&p.path);
-                let defs = self.res.resolve(
-                    self.module,
-                    &segs,
-                    Ns::Type,
-                    p.path.leading_colon.is_some(),
-                    &self.self_ty,
-                );
+                let defs = self.lookup(&segs, Ns::Type, p.path.leading_colon.is_some());
                 self.is_tab(&defs).then_some(true)
             }
             _ => None,
@@ -46,9 +40,7 @@ impl Visitor<'_, '_> {
             Expr::Call(c) => match &*c.func {
                 Expr::Path(p) => {
                     let segs = syntax::path_idents(&p.path);
-                    let defs =
-                        self.res
-                            .resolve(self.module, &segs, Ns::Value, false, &self.self_ty);
+                    let defs = self.lookup(&segs, Ns::Value, false);
                     let named = segs.last().is_some_and(|n| self.tab.returning.contains(n));
                     (self.is_tab(&defs) || named).then_some(true)
                 }

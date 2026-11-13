@@ -21,7 +21,7 @@ pub struct Policy {
     #[serde(default)]
     pub allowed_edges: Vec<AllowedEdge>,
     pub repo_tab: RepoTabPolicy,
-    /// Whether test-only code is held to the boundary rules (it is always reported).
+    /// Reserved: test-only code is always reported and never enforced, so `true` is rejected.
     #[serde(default)]
     pub enforce_tests: bool,
     /// Domains whose number of distinct foreign symbols is budgeted, not only their domains.
@@ -272,6 +272,9 @@ impl Policy {
             if krate.domain.as_deref().is_some_and(|d| !known(d)) {
                 errors.push(format!("crate {}: unknown domain", krate.name));
             }
+        }
+        if self.enforce_tests {
+            errors.push("enforce_tests: holding test-only code to the rules is not implemented; it is reported only".into());
         }
         errors
     }

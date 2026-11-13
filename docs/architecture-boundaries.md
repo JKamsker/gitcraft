@@ -182,7 +182,7 @@ mutator); `init` (struct literal). At adoption, 138 fields belong to `repo-core`
 5. **Domains**: module → domain mapping; edges, SCCs, fan-in/out, foreign symbols, effective
    visibility (an item's own visibility narrowed by its enclosing modules), and
    cross-domain re-exports. Test-only code (`cfg(test)`, `#[test]`, test crates) is listed
-   separately as `test_edges` and not enforced (`enforce_tests` in the policy).
+   separately as `test_edges` and not enforced (the policy rejects `enforce_tests: true`).
 6. **`RepoTab` fields**: accesses through `self` in `impl RepoTab` (however the type is
    spelled or aliased), parameters/closure parameters/`let` bindings typed as the tab, and
    bindings initialised from a tab constructor or a function every definition of which
