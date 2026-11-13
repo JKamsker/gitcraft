@@ -54,23 +54,23 @@ pub(super) fn show(
         return;
     }
     for archive in listed {
-        let m = &archive.manifest;
-        let into = window.restore_into.entry(m.id.clone()).or_insert_with(|| {
+        let id = archive.id().to_owned();
+        let into = window.restore_into.entry(id.clone()).or_insert_with(|| {
             worktrees
                 .iter()
-                .find(|(_, branch)| *branch == m.branch)
+                .find(|(_, branch)| branch == archive.branch())
                 .or(worktrees.first())
                 .map(|(p, _)| p.clone())
                 .unwrap_or_default()
         });
         ui.horizontal_wrapped(|ui| {
             ui.label(RichText::new(archive.describe()).small())
-                .on_hover_text(format!("{}\n{}", m.worktree, archive.zip.display()));
+                .on_hover_text(format!("{}\n{}", archive.worktree(), archive.zip.display()));
             let shown = into
                 .file_name()
                 .map(|n| n.to_string_lossy().into_owned())
                 .unwrap_or_default();
-            egui::ComboBox::from_id_salt(("worktree-archive-into", &m.id))
+            egui::ComboBox::from_id_salt(("worktree-archive-into", &id))
                 .selected_text(shown)
                 .width(160.0)
                 .show_ui(ui, |ui| {
@@ -90,7 +90,7 @@ pub(super) fn show(
             {
                 asks.restore = Some((archive.clone(), into.clone()));
             }
-            let asking = window.armed.as_deref() == Some(m.id.as_str());
+            let asking = window.armed.as_deref() == Some(id.as_str());
             let label = if asking {
                 crate::i18n::text("worktree-cleanup-delete-confirm")
             } else {
@@ -104,7 +104,7 @@ pub(super) fn show(
                 if asking {
                     asks.delete = Some(archive.clone());
                 } else {
-                    window.armed = Some(m.id.clone());
+                    window.armed = Some(id.clone());
                 }
             }
         });

@@ -109,7 +109,7 @@ fn put_back(store: &Store, listed: &Listed, worktree: &Path, error: &str) -> Str
     match store.restore(listed, worktree) {
         Ok(report) if report.failed.is_empty() => {
             // Every file is back in place: the archive would only be a second copy.
-            let _ = store.delete(&listed.manifest);
+            let _ = store.delete(listed);
             crate::i18n::message(
                 "worktree-cleanup-put-back",
                 &[("error", error.to_owned().into())],

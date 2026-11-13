@@ -21,7 +21,7 @@ pub(crate) struct RestoreReport {
     /// Not restored, and why.
     pub failed: Vec<(String, String)>,
     /// The manifest with this restore recorded.
-    pub manifest: Option<Manifest>,
+    pub(in crate::git) manifest: Option<Manifest>,
 }
 
 /// Restores `archive` into the worktree `dest`, which must be a worktree (its top folder) of

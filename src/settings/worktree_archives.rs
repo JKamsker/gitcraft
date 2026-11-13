@@ -146,15 +146,14 @@ fn archive_list(ui: &mut Ui, store: &Store) {
         let armed: Option<String> = ui.data(|d| d.get_temp(armed_id));
         let mut deleted = false;
         for listed in &seen.archives {
-            let m = &listed.manifest;
             ui.horizontal_wrapped(|ui| {
                 let line = listed.describe();
                 ui.label(RichText::new(line).small()).on_hover_text(format!(
                     "{}\n{}",
-                    m.worktree,
+                    listed.worktree(),
                     listed.zip.display()
                 ));
-                let asking = armed.as_deref() == Some(m.id.as_str());
+                let asking = armed.as_deref() == Some(listed.id());
                 let label = if asking {
                     crate::i18n::text("worktree-cleanup-delete-confirm")
                 } else {
@@ -164,13 +163,13 @@ fn archive_list(ui: &mut Ui, store: &Store) {
                 let button = egui::Button::new(RichText::new(label).color(color)).small();
                 if ui.add(button).clicked() {
                     if asking {
-                        if let Err(e) = store.delete(m) {
+                        if let Err(e) = store.delete(listed) {
                             layout::note(ui, e);
                         }
                         deleted = true;
                         ui.data_mut(|d| d.remove::<String>(armed_id));
                     } else {
-                        ui.data_mut(|d| d.insert_temp(armed_id, m.id.clone()));
+                        ui.data_mut(|d| d.insert_temp(armed_id, listed.id().to_owned()));
                     }
                 }
             });

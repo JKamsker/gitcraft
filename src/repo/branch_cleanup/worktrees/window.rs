@@ -73,7 +73,7 @@ impl RepoTab {
         let Some(store) = Settings::get(ctx).worktree_archives.store() else {
             return;
         };
-        let said = match store.delete(&listed.manifest) {
+        let said = match store.delete(listed) {
             Ok(()) => (
                 crate::i18n::text("worktree-cleanup-archive-deleted").to_owned(),
                 false,
@@ -187,7 +187,7 @@ pub(super) fn describe(outcome: &Outcome) -> (String, bool) {
                     "worktree-cleanup-removed-archived",
                     &[
                         ("freed", freed.into()),
-                        ("count", listed.manifest.files.len().into()),
+                        ("count", listed.file_count().into()),
                     ],
                 ),
                 None => {

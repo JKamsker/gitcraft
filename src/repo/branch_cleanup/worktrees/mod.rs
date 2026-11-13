@@ -381,11 +381,10 @@ pub(super) fn auto_restore(
     };
     let mut done = Vec::new();
     for listed in archives {
-        let m = &listed.manifest;
         let matching = worktrees
             .iter()
-            .find(|(_, branch, head)| *branch == m.branch && *head == m.head);
-        if let (true, Some((path, ..))) = (m.restored.is_empty(), matching)
+            .find(|(_, branch, head)| listed.awaits(branch, head));
+        if let Some((path, ..)) = matching
             && let Ok(report) = store.restore(&listed, path)
         {
             done.push((path.clone(), report));

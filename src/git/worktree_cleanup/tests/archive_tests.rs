@@ -61,7 +61,7 @@ fn an_archive_holds_the_files_and_a_manifest_and_is_listed() -> Result<(), Strin
     let key = manifest.repository.key.clone();
     assert_eq!(f.store.list(Some(&key)), [listed.clone()]);
     assert_eq!(f.store.usage(), listed.bytes);
-    f.store.delete(manifest)?;
+    f.store.delete(&listed)?;
     assert!(f.store.list(None).is_empty());
     assert_eq!(f.store.usage(), 0);
     Ok(())
@@ -115,9 +115,9 @@ fn a_tampered_archive_or_an_id_outside_the_store_is_refused() -> Result<(), Stri
     let listed = archived(&f, &wt, "done")?;
     let mut evil = listed.manifest.clone();
     evil.id = "../../x".to_owned();
-    assert!(f.store.delete(&evil).is_err());
+    assert!(f.store.delete_manifest(&evil).is_err());
     evil.repository.key = "../..".to_owned();
-    assert!(f.store.delete(&evil).is_err());
+    assert!(f.store.delete_manifest(&evil).is_err());
     // Bytes changed in the ZIP: it no longer verifies, and nothing is restored from it.
     let mut bytes = std::fs::read(&listed.zip).map_err(|e| e.to_string())?;
     let middle = bytes.len() / 3;

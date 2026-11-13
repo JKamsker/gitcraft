@@ -28,13 +28,13 @@ pub(crate) struct Store {
 
 /// The repository an archive belongs to: its common git folder, and a key made from it.
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
-pub(crate) struct Repository {
+pub(in crate::git) struct Repository {
     pub common_dir: String,
     pub key: String,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-pub(crate) struct Entry {
+pub(in crate::git) struct Entry {
     pub path: String,
     pub size: u64,
     pub sha256: String,
@@ -42,7 +42,7 @@ pub(crate) struct Entry {
 
 /// A restore that was done: when, into which worktree, and what it made.
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
-pub(crate) struct Restored {
+pub(in crate::git) struct Restored {
     pub at: i64,
     pub into: String,
     pub created: Vec<String>,
@@ -51,7 +51,7 @@ pub(crate) struct Restored {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-pub(crate) struct Manifest {
+pub(in crate::git) struct Manifest {
     pub version: u32,
     pub id: String,
     pub created: i64,
@@ -67,7 +67,7 @@ pub(crate) struct Manifest {
 /// An archive found in the store.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(crate) struct Listed {
-    pub manifest: Manifest,
+    pub(in crate::git) manifest: Manifest,
     pub zip: PathBuf,
     /// The ZIP and its manifest on disk.
     pub bytes: u64,
@@ -132,8 +132,13 @@ impl Store {
         out
     }
 
+    /// Deletes the archive `listed`.
+    pub fn delete(&self, listed: &Listed) -> Result<(), String> {
+        self.delete_manifest(&listed.manifest)
+    }
+
     /// Deletes an archive: its ZIP, then its manifest.
-    pub fn delete(&self, manifest: &Manifest) -> Result<(), String> {
+    pub(in crate::git) fn delete_manifest(&self, manifest: &Manifest) -> Result<(), String> {
         let (zip, json) = self.paths(&manifest.repository.key, &manifest.id)?;
         for path in [zip, json] {
             match std::fs::remove_file(&path) {
@@ -178,7 +183,11 @@ impl Store {
     }
 
     /// Records a restore in the archive's manifest (written whole, then moved in place).
-    pub fn record(&self, manifest: &Manifest, restored: Restored) -> Result<Manifest, String> {
+    pub(in crate::git) fn record(
+        &self,
+        manifest: &Manifest,
+        restored: Restored,
+    ) -> Result<Manifest, String> {
         let mut manifest = manifest.clone();
         manifest.restored.push(restored);
         let (_, json) = self.paths(&manifest.repository.key, &manifest.id)?;
@@ -215,6 +224,31 @@ fn write_json(path: &Path, value: &impl Serialize) -> Result<(), String> {
 }
 
 impl Listed {
+    pub fn id(&self) -> &str {
+        &self.manifest.id
+    }
+
+    pub fn branch(&self) -> &str {
+        &self.manifest.branch
+    }
+
+    /// The worktree's folder it was archived from.
+    pub fn worktree(&self) -> &str {
+        &self.manifest.worktree
+    }
+
+    pub fn file_count(&self) -> usize {
+        self.manifest.files.len()
+    }
+
+    /// Whether it waits to be restored into a worktree of `branch` at `head`: the same branch
+    /// at the commit it was archived from (a branch of the same name made again elsewhere is
+    /// another one), never restored before.
+    pub fn awaits(&self, branch: &str, head: &str) -> bool {
+        let m = &self.manifest;
+        m.restored.is_empty() && m.branch == branch && m.head == head
+    }
+
     /// "feature/x · 3 files · 4.1 KB · 2 hours ago", and whether it was restored.
     pub fn describe(&self) -> String {
         let (listed, m) = (self, &self.manifest);
