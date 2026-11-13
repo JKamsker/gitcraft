@@ -19,6 +19,7 @@ impl RepoTab {
         super::super::hang_diagnostics::checkpoint(format_args!("poll connections and filesystem"));
         self.notice_connections(ctx);
         self.local_ci.poll(ctx);
+        self.worktree_cleanup.note_terminals(self.terminals.len());
         self.shown = shown;
         if !shown || self.fs_pending.is_some() {
             self.discard_decrypted();

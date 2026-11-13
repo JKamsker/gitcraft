@@ -22,7 +22,9 @@ pub(crate) fn sha256_hex(bytes: &[u8]) -> String {
 }
 
 /// A relative path as the archive stores it: names joined by `/`, none empty, `.`, `..`, with
-/// a separator, drive or NUL in it, and not in `.git`. Anything else is refused.
+/// a separator, drive or NUL in it, and not in `.git`. Anything else is refused, and so is a
+/// name Windows would take for another: one ending in a dot or a space (`.git.`), or the
+/// short name of `.git` (`GIT~1`).
 pub(crate) fn checked_rel(rel: &str) -> Option<Vec<&str>> {
     let names: Vec<&str> = rel.split('/').collect();
     let bad = |n: &&str| {
@@ -30,6 +32,8 @@ pub(crate) fn checked_rel(rel: &str) -> Option<Vec<&str>> {
             || matches!(*n, "." | "..")
             || n.contains(['\\', ':', '\0'])
             || n.eq_ignore_ascii_case(".git")
+            || n.ends_with(['.', ' '])
+            || short_git(n)
     };
     if rel.is_empty() || names.iter().any(bad) {
         return None;
@@ -39,6 +43,13 @@ pub(crate) fn checked_rel(rel: &str) -> Option<Vec<&str>> {
         .components()
         .all(|c| matches!(c, Component::Normal(_)));
     normal.then_some(names)
+}
+
+/// `git~1` in any case: the 8.3 short name Windows may give `.git`.
+fn short_git(name: &str) -> bool {
+    name.get(..4).is_some_and(|head| head.eq_ignore_ascii_case("git~"))
+        && name.len() > 4
+        && name[4..].bytes().all(|b| b.is_ascii_digit())
 }
 
 /// What the untracked file `rel` of `root` is, never through a link.
@@ -73,10 +84,13 @@ pub(crate) fn classify(root: &Path, rel: &str) -> (u64, Kind) {
 
 /// How much `path` holds (a file or a folder), never following a link, within the limits.
 pub(crate) fn footprint(path: &Path) -> Footprint {
-    footprint_within(path, Instant::now() + WALK_TIME, WALK_ENTRIES)
+    walk(path, Instant::now() + WALK_TIME, WALK_ENTRIES).0
 }
 
-pub(crate) fn footprint_within(path: &Path, deadline: Instant, limit: u64) -> Footprint {
+/// What `path` holds within the time and entries given, and when anything in it last changed
+/// (nanoseconds since 1970).
+pub(crate) fn walk(path: &Path, deadline: Instant, limit: u64) -> (Footprint, u128) {
+    let mut newest = 0u128;
     let mut size = Footprint {
         complete: true,
         ..Footprint::default()
@@ -93,6 +107,9 @@ pub(crate) fn footprint_within(path: &Path, deadline: Instant, limit: u64) -> Fo
             size.complete = false;
             continue;
         };
+        let modified = meta.modified().ok();
+        let since = modified.and_then(|m| m.duration_since(std::time::UNIX_EPOCH).ok());
+        newest = newest.max(since.map_or(0, |d| d.as_nanos()));
         if meta.is_dir() {
             match std::fs::read_dir(&at) {
                 Ok(entries) => stack.extend(entries.flatten().map(|e| e.path())),
@@ -103,7 +120,7 @@ pub(crate) fn footprint_within(path: &Path, deadline: Instant, limit: u64) -> Fo
             size.bytes += meta.len();
         }
     }
-    size
+    (size, newest)
 }
 
 /// A footprint shown as "1.2 MB", or "≥ 1.2 MB" when the count stopped early.

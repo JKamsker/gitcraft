@@ -6,13 +6,16 @@
 
 mod archives;
 mod jobs;
+mod presence;
 mod rows;
 mod window;
 
 #[cfg(test)]
 mod tests;
+#[cfg(test)]
+mod tests_in_use;
 
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use crate::git::worktree_cleanup::archive::Listed;
 use crate::git::worktree_cleanup::{Evidence, Inspection, Outcome, Proof, Target, inspect};
@@ -21,13 +24,31 @@ use crate::repo::branch_health::{Bases, Merged, Reason};
 use crate::repo::dialogs::CleanupAct;
 use crate::settings::Settings;
 
-/// The tab's worktree cleanup: its window, and the automatic restores.
-#[derive(Default)]
+/// The tab's worktree cleanup: its window, the automatic restores, and the tab's place among
+/// the views the app has open (whose worktrees are in use).
 pub(in crate::repo) struct WorktreeCleanup {
     window: Option<Window>,
     /// The worktrees (folder, branch, commit) automatic restores last looked at.
     auto_seen: Option<Vec<(PathBuf, String, String)>>,
     auto_running: bool,
+    presence: presence::Presence,
+}
+
+impl WorktreeCleanup {
+    /// For the tab of the worktree at `path`.
+    pub fn new(path: &Path) -> Self {
+        Self {
+            window: None,
+            auto_seen: None,
+            auto_running: false,
+            presence: presence::Presence::new(path),
+        }
+    }
+
+    /// How many terminals the tab has open, for the other tabs' cleanup.
+    pub fn note_terminals(&mut self, count: usize) {
+        self.presence.terminals(count);
+    }
 }
 
 /// A worktree offered, as last looked at, and whether it is ticked.
@@ -88,10 +109,25 @@ impl RepoTab {
                     path: w.path.clone(),
                     branch: branch.clone(),
                     evidence: evidence(how, tip, &bases)?,
-                    in_use: None,
+                    in_use: self.in_use(&w.path),
                 })
             })
             .collect()
+    }
+
+    /// Why the app uses the worktree at `path`, if it does: an agent task listed for it,
+    /// another tab or view open on it, terminals open in it.
+    fn in_use(&self, path: &Path) -> Option<String> {
+        let same = crate::remote::is_same_dir_as(path);
+        let agents = self.agents.tasks.iter().filter(|t| same(Path::new(&t.path)));
+        let mut why: Vec<String> = agents
+            .map(|t| {
+                let agent = crate::agent::tasks::agent_label(&t.agent);
+                crate::i18n::message("worktree-cleanup-in-use-agent", &[("agent", agent.into())])
+            })
+            .collect();
+        why.extend(self.worktree_cleanup.presence.others(path));
+        (!why.is_empty()).then(|| why.join("; "))
     }
 
     fn open_worktree_cleanup(&mut self, ctx: &egui::Context) {

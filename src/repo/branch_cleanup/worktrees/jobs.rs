@@ -19,7 +19,7 @@ impl RepoTab {
         if chosen.is_empty() || window.running || self.busy_op.is_some() {
             return;
         }
-        let store = if window.archive { store } else { None };
+        let archive = window.archive;
         window.running = true;
         window.results.clear();
         let repo = self.path.clone();
@@ -39,6 +39,7 @@ impl RepoTab {
                             &target,
                             &preview,
                             store.as_ref(),
+                            archive,
                         ),
                     ));
                 }
@@ -99,12 +100,7 @@ impl RepoTab {
         else {
             return;
         };
-        let worktrees: Vec<(PathBuf, String, String)> = self
-            .worktrees
-            .iter()
-            .filter(|w| !w.bare && w.prunable.is_none())
-            .filter_map(|w| Some((w.path.clone(), w.branch.clone()?, w.head.clone())))
-            .collect();
+        let worktrees = restore_targets(&self.worktrees);
         if self.worktree_cleanup.auto_seen.as_ref() == Some(&worktrees) {
             return;
         }
@@ -127,6 +123,16 @@ impl RepoTab {
             },
         );
     }
+}
+
+/// The worktrees (folder, branch, commit) an archive may come back into by itself: never the
+/// main one (archives come from worktrees that were removed), a bare one or one gone.
+pub(super) fn restore_targets(worktrees: &[crate::git::Worktree]) -> Vec<(PathBuf, String, String)> {
+    worktrees
+        .iter()
+        .filter(|w| !w.main && !w.bare && w.prunable.is_none())
+        .filter_map(|w| Some((w.path.clone(), w.branch.clone()?, w.head.clone())))
+        .collect()
 }
 
 /// Restores every archive of this repository not restored yet whose branch is checked out in

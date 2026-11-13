@@ -4,7 +4,7 @@
 use std::path::Path;
 use std::time::{Duration, Instant};
 
-use super::files::{classify, footprint, footprint_within, sha256_hex};
+use super::files::{classify, footprint, sha256_hex, walk};
 use super::{Blocker, Footprint, Inspection, Kind, Proof, Target, Untracked};
 use crate::git::{self, Worktree};
 
@@ -56,12 +56,12 @@ pub(crate) fn inspect(repo: &Path, target: &Target) -> Result<Inspection, String
         merge_blockers(repo, target, &mut found.blockers);
     }
     operation_blockers(&target.path, &mut found.blockers);
-    read_files(&target.path, &mut found)?;
+    let ignored = read_files(&target.path, &mut found)?;
     if !found.changed.is_empty() {
         found.blockers.push(Blocker::Changed(found.changed.len()));
     }
     found.footprint = footprint(&target.path);
-    found.fingerprint = fingerprint(&found, tip.as_deref().unwrap_or(""));
+    found.fingerprint = fingerprint(&found, tip.as_deref().unwrap_or(""), &ignored);
     Ok(found)
 }
 
@@ -155,7 +155,9 @@ fn operation_blockers(path: &Path, out: &mut Vec<Blocker>) {
 }
 
 /// Tracked changes, untracked files (each looked at) and ignored ones, from one `status`.
-fn read_files(path: &Path, found: &mut Inspection) -> Result<(), String> {
+/// Returns each ignored entry with what it holds and when it last changed, for the
+/// fingerprint: an ignored file made or changed after the preview is not removed unseen.
+fn read_files(path: &Path, found: &mut Inspection) -> Result<String, String> {
     let out = git::run_bytes(
         Some(path),
         &[
@@ -172,6 +174,7 @@ fn read_files(path: &Path, found: &mut Inspection) -> Result<(), String> {
         complete: true,
         ..Footprint::default()
     };
+    let mut marks = String::new();
     let mut fields = out.split(|b| *b == 0);
     while let Some(field) = fields.next() {
         let [x, y, b' ', name @ ..] = field else {
@@ -181,8 +184,10 @@ fn read_files(path: &Path, found: &mut Inspection) -> Result<(), String> {
             (b'?', b'?') => found.untracked.push(untracked(path, name)),
             (b'!', b'!') => {
                 let rel = String::from_utf8_lossy(name).into_owned();
-                let size =
-                    footprint_within(&path.join(rel.trim_end_matches('/')), deadline, 1 << 20);
+                let (size, newest) =
+                    walk(&path.join(rel.trim_end_matches('/')), deadline, 1 << 20);
+                let (files, bytes) = (size.files, size.bytes);
+                marks.push_str(&format!("i {rel}\0{files}\0{bytes}\0{newest}\0"));
                 ignored_size.files += size.files;
                 ignored_size.bytes += size.bytes;
                 ignored_size.complete &= size.complete;
@@ -200,7 +205,7 @@ fn read_files(path: &Path, found: &mut Inspection) -> Result<(), String> {
         }
     }
     found.ignored_size = ignored_size;
-    Ok(())
+    Ok(marks)
 }
 
 fn untracked(root: &Path, name: &[u8]) -> Untracked {
@@ -221,9 +226,10 @@ fn untracked(root: &Path, name: &[u8]) -> Untracked {
     }
 }
 
-/// HEAD, the tip, the changed files and every untracked file with what it is (text with its
-/// checksum): what must not change between the preview and the removal.
-fn fingerprint(found: &Inspection, tip: &str) -> String {
+/// HEAD, the tip, the changed files, every untracked file with what it is (text with its
+/// checksum) and the `ignored` entries' marks: what must not change between the preview and
+/// the removal.
+fn fingerprint(found: &Inspection, tip: &str, ignored: &str) -> String {
     let mut text = format!("{}\0{tip}\0", found.head);
     for path in &found.changed {
         text.push_str(&format!("c {path}\0"));
@@ -234,5 +240,6 @@ fn fingerprint(found: &Inspection, tip: &str) -> String {
             file.path, file.size, file.kind
         ));
     }
+    text.push_str(ignored);
     sha256_hex(text.as_bytes())
 }

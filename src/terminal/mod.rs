@@ -74,6 +74,8 @@ pub struct Terminal {
     /// Selected cells, (row, col) on screen, from where the drag started to where it is.
     selection: Option<((u16, u16), (u16, u16))>,
     pub shell: String,
+    /// The folder it was started in (a worktree someone may be working in).
+    pub cwd: PathBuf,
 }
 
 impl Terminal {
@@ -200,6 +202,7 @@ impl Terminal {
             scroll_rest: 0.0,
             selection: None,
             shell,
+            cwd: cwd.to_owned(),
         })
     }
 

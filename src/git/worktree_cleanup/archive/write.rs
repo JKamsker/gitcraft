@@ -41,7 +41,9 @@ pub(crate) fn create(store: &Store, source: &Source<'_>) -> Result<Listed, Strin
     let written = write_zip(file, source, &mut manifest).and_then(|()| verify(&partial, &manifest));
     written?;
     let json = serde_json::to_vec_pretty(&manifest).map_err(|e| e.to_string())?;
-    let total = store.usage() + json.len() as u64;
+    // The new ZIP is still a partial file, which the usage doesn't count.
+    let zip_len = std::fs::metadata(&partial).map(|m| m.len()).unwrap_or(0);
+    let total = store.usage() + zip_len + json.len() as u64;
     if total > store.quota {
         return Err(crate::i18n::message(
             "worktree-cleanup-archive-quota",

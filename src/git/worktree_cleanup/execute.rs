@@ -26,13 +26,19 @@ pub(crate) enum Outcome {
 }
 
 /// Removes `target` if it is still as `preview` showed it and nothing keeps it; its untracked
-/// text files go to `store` first (`None`: it must have none).
+/// text files go to `store` first when `archive` (otherwise it must have none). Never when the
+/// archives would go with it: `store` lies inside it, in an ignored folder too.
 pub(crate) fn remove(
     repo: &Path,
     target: &Target,
     preview: &Inspection,
     store: Option<&Store>,
+    archive: bool,
 ) -> Outcome {
+    if store.is_some_and(|s| s.is_inside(&target.path)) {
+        return Outcome::Failed(crate::i18n::text("worktree-cleanup-archive-inside").to_owned());
+    }
+    let store = store.filter(|_| archive);
     let now = match inspect(repo, target) {
         Ok(now) => now,
         Err(e) => return Outcome::Failed(e),
@@ -74,9 +80,6 @@ pub(crate) fn remove(
 /// Archives the untracked files, then takes each out of the worktree, as checked just before;
 /// should one fail, those taken out are put back and the archive goes.
 fn archive_and_clear(store: &Store, target: &Target, now: &Inspection) -> Result<Listed, String> {
-    if store.is_inside(&target.path) {
-        return Err(crate::i18n::text("worktree-cleanup-archive-inside").to_owned());
-    }
     let repository = archive::repository(&target.path)?;
     let listed = archive::create(
         store,

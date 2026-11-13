@@ -14,7 +14,7 @@ use serde::{Deserialize, Serialize};
 pub(crate) use restore::RestoreReport;
 pub(in crate::git) use write::{Source, create};
 
-use super::files::{footprint, human, sha256_hex};
+use super::files::{human, sha256_hex};
 
 const MANIFEST_VERSION: u32 = 1;
 
@@ -94,13 +94,30 @@ impl Store {
         ))
     }
 
-    /// The bytes every archive takes together (every file under the root, links not
-    /// followed).
+    /// The bytes every archive takes together: the ZIPs and manifests in the store's own
+    /// folders (`<root>/<key>/<id>.zip|json`), nothing else under the root, links not followed.
     pub fn usage(&self) -> u64 {
-        if !self.root.exists() {
-            return 0;
-        }
-        footprint(&self.root).bytes
+        let plain = |p: &Path, dir: bool| {
+            std::fs::symlink_metadata(p)
+                .ok()
+                .filter(|m| if dir { m.is_dir() } else { m.is_file() })
+        };
+        let entries = |p: &Path| {
+            std::fs::read_dir(p)
+                .into_iter()
+                .flat_map(|d| d.flatten().map(|e| e.path()))
+        };
+        let ours = |p: &Path| {
+            let key = p.file_name().and_then(|n| n.to_str()).unwrap_or("");
+            self.folder(key).is_ok() && plain(p, true).is_some()
+        };
+        let archive = |p: &Path| p.extension().is_some_and(|e| e == "zip" || e == "json");
+        entries(&self.root)
+            .filter(|p| ours(p))
+            .flat_map(|folder| entries(&folder).collect::<Vec<_>>())
+            .filter(|p| archive(p))
+            .filter_map(|p| plain(&p, false).map(|m| m.len()))
+            .sum()
     }
 
     /// The archives of the repository `key` (every repository's when `None`), newest first.

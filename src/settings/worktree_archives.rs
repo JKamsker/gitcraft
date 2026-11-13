@@ -3,6 +3,7 @@
 //! when the worktree is made again, and the archives themselves, to look at and delete.
 
 use std::path::PathBuf;
+use std::sync::Mutex;
 use std::time::{Duration, Instant};
 
 use egui::{RichText, Ui};
@@ -50,7 +51,8 @@ impl WorktreeArchives {
     }
 }
 
-/// What the store held when last looked at, looked at again every few seconds.
+/// What the store held when last looked at, read again in the background every few seconds
+/// while the page shows: a store can be large or slow, and never holds up drawing.
 #[derive(Clone)]
 struct Seen {
     at: Instant,
@@ -59,21 +61,66 @@ struct Seen {
     archives: Vec<Listed>,
 }
 
-fn seen(ui: &Ui, store: &Store, again: bool) -> Seen {
-    let id = egui::Id::new("settings-worktree-archives");
-    let kept: Option<Seen> = ui.data(|d| d.get_temp(id));
-    match kept {
-        Some(s) if !again && s.root == store.root && s.at.elapsed() < Duration::from_secs(3) => s,
-        _ => {
+/// The last look, and whether one is under way.
+static LOOK: Mutex<(Option<Seen>, bool)> = Mutex::new((None, false));
+
+fn look() -> std::sync::MutexGuard<'static, (Option<Seen>, bool)> {
+    LOOK.lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner)
+}
+
+/// What `store` held when last looked at, if that was this store; starts a new look when there
+/// is none, it is a few seconds old, or `again`.
+fn seen(ctx: &egui::Context, store: &Store, again: bool) -> Option<Seen> {
+    let mut held = look();
+    let kept = held.0.clone().filter(|s| s.root == store.root);
+    let fresh = kept
+        .as_ref()
+        .is_some_and(|s| s.at.elapsed() < Duration::from_secs(3));
+    if (again || !fresh) && !held.1 {
+        held.1 = true;
+        let (store, ctx) = (store.clone(), ctx.clone());
+        std::thread::spawn(move || {
             let fresh = Seen {
                 at: Instant::now(),
                 root: store.root.clone(),
                 usage: store.usage(),
                 archives: store.list(None),
             };
-            ui.data_mut(|d| d.insert_temp(id, fresh.clone()));
-            fresh
-        }
+            *look() = (Some(fresh), false);
+            ctx.request_repaint();
+        });
+    }
+    kept
+}
+
+/// Takes the archive `id` off the last look.
+fn forget(id: &str) {
+    if let Some(seen) = &mut look().0 {
+        seen.archives.retain(|a| a.id() != id);
+    }
+}
+
+/// The archive location as typed: taken on Enter or when the field is left, so that the half
+/// of a path typed so far is never looked in.
+fn location_field(ui: &mut Ui, location: &mut String) {
+    let id = egui::Id::new("settings-worktree-archive-location");
+    let mut draft: String = ui
+        .data(|d| d.get_temp(id))
+        .unwrap_or_else(|| location.clone());
+    let default = Store::default_root()
+        .map(|p| p.display().to_string())
+        .unwrap_or_default();
+    let field = ui.add(
+        layout::field(&mut draft)
+            .hint_text(default)
+            .desired_width(layout::fit(ui, FIELD_WIDTH)),
+    );
+    if field.lost_focus() {
+        *location = draft;
+        ui.data_mut(|d| d.remove::<String>(id));
+    } else if field.has_focus() {
+        ui.data_mut(|d| d.insert_temp(id, draft));
     }
 }
 
@@ -84,16 +131,7 @@ impl Settings {
             "Archive location",
             crate::i18n::text("worktree-cleanup-settings-location-hint"),
             "worktree archive untracked zip folder location",
-            |ui| {
-                let default = Store::default_root()
-                    .map(|p| p.display().to_string())
-                    .unwrap_or_default();
-                ui.add(
-                    layout::field(&mut archives.location)
-                        .hint_text(default)
-                        .desired_width(layout::fit(ui, FIELD_WIDTH)),
-                );
-            },
+            |ui| location_field(ui, &mut archives.location),
         );
         card.row_hint(
             "Archive storage limit",
@@ -134,7 +172,10 @@ impl Settings {
 /// The archives with their sizes, newest first, each with Delete (asked twice).
 fn archive_list(ui: &mut Ui, store: &Store) {
     let t = crate::theme::Tokens::get(ui.ctx());
-    let seen = seen(ui, store, false);
+    let Some(seen) = seen(ui.ctx(), store, false) else {
+        ui.add(crate::spinner::Spinner::new());
+        return;
+    };
     let used = store.usage_line(seen.usage);
     ui.vertical(|ui| {
         layout::note(ui, used);
@@ -163,8 +204,10 @@ fn archive_list(ui: &mut Ui, store: &Store) {
                 let button = egui::Button::new(RichText::new(label).color(color)).small();
                 if ui.add(button).clicked() {
                     if asking {
-                        if let Err(e) = store.delete(listed) {
-                            layout::note(ui, e);
+                        match store.delete(listed) {
+                            // Gone from the list at once; the usage follows with the next look.
+                            Ok(()) => forget(listed.id()),
+                            Err(e) => layout::note(ui, e),
                         }
                         deleted = true;
                         ui.data_mut(|d| d.remove::<String>(armed_id));
@@ -176,7 +219,7 @@ fn archive_list(ui: &mut Ui, store: &Store) {
         }
         if deleted {
             // Looked at again at once: the list and the usage without it.
-            self::seen(ui, store, true);
+            self::seen(ui.ctx(), store, true);
         }
     });
 }
