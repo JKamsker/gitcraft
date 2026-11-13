@@ -44,7 +44,17 @@ pub(super) struct SearchKeys {
 /// it) before the field sees them; it takes the keyboard itself when `take_focus` and nothing
 /// else has it.
 pub(super) fn search_ui(ui: &mut Ui, f: &mut RecentFilter, take_focus: bool) -> SearchKeys {
-    let id = home_filter::search_id();
+    search_ui_at(ui, f, home_filter::search_id(), take_focus)
+}
+
+/// [`search_ui`] for the search field `id` (the start page has two: Recent's and the
+/// library's), its hint the same.
+pub(super) fn search_ui_at(
+    ui: &mut Ui,
+    f: &mut RecentFilter,
+    id: egui::Id,
+    take_focus: bool,
+) -> SearchKeys {
     let mut keys = SearchKeys::default();
     if ui.memory(|m| m.has_focus(id)) {
         let has_text = !f.query.is_empty();
@@ -116,6 +126,7 @@ impl App {
             || self.palette.is_some()
             || self.manual_open
             || self.repo_scan.is_some()
+            || self.library_open
     }
 
     /// The recent repositories: the search, then the rows matching it.

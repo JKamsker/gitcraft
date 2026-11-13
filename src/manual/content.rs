@@ -89,7 +89,7 @@ mod tests {
                 .iter()
                 .map(|(_, points)| points.len())
                 .sum::<usize>(),
-            219
+            220
         );
         let mut ids = BTreeSet::new();
         for (title, points) in sections {

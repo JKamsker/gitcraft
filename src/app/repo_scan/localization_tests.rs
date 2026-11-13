@@ -1,5 +1,6 @@
 use super::*;
 use egui_kittest::{Harness, kittest::Queryable};
+use std::path::Path;
 
 #[test]
 fn actual_inert_scan_progress_result_and_error_paint_preserve_original_open_request_and_state() {
@@ -13,6 +14,7 @@ fn actual_inert_scan_progress_result_and_error_paint_preserve_original_open_requ
             repos: 6,
         },
         result: None,
+        deepest: 0,
         cancel: Arc::new(AtomicBool::new(false)),
     };
     let fonts = std::cell::Cell::new(false);
