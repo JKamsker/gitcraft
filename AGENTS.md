@@ -11,7 +11,7 @@
 
 - Commit **and push** every completed unit before starting the next unit or any risky test. Verify the remote branch SHA equals the local commit, and report whether the unit is WIP, reviewed, or validated.
 - Keep each agent's work on its assigned branch/worktree. Do not modify another agent's WIP.
-- **Never rebase or force-push a pushed branch.** To bring a branch up to date with `dev` (or resolve PR conflicts), merge `dev` into it (`git merge origin/dev`) and push normally. Published history is never rewritten.
+- **Never rebase or force-push a pushed branch.** To bring a branch up to date with `dev` (or resolve PR conflicts), run `git fetch origin dev`, then merge it in (`git merge origin/dev`) and push normally. Published history is never rewritten.
 
 # Commit authorship
 
