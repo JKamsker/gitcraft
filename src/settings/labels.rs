@@ -148,6 +148,11 @@ pub(super) fn display(raw: &str) -> &str {
         "Repository network" => crate::i18n::text("interaction-accounts-repo-network"),
         "Command palette" => crate::i18n::text("interaction-presentation-palette"),
         "Manual" => crate::i18n::text("interaction-presentation-manual"),
+        "Worktree archives" => crate::i18n::text("worktree-cleanup-settings-label-archives"),
+        "Archive location" => crate::i18n::text("worktree-cleanup-settings-label-location"),
+        "Archive storage limit" => crate::i18n::text("worktree-cleanup-settings-label-limit"),
+        "Restore automatically" => crate::i18n::text("worktree-cleanup-settings-label-auto"),
+        "Archives" => crate::i18n::text("worktree-cleanup-settings-label-list"),
         _ => raw,
     }
 }

@@ -33,6 +33,7 @@ use std::path::{Path, PathBuf};
 
 use egui::{Key, RichText};
 
+pub(crate) use cleanup::CleanupAct;
 pub(crate) use preview::WhatItDoes;
 
 pub use custom::CustomDialog;

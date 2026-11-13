@@ -204,7 +204,7 @@ impl RepoTab {
             Action::Detached(act) => self.detached_act(act, ctx),
             Action::CarryCheckout(blocked) => self.carry_checkout(*blocked, ctx),
             Action::Dialog(dialog) => self.open_dialog(dialog, ctx),
-            Action::SelectStaleBranches => self.dialog = Some(self.cleanup_dialog(ctx)),
+            Action::Cleanup(act) => self.cleanup_act(act, ctx),
             Action::OpenCollisions => self.open_collisions(),
             Action::OpenFence => self.open_fence(ctx),
             Action::OpenDrift(path) => self.open_drift(&path, ctx),

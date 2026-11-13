@@ -233,7 +233,7 @@ interaction-manual-feature-changes-commits-title = Changes and commits
 
 interaction-manual-feature-changes-commits-01 = Stage, unstage or discard whole files from the right pane.
 
-interaction-manual-feature-changes-commits-02 = Path / Tree at the top of the right pane lists the files flat or in their folders; click a folder to fold it.
+interaction-manual-feature-changes-commits-02 = Path / Tree at the top of the changes pane lists the files flat or in their folders; click a folder to fold it. The selected commit has no switch of its own: it follows Settings → Appearance → Changed files (folders by default).
 
 interaction-manual-feature-changes-commits-03 = In a file's diff, stage, unstage or discard one hunk, or click the lines you want and act on only those.
 
@@ -283,7 +283,7 @@ interaction-manual-feature-changes-commits-25 = Stash (toolbar or palette): ever
 
 interaction-manual-feature-changes-commits-26 = Ctrl+click files in the changes to pick them for stashing (or right-click one: Stash this file…); the bar over the list stashes those picked. Conflicted files and a staged rename or deletion can't be stashed by file: unstage it first, or stash what is staged.
 
-interaction-manual-feature-changes-commits-27 = Below a commit's hash, click a section to fold it out: Signature (whether it is valid, and if not why, with the signer and git's output; Check again after importing a key), Contained in (its branches and tags, and the first tag after it), Notes (add, edit or delete a note in the namespace picked; Fetch notes and Push notes share that namespace with a remote, and stop rather than overwrite when both sides have notes the other lacks) and Backlinks (later commits that revert it, cherry-pick it, name it in a trailer such as Fixes: or just mention its hash; click one to open it).
+interaction-manual-feature-changes-commits-27 = A long description shows its first lines; Show more unfolds the rest (and Show less folds it again, for every commit). Below a commit's hash, More details folds out four sections: Signature (whether it is valid, and if not why, with the signer and git's output; Check again after importing a key), Contained in (its branches and tags, and the first tag after it), Notes (add, edit or delete a note in the namespace picked; Fetch notes and Push notes share that namespace with a remote, and stop rather than overwrite when both sides have notes the other lacks) and Backlinks (later commits that revert it, cherry-pick it, name it in a trailer such as Fixes: or just mention its hash; click one to open it). A signature that needs attention shows above it while folded; click it to open the signature.
 
 interaction-manual-feature-changes-commits-28 = Fold staged changes into an older commit: right-click it in the graph and pick “Fold staged changes into this commit”, or use “Fold…” beside “Amend last commit”. First it shows the commit and the ones after it that get rewritten, and warns when they are already pushed. “Keep as fixup! commit for later” only commits them as “fixup! <summary>” on top. A conflict is resolved as in any rebase, and Abort goes back to before the fold; Ctrl+Z undoes it, the changes staged again.
 
@@ -349,11 +349,11 @@ interaction-manual-feature-branches-remotes-02 = Submodules show whether they ar
 
 interaction-manual-feature-branches-remotes-03 = Hover a branch and click its eye to hide it from the graph, or Solo it from its menu to see only the branches soloed; “Show all” at the top brings them all back.
 
-interaction-manual-feature-branches-remotes-04 = Pin to top (a branch's menu) keeps it at the top of Local; Name / Recent in the Branches header sorts the others by name or by their last commit. Both are kept per repository.
+interaction-manual-feature-branches-remotes-04 = Pin to top (a branch's menu) keeps it at the top of Local; the Name (A–Z) and Recent (clock) icons in the Branches header sort the others by name or by their last commit. Both are kept per repository.
 
 interaction-manual-feature-branches-remotes-05 = A branch marked merged has its work in the default branch: merged, rebased or cherry-picked, or squash-merged by a pull request into it; stale, no commit for 90 days (Settings → Git); gone, its upstream deleted on the remote.
 
-interaction-manual-feature-branches-remotes-06 = The brush in the Branches header (or Select stale or merged branches… in the palette) lists those branches with why, only the merged ones ticked, and deletes the ticked ones here, and if asked their branches of the same name on the remote, in one go that Undo brings back. It never offers the checked-out branch, the default one, or one checked out in a worktree.
+interaction-manual-feature-branches-remotes-06 = The brush in the Branches header (or Select stale or merged branches… in the palette) lists those branches with why, only the merged ones ticked, and deletes the ticked ones here, and if asked their branches of the same name on the remote, in one go that Undo brings back. It never offers the checked-out branch, the default one, or one checked out in a worktree. Worktrees whose branch is merged are offered there too (Review worktree cleanup…, or Clean up worktrees of merged branches… in the palette): each shows its folder, branch, how it is known merged, its changed, untracked and ignored files and the space it gives back. Only the ones ticked and confirmed are removed, never one with changes, untracked files (unless archived first), unpublished commits, in use or the main worktree; each is looked at again just before. Their branches are kept.
 
 interaction-manual-feature-branches-remotes-07 = Conflicts open in a three-pane editor with Ours, Theirs and Both for each conflict.
 

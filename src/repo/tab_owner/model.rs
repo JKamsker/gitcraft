@@ -325,6 +325,8 @@ pub struct RepoTab {
     pub(in crate::repo) postcards: postcards::State,
     pub(in crate::repo) growth: Option<growth::State>,
     pub(in crate::repo) cleanup: Option<cleanup::State>,
+    /// Cleaning up the worktrees of merged branches, and restoring their archives.
+    pub(in crate::repo) worktree_cleanup: crate::repo::branch_cleanup::WorktreeCleanup,
     pub(in crate::repo) sparse: Option<sparse::State>,
     pub(in crate::repo) atlas: Option<atlas::State>,
     pub(in crate::repo) history_activity: Option<history_activity::Activity>,
