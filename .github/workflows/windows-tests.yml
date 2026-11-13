@@ -1,4 +1,7 @@
-# Shared by PR checks and releases so both execute the same complete Windows suite.
+# The complete Windows suite, in complete and disjoint shards (ci/test-shards.py). CI calls it
+# for pull requests, merge-queue candidates and pushes; Release publishes only after that CI
+# passed for the same commit. Each shard runs under the test watchdog and uploads its report,
+# JUnit, capped logs and any process snapshot, even when it fails or times out.
 name: Windows tests
 
 on:
@@ -25,11 +28,13 @@ jobs:
           components: clippy
       - uses: Swatinem/rust-cache@v2
         with:
-          # Dev releases populate this cache, so new PRs can restore it too.
+          # CI on dev populates this cache, so new PRs can restore it too.
           shared-key: build
           cache-on-failure: true
       - name: Verify compiler diagnostics and build inventory
         run: python -m unittest discover -s ci -p test_windows_test_build.py -v
+      - name: Verify the test watchdog's Job Object containment on native Windows
+        run: python -m unittest discover -s ci -p test_libtest_watchdog.py -v
       - name: Clippy and complexity gate
         run: python ci/clippy_packages.py
       - name: Build test binaries
@@ -73,13 +78,26 @@ jobs:
           - core
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
       - uses: actions/download-artifact@v4
         with:
           name: windows-test-binaries
+      # The watchdog's shard budget (ci/test-shards.py) ends before this step's timeout, so a
+      # hang fails with a report naming the running tests and their processes.
       - name: Run precompiled test shard
         timeout-minutes: 20
         env:
           RUST_BACKTRACE: "1"
           GITCRAFT_TEST_PROCESS_TRACE: "1"
-        run: python ci/test-shards.py ${{ matrix.shard }}
+        run: python ci/test-shards.py ${{ matrix.shard }} --report-dir ci-reports
+      - name: Upload test report and diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-report-windows-${{ matrix.shard }}-attempt-${{ github.run_attempt }}
+          path: ci-reports/
+          if-no-files-found: warn
+          retention-days: 14
 
