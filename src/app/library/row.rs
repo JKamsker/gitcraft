@@ -51,7 +51,11 @@ pub(in crate::app) fn library_row(
     icons::paint(
         ui,
         Rect::from_center_size(pos2(rect.left() + 20.0, y), vec2(18.0, 18.0)),
-        "folder-git-2",
+        if crate::remote::is_remote(path) {
+            "server"
+        } else {
+            "folder-git-2"
+        },
         16.0,
         if row.stale { t.text_faint } else { t.icon },
     );

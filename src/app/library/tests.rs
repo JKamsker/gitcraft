@@ -11,6 +11,7 @@ use super::super::Tab;
 use super::model::{Outcome, Source};
 use super::roots_dialog::RootsClick;
 use super::*;
+use crate::app::App;
 
 /// A folder of its own for a test, under the temporary folder (whose own children are never
 /// a nearby folder: see `identity::nearby_parent`).

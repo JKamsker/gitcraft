@@ -3,6 +3,7 @@
 //! Recent ones. Scans run in the background with the shared bounded engine
 //! (`repo_scan::engine`); the window thread only reads what they sent.
 
+mod actions;
 mod identity;
 mod model;
 mod roots_dialog;
@@ -20,7 +21,6 @@ pub(super) use view::{LibraryClick, search_id};
 use std::path::{Path, PathBuf};
 use std::time::{Duration, Instant};
 
-use super::App;
 use super::home_recent::now_secs;
 use super::repo_scan::{NEARBY_LIMITS, ROOT_LIMITS, ScanLimits};
 
@@ -72,6 +72,8 @@ impl LibraryState {
     pub fn switch_profile(&mut self) {
         self.scheduler.retire_all();
         self.view = Default::default();
+        // Its roots are looked at again as on start.
+        self.checked = None;
         self.rev += 1;
     }
 
@@ -85,9 +87,8 @@ impl LibraryState {
     fn tick(&mut self, profile: u64, active: bool, ctx: &egui::Context) {
         self.scheduler.set_repaint(ctx);
         let now = now_secs();
-        if let Some(lib) = self.saved.get_mut(&profile)
-            && self.scheduler.poll(profile, lib, now)
-        {
+        let lib = self.saved.entry(profile).or_default();
+        if self.scheduler.poll(profile, lib, now) {
             self.rev += 1;
         }
         let started = *self.started.get_or_insert_with(Instant::now);
@@ -98,11 +99,16 @@ impl LibraryState {
         if !active || self.checked.is_some_and(|c| c.elapsed() < CHECK_EVERY) {
             return;
         }
-        self.checked = Some(Instant::now());
+        // The first look after start scans every root: what the cache shows is only what was
+        // there when gitcraft last looked.
+        let first = self.checked.replace(Instant::now()).is_none();
         let due: Vec<u64> = self.get(profile).map_or_else(Vec::new, |lib| {
             lib.roots
                 .iter()
-                .filter(|r| r.enabled && r.last.as_ref().is_none_or(|l| now - l.at >= STALE_AFTER))
+                .filter(|r| {
+                    r.enabled
+                        && (first || r.last.as_ref().is_none_or(|l| now - l.at >= STALE_AFTER))
+                })
                 .map(|r| r.id)
                 .collect()
         });
@@ -161,11 +167,15 @@ impl LibraryState {
             return;
         };
         let lib = self.lib(profile);
-        let gone = lib.note_nearby(parent.clone());
-        let fresh = lib
-            .nearby
-            .first()
-            .and_then(|n| n.last.as_ref())
+        let gone = lib.note_nearby(parent);
+        // As the library spells it (a folder noted before keeps its first spelling).
+        let Some(first) = lib.nearby.first() else {
+            return;
+        };
+        let parent = first.parent.clone();
+        let fresh = first
+            .last
+            .as_ref()
             .is_some_and(|l| l.outcome == Outcome::Complete && now_secs() - l.at < STALE_AFTER);
         for parent in gone {
             self.scheduler.retire(&Source::Nearby(parent));
@@ -250,64 +260,9 @@ impl LibraryState {
     }
 }
 
-impl App {
-    fn profile(&self) -> u64 {
-        self.settings.active_profile
-    }
-
-    /// The window's part of the library: applying what scans sent, starting those due.
-    pub(super) fn poll_library(&mut self, ctx: &egui::Context) {
-        let active =
-            ctx.input(|i| i.focused || i.raw.viewports.values().any(|v| v.focused == Some(true)));
-        let profile = self.profile();
-        self.library.tick(profile, active, ctx);
-    }
-
-    /// A local repository was opened (by the user): its siblings are looked for.
-    pub(super) fn library_noticed_open(&mut self, root: &Path) {
-        let profile = self.profile();
-        self.library.noticed_open(profile, root);
-    }
-
-    /// Does what the start page's section asked.
-    pub(super) fn library_click(&mut self, click: LibraryClick, ctx: &egui::Context) {
-        let profile = self.profile();
-        match click {
-            LibraryClick::Open(path) => self.open_repo(&path, ctx),
-            LibraryClick::Hide(path) => self.library.hide(profile, &path),
-            LibraryClick::Manage => self.library_open = true,
-            LibraryClick::AddRoot => {
-                self.library_open = true;
-                self.pick_library_root(None);
-            }
-        }
-    }
-
-    /// Asks for a folder: a new root, or root `id`'s new folder.
-    pub(super) fn pick_library_root(&mut self, id: Option<u64>) {
-        let Some(dir) = rfd::FileDialog::new()
-            .set_title(crate::i18n::text("interaction-library-pick"))
-            .pick_folder()
-        else {
-            return;
-        };
-        let profile = self.profile();
-        match id {
-            Some(id) => self.library.move_root(profile, id, dir),
-            None => self.library.add_root(profile, dir, 1),
-        }
-    }
-
-    /// _Save as root_ after _Scan a folder_: as deep as the deepest repository it found
-    /// there (at least 1, at most [`model::MAX_DEPTH`]); the roots dialog shows it.
-    pub(super) fn save_scan_as_root(&mut self, root: PathBuf, deepest: usize) {
-        let depth = deepest.clamp(1, usize::from(model::MAX_DEPTH)) as u8;
-        let profile = self.profile();
-        self.library.add_root(profile, root, depth);
-        self.library_open = true;
-    }
-}
-
+#[cfg(test)]
+#[path = "library/fs_tests.rs"]
+mod fs_tests;
 #[cfg(test)]
 #[path = "library/tests.rs"]
 mod tests;

@@ -240,7 +240,7 @@ impl App {
                     if add.clicked() {
                         click = Some(ScanClick::AddAll);
                     }
-                    if done
+                    if count > 0
                         && ui
                             .button(crate::i18n::text("interaction-library-save-root"))
                             .on_hover_text(crate::i18n::text("interaction-library-save-root-tip"))

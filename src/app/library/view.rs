@@ -6,14 +6,13 @@ use std::path::{Path, PathBuf};
 
 use egui::{RichText, Ui};
 
-use super::model::{Library, ScanRecord, Source};
+use super::model::{Library, Source};
 use super::row::{RowClick, library_row};
 use super::rows::{self, Row, Show};
-use super::scheduler::Scheduler;
 use super::status;
 use crate::app::App;
 use crate::app::home_filter::RecentFilter;
-use crate::app::home_recent::{SearchKeys, apply_keys, now_secs, search_ui_at};
+use crate::app::home_recent::{SearchKeys, apply_keys, search_ui_at};
 use crate::app::recent_status::RecentStatuses;
 use crate::icons;
 use crate::theme::{self, Tokens};
@@ -43,7 +42,7 @@ pub(in crate::app) struct LibraryView {
 #[derive(Default)]
 pub(in crate::app) struct RowsCache {
     key: Option<(u64, u64, Vec<PathBuf>)>,
-    rows: Vec<Row>,
+    pub(super) rows: Vec<Row>,
 }
 
 impl RowsCache {
@@ -122,7 +121,7 @@ impl App {
         }
         let moved = view.filter.selected != before || keys.down || keys.up;
         let follow = moved.then(|| view.follow(view.filter.selected)).flatten();
-        source_line(ui, t, view, lib, &state.scheduler, profile);
+        status::source_line(ui, t, view, lib, &state.scheduler, profile);
         if rows.is_empty() && lib.roots.is_empty() {
             ui.add_space(4.0);
             ui.label(
@@ -243,78 +242,6 @@ fn show_chips(ui: &mut Ui, view: &mut LibraryView, lib: &Library) {
             }
         }
     });
-}
-
-/// The sources the filter shows, with whether each is on and its last scan.
-fn sources_shown<'a>(
-    view: &LibraryView,
-    lib: &'a Library,
-) -> Vec<(Source, bool, Option<&'a ScanRecord>)> {
-    let roots = lib
-        .roots
-        .iter()
-        .map(|r| (Source::Root(r.id), r.enabled, r.last.as_ref()));
-    let nearby = lib.nearby.iter().map(|n| {
-        (
-            Source::Nearby(n.parent.clone()),
-            lib.nearby_enabled,
-            n.last.as_ref(),
-        )
-    });
-    match &view.show {
-        Show::Root(id) => roots.filter(|(s, ..)| *s == Source::Root(*id)).collect(),
-        Show::Nearby => nearby.collect(),
-        Show::All => roots.filter(|(_, on, _)| *on).chain(nearby).collect(),
-        Show::Recent => Vec::new(),
-    }
-}
-
-/// How the sources shown are doing: one root's own line, else how many are scanning or
-/// in trouble (partial, unavailable).
-fn source_line(
-    ui: &mut Ui,
-    t: &Tokens,
-    view: &LibraryView,
-    lib: &Library,
-    sched: &Scheduler,
-    profile: u64,
-) {
-    let now = now_secs();
-    let sources = sources_shown(view, lib);
-    let activity = |s: &Source| sched.activity(profile, s);
-    let scanning = sources
-        .iter()
-        .filter(|(s, ..)| activity(s).is_some())
-        .count();
-    let troubled = sources
-        .iter()
-        .filter(|(s, on, last)| status::state(*on, activity(s), *last, now).is_problem())
-        .count();
-    let text = match (&view.show, sources.first()) {
-        (Show::Root(_), Some((s, on, last))) => Some(status::line(*on, activity(s), *last, now)),
-        _ if scanning > 0 => Some(crate::i18n::message(
-            "interaction-library-scanning",
-            &[("count", scanning.into())],
-        )),
-        _ if troubled > 0 => Some(crate::i18n::message(
-            "interaction-library-troubled",
-            &[("count", troubled.into())],
-        )),
-        _ => None,
-    };
-    if let Some(text) = text {
-        ui.horizontal(|ui| {
-            if scanning > 0 {
-                ui.add(crate::spinner::Spinner::new());
-            }
-            let color = if troubled > 0 {
-                t.warning
-            } else {
-                t.text_faint
-            };
-            ui.label(RichText::new(text).color(color).small());
-        });
-    }
 }
 
 /// A root's name in the filter: its folder's name.
