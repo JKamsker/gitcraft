@@ -60,11 +60,11 @@ mkdir -p "$cache"
 expected=$(pinned "$kind-$version-$arch")
 if [ -z "$expected" ]; then
   echo "No checksum kept for $kind $version ($arch): trusting the one $url.sha256 gives" >&2
-  expected=$(curl -fsSL --retry 3 "$url.sha256" | awk '{print $1}')
+  expected=$(curl -fsSL --retry 5 --retry-delay 5 --retry-all-errors "$url.sha256" | awk '{print $1}')
 fi
 if [ ! -x "$bin" ]; then
   echo "Downloading $kind $version" >&2
-  curl -fsSL --retry 3 -o "$bin.part" "$url"
+  curl -fsSL --retry 5 --retry-delay 5 --retry-all-errors -o "$bin.part" "$url"
   chmod +x "$bin.part"
   mv "$bin.part" "$bin"
 fi
