@@ -164,10 +164,20 @@ impl Visitor<'_, '_> {
         }
     }
 
+    /// An assignment target; destructuring (`(t.a, [t.b, _]) = ..`) writes every element.
+    fn assignee(&mut self, expr: &Expr) {
+        match expr {
+            Expr::Tuple(t) => t.elems.iter().for_each(|e| self.assignee(e)),
+            Expr::Array(a) => a.elems.iter().for_each(|e| self.assignee(e)),
+            Expr::Paren(p) => self.assignee(&p.expr),
+            other => self.place(other, &Place::Plain(Mode::Write)),
+        }
+    }
+
     pub(crate) fn place_expr(&mut self, expr: &Expr) -> bool {
         match expr {
             Expr::Assign(a) => {
-                self.place(&a.left, &Place::Plain(Mode::Write));
+                self.assignee(&a.left);
                 self.visit_expr(&a.right);
             }
             Expr::Binary(b) if is_assign(&b.op) => {

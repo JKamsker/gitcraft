@@ -264,3 +264,18 @@ impl Tarjan<'_> {
         self.out.push(component);
     }
 }
+
+/// Per crate, the domains of the non-test crates that depend on it.
+pub fn dependent_domains<'a>(inv: &Inventory, domains: &'a [String]) -> Vec<BTreeSet<&'a str>> {
+    let mut out = vec![BTreeSet::new(); inv.crates.len()];
+    for (m, module) in inv.modules.iter().enumerate() {
+        let krate = &inv.crates[module.krate];
+        if krate.test {
+            continue;
+        }
+        for &target in krate.externs.values() {
+            out[target].insert(domains[m].as_str());
+        }
+    }
+    out
+}

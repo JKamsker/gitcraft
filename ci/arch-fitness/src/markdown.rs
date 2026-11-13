@@ -264,6 +264,12 @@ fn gaps(md: &mut String, a: &Analysis) {
             cell(&gap.detail)
         );
     }
+    if !g.unresolved_paths.is_empty() {
+        let _ = writeln!(md, "\nUnresolved paths ({}):\n", g.unresolved_paths.len());
+        for gap in g.unresolved_paths.iter().take(50) {
+            let _ = writeln!(md, "- `{}:{}` {}", gap.file, gap.line, cell(&gap.detail));
+        }
+    }
     let mut macros: Vec<_> = g.unparsed_macros.iter().collect();
     macros.sort_by(|x, y| y.1.cmp(x.1).then(x.0.cmp(y.0)));
     let list: Vec<String> = macros

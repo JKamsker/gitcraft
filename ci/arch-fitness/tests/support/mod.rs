@@ -87,12 +87,7 @@ pub fn adopted(files: &Files) -> Baseline {
         owner: "o".into(),
         remediation: "none".into(),
     };
-    ratchet::adopt(
-        &analysis(files),
-        &policy().symbol_budget_domains,
-        &Baseline::default(),
-        &why,
-    )
+    ratchet::adopt(&analysis(files), &policy(), &Baseline::default(), &why)
 }
 
 pub fn outcome(files: &Files, baseline: &Baseline) -> Outcome {

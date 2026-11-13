@@ -154,8 +154,9 @@ fn run(args: &Args) -> Result<bool, String> {
         }
         "ratchet" | "adopt" => {
             ratchet::refuse_in_ci()?;
+            ratchet::refuse_with_gaps(&outcome)?;
             let new = if args.command == "ratchet" {
-                ratchet::ratchet(&analysis, &policy.symbol_budget_domains, &baseline)
+                ratchet::ratchet(&analysis, &policy, &baseline)
             } else {
                 let why = ratchet::Why {
                     reason: args.reason.clone().ok_or("adopt needs --reason")?,
@@ -165,7 +166,7 @@ fn run(args: &Args) -> Result<bool, String> {
                         .clone()
                         .ok_or("adopt needs --remediation")?,
                 };
-                ratchet::adopt(&analysis, &policy.symbol_budget_domains, &baseline, &why)
+                ratchet::adopt(&analysis, &policy, &baseline, &why)
             };
             write(&baseline_path, &policy::to_json(&new)?)?;
             eprintln!(

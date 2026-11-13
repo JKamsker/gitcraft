@@ -205,19 +205,11 @@ fn stale_entries_fail_and_ratchet_only_lowers() {
     assert_eq!(baseline.forbidden_edges.len(), 1);
     let clean = tree(&[]);
     assert!(rules(&outcome(&clean, &baseline)).contains(&"stale-baseline".to_owned()));
-    let lowered = ratchet::ratchet(
-        &analysis(&clean),
-        &policy().symbol_budget_domains,
-        &baseline,
-    );
+    let lowered = ratchet::ratchet(&analysis(&clean), &policy(), &baseline);
     assert!(lowered.forbidden_edges.is_empty());
     assert!(outcome(&clean, &lowered).violations.is_empty());
     // Ratcheting never raises a budget: the coupled tree now fails against it.
-    let raised = ratchet::ratchet(
-        &analysis(&coupled),
-        &policy().symbol_budget_domains,
-        &lowered,
-    );
+    let raised = ratchet::ratchet(&analysis(&coupled), &policy(), &lowered);
     assert_eq!(raised.budgets, lowered.budgets);
     assert!(!outcome(&coupled, &raised).violations.is_empty());
     let budget = raised
@@ -261,9 +253,8 @@ fn declared_edges_are_allowed() {
 #[test]
 fn baseline_rewrites_are_refused_in_ci() {
     // The CLI calls this before `ratchet`/`adopt`; GitHub Actions always sets CI.
-    let ci = std::env::var_os("CI").is_some_and(|v| !v.is_empty());
-    assert_eq!(
-        ratchet::refuse_in_ci().is_err(),
-        ci || std::env::var_os("GITHUB_ACTIONS").is_some()
-    );
+    let ci = ["CI", "GITHUB_ACTIONS", "TF_BUILD"]
+        .iter()
+        .any(|k| std::env::var_os(k).is_some_and(|v| !v.is_empty()));
+    assert_eq!(ratchet::refuse_in_ci().is_err(), ci);
 }

@@ -905,10 +905,6 @@
         ],
         [
           "agents",
-          "repo-core"
-        ],
-        [
-          "agents",
           "review"
         ],
         [
@@ -1033,10 +1029,6 @@
         ],
         [
           "bisect",
-          "repo-core"
-        ],
-        [
-          "bisect",
           "runtime"
         ],
         [
@@ -1074,10 +1066,6 @@
         [
           "changes",
           "remote"
-        ],
-        [
-          "changes",
-          "repo-core"
         ],
         [
           "changes",
@@ -1129,10 +1117,6 @@
         ],
         [
           "conflicts",
-          "repo-core"
-        ],
-        [
-          "conflicts",
           "runtime"
         ],
         [
@@ -1173,10 +1157,6 @@
         ],
         [
           "diff",
-          "repo-core"
-        ],
-        [
-          "diff",
           "review"
         ],
         [
@@ -1206,10 +1186,6 @@
         [
           "doctor",
           "remote"
-        ],
-        [
-          "doctor",
-          "repo-core"
         ],
         [
           "doctor",
@@ -1333,10 +1309,6 @@
         ],
         [
           "graph",
-          "repo-core"
-        ],
-        [
-          "graph",
           "review"
         ],
         [
@@ -1378,10 +1350,6 @@
         [
           "guidance",
           "remote"
-        ],
-        [
-          "guidance",
-          "repo-core"
         ],
         [
           "guidance",
@@ -1437,10 +1405,6 @@
         ],
         [
           "insights",
-          "repo-core"
-        ],
-        [
-          "insights",
           "review"
         ],
         [
@@ -1494,10 +1458,6 @@
         [
           "release",
           "remote"
-        ],
-        [
-          "release",
-          "repo-core"
         ],
         [
           "release",
@@ -1657,10 +1617,6 @@
         ],
         [
           "review",
-          "repo-core"
-        ],
-        [
-          "review",
           "rewrite"
         ],
         [
@@ -1718,10 +1674,6 @@
         [
           "rewrite",
           "remote"
-        ],
-        [
-          "rewrite",
-          "repo-core"
         ],
         [
           "rewrite",
@@ -1869,10 +1821,6 @@
         ],
         [
           "sidebar",
-          "repo-core"
-        ],
-        [
-          "sidebar",
           "review"
         ],
         [
@@ -1925,10 +1873,6 @@
         ],
         [
           "sync",
-          "repo-core"
-        ],
-        [
-          "sync",
           "review"
         ],
         [
@@ -1973,10 +1917,6 @@
         ],
         [
           "terminal",
-          "repo-core"
-        ],
-        [
-          "terminal",
           "runtime"
         ],
         [
@@ -2018,10 +1958,6 @@
         [
           "worktrees",
           "remote"
-        ],
-        [
-          "worktrees",
-          "repo-core"
         ],
         [
           "worktrees",
@@ -3566,6 +3502,13 @@
     },
     {
       "domain": "sync",
+      "field": "fetched_at",
+      "reason": "Legacy direct mutation at adoption (#209): sync changes RepoTab.fetched_at (owned by repo-core) at 2 sites, e.g. src/repo/offline.rs:158 (lock); found once std mutators stopped being hidden by unrelated receivers.",
+      "owner": "@JKamsker",
+      "remediation": "Give repo-core a method or Action for this transition and call it instead of writing the field."
+    },
+    {
+      "domain": "sync",
       "field": "finished",
       "reason": "Legacy direct mutation at adoption (#209): sync changes RepoTab.finished (owned by repo-core) at 1 sites, e.g. src/repo/https_recovery.rs:133 (mut_call).",
       "owner": "@JKamsker",
@@ -3834,7 +3777,7 @@
     },
     "os": {
       "domains": 4,
-      "exported": 26
+      "exported": 32
     },
     "release": {
       "domains": 9,

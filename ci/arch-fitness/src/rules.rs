@@ -74,7 +74,7 @@ pub fn check(a: &Analysis, policy: &Policy, baseline: &Baseline) -> Outcome {
     }
     gaps(a, &mut out);
     edges(a, policy, baseline, &mut out);
-    cycles(a, baseline, &mut out);
+    cycles(a, policy, baseline, &mut out);
     mutations(a, baseline, &mut out);
     reexports(a, baseline, &mut out);
     budgets(a, policy, baseline, &mut out);
@@ -168,15 +168,17 @@ fn edges(a: &Analysis, policy: &Policy, baseline: &Baseline, out: &mut Outcome) 
     }
 }
 
-fn edge_set(a: &Analysis, members: &BTreeSet<&str>) -> BTreeSet<[String; 2]> {
+/// Edges between cycle members that take part in cycle analysis (`cycles: false` exempts).
+fn edge_set(a: &Analysis, policy: &Policy, members: &BTreeSet<&str>) -> BTreeSet<[String; 2]> {
     a.edges
         .iter()
         .filter(|e| members.contains(e.from.as_str()) && members.contains(e.to.as_str()))
+        .filter(|e| policy.in_cycles(&e.from, &e.to))
         .map(|e| [e.from.clone(), e.to.clone()])
         .collect()
 }
 
-fn cycles(a: &Analysis, baseline: &Baseline, out: &mut Outcome) {
+fn cycles(a: &Analysis, policy: &Policy, baseline: &Baseline, out: &mut Outcome) {
     let edges: BTreeMap<(&str, &str), &Edge> = a
         .edges
         .iter()
@@ -199,7 +201,7 @@ fn cycles(a: &Analysis, baseline: &Baseline, out: &mut Outcome) {
             continue;
         };
         let allowed: BTreeSet<&[String; 2]> = owner.edges.iter().collect();
-        for pair in edge_set(a, &members) {
+        for pair in edge_set(a, policy, &members) {
             if allowed.contains(&pair) {
                 continue;
             }
@@ -223,7 +225,7 @@ fn cycles(a: &Analysis, baseline: &Baseline, out: &mut Outcome) {
             .flatten()
             .map(String::as_str)
             .collect();
-        let current: Vec<[String; 2]> = edge_set(a, &members).into_iter().collect();
+        let current: Vec<[String; 2]> = edge_set(a, policy, &members).into_iter().collect();
         let domains: Vec<&str> = entry.domains.iter().map(String::as_str).collect();
         let gone = entry.edges.iter().any(|e| !current.contains(e));
         if members.into_iter().collect::<Vec<_>>() != domains || gone {

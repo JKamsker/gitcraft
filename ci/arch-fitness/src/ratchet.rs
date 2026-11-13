@@ -6,8 +6,9 @@ use std::collections::BTreeSet;
 
 use crate::analysis::Analysis;
 use crate::policy::{
-    Baseline, Budget, CycleException, EdgeException, MutationException, ReExportException,
+    Baseline, Budget, CycleException, EdgeException, MutationException, Policy, ReExportException,
 };
+use crate::rules::Outcome;
 
 /// Refuse to rewrite the baseline in continuous integration.
 pub fn refuse_in_ci() -> Result<(), String> {
@@ -20,6 +21,24 @@ pub fn refuse_in_ci() -> Result<(), String> {
     Ok(())
 }
 
+/// Refuse to rewrite the baseline from an incomplete inventory: missing edges would drop
+/// reviewed exceptions and lower budgets to partial measurements.
+pub fn refuse_with_gaps(outcome: &Outcome) -> Result<(), String> {
+    let gaps: Vec<&str> = outcome
+        .violations
+        .iter()
+        .filter(|v| v.rule == "analysis-gap")
+        .map(|v| v.message.as_str())
+        .collect();
+    if gaps.is_empty() {
+        return Ok(());
+    }
+    Err(format!(
+        "the analysis has gaps, so the baseline is not rewritten; fix them first: {}",
+        gaps.join("; ")
+    ))
+}
+
 fn budget(a: &Analysis, domain: &str) -> Budget {
     let d = &a.domains[domain];
     Budget {
@@ -30,7 +49,8 @@ fn budget(a: &Analysis, domain: &str) -> Budget {
 }
 
 /// Drop exceptions that no longer occur and lower every budget to the measurement.
-pub fn ratchet(a: &Analysis, symbol_domains: &[String], old: &Baseline) -> Baseline {
+pub fn ratchet(a: &Analysis, policy: &Policy, old: &Baseline) -> Baseline {
+    let symbol_domains = &policy.symbol_budget_domains;
     let mut new = old.clone();
     let edges: BTreeSet<(&str, &str)> = a
         .edges
@@ -64,7 +84,7 @@ pub fn ratchet(a: &Analysis, symbol_domains: &[String], old: &Baseline) -> Basel
             .flatten()
             .cloned()
             .collect();
-        entry.edges = cycle_edges(a, &members)
+        entry.edges = cycle_edges(a, policy, &members)
             .into_iter()
             .filter(|e| entry.edges.contains(e))
             .collect();
@@ -86,10 +106,12 @@ pub fn ratchet(a: &Analysis, symbol_domains: &[String], old: &Baseline) -> Basel
     new
 }
 
-fn cycle_edges(a: &Analysis, members: &BTreeSet<String>) -> Vec<[String; 2]> {
+/// Edges between cycle members that take part in cycle analysis (`cycles: false` exempts).
+fn cycle_edges(a: &Analysis, policy: &Policy, members: &BTreeSet<String>) -> Vec<[String; 2]> {
     a.edges
         .iter()
         .filter(|e| members.contains(&e.from) && members.contains(&e.to))
+        .filter(|e| policy.in_cycles(&e.from, &e.to))
         .map(|e| [e.from.clone(), e.to.clone()])
         .collect()
 }
@@ -101,8 +123,9 @@ pub struct Why {
 }
 
 /// Record every current violation as an exception and raise budgets to the measurement.
-pub fn adopt(a: &Analysis, symbol_domains: &[String], old: &Baseline, why: &Why) -> Baseline {
-    let mut new = ratchet(a, symbol_domains, old);
+pub fn adopt(a: &Analysis, policy: &Policy, old: &Baseline, why: &Why) -> Baseline {
+    let symbol_domains = &policy.symbol_budget_domains;
+    let mut new = ratchet(a, policy, old);
     let (reason, owner, remediation) = (
         why.reason.clone(),
         why.owner.clone(),
@@ -156,13 +179,19 @@ pub fn adopt(a: &Analysis, symbol_domains: &[String], old: &Baseline, why: &Why)
     }
     for scc in &a.cycles {
         let members: BTreeSet<String> = scc.iter().cloned().collect();
-        let edges = cycle_edges(a, &members);
+        let edges = cycle_edges(a, policy, &members);
         match new
             .cycles
             .iter_mut()
             .find(|c| scc.iter().all(|m| c.domains.contains(m)))
         {
-            Some(entry) => entry.edges = edges,
+            // `ratchet` already dropped gone edges. A split cycle matches one entry per
+            // surviving component, so keep every component's edges.
+            Some(entry) => {
+                entry.edges.extend(edges);
+                entry.edges.sort();
+                entry.edges.dedup();
+            }
             None => new.cycles.push(CycleException {
                 domains: scc.clone(),
                 edges,

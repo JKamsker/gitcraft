@@ -221,27 +221,32 @@ pub fn analyze(
     }
 }
 
-/// The deepest module an item is visible within, after enclosing modules' visibility.
+/// The deepest module an item is visible within, after enclosing modules' visibility, and
+/// whether it is `pub` all the way to its crate root (and so visible to dependent crates).
 fn effective_root(
     inv: &Inventory,
     res: &Resolver,
     module: ModId,
     vis: &crate::model::VisSyntax,
-) -> ModId {
+) -> (ModId, bool) {
     let root_of = |m: ModId, scope: Scope| match scope {
         Scope::Module(s) => s,
         _ => inv.crates[inv.modules[m].krate].root,
     };
-    let mut deepest = root_of(module, res.scope(module, vis));
+    let scope = res.scope(module, vis);
+    let mut public = scope == Scope::Public;
+    let mut deepest = root_of(module, scope);
     let mut at = module;
     while let Some(parent) = inv.modules[at].parent {
-        let limit = root_of(parent, res.scope(parent, &inv.modules[at].vis));
+        let scope = res.scope(parent, &inv.modules[at].vis);
+        public &= scope == Scope::Public;
+        let limit = root_of(parent, scope);
         if inv.is_ancestor(deepest, limit) {
             deepest = limit;
         }
         at = parent;
     }
-    deepest
+    (deepest, public)
 }
 
 type Unused<'a> = (&'a BTreeSet<Def>, &'a mut BTreeMap<String, Vec<String>>);
@@ -267,6 +272,7 @@ fn domain_reports(
             below[parent].extend(child);
         }
     }
+    let dependents = domains::dependent_domains(inv, domains);
     let mut out: BTreeMap<String, Domain> = BTreeMap::new();
     let entry = |out: &mut BTreeMap<String, Domain>, d: &str| -> Domain {
         out.remove(d).unwrap_or_else(|| Domain {
@@ -313,8 +319,10 @@ fn domain_reports(
             continue;
         }
         let domain = &domains[item.module];
-        let root = effective_root(inv, res, item.module, &item.vis);
-        let exported = below[root].iter().any(|d| d != domain);
+        let (root, public) = effective_root(inv, res, item.module, &item.vis);
+        let krate = inv.modules[item.module].krate;
+        let exported = below[root].iter().any(|d| d != domain)
+            || (public && dependents[krate].iter().any(|d| d != domain));
         if exported && !used.contains(&Def::Item(id)) {
             let list = unused.entry(domain.clone()).or_default();
             if list.len() < 10 {

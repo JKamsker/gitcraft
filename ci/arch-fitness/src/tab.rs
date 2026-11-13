@@ -136,19 +136,14 @@ impl TabInfo {
                 scan_impl(item, &info.name, &mut receivers, &mut returns);
             }
         }
+        // Receiver types are not resolved, so an unrelated `fn clear(&self)` must not hide
+        // `String::clear`: standard mutators always count, crate methods by their receivers.
         info.mutating = receivers
             .iter()
-            .filter(|(name, (mutable, shared))| {
-                mutable > shared || (STD_MUTATING.contains(&name.as_str()) && *shared == 0)
-            })
+            .filter(|(_, (mutable, shared))| mutable > shared)
             .map(|(name, _)| name.clone())
+            .chain(STD_MUTATING.iter().map(|n| (*n).to_owned()))
             .collect();
-        info.mutating.extend(
-            STD_MUTATING
-                .iter()
-                .filter(|n| !receivers.contains_key(**n))
-                .map(|n| (*n).to_owned()),
-        );
         info.returning = returns
             .into_iter()
             .filter(|(_, (tab, other))| *tab > 0 && *other == 0)
