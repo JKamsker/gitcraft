@@ -12,6 +12,7 @@ impl crate::repo::insights::context::namespace_tests::Fixture for State {
         use crate::repo::insights::context::namespace_tests::seed_slot;
         seed_slot(&mut self.runs);
         seed_slot(&mut self.explorer);
+        seed_slot(&mut self.logs);
         self.selected = Some(7);
         self.pinned = Some(RunKey { run: 9, attempt: 3 });
         self.workflow = Some(12);
@@ -20,12 +21,13 @@ impl crate::repo::insights::context::namespace_tests::Fixture for State {
         use crate::repo::insights::context::namespace_tests::assert_slot_retired;
         assert_slot_retired(&self.runs);
         assert_slot_retired(&self.explorer);
+        assert_slot_retired(&self.logs);
         assert!(self.selected.is_none() && self.run.is_none() && self.expanded.is_empty());
         assert!(self.pinned.is_none() && self.workflow.is_none());
     }
 }
 
-fn draw(tab: &mut RepoTab, ctx: &egui::Context) -> Vec<Action> {
+pub(super) fn draw(tab: &mut RepoTab, ctx: &egui::Context) -> Vec<Action> {
     let mut acts = Vec::new();
     let input = egui::RawInput {
         screen_rect: Some(egui::Rect::from_min_size(
