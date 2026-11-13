@@ -286,7 +286,11 @@ impl App {
                     ));
                 }
             }
-            Some(ScanClick::SaveAsRoot) => {}
+            Some(ScanClick::SaveAsRoot) => {
+                if let Some(scan) = self.repo_scan.take() {
+                    self.save_scan_as_root(scan.root.clone(), scan.deepest);
+                }
+            }
             Some(ScanClick::Stop) => {
                 if let Some(scan) = &self.repo_scan {
                     scan.stop();

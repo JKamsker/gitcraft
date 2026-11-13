@@ -65,6 +65,9 @@ impl App {
             return;
         }
         self.remember(&root);
+        if !crate::remote::is_remote(&root) {
+            self.library_noticed_open(&root);
+        }
         self.error = None;
         self.error_card.take_if(|card| !card.fixed());
 

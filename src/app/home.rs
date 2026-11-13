@@ -237,6 +237,7 @@ impl App {
         let mut open = None;
         let mut forget = None;
         let mut action = None;
+        let mut library = None;
 
         egui::ScrollArea::vertical()
             .auto_shrink(false)
@@ -347,6 +348,10 @@ impl App {
                             }
                         });
                     }
+                    ui.add_space(24.0);
+                    ui.with_layout(egui::Layout::top_down(egui::Align::Min), |ui| {
+                        library = self.library_section(ui, &t);
+                    });
                 });
             });
 
@@ -363,6 +368,9 @@ impl App {
         }
         if let Some(i) = forget {
             self.recent.remove(i);
+        }
+        if let Some(click) = library {
+            self.library_click(click, &ctx);
         }
     }
 

@@ -166,11 +166,21 @@ impl Scheduler {
     }
 
     /// Threads running (also those stopped and not ended yet).
+    #[cfg(test)]
     pub fn threads(&self) -> usize {
         self.running.len()
     }
 
+    /// Scans wait while every slot is held by a stopped scan that hasn't ended (a folder slow
+    /// to answer).
+    pub fn waiting_on_slow(&self) -> bool {
+        !self.queue.is_empty()
+            && self.running.len() >= MAX_WORKERS
+            && self.running.iter().any(|r| r.retired)
+    }
+
     /// Whether anything is waiting or running for the library.
+    #[cfg(test)]
     pub fn busy(&self) -> bool {
         !self.queue.is_empty() || self.running.iter().any(|r| !r.retired)
     }

@@ -111,6 +111,7 @@ pub(super) fn display(raw: &str) -> &str {
         "Quiet celebrations" => crate::i18n::text("interaction-settings-label-quiet-celebrations"),
         "Register gitcraft" => crate::i18n::text("interaction-settings-label-register-gitcraft"),
         "Remote machines" => crate::i18n::text("interaction-settings-label-remote-machines"),
+        "Repository roots" => crate::i18n::text("interaction-settings-label-repository-roots"),
         "Repository commands" => {
             crate::i18n::text("interaction-settings-label-repository-commands")
         }

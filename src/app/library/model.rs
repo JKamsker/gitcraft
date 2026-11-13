@@ -299,6 +299,7 @@ impl Library {
         self.hidden.insert(path.to_owned());
     }
 
+    #[cfg(test)]
     pub fn is_hidden(&self, path: &Path) -> bool {
         let key = PathKey::of(path);
         self.hidden.iter().any(|h| PathKey::of(h) == key)

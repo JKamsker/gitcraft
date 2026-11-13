@@ -78,6 +78,8 @@ impl App {
             last_opened: saved.last_opened,
             patches: Default::default(),
             repo_scan: None,
+            library: library::LibraryState::new(saved.library),
+            library_open: false,
             launching: Default::default(),
             home_link: String::new(),
             tab_scroll: 0.0,

@@ -18,6 +18,7 @@ impl App {
                     || self.remote_form.is_some()
                     || self.teleport.is_some()
                     || self.repo_scan.is_some()
+                    || self.library_open
                     || self.my_work.open
                     || asking;
                 // Its widgets' state (scroll offsets, text fields' undo, open menus) is its own:
@@ -65,6 +66,7 @@ impl App {
         self.poll_clone(ctx);
         self.poll_connecting(ctx);
         self.poll_launch(ctx);
+        self.poll_library(ctx);
         self.poll_window_models(ctx);
         self.poll_update(ctx);
         self.poll_inbox_opening(ctx);
@@ -189,6 +191,7 @@ impl App {
         // After the tabs are drawn, so what was typed in this frame is in.
         self.keep_drafts(&ctx, focused);
         self.repo_scan_dialog(&ctx);
+        self.library_dialog(&ctx);
         self.my_work_ui(&ctx);
         self.poll_diagnostics(&ctx);
         for (path, url) in crate::settings::network_page::take_rejections(&ctx) {

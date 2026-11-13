@@ -40,6 +40,7 @@ impl App {
             || self.remote_form.is_some()
             || self.teleport.is_some()
             || self.repo_scan.is_some()
+            || self.library_open
             || self.my_work.open
             || self.askpass_open()
     }
