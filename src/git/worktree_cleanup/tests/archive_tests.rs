@@ -59,7 +59,7 @@ fn an_archive_holds_the_files_and_a_manifest_and_is_listed() -> Result<(), Strin
     assert!(zip.by_name("manifest.json").is_ok());
     // Listed for this repository, with its size counted in the store's usage.
     let key = manifest.repository.key.clone();
-    assert_eq!(f.store.list(Some(&key)), [listed.clone()]);
+    assert_eq!(f.store.list(Some(&key)), std::slice::from_ref(&listed));
     assert_eq!(f.store.usage(), listed.bytes);
     f.store.delete(&listed)?;
     assert!(f.store.list(None).is_empty());
