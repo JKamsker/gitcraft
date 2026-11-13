@@ -286,14 +286,6 @@ impl RepoTab {
                                 crate::a11y::list_stop(&resp, rows_id, self.selected == Some(i));
                             }
                             self.keyboard_graph_focus(&resp);
-                            if resp.clicked() {
-                                // Ctrl+click: compare the selected commit with this one.
-                                let compare = ui
-                                    .input(|inp| inp.modifiers.command)
-                                    .then(|| self.compare_rows(self.selected?, i))
-                                    .flatten();
-                                acts.push(compare.unwrap_or(Action::Select(i)));
-                            }
                             // A merge put aside, double-clicked: brought back (from any branch).
                             if resp.double_clicked()
                                 && let Some(parked) = self.parked_at(i)

@@ -285,6 +285,21 @@ impl RepoTab {
         if draggable {
             self.row_drag_drop(ui, &resp, &row, pill.as_ref(), acts);
         }
+        if resp.clicked() {
+            let compare = ui
+                .input(|input| input.modifiers.command)
+                .then(|| self.compare_rows(self.selected?, i))
+                .flatten();
+            let selection = if pill
+                .as_ref()
+                .is_some_and(|pill| pill.branch_at(ui.ctx().pointer_interact_pos()))
+            {
+                Action::SelectBranchTip(i)
+            } else {
+                Action::Select(i)
+            };
+            acts.push(compare.unwrap_or(selection));
+        }
         (resp, hovered_message)
     }
 

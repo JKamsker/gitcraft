@@ -79,6 +79,7 @@ impl RepoTab {
                 self.select_history(row, ctx);
                 self.hint_after_select(row, ctx);
             }
+            Action::SelectBranchTip(row) => self.select_branch_tip(row, ctx),
             Action::ActivityCommit(hash) => self.activity_commit(hash, ctx),
             Action::OpenCommitChanges(hash) => self.open_commit_changes(hash, ctx),
             Action::SelectHash(hash) => {

@@ -25,6 +25,10 @@ pub(super) struct PillHit {
 }
 
 impl PillHit {
+    pub(super) fn branch_at(&self, pointer: Option<egui::Pos2>) -> bool {
+        self.branch.is_some() && pointer.is_some_and(|pos| self.rect.contains(pos))
+    }
+
     pub(super) fn of(badge: &Badge, rect: Rect, hash: &str) -> Self {
         let branch = (badge.kind == BadgeKind::Branch).then(|| DragBranch {
             name: badge.git_ref(),

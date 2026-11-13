@@ -2,6 +2,56 @@
 use super::*;
 use crate::repo::DiffView;
 
+#[test]
+fn branch_selection_reopens_details_without_scheduling_or_completing_a_diff() {
+    use crate::repo::{Action, Msg};
+    for same_row in [false, true] {
+        for beside in [false, true] {
+            for automatic in [false, true] {
+                let ctx = egui::Context::default();
+                let mut tab = RepoTab::new_deferred("/recording-only/branch-tip".into(), &ctx);
+                let hash = "a".repeat(40);
+                tab.commits.push(std::sync::Arc::new(crate::git::Commit {
+                    hash: hash.clone(),
+                    ..Default::default()
+                }));
+                tab.selected = same_row.then_some(0);
+                tab.detail_hash = same_row.then(|| hash.clone());
+                let mut settings = crate::settings::Settings::get(&ctx);
+                settings.show_detail = automatic;
+                settings.diff_beside_graph = beside;
+                settings.put_for_test(&ctx);
+                ctx.data_mut(|data| {
+                    data.insert_temp(
+                        egui::Id::new("repo_detail").with("auto-collapsed"),
+                        automatic,
+                    )
+                });
+                // An earlier row selection must not open a diff after this click.
+                tab.commit_changes.pending = Some(hash.clone());
+                tab.commit_changes.history = Some(hash.clone());
+                crate::repo::messages::record_jobs(|| {
+                    tab.apply(Action::SelectBranchTip(0), &ctx);
+                    tab.handle(Msg::Detail(hash.clone(), Ok(detail(&hash))), &ctx);
+                });
+                assert_eq!(tab.selected, Some(0));
+                assert!(tab.detail.is_some());
+                assert!(tab.diff.is_none());
+                assert!(tab.commit_changes.pending.is_none());
+                assert!(!tab.commit_changes.follows_history());
+                let settings = crate::settings::Settings::get(&ctx);
+                assert!(settings.show_detail);
+                assert_eq!(settings.diff_beside_graph, beside);
+                assert_eq!(
+                    ctx.data(|data| data
+                        .get_temp::<bool>(egui::Id::new("repo_detail").with("reopen-small"))),
+                    Some(true)
+                );
+            }
+        }
+    }
+}
+
 fn key(hash: &str) -> DiffKey {
     DiffKey::Commit {
         hash: hash.into(),
