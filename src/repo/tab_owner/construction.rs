@@ -231,6 +231,7 @@ impl RepoTab {
             postcards: Default::default(),
             growth: None,
             cleanup: None,
+            worktree_cleanup: Default::default(),
             sparse: None,
             atlas: None,
             history_activity: None,

@@ -42,3 +42,68 @@ worktree-cleanup-restore-blocked = A file or link is in the way, or the place is
 worktree-cleanup-path-not-utf8 = The worktree's path is not valid UTF-8
 worktree-cleanup-put-back = { $error } The worktree was kept and its untracked files were put back.
 worktree-cleanup-put-back-failed = { $error } The worktree was kept; its untracked files are in the archive { $archive }.
+worktree-cleanup-title = Clean up worktrees of merged branches
+worktree-cleanup-intro = Worktrees whose branch is merged. Only those with nothing that could be lost are removed, and only the ones you tick and confirm; each is looked at again just before. The branches themselves are kept.
+worktree-cleanup-basis = Merged means merged into { $base } (the default branch set for this repository), checked against { $refs }.
+worktree-cleanup-checking = Which branches are merged is still being read…
+worktree-cleanup-reading = Looking at the worktrees…
+worktree-cleanup-none = No worktree has a merged branch checked out.
+worktree-cleanup-summary = Gives back { $size } · { $changed } changed · { $untracked } untracked ({ $text } text) · { $ignored } ignored ({ $ignored-size })
+worktree-cleanup-show-files = Show files
+worktree-cleanup-hide-files = Hide files
+worktree-cleanup-more-files = …and { $count } more
+worktree-cleanup-file-text = archived when archiving is on
+worktree-cleanup-file-binary = not archived: binary
+worktree-cleanup-file-large = not archived: larger than 1 MiB
+worktree-cleanup-file-link = not archived: a link
+worktree-cleanup-file-other = not archived: not a plain readable file
+worktree-cleanup-archive-option = Archive untracked text files before cleanup
+worktree-cleanup-archive-option-tip = Untracked text files go into a verified ZIP with a manifest, in the archive folder (Settings → Git → Worktree archives), before the worktree is removed. Binary, large and linked files are never archived: a worktree with any stays. If archiving fails, nothing is removed.
+worktree-cleanup-confirm = { $count ->
+        [one] I reviewed the list: remove the { $count } ticked worktree. Its branch is kept.
+       *[other] I reviewed the list: remove the { $count } ticked worktrees. Their branches are kept.
+    }
+worktree-cleanup-remove = { $count ->
+        [one] Remove { $count } worktree
+       *[other] Remove { $count } worktrees
+    }
+worktree-cleanup-look-again = Look again
+worktree-cleanup-removed = removed, { $freed } given back
+worktree-cleanup-removed-archived = { $count ->
+        [one] removed, { $freed } given back; { $count } untracked file archived
+       *[other] removed, { $freed } given back; { $count } untracked files archived
+    }
+worktree-cleanup-kept = kept: { $why }
+worktree-cleanup-changed = kept: it changed since it was looked at. Look again before removing it.
+worktree-cleanup-archives = Archived untracked files
+worktree-cleanup-no-archives = No archive of this repository.
+worktree-cleanup-archive-usage = Archives use { $used } of { $quota }.
+worktree-cleanup-archive-line = { $branch } · { $count ->
+        [one] { $count } file
+       *[other] { $count } files
+    } · { $size } · { $when }{ $restored ->
+        [0] {""}
+       *[other] {" "}· restored
+    }
+worktree-cleanup-restore = Restore
+worktree-cleanup-restore-tip = Puts the archived files back into the worktree picked. Nothing there is overwritten: a file already there with other content keeps it, and the archived one goes beside it as name.restored. The archive is kept.
+worktree-cleanup-restored = Restored { $created } into { $into } ({ $renamed } beside a different file, { $same } already there, { $failed } failed).
+worktree-cleanup-delete = Delete
+worktree-cleanup-delete-confirm = Delete for good?
+worktree-cleanup-archive-deleted = The archive was deleted.
+worktree-cleanup-offer = { $count ->
+        [one] { $count } worktree has a merged branch checked out.
+       *[other] { $count } worktrees have a merged branch checked out.
+    }
+worktree-cleanup-offer-button = Review worktree cleanup…
+worktree-cleanup-settings-intro = When worktrees of merged branches are cleaned up, their untracked text files can be archived first (opt-in, each time). Archives are never deleted to make room.
+worktree-cleanup-settings-label-archives = Worktree archives
+worktree-cleanup-settings-label-location = Archive location
+worktree-cleanup-settings-label-limit = Archive storage limit
+worktree-cleanup-settings-label-auto = Restore automatically
+worktree-cleanup-settings-label-list = Archives
+worktree-cleanup-settings-location-hint = A folder outside your worktrees; empty for the app's data folder
+worktree-cleanup-settings-limit-hint = All archives together; archiving more is refused (and the worktree kept) until old ones are deleted
+worktree-cleanup-settings-auto-restore = Restore archived files when the branch is checked out again
+worktree-cleanup-settings-auto-restore-tip = When a worktree of the branch appears at the commit it was archived from, its files are put back once, never over a file already there.
+worktree-cleanup-settings-none = No archives yet.

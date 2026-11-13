@@ -47,8 +47,19 @@ pub(super) fn message_section(
     }
 }
 
-/// `subject` and `body`, cut to `room`: the description first, then the title down to its first
-/// row. What was cut shows on hover. Returns whether it was double-clicked.
+/// Description rows shown while folded: a longer one gets _Show more_ (#213).
+pub(super) const PREVIEW_ROWS: usize = 4;
+
+/// Whether long descriptions are unfolded: one choice for every commit, so going from commit to
+/// commit keeps the layout.
+fn unfolded_id() -> egui::Id {
+    egui::Id::new("commit-message-unfolded")
+}
+
+/// `subject` and `body`, cut to `room` and, folded, to [`PREVIEW_ROWS`] description rows: the
+/// description first, then the title down to its first row. A description cut that way gets
+/// _Show more_ / _Show less_; what was cut also shows on hover. Returns whether it was
+/// double-clicked.
 pub(super) fn fitted_message(
     ui: &mut Ui,
     detail: &CommitDetail,
@@ -74,12 +85,22 @@ pub(super) fn fitted_message(
         text_rows(ui, desc.clone())
     };
     let fit = |room: f32, h: f32| (room / h).floor().max(0.0) as usize;
-    let show_title = fit(budget, title_h).clamp(1, title_rows);
-    let show_body = if show_title < title_rows {
-        0
+    let unfolded = ui
+        .data(|d| d.get_temp::<bool>(unfolded_id()))
+        .unwrap_or(false);
+    // Folded, at most the preview; a description that fits it needs no expander.
+    let foldable = body_rows > PREVIEW_ROWS;
+    let (show_title, show_body) = if unfolded && foldable {
+        (title_rows, body_rows)
     } else {
-        let room = budget - title_rows as f32 * title_h - gap - 2.0;
-        fit(room, body_h).min(body_rows)
+        let show_title = fit(budget, title_h).clamp(1, title_rows);
+        let show_body = if show_title < title_rows {
+            0
+        } else {
+            let room = budget - title_rows as f32 * title_h - gap - 2.0;
+            fit(room, body_h).min(body_rows).min(PREVIEW_ROWS)
+        };
+        (show_title, show_body)
     };
     let hint = if editable {
         Some(crate::i18n::text("repo-core-0874"))
@@ -114,7 +135,39 @@ pub(super) fn fitted_message(
         ui.add_space(2.0);
         clicked |= message(ui, desc, show_body);
     }
+    if foldable {
+        expander(ui, unfolded);
+    }
     clicked
+}
+
+/// _Show more_ / _Show less_ under a long description, a disclosure for screen readers.
+fn expander(ui: &mut Ui, unfolded: bool) {
+    let t = Tokens::get(ui.ctx());
+    let (label, icon) = if unfolded {
+        (crate::i18n::text("commit-details-show-less"), "chevron-up")
+    } else {
+        (
+            crate::i18n::text("commit-details-show-more"),
+            "chevron-down",
+        )
+    };
+    let row = ui.horizontal(|ui| {
+        ui.spacing_mut().item_spacing.x = 2.0;
+        let link = ui.add(
+            egui::Label::new(RichText::new(label).color(t.accent).small()).sense(Sense::click()),
+        );
+        crate::icons::inline(ui, icon, 11.0, t.accent);
+        link
+    });
+    let link = row.inner;
+    crate::a11y::expanded(&link, label, unfolded);
+    if link.hovered() {
+        ui.ctx().set_cursor_icon(egui::CursorIcon::PointingHand);
+    }
+    if link.clicked() {
+        ui.data_mut(|d| d.insert_temp(unfolded_id(), !unfolded));
+    }
 }
 
 /// Author line with an initials avatar, and the committer when someone else.

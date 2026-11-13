@@ -80,7 +80,12 @@ impl RepoTab {
             (
                 "Select stale or merged branches…".into(),
                 "branch".into(),
-                Action::SelectStaleBranches,
+                Action::Cleanup(crate::repo::branch_cleanup::CleanupAct::Branches),
+            ),
+            (
+                "Clean up worktrees of merged branches…".into(),
+                "worktree".into(),
+                Action::Cleanup(crate::repo::branch_cleanup::CleanupAct::Worktrees),
             ),
         ]);
         items.extend(crate::repo::repository_tools::palette::items());

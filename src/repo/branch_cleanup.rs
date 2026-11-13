@@ -2,6 +2,10 @@
 //! branches change, the merged pull requests that read uses, and the branches _Select stale or
 //! merged branches…_ offers.
 
+mod worktrees;
+pub(crate) use worktrees::CleanupAct;
+pub(in crate::repo) use worktrees::WorktreeCleanup;
+
 use super::branch_health::{self, Bases, Inputs, Reason};
 use super::{Dialog, RepoTab};
 use crate::git::{self, Branch};
@@ -53,6 +57,7 @@ impl RepoTab {
     /// Reads again, in the background, which branches are merged and when each last had a
     /// commit, if the branches, the default branch or the merged pull requests changed.
     pub(super) fn want_health(&mut self, ctx: &egui::Context) {
+        self.want_auto_restore(ctx);
         let bases = self.health_bases();
         let key = branch_health::key_of(&self.refs.local, &bases, &self.branch_health.merged_prs);
         if !self.branch_health.should_read(key) {
@@ -192,11 +197,15 @@ impl RepoTab {
     /// _Select stale or merged branches…_ with what there is to offer now.
     pub(super) fn cleanup_dialog(&self, ctx: &egui::Context) -> Dialog {
         let days = Settings::get(ctx).stale_branch_days;
-        Dialog::cleanup(
+        let mut dialog = Dialog::cleanup(
             self.cleanup_candidates(days),
             self.branch_health.checking(),
             self.branch_health.error.clone(),
-        )
+        );
+        if let Dialog::Cleanup(d) = &mut dialog {
+            d.offer_worktrees(self.merged_worktrees().len());
+        }
+        dialog
     }
 }
 

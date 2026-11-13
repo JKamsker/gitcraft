@@ -19,6 +19,8 @@ pub(crate) struct CleanupDialog {
     checking: bool,
     /// Reading which are merged failed.
     error: Option<String>,
+    /// Worktrees whose branch is merged: offered in a window of their own.
+    worktrees: usize,
 }
 
 impl CleanupDialog {
@@ -34,7 +36,13 @@ impl CleanupDialog {
             on_remote: false,
             checking,
             error,
+            worktrees: 0,
         }
+    }
+
+    /// How many worktrees of merged branches to offer beside the branches.
+    pub(crate) fn offer_worktrees(&mut self, count: usize) {
+        self.worktrees = count;
     }
 
     fn chosen(&self) -> Vec<&Candidate> {
@@ -129,6 +137,10 @@ pub(super) fn cleanup(ui: &mut Ui, dialog: &mut CleanupDialog) -> Outcome {
         });
     }
     ui.add_space(10.0);
+    if worktrees_offer(ui, dialog.worktrees, &t) {
+        let act = crate::repo::branch_cleanup::CleanupAct::Worktrees;
+        return Outcome::Done(Box::new(Action::Cleanup(act)));
+    }
     if dialog.rows.is_empty() {
         if !dialog.checking {
             ui.label(crate::i18n::text("repo-core-1276"));
@@ -182,6 +194,33 @@ pub(super) fn cleanup(ui: &mut Ui, dialog: &mut CleanupDialog) -> Outcome {
         }
     });
     outcome
+}
+
+/// "2 worktrees belong to merged branches" and the button that reviews them (the branches
+/// checked out there are not offered above until their worktree is gone); whether clicked.
+fn worktrees_offer(ui: &mut Ui, count: usize, t: &Tokens) -> bool {
+    if count == 0 {
+        return false;
+    }
+    let mut clicked = false;
+    egui::Frame::new()
+        .fill(t.accent.gamma_multiply(0.10))
+        .corner_radius(t.radius_sm)
+        .inner_margin(egui::Margin::symmetric(10, 6))
+        .show(ui, |ui| {
+            ui.set_width(ui.available_width());
+            ui.horizontal_wrapped(|ui| {
+                ui.label(crate::i18n::message(
+                    "worktree-cleanup-offer",
+                    &[("count", count.into())],
+                ));
+                clicked = ui
+                    .button(crate::i18n::text("worktree-cleanup-offer-button"))
+                    .clicked();
+            });
+        });
+    ui.add_space(8.0);
+    clicked
 }
 
 /// _All_ and _None_.

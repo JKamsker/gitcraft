@@ -14,7 +14,7 @@ use serde::{Deserialize, Serialize};
 pub(crate) use restore::{RestoreReport, restore};
 pub(crate) use write::{Source, create};
 
-use super::files::{footprint, sha256_hex};
+use super::files::{footprint, human, sha256_hex};
 
 const MANIFEST_VERSION: u32 = 1;
 
@@ -180,6 +180,35 @@ fn write_json(path: &Path, value: &impl Serialize) -> Result<(), String> {
         let _ = std::fs::remove_file(&partial);
         e.to_string()
     })
+}
+
+/// "12.0 MB of 268.4 MB used".
+pub(crate) fn describe_usage(usage: u64, quota: u64) -> String {
+    crate::i18n::message(
+        "worktree-cleanup-archive-usage",
+        &[
+            ("used", human(usage).into()),
+            ("quota", human(quota).into()),
+        ],
+    )
+}
+
+/// "feature/x · 3 files · 4.1 KB · 2 hours ago", and whether it was restored.
+pub(crate) fn describe(listed: &Listed) -> String {
+    let m = &listed.manifest;
+    crate::i18n::message(
+        "worktree-cleanup-archive-line",
+        &[
+            ("branch", m.branch.clone().into()),
+            ("count", m.files.len().into()),
+            ("size", human(listed.bytes).into()),
+            (
+                "when",
+                crate::git::relative_time(m.created, crate::git::now()).into(),
+            ),
+            ("restored", m.restored.len().into()),
+        ],
+    )
 }
 
 /// The repository `path` (any of its worktrees) is part of.
