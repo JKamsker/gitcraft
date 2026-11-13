@@ -107,7 +107,7 @@ impl RepoTab {
         match a {
             Act::Show(on) => state.on = on,
             Act::Load => self.purpose_load(ctx),
-            Act::Refresh => self.purpose_refresh(ctx),
+            Act::Refresh => self.purpose_refresh(),
             Act::Select(key, on) => {
                 if on {
                     state.selected.insert(key);
@@ -187,7 +187,7 @@ impl RepoTab {
                 let saved = store::load(&repo, &subject.url);
                 Ok((units, saved))
             },
-            move |tab, result: Result<(Units, Result<Option<Saved>, String>), String>, ctx| {
+            move |tab, result: Result<(Units, Result<Option<Saved>, String>), String>, _| {
                 let state = &mut tab.review_purpose;
                 if state.request != request {
                     return;
@@ -205,15 +205,15 @@ impl RepoTab {
                     }
                     Err(e) => state.units = Some(Err(e)),
                 }
-                tab.purpose_refresh(ctx);
+                tab.purpose_refresh();
             },
         );
     }
 
     /// Proposes the groups again, and applies the arrangement to them.
-    fn purpose_refresh(&mut self, ctx: &egui::Context) {
-        let settings = crate::settings::Settings::get(ctx);
-        let rules = crate::repo::folding::Rules::new(true, &settings.fold_patterns);
+    fn purpose_refresh(&mut self) {
+        // The attributes and the built-in names (lockfiles, minified files), folding on or off.
+        let rules = crate::repo::folding::Rules::new(true, "");
         let generation = self.folding.generation;
         let Some(Ok(units)) = &self.review_purpose.units else {
             return;
@@ -241,7 +241,7 @@ impl RepoTab {
             return;
         };
         self.review_purpose.saved = saved.clone();
-        self.purpose_refresh(ctx);
+        self.purpose_refresh();
         let state = &mut self.review_purpose;
         state.sent += 1;
         let (seq, written, repo) = (state.sent, state.written.clone(), self.path.clone());
