@@ -1,0 +1,27 @@
+# Architecture fitness checker (issue #209). An independent workspace so that its
+# `proc-macro2/span-locations` feature never unifies into the application's build.
+[package]
+name = "gitcraft-arch-fitness"
+version = "0.0.0"
+edition = "2024"
+rust-version = "1.95"
+publish = false
+license = "MIT OR Apache-2.0"
+
+[workspace]
+
+[dependencies]
+proc-macro2 = { version = "1", features = ["span-locations"] }
+quote = "1"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+syn = { version = "2", default-features = false, features = ["full", "visit", "parsing", "printing", "clone-impls"] }
+
+[lints.rust]
+unsafe_code = "forbid"
+
+[lints.clippy]
+cognitive_complexity = "forbid"
+unwrap_used = "deny"
+expect_used = "deny"
+panic = "deny"
