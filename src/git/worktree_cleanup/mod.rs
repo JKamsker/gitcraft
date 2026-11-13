@@ -14,11 +14,6 @@ use std::path::PathBuf;
 pub(crate) use execute::{Outcome, remove};
 pub(crate) use inspect::inspect;
 
-/// A footprint as "1.2 MB", or "≥ 1.2 MB" when counting stopped at its limits.
-pub(crate) fn describe_size(size: Footprint) -> String {
-    files::describe(size)
-}
-
 /// How the branch's work is known to be in its base.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(crate) enum Proof {
@@ -81,6 +76,13 @@ pub(crate) struct Untracked {
     pub path: String,
     pub size: u64,
     pub kind: Kind,
+}
+
+impl Footprint {
+    /// "1.2 MB", or "≥ 1.2 MB" when counting stopped at its limits.
+    pub fn describe(self) -> String {
+        files::describe(self)
+    }
 }
 
 impl Untracked {

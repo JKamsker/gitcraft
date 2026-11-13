@@ -4,7 +4,7 @@
 use egui::{RichText, Ui};
 
 use super::Row;
-use crate::git::worktree_cleanup::{Inspection, Kind, Untracked, describe_size};
+use crate::git::worktree_cleanup::{Footprint, Inspection, Kind, Untracked};
 use crate::theme::{self, Tokens};
 
 /// Files listed per kind when the details are open.
@@ -89,12 +89,12 @@ pub(super) fn summary(found: &Inspection) -> String {
     crate::i18n::message(
         "worktree-cleanup-summary",
         &[
-            ("size", describe_size(found.footprint).into()),
+            ("size", found.footprint.describe().into()),
             ("changed", found.changed.len().into()),
             ("untracked", found.untracked.len().into()),
             ("text", text.into()),
             ("ignored", found.ignored.len().into()),
-            ("ignored-size", describe_size(found.ignored_size).into()),
+            ("ignored-size", found.ignored_size.describe().into()),
         ],
     )
 }
@@ -160,11 +160,12 @@ pub(super) fn untracked_line(file: &Untracked) -> String {
     format!(
         "?? {} ({}) · {}",
         file.path,
-        crate::git::worktree_cleanup::describe_size(crate::git::worktree_cleanup::Footprint {
+        Footprint {
             files: 1,
             bytes: file.size,
             complete: true,
-        }),
+        }
+        .describe(),
         crate::i18n::text(why)
     )
 }

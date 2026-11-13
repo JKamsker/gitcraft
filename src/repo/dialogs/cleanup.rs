@@ -9,6 +9,13 @@ use crate::repo::sidebar::delete_many;
 use crate::repo::{Action, Refresh};
 use crate::theme::{self, Tokens};
 
+/// What _Select stale or merged branches…_ opens: the branches, or the worktrees of merged
+/// ones (in a window of their own).
+pub(crate) enum CleanupAct {
+    Branches,
+    Worktrees,
+}
+
 /// The checklist's state.
 pub(crate) struct CleanupDialog {
     /// Each branch offered, and whether it is ticked.
@@ -138,7 +145,7 @@ pub(super) fn cleanup(ui: &mut Ui, dialog: &mut CleanupDialog) -> Outcome {
     }
     ui.add_space(10.0);
     if worktrees_offer(ui, dialog.worktrees, &t) {
-        let act = crate::repo::branch_cleanup::CleanupAct::Worktrees;
+        let act = CleanupAct::Worktrees;
         return Outcome::Done(Box::new(Action::Cleanup(act)));
     }
     if dialog.rows.is_empty() {

@@ -26,7 +26,7 @@ pub(crate) struct RestoreReport {
 
 /// Restores `archive` into the worktree `dest`, which must be a worktree (its top folder) of
 /// the repository the archive came from.
-pub(crate) fn restore(
+pub(super) fn restore(
     store: &Store,
     archive: &Listed,
     dest: &Path,

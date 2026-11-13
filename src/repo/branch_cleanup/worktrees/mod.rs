@@ -13,17 +13,12 @@ mod tests;
 
 use std::path::{Path, PathBuf};
 
-use crate::git::worktree_cleanup::archive::{self, Listed, RestoreReport, Store};
+use crate::git::worktree_cleanup::archive::{Listed, RestoreReport, Store};
 use crate::git::worktree_cleanup::{Evidence, Inspection, Outcome, Proof, Target, inspect};
 use crate::repo::branch_health::{Bases, Merged, Reason};
+use crate::repo::dialogs::CleanupAct;
 use crate::repo::{Notice, RepoTab};
 use crate::settings::Settings;
-
-/// What _Select stale or merged branches…_ opens: the branches, or the worktrees.
-pub(crate) enum CleanupAct {
-    Branches,
-    Worktrees,
-}
 
 /// The tab's worktree cleanup: its window, and the automatic restores.
 #[derive(Default)]
@@ -193,10 +188,7 @@ impl RepoTab {
         let repo = self.path.clone();
         self.then(
             ctx,
-            move || {
-                let key = archive::repository(&repo)?.key;
-                Ok((store.list(Some(&key)), store.usage()))
-            },
+            move || Ok((store.list_for(&repo)?, store.usage())),
             |tab, listed: Result<(Vec<Listed>, u64), String>, _| {
                 if let Some(window) = &mut tab.worktree_cleanup.window {
                     window.archives = Some(listed);
@@ -260,7 +252,7 @@ impl RepoTab {
         };
         self.then(
             ctx,
-            move || archive::restore(&store, &listed, &into).map(|r| (into, r)),
+            move || store.restore(&listed, &into).map(|r| (into, r)),
             |tab, result, ctx| {
                 let said = match result {
                     Ok((into, report)) => {
@@ -384,17 +376,17 @@ pub(super) fn auto_restore(
     store: &Store,
     worktrees: &[(PathBuf, String, String)],
 ) -> Vec<(PathBuf, RestoreReport)> {
-    let Ok(repository) = archive::repository(repo) else {
+    let Ok(archives) = store.list_for(repo) else {
         return Vec::new();
     };
     let mut done = Vec::new();
-    for listed in store.list(Some(&repository.key)) {
+    for listed in archives {
         let m = &listed.manifest;
         let matching = worktrees
             .iter()
             .find(|(_, branch, head)| *branch == m.branch && *head == m.head);
         if let (true, Some((path, ..))) = (m.restored.is_empty(), matching)
-            && let Ok(report) = archive::restore(store, &listed, path)
+            && let Ok(report) = store.restore(&listed, path)
         {
             done.push((path.clone(), report));
         }

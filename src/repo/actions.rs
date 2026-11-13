@@ -210,7 +210,7 @@ pub(crate) enum Action {
     ToggleSearch,
     FocusSearch,
     /// Open the checklist of stale or merged branches, or the worktrees of merged ones.
-    Cleanup(super::branch_cleanup::CleanupAct),
+    Cleanup(super::dialogs::CleanupAct),
     SearchStep(i32),
     CreatePr {
         branch: String,

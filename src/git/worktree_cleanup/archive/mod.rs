@@ -11,8 +11,8 @@ use std::path::{Path, PathBuf};
 
 use serde::{Deserialize, Serialize};
 
-pub(crate) use restore::{RestoreReport, restore};
-pub(crate) use write::{Source, create};
+pub(crate) use restore::RestoreReport;
+pub(in crate::git) use write::{Source, create};
 
 use super::files::{footprint, human, sha256_hex};
 
@@ -145,6 +145,38 @@ impl Store {
         Ok(())
     }
 
+    /// The archives of the repository `repo` (any of its worktrees) is part of.
+    pub fn list_for(&self, repo: &Path) -> Result<Vec<Listed>, String> {
+        Ok(self.list(Some(&repository(repo)?.key)))
+    }
+
+    /// Restores `archive` into the worktree `dest` (see [`restore::restore`]).
+    pub fn restore(&self, archive: &Listed, dest: &Path) -> Result<RestoreReport, String> {
+        restore::restore(self, archive, dest)
+    }
+
+    /// "12.0 MB of 268.4 MB used", for `used` bytes.
+    pub fn usage_line(&self, used: u64) -> String {
+        crate::i18n::message(
+            "worktree-cleanup-archive-usage",
+            &[
+                ("used", human(used).into()),
+                ("quota", human(self.quota).into()),
+            ],
+        )
+    }
+
+    /// The archives' default folder: in the app's data folder; in tests, a temporary one of
+    /// the test run's own, never the user's.
+    pub fn default_root() -> Option<PathBuf> {
+        if cfg!(test) {
+            return Some(
+                std::env::temp_dir().join(format!("gitcraft-archives-test-{}", std::process::id())),
+            );
+        }
+        crate::portable::data_dir().map(|d| d.join("worktree-archives"))
+    }
+
     /// Records a restore in the archive's manifest (written whole, then moved in place).
     pub fn record(&self, manifest: &Manifest, restored: Restored) -> Result<Manifest, String> {
         let mut manifest = manifest.clone();
@@ -182,37 +214,28 @@ fn write_json(path: &Path, value: &impl Serialize) -> Result<(), String> {
     })
 }
 
-/// "12.0 MB of 268.4 MB used".
-pub(crate) fn describe_usage(usage: u64, quota: u64) -> String {
-    crate::i18n::message(
-        "worktree-cleanup-archive-usage",
-        &[
-            ("used", human(usage).into()),
-            ("quota", human(quota).into()),
-        ],
-    )
-}
-
-/// "feature/x · 3 files · 4.1 KB · 2 hours ago", and whether it was restored.
-pub(crate) fn describe(listed: &Listed) -> String {
-    let m = &listed.manifest;
-    crate::i18n::message(
-        "worktree-cleanup-archive-line",
-        &[
-            ("branch", m.branch.clone().into()),
-            ("count", m.files.len().into()),
-            ("size", human(listed.bytes).into()),
-            (
-                "when",
-                crate::git::relative_time(m.created, crate::git::now()).into(),
-            ),
-            ("restored", m.restored.len().into()),
-        ],
-    )
+impl Listed {
+    /// "feature/x · 3 files · 4.1 KB · 2 hours ago", and whether it was restored.
+    pub fn describe(&self) -> String {
+        let (listed, m) = (self, &self.manifest);
+        crate::i18n::message(
+            "worktree-cleanup-archive-line",
+            &[
+                ("branch", m.branch.clone().into()),
+                ("count", m.files.len().into()),
+                ("size", human(listed.bytes).into()),
+                (
+                    "when",
+                    crate::git::relative_time(m.created, crate::git::now()).into(),
+                ),
+                ("restored", m.restored.len().into()),
+            ],
+        )
+    }
 }
 
 /// The repository `path` (any of its worktrees) is part of.
-pub(crate) fn repository(path: &Path) -> Result<Repository, String> {
+pub(in crate::git) fn repository(path: &Path) -> Result<Repository, String> {
     let dir = crate::git::run(Some(path), &["rev-parse", "--git-common-dir"])?;
     let dir = Path::new(dir.trim());
     let dir = if dir.is_absolute() {
@@ -224,15 +247,4 @@ pub(crate) fn repository(path: &Path) -> Result<Repository, String> {
     let common_dir = dir.to_string_lossy().into_owned();
     let key = sha256_hex(common_dir.as_bytes())[..16].to_owned();
     Ok(Repository { common_dir, key })
-}
-
-/// The archives' default folder: in the app's data folder; in tests, a temporary one of the
-/// test run's own, never the user's.
-pub(crate) fn default_root() -> Option<PathBuf> {
-    if cfg!(test) {
-        return Some(
-            std::env::temp_dir().join(format!("gitcraft-archives-test-{}", std::process::id())),
-        );
-    }
-    crate::portable::data_dir().map(|d| d.join("worktree-archives"))
 }

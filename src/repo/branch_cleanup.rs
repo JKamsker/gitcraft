@@ -3,7 +3,6 @@
 //! merged branches…_ offers.
 
 mod worktrees;
-pub(crate) use worktrees::CleanupAct;
 pub(in crate::repo) use worktrees::WorktreeCleanup;
 
 use super::branch_health::{self, Bases, Inputs, Reason};

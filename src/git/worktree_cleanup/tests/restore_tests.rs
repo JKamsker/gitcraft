@@ -3,7 +3,6 @@
 
 use super::archive_tests::archived;
 use super::{Fixture, UNICODE, write};
-use crate::git::worktree_cleanup::archive;
 use crate::git::worktree_cleanup::{Outcome, inspect, remove};
 
 #[test]
@@ -24,7 +23,7 @@ fn files_come_back_into_a_recreated_worktree_once() -> Result<(), String> {
     // The branch is checked out again in a worktree at the same place.
     let again = f.add_worktree("done")?;
     assert_eq!(again, wt);
-    let report = archive::restore(&f.store, &listed, &again)?;
+    let report = f.store.restore(&listed, &again)?;
     assert_eq!(report.created, [UNICODE]);
     assert_eq!(
         std::fs::read(again.join(UNICODE)).ok(),
@@ -35,7 +34,7 @@ fn files_come_back_into_a_recreated_worktree_once() -> Result<(), String> {
     // Listed with the restore recorded; restoring again finds every file there already.
     let listed = f.store.list(None).into_iter().next().ok_or("not listed")?;
     assert_eq!(listed.manifest.restored.len(), 1);
-    let report = archive::restore(&f.store, &listed, &again)?;
+    let report = f.store.restore(&listed, &again)?;
     assert_eq!((report.created.len(), report.same.len()), (0, 1));
     Ok(())
 }
@@ -49,7 +48,7 @@ fn a_file_already_there_is_never_overwritten() -> Result<(), String> {
     let listed = archived(&f, &wt, "done")?;
     write(&wt, "a.txt", b"newer work\n")?;
     write(&wt, "a.txt.restored", b"in the way too\n")?;
-    let report = archive::restore(&f.store, &listed, &wt)?;
+    let report = f.store.restore(&listed, &wt)?;
     assert_eq!(report.same, ["b.txt"]);
     assert_eq!(
         report.renamed,
@@ -77,7 +76,7 @@ fn only_a_worktrees_top_folder_takes_a_restore() -> Result<(), String> {
     write(&wt, "a.txt", b"archived\n")?;
     let listed = archived(&f, &wt, "done")?;
     std::fs::create_dir_all(wt.join("inner")).map_err(|e| e.to_string())?;
-    assert!(archive::restore(&f.store, &listed, &wt.join("inner")).is_err());
+    assert!(f.store.restore(&listed, &wt.join("inner")).is_err());
     assert!(!wt.join("inner/a.txt").exists());
     Ok(())
 }
@@ -96,7 +95,7 @@ fn a_restore_never_follows_a_link_out_of_the_worktree() -> Result<(), String> {
     let outside = f.scratch.join("outside");
     std::fs::create_dir_all(&outside).map_err(|e| e.to_string())?;
     std::os::unix::fs::symlink(&outside, wt.join("notes ü")).map_err(|e| e.to_string())?;
-    let report = archive::restore(&f.store, &listed, &wt)?;
+    let report = f.store.restore(&listed, &wt)?;
     assert_eq!(report.created, ["top.txt"]);
     assert_eq!(report.failed.len(), 1);
     assert_eq!(report.failed[0].0, UNICODE);

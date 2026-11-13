@@ -7,7 +7,7 @@ use egui::{RichText, Ui};
 
 use super::{Window, archives, rows};
 use crate::git::worktree_cleanup::Outcome;
-use crate::git::worktree_cleanup::archive::{Listed, describe_usage};
+use crate::git::worktree_cleanup::archive::Listed;
 use crate::repo::RepoTab;
 use crate::settings::Settings;
 use crate::theme::{self, Tokens};
@@ -46,8 +46,8 @@ impl RepoTab {
                     .max_height(620.0)
                     .show(ui, |ui| {
                         body(ui, window, checking, idle, &mut asks);
-                        let quota = settings.store().map(|s| s.quota).unwrap_or(0);
-                        archives::show(ui, window, &worktrees, quota, &mut asks);
+                        let store = settings.store();
+                        archives::show(ui, window, &worktrees, store.as_ref(), &mut asks);
                     });
             });
         let running = window.running;
@@ -181,7 +181,7 @@ fn results(ui: &mut Ui, results: &[(String, Outcome)], t: &Tokens) {
 pub(super) fn describe(outcome: &Outcome) -> (String, bool) {
     match outcome {
         Outcome::Removed { archive, freed } => {
-            let freed = crate::git::worktree_cleanup::describe_size(*freed);
+            let freed = freed.describe();
             let text = match archive {
                 Some(listed) => crate::i18n::message(
                     "worktree-cleanup-removed-archived",
@@ -212,9 +212,4 @@ pub(super) fn describe(outcome: &Outcome) -> (String, bool) {
             true,
         ),
     }
-}
-
-/// "12.0 MB of 268.4 MB used" for the archives' line.
-pub(super) fn usage(used: u64, quota: u64) -> String {
-    describe_usage(used, quota)
 }

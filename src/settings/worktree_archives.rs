@@ -10,7 +10,7 @@ use serde::{Deserialize, Serialize};
 
 use super::layout::{self, Card};
 use super::{FIELD_WIDTH, Settings, parse_localized_number};
-use crate::git::worktree_cleanup::archive::{Listed, Store, default_root};
+use crate::git::worktree_cleanup::archive::{Listed, Store};
 
 /// How the archives are kept.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -40,7 +40,7 @@ impl WorktreeArchives {
     /// The store these settings describe; none when no folder is known.
     pub(crate) fn store(&self) -> Option<Store> {
         let root = match self.location.trim() {
-            "" => default_root()?,
+            "" => Store::default_root()?,
             typed => PathBuf::from(typed),
         };
         Some(Store {
@@ -85,7 +85,7 @@ impl Settings {
             crate::i18n::text("worktree-cleanup-settings-location-hint"),
             "worktree archive untracked zip folder location",
             |ui| {
-                let default = default_root()
+                let default = Store::default_root()
                     .map(|p| p.display().to_string())
                     .unwrap_or_default();
                 ui.add(
@@ -135,7 +135,7 @@ impl Settings {
 fn archive_list(ui: &mut Ui, store: &Store) {
     let t = crate::theme::Tokens::get(ui.ctx());
     let seen = seen(ui, store, false);
-    let used = crate::git::worktree_cleanup::archive::describe_usage(seen.usage, store.quota);
+    let used = store.usage_line(seen.usage);
     ui.vertical(|ui| {
         layout::note(ui, used);
         if seen.archives.is_empty() {
@@ -148,7 +148,7 @@ fn archive_list(ui: &mut Ui, store: &Store) {
         for listed in &seen.archives {
             let m = &listed.manifest;
             ui.horizontal_wrapped(|ui| {
-                let line = crate::git::worktree_cleanup::archive::describe(listed);
+                let line = listed.describe();
                 ui.label(RichText::new(line).small()).on_hover_text(format!(
                     "{}\n{}",
                     m.worktree,

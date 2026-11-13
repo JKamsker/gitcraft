@@ -120,9 +120,7 @@ impl RepoTab {
             .inner
             .on_disabled_hover_text(crate::i18n::text("repo-core-3429"));
         if clean.clicked() {
-            acts.push(Action::Cleanup(
-                crate::repo::branch_cleanup::CleanupAct::Branches,
-            ));
+            acts.push(Action::Cleanup(crate::repo::dialogs::CleanupAct::Branches));
         }
         let mut order = BranchOrder::load(ui.ctx(), self.repo_key());
         // Laid out right to left: Recent first puts Name on its left, as the words were.

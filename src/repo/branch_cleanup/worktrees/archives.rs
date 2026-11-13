@@ -6,15 +6,15 @@ use std::path::PathBuf;
 use egui::{RichText, Ui};
 
 use super::Window;
-use super::window::{Asks, usage};
-use crate::git::worktree_cleanup::archive::describe;
+use super::window::Asks;
+use crate::git::worktree_cleanup::archive::Store;
 use crate::theme::{self, Tokens};
 
 pub(super) fn show(
     ui: &mut Ui,
     window: &mut Window,
     worktrees: &[(PathBuf, String)],
-    quota: u64,
+    store: Option<&Store>,
     asks: &mut Asks,
 ) {
     let t = Tokens::get(ui.ctx());
@@ -33,7 +33,13 @@ pub(super) fn show(
             return;
         }
         Some(Ok((listed, used))) => {
-            ui.label(RichText::new(usage(*used, quota)).color(t.text_dim).small());
+            if let Some(store) = store {
+                ui.label(
+                    RichText::new(store.usage_line(*used))
+                        .color(t.text_dim)
+                        .small(),
+                );
+            }
             listed.clone()
         }
     };
@@ -58,7 +64,7 @@ pub(super) fn show(
                 .unwrap_or_default()
         });
         ui.horizontal_wrapped(|ui| {
-            ui.label(RichText::new(describe(&archive)).small())
+            ui.label(RichText::new(archive.describe()).small())
                 .on_hover_text(format!("{}\n{}", m.worktree, archive.zip.display()));
             let shown = into
                 .file_name()

@@ -106,7 +106,7 @@ fn archive_and_clear(store: &Store, target: &Target, now: &Inspection) -> Result
 /// After `error`, puts the archived files back where they were; the archive goes once all are
 /// back. Says what happened.
 fn put_back(store: &Store, listed: &Listed, worktree: &Path, error: &str) -> String {
-    match archive::restore(store, listed, worktree) {
+    match store.restore(listed, worktree) {
         Ok(report) if report.failed.is_empty() => {
             // Every file is back in place: the archive would only be a second copy.
             let _ = store.delete(&listed.manifest);

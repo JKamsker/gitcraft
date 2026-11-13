@@ -101,7 +101,7 @@ fn archives_of_another_repository_are_neither_listed_nor_restored() -> Result<()
     let theirs = archive::repository(other.repo.path())?;
     assert_ne!(theirs.key, listed.manifest.repository.key);
     assert!(f.store.list(Some(&theirs.key)).is_empty());
-    let restored = archive::restore(&f.store, &listed, other.repo.path());
+    let restored = f.store.restore(&listed, other.repo.path());
     assert!(restored.is_err());
     assert!(!other.repo.path().join("a.txt").exists());
     Ok(())
@@ -124,7 +124,7 @@ fn a_tampered_archive_or_an_id_outside_the_store_is_refused() -> Result<(), Stri
     bytes[middle] ^= 0xff;
     std::fs::write(&listed.zip, bytes).map_err(|e| e.to_string())?;
     std::fs::remove_file(wt.join("a.txt")).map_err(|e| e.to_string())?;
-    assert!(archive::restore(&f.store, &listed, &wt).is_err());
+    assert!(f.store.restore(&listed, &wt).is_err());
     assert!(!wt.join("a.txt").exists());
     Ok(())
 }
