@@ -21,6 +21,7 @@ mod home_filter;
 mod home_recent;
 mod inbox;
 mod launch;
+mod library;
 mod links;
 mod my_work;
 mod os_shell;

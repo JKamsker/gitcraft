@@ -1,5 +1,6 @@
 use super::*;
 use crate::git;
+use std::path::Path;
 
 fn tree(name: &str) -> PathBuf {
     let dir = std::env::temp_dir().join(format!("gitcraft-scan-{name}-{}", std::process::id()));
