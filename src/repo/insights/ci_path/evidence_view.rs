@@ -67,7 +67,9 @@ fn show(ui: &mut Ui, evidence: &JobEvidence) {
     if evidence.plan.baseline.is_some() {
         ui.label(format!("Baseline: {}", report(evidence.before.as_ref())));
     }
-    for read in evidence.history.iter().filter(|read| read.log.is_err()) {
+    // Same-SHA attempts whose log can't vouch for every test: listed, never taken as passed.
+    let partial = |read: &&Read| read.report() != Some(Report::Complete);
+    for read in evidence.history.iter().filter(partial) {
         ui.label(format!(
             "Run {} attempt {}: {}",
             read.target.key.run,
