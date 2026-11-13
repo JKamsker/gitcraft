@@ -81,6 +81,8 @@ pub(crate) enum Action {
     },
     ComparisonNormalPatch,
     SelectHash(String),
+    /// Select a branch's tip commit by hash: details only, never an automatic file diff.
+    SelectBranch(String),
     /// Follow a backlink directly to changed files and the first file diff.
     OpenCommitChanges(String),
     ActivityCommit(String),
@@ -492,9 +494,7 @@ pub(crate) enum Action {
 
 #[path = "core_seams/branch_actions.rs"]
 mod branch_actions;
-#[allow(unused_imports)]
 pub(crate) use branch_actions::*;
 #[path = "core_seams/palette_actions.rs"]
 mod palette_actions;
-#[allow(unused_imports)]
 pub(crate) use palette_actions::*;

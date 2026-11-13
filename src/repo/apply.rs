@@ -89,6 +89,7 @@ impl RepoTab {
                 self.doctor = None;
                 self.goto(&hash, ctx);
             }
+            Action::SelectBranch(hash) => self.select_branch(hash, ctx),
             Action::SelectPr(number) => self.select_pr(number, ctx),
             Action::SelectStash(i) => {
                 self.leave_pages();

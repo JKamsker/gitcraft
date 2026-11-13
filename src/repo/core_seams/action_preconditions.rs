@@ -14,6 +14,7 @@ impl RepoTab {
                 Action::Select(_)
                     | Action::SelectBranchTip(_)
                     | Action::SelectHash(_)
+                    | Action::SelectBranch(_)
                     | Action::OpenCommitChanges(_)
                     | Action::OpenDiff(_)
                     | Action::CloseDiff
@@ -64,6 +65,7 @@ impl RepoTab {
             Action::Select(_)
                 | Action::SelectBranchTip(_)
                 | Action::SelectHash(_)
+                | Action::SelectBranch(_)
                 | Action::SelectStash(_)
                 | Action::OpenPr(_)
                 | Action::ClosePr
@@ -98,6 +100,7 @@ impl RepoTab {
                 | Action::Select(_)
                 | Action::SelectBranchTip(_)
                 | Action::SelectHash(_)
+                | Action::SelectBranch(_)
                 | Action::SelectPr(_)
                 | Action::SelectStash(_)
                 | Action::Compare { .. }

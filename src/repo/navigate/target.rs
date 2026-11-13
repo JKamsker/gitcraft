@@ -13,12 +13,14 @@ use crate::repo::{
 pub(in crate::repo) enum PendingGoto {
     History(String),
     Restore(String),
+    /// A branch clicked by name: its tip shows details without an automatic file diff.
+    BranchTip(String),
 }
 
 impl PendingGoto {
     pub(in crate::repo) fn hash(&self) -> &str {
         match self {
-            Self::History(hash) | Self::Restore(hash) => hash,
+            Self::History(hash) | Self::Restore(hash) | Self::BranchTip(hash) => hash,
         }
     }
 
@@ -38,6 +40,7 @@ impl RepoTab {
                 Action::Select(_)
                     | Action::SelectBranchTip(_)
                     | Action::SelectHash(_)
+                    | Action::SelectBranch(_)
                     | Action::SelectStash(_)
                     | Action::SelectPr(_)
                     | Action::FocusCommit
@@ -92,10 +95,10 @@ impl RepoTab {
         let hash = target.hash();
         match self.index.get(hash).copied() {
             Some(row) => {
-                if target.restoring() {
-                    self.restore_commit_selection(row, ctx);
-                } else {
-                    self.select_history(row, ctx);
+                match target {
+                    PendingGoto::Restore(_) => self.restore_commit_selection(row, ctx),
+                    PendingGoto::BranchTip(_) => self.select_branch_tip(row, ctx),
+                    PendingGoto::History(_) => self.select_history(row, ctx),
                 }
                 self.scroll_to = Some(row);
             }
@@ -109,6 +112,14 @@ impl RepoTab {
                 )));
             }
         }
+    }
+
+    /// A branch clicked by name: a navigation step to its tip, details without a diff.
+    pub(in crate::repo) fn select_branch(&mut self, hash: String, ctx: &egui::Context) {
+        self.leave_pages();
+        self.nav_jump = true;
+        self.doctor = None;
+        self.goto_target(PendingGoto::BranchTip(hash), ctx);
     }
 
     /// Selects `hash`, loading more history first if it's further down.
