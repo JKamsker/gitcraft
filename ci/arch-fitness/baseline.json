@@ -3761,7 +3761,7 @@
     },
     "git": {
       "domains": 12,
-      "exported": 375
+      "exported": 385
     },
     "graph": {
       "domains": 18,
@@ -3789,7 +3789,7 @@
     },
     "repo-core": {
       "domains": 24,
-      "symbols": 608,
+      "symbols": 609,
       "exported": 91
     },
     "review": {
@@ -3806,7 +3806,7 @@
     },
     "settings": {
       "domains": 15,
-      "symbols": 179,
+      "symbols": 181,
       "exported": 34
     },
     "sidebar": {
