@@ -20,7 +20,12 @@ pub(super) fn job(
         return;
     };
     ui.separator();
-    let reads = 1 + usize::from(plan.before.is_some()) + plan.history.len();
+    let reads = std::iter::once(&plan.now)
+        .chain(&plan.before)
+        .chain(&plan.history)
+        .map(|target| target.job)
+        .collect::<HashSet<_>>()
+        .len();
     let current = state.logs.ready().filter(|evidence| evidence.plan == plan);
     if current.is_none() && !state.logs.loading {
         if let Some(error) = state.logs.error() {
@@ -99,6 +104,13 @@ fn show(ui: &mut Ui, evidence: &JobEvidence) {
          ambiguous or unreported: unknown, not passed).",
         evidence.passed_both, evidence.unknown
     ));
+    if let Ok(log) = &evidence.now.log {
+        ui.label(format!("Cache (this run): {}", test_history::caches(log)));
+        ui.label(format!(
+            "Toolchain (this run): {}",
+            test_history::toolchains(log)
+        ));
+    }
     for difference in &evidence.differences {
         ui.label(format!(
             "{}: {} → {}",

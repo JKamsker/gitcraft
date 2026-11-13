@@ -16,6 +16,7 @@ impl RepoTab {
         };
         if state.subject != subject {
             state.explorer = Slot::default();
+            state.logs = Slot::default();
             state.run = None;
             state.pinned = None;
             state.workflow = None;

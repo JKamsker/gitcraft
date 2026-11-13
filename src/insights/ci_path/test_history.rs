@@ -243,16 +243,22 @@ fn rank(row: &TestRow) -> u8 {
     }
 }
 
-fn differences(now: &LogEvidence, before: &LogEvidence) -> Vec<Difference> {
-    let caches = |log: &LogEvidence| {
-        let shown: Vec<String> = log
-            .caches
+/// The log's cache lines, or that it records none.
+pub fn caches(log: &LogEvidence) -> String {
+    listed(
+        log.caches
             .iter()
             .map(|c| format!("{} {}", if c.hit { "hit" } else { "miss" }, c.key))
-            .collect();
-        listed(shown)
-    };
-    let toolchains = |log: &LogEvidence| listed(log.toolchains.iter().cloned().collect());
+            .collect(),
+    )
+}
+
+/// The log's toolchain version lines, or that it records none.
+pub fn toolchains(log: &LogEvidence) -> String {
+    listed(log.toolchains.iter().cloned().collect())
+}
+
+fn differences(now: &LogEvidence, before: &LogEvidence) -> Vec<Difference> {
     let report = |log: &LogEvidence| log.report().label().to_owned();
     [
         ("cache", caches(now), caches(before)),

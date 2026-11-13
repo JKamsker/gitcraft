@@ -72,7 +72,7 @@ fn log_evidence_is_accepted_for_the_picked_job_and_drawn() -> Result<(), String>
 
 #[test]
 fn changing_job_attempt_or_baseline_retires_log_evidence_and_late_answers() -> Result<(), String> {
-    for change in ["job", "baseline", "plan"] {
+    for change in ["job", "baseline", "branch", "plan"] {
         let ctx = egui::Context::default();
         let mut tab = schedule::tab(&ctx, Kind::CiPath);
         let mut evidence = ready(&mut tab, &ctx)?;
@@ -80,6 +80,11 @@ fn changing_job_attempt_or_baseline_retires_log_evidence_and_late_answers() -> R
         crate::repo::messages::record_jobs(|| match change {
             "job" => tab.ci_path_act(Act::Select(Some(0)), &ctx),
             "baseline" => tab.ci_path_act(Act::PickBaseline(Baseline::None), &ctx),
+            "branch" => {
+                // Switching branches moves HEAD: the page is about another revision now.
+                tab.refs.head = "b".repeat(40);
+                tab.ci_path_load(&ctx);
+            }
             _ => {}
         });
         if change == "plan" {

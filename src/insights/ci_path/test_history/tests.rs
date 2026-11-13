@@ -84,7 +84,7 @@ fn row<'a>(evidence: &'a JobEvidence, name: &str) -> Option<&'a TestRow> {
 }
 
 #[test]
-fn reruns_at_one_sha_show_a_flaky_test_with_exact_attempt_links() {
+fn reruns_at_one_sha_show_a_flaky_test_with_exact_attempt_links() -> Result<(), &'static str> {
     let sha = "abc";
     let (first, second, current) = (run(10, 1, sha, 4), run(10, 2, sha, 4), run(10, 3, sha, 4));
     let baseline = run(9, 1, "older", 3);
@@ -94,7 +94,7 @@ fn reruns_at_one_sha_show_a_flaky_test_with_exact_attempt_links() {
         vec![first, second, current],
     );
     // The windows matrix leg: its own job id in every attempt, never the linux one.
-    let plan = plan(&explorer, 1).expect("job");
+    let plan = plan(&explorer, 1).ok_or("job")?;
     assert_eq!(plan.now.job, 10 * 100 + 30 + 1);
     assert_eq!(plan.before.as_ref().map(|t| t.job), Some(9 * 100 + 10 + 1));
     assert_eq!(
@@ -128,7 +128,7 @@ fn reruns_at_one_sha_show_a_flaky_test_with_exact_attempt_links() {
             .ok_or("gone".into())
     });
     assert_eq!(reads, [1031, 911, 1011, 1021]);
-    let flaky = row(&evidence, "flaky").expect("flaky row");
+    let flaky = row(&evidence, "flaky").ok_or("flaky row")?;
     assert!(flaky.intermittent);
     assert_eq!(flaky.transition, Transition::Passed);
     assert_eq!(
@@ -144,19 +144,21 @@ fn reruns_at_one_sha_show_a_flaky_test_with_exact_attempt_links() {
         ]
     );
     assert_eq!(flaky.history[0].url, "job-10-1-1");
-    let broken = row(&evidence, "broken").expect("broken row");
+    let broken = row(&evidence, "broken").ok_or("broken row")?;
     assert_eq!(broken.transition, Transition::NewlyFailed);
     assert!(!broken.intermittent);
     assert_eq!(evidence.rows[0].test.1, "broken");
     assert_eq!((evidence.passed_both, evidence.unknown), (1, 0));
+    Ok(())
 }
 
 #[test]
-fn incomplete_or_unread_logs_leave_tests_unknown_rather_than_fixed_or_green() {
+fn incomplete_or_unread_logs_leave_tests_unknown_rather_than_fixed_or_green()
+-> Result<(), &'static str> {
     let mut current = run(20, 1, "abc", 2);
     current.jobs[0].state = CheckState::Running;
     let explorer = explorer(current, Some(run(19, 1, "old", 1)), Vec::new());
-    let plan = plan(&explorer, 0).expect("job");
+    let plan = plan(&explorer, 0).ok_or("job")?;
     assert!(!plan.now.finished);
     let evidence = read(plan, |job| match job {
         2010 => Ok((
@@ -166,23 +168,24 @@ fn incomplete_or_unread_logs_leave_tests_unknown_rather_than_fixed_or_green() {
         _ => Ok((log(&[("done", "FAILED"), ("pending", "FAILED")]), false)),
     });
     assert_eq!(evidence.now.report(), Some(Report::Incomplete));
-    let done = row(&evidence, "done").expect("done row");
+    let done = row(&evidence, "done").ok_or("done row")?;
     assert_eq!(done.transition, Transition::Fixed);
     // Absent from the incomplete log: unknown, never fixed.
     assert!(row(&evidence, "pending").is_none());
     assert_eq!(evidence.unknown, 1);
     assert!(evidence.differences.iter().any(|d| d.what == "test report"));
-    let unread = read(super::plan(&explorer, 0).expect("job"), |_| {
+    let unread = read(super::plan(&explorer, 0).ok_or("job")?, |_| {
         Err("410 expired".into())
     });
     assert!(unread.rows.is_empty() && unread.now.log.is_err());
     assert_eq!(unread.unknown + unread.passed_both, 0);
+    Ok(())
 }
 
 #[test]
-fn cache_toolchain_and_error_differences_are_recorded_not_explained() {
+fn cache_toolchain_and_error_differences_are_recorded_not_explained() -> Result<(), &'static str> {
     let explorer = explorer(run(30, 1, "abc", 2), Some(run(29, 1, "old", 1)), Vec::new());
-    let plan = plan(&explorer, 0).expect("job");
+    let plan = plan(&explorer, 0).ok_or("job")?;
     let evidence = read(plan, |job| {
         Ok((
             if job == 3010 {
@@ -203,16 +206,18 @@ fn cache_toolchain_and_error_differences_are_recorded_not_explained() {
     assert_eq!(evidence.differences[0].before, "hit k1");
     assert_eq!(evidence.differences[0].now, "miss k1");
     assert_eq!(evidence.new_errors, ["boom"]);
+    Ok(())
 }
 
 #[test]
-fn ambiguous_matrix_legs_and_other_revisions_are_unaligned_not_guessed() {
+fn ambiguous_matrix_legs_and_other_revisions_are_unaligned_not_guessed() -> Result<(), &'static str>
+{
     let current = run(40, 2, "abc", 2);
     let mut renamed = run(40, 1, "abc", 2);
     renamed.jobs[1].name = "test (linux)".into();
     let other_sha = run(41, 1, "zzz", 3);
     let explorer = explorer(current.clone(), None, vec![renamed, other_sha, current]);
-    let plan = plan(&explorer, 1).expect("job");
+    let plan = plan(&explorer, 1).ok_or("job")?;
     assert!(plan.baseline.is_none() && plan.before.is_none() && plan.history.is_empty());
     assert_eq!(
         plan.unaligned,
@@ -228,4 +233,5 @@ fn ambiguous_matrix_legs_and_other_revisions_are_unaligned_not_guessed() {
         ]
     );
     assert!(super::plan(&explorer, 9).is_none());
+    Ok(())
 }
