@@ -86,20 +86,16 @@ pub(super) fn act(a: Act) -> Action {
 
 impl RepoTab {
     /// The pull request shown, and its files as read, when both are current.
-    fn purpose_subject(&self) -> Option<(Subject, crate::pull_request::PrFiles)> {
+    fn purpose_files_read(&self) -> Option<(Subject, &crate::pull_request::PrFiles)> {
         let view = self.pr_view.as_ref()?;
         let details = view.details.as_ref()?.as_ref().ok()?;
         let files = view.files.as_ref()?.as_ref().ok()?;
-        (files.to == details.head_oid).then(|| {
-            (
-                Subject {
-                    url: details.url.clone(),
-                    base: files.from.clone(),
-                    head: files.to.clone(),
-                },
-                files.clone(),
-            )
-        })
+        let subject = Subject {
+            url: details.url.clone(),
+            base: files.from.clone(),
+            head: files.to.clone(),
+        };
+        (files.to == details.head_oid).then_some((subject, files))
     }
 
     pub(super) fn purpose_act(&mut self, a: Act, ctx: &egui::Context) {
@@ -119,6 +115,14 @@ impl RepoTab {
                 let (Some(Ok(units)), Some(Ok(arranged))) = (&state.units, &state.arranged) else {
                     return;
                 };
+                if arranged.stale.is_some() {
+                    state.notice = Some((
+                        "Carry over or discard your earlier grouping before changing this one"
+                            .to_owned(),
+                        true,
+                    ));
+                    return;
+                }
                 match arrange::edit(arranged, units, edit) {
                     Ok(saved) => {
                         state.selected.clear();
@@ -166,9 +170,10 @@ impl RepoTab {
 
     /// Reads the units of the pull request shown, and the arrangement saved for it.
     fn purpose_load(&mut self, ctx: &egui::Context) {
-        let Some((subject, files)) = self.purpose_subject() else {
+        let Some((subject, files)) = self.purpose_files_read() else {
             return;
         };
+        let files = files.clone();
         let state = &mut self.review_purpose;
         state.request += 1;
         let request = state.request;

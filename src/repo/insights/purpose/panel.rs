@@ -32,7 +32,7 @@ impl RepoTab {
         if !state.on {
             return false;
         }
-        let Some((subject, _)) = self.purpose_subject() else {
+        let Some((subject, _)) = self.purpose_files_read() else {
             ui.weak("  The groups come once the files are read at the pull request's head.");
             return false;
         };
@@ -134,9 +134,11 @@ fn header(
         .color(t.text_dim),
     );
     let mine = if arranged.edited {
-        "Groups proposed by the rules, arranged by you (✓ marks what you placed)."
+        "Groups proposed by the rules, arranged by you (✓ marks what you placed). \
+         Right-click a group or a change to rename, reorder, split, merge or move it."
     } else {
-        "Groups proposed by the rules: hover a change for the rule that placed it."
+        "Groups proposed by the rules: hover a change for the rule that placed it. \
+         Right-click a group or a change to rename, reorder, split, merge or move it."
     };
     ui.label(RichText::new(mine).small().color(t.text_faint));
     for note in units.notes.iter().chain(
