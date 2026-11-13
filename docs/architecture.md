@@ -8,6 +8,10 @@ harden those implementations, preserving legacy undo data and recovery safety.
 The open issues track remaining cross-feature and platform validation; the
 historical inventory below is a baseline, not an instruction to redo shipped work.
 
+Dependency direction, feature ownership and `RepoTab` field access are enforced separately
+by the [architecture fitness gate](architecture-boundaries.md) (#209); the lexical survey
+below remains advisory.
+
 ## Mandatory Rust file-size policy
 
 Try to keep each Rust file below **300 physical lines**. Files at **300–500**

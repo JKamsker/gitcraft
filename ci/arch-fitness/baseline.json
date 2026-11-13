@@ -1,0 +1,3898 @@
+{
+  "schema": 1,
+  "note": "Reviewed legacy exceptions and budgets measured when the architecture fitness gate was adopted (#209). CI only reads this file. Remove entries (`ratchet`) as coupling is removed; additions need a reviewed reason.",
+  "forbidden_edges": [
+    {
+      "from": "agents",
+      "to": "app",
+      "reason": "Legacy upward dependency at adoption (#209): agents (features) uses 2 symbols of app (shell), e.g. gitcraft::app::lifecycle::repo_root at src/mcp/mod.rs:153.",
+      "owner": "@JKamsker",
+      "remediation": "Move what agents needs into agents or a lower layer, or pass it in (parameter, callback, event)."
+    },
+    {
+      "from": "agents",
+      "to": "conflicts",
+      "reason": "Legacy cross-feature dependency at adoption (#209): agents (features) uses 6 symbols of conflicts (features), e.g. gitcraft::resolver::report::MAX_ESTIMATE_MINUTES at src/mcp/tools/resolve.rs:12.",
+      "owner": "@JKamsker",
+      "remediation": "Route through repo-core (an Action or effect) or move the shared piece into a lower layer; declare a narrow allowed edge only if conflicts is meant to serve agents."
+    },
+    {
+      "from": "agents",
+      "to": "diff",
+      "reason": "Legacy cross-feature dependency at adoption (#209): agents (features) uses 2 symbols of diff (features), e.g. gitcraft::repo::diff::DiffData at src/repo/agents/handoff.rs:17.",
+      "owner": "@JKamsker",
+      "remediation": "Route through repo-core (an Action or effect) or move the shared piece into a lower layer; declare a narrow allowed edge only if diff is meant to serve agents."
+    },
+    {
+      "from": "agents",
+      "to": "doctor",
+      "reason": "Legacy cross-feature dependency at adoption (#209): agents (features) uses 1 symbols of doctor (features), e.g. gitcraft::repo::repository_tools::Act at src/repo/agents/turns.rs:177.",
+      "owner": "@JKamsker",
+      "remediation": "Route through repo-core (an Action or effect) or move the shared piece into a lower layer; declare a narrow allowed edge only if doctor is meant to serve agents."
+    },
+    {
+      "from": "agents",
+      "to": "graph",
+      "reason": "Legacy cross-feature dependency at adoption (#209): agents (features) uses 3 symbols of graph (features), e.g. gitcraft::repo::history_filter::rules at src/repo/authorship_view.rs:122.",
+      "owner": "@JKamsker",
+      "remediation": "Route through repo-core (an Action or effect) or move the shared piece into a lower layer; declare a narrow allowed edge only if graph is meant to serve agents."
+    },
+    {
+      "from": "agents",
+      "to": "review",
+      "reason": "Legacy cross-feature dependency at adoption (#209): agents (features) uses 3 symbols of review (features), e.g. gitcraft::repo::pr_review::LineTarget at src/repo/agents/handoff.rs:18.",
+      "owner": "@JKamsker",
+      "remediation": "Route through repo-core (an Action or effect) or move the shared piece into a lower layer; declare a narrow allowed edge only if review is meant to serve agents."
+    },
+    {
+      "from": "agents",
+      "to": "rewrite",
+      "reason": "Legacy cross-feature dependency at adoption (#209): agents (features) uses 11 symbols of rewrite (features), e.g. gitcraft::repo::quick_edit at src/repo/agent/plan.rs:23.",
+      "owner": "@JKamsker",
+      "remediation": "Route through repo-core (an Action or effect) or move the shared piece into a lower layer; declare a narrow allowed edge only if rewrite is meant to serve agents."
+    },
+    {
+      "from": "agents",
+      "to": "sidebar",
+      "reason": "Legacy cross-feature dependency at adoption (#209): agents (features) uses 4 symbols of sidebar (features), e.g. gitcraft::repo::sidebar::branch_delete::redo_delete at src/repo/agent/plan.rs:24.",
+      "owner": "@JKamsker",
+      "remediation": "Route through repo-core (an Action or effect) or move the shared piece into a lower layer; declare a narrow allowed edge only if sidebar is meant to serve agents."
+    },
+    {
+      "from": "agents",
+      "to": "terminal",
+      "reason": "Legacy cross-feature dependency at adoption (#209): agents (features) uses 4 symbols of terminal (features), e.g. gitcraft::terminal::shells::ShellSpec at src/agent/launch.rs:14.",
+      "owner": "@JKamsker",
+      "remediation": "Route through repo-core (an Action or effect) or move the shared piece into a lower layer; declare a narrow allowed edge only if terminal is meant to serve agents."
+    },
+    {
+      "from": "agents",
+      "to": "update",
+      "reason": "Legacy cross-feature dependency at adoption (#209): agents (features) uses 1 symbols of update (features), e.g. gitcraft::update::CURRENT at src/mcp/server.rs:160.",
+      "owner": "@JKamsker",
+      "remediation": "Route through repo-core (an Action or effect) or move the shared piece into a lower layer; declare a narrow allowed edge only if update is meant to serve agents."
+    },
+    {
+      "from": "bisect",
+      "to": "app",
+      "reason": "Legacy upward dependency at adoption (#209): bisect (features) uses 1 symbols of app (shell), e.g. gitcraft::app::lifecycle::strip_verbatim at src/parallel_bisect/bundle/native.rs:169.",
+      "owner": "@JKamsker",
+      "remediation": "Move what bisect needs into bisect or a lower layer, or pass it in (parameter, callback, event)."
+    },
+    {
+      "from": "bisect",
+      "to": "doctor",
+      "reason": "Legacy cross-feature dependency at adoption (#209): bisect (features) uses 1 symbols of doctor (features), e.g. gitcraft::repo::activity::display_workflow_error at src/repo/local_ci/mod.rs:222.",
+      "owner": "@JKamsker",
+      "remediation": "Route through repo-core (an Action or effect) or move the shared piece into a lower layer; declare a narrow allowed edge only if doctor is meant to serve bisect."
+    },
+    {
+      "from": "bisect",
+      "to": "graph",
+      "reason": "Legacy cross-feature dependency at adoption (#209): bisect (features) uses 3 symbols of graph (features), e.g. gitcraft::repo::graph_view::ROW_GAP at src/repo/parallel_bisect/marks.rs:10.",
+      "owner": "@JKamsker",
+      "remediation": "Route through repo-core (an Action or effect) or move the shared piece into a lower layer; declare a narrow allowed edge only if graph is meant to serve bisect."
+    },
+    {
+      "from": "changes",
+      "to": "app",
+      "reason": "Legacy upward dependency at adoption (#209): changes (features) uses 1 symbols of app (shell), e.g. gitcraft::manual::command at src/repo/detail/extras/notes_view.rs:243.",
+      "owner": "@JKamsker",
+      "remediation": "Move what changes needs into changes or a lower layer, or pass it in (parameter, callback, event)."
+    },
+    {
+      "from": "changes",
+      "to": "conflicts",
+      "reason": "Legacy cross-feature dependency at adoption (#209): changes (features) uses 1 symbols of conflicts (features), e.g. gitcraft::repo::remerge::panel::Mode at src/repo/detail/commit.rs:16.",
+      "owner": "@JKamsker",
+      "remediation": "Route through repo-core (an Action or effect) or move the shared piece into a lower layer; declare a narrow allowed edge only if conflicts is meant to serve changes."
+    },
+    {
+      "from": "changes",
+      "to": "diff",
+      "reason": "Legacy cross-feature dependency at adoption (#209): changes (features) uses 17 symbols of diff (features), e.g. gitcraft::repo::diff::literal_path at src/repo/checkout_blocked/carry.rs:13.",
+      "owner": "@JKamsker",
+      "remediation": "Route through repo-core (an Action or effect) or move the shared piece into a lower layer; declare a narrow allowed edge only if diff is meant to serve changes."
+    },
+    {
+      "from": "changes",
+      "to": "graph",
+      "reason": "Legacy cross-feature dependency at adoption (#209): changes (features) uses 2 symbols of graph (features), e.g. gitcraft::repo::saved_views::reader::Reader at src/repo/content_recovery/mod.rs:3.",
+      "owner": "@JKamsker",
+      "remediation": "Route through repo-core (an Action or effect) or move the shared piece into a lower layer; declare a narrow allowed edge only if graph is meant to serve changes."
+    },
+    {
+      "from": "changes",
+      "to": "review",
+      "reason": "Legacy cross-feature dependency at adoption (#209): changes (features) uses 6 symbols of review (features), e.g. gitcraft::repo::review_workflow::continuous::ReviewSource at src/repo/detail/changes.rs:44.",
+      "owner": "@JKamsker",
+      "remediation": "Route through repo-core (an Action or effect) or move the shared piece into a lower layer; declare a narrow allowed edge only if review is meant to serve changes."
+    },
+    {
+      "from": "changes",
+      "to": "rewrite",
+      "reason": "Legacy cross-feature dependency at adoption (#209): changes (features) uses 4 symbols of rewrite (features), e.g. gitcraft::repo::stack::StackAct at src/repo/detail/changes.rs:164.",
+      "owner": "@JKamsker",
+      "remediation": "Route through repo-core (an Action or effect) or move the shared piece into a lower layer; declare a narrow allowed edge only if rewrite is meant to serve changes."
+    },
+    {
+      "from": "changes",
+      "to": "sidebar",
+      "reason": "Legacy cross-feature dependency at adoption (#209): changes (features) uses 7 symbols of sidebar (features), e.g. gitcraft::repo::branch_tree at src/repo/detail/all_files.rs:11.",
+      "owner": "@JKamsker",
+      "remediation": "Route through repo-core (an Action or effect) or move the shared piece into a lower layer; declare a narrow allowed edge only if sidebar is meant to serve changes."
+    },
+    {
+      "from": "conflicts",
+      "to": "agents",
+      "reason": "Legacy cross-feature dependency at adoption (#209): conflicts (features) uses 13 symbols of agents (features), e.g. gitcraft::agent::handoff::Sides at src/repo/conflict/mod.rs:100.",
+      "owner": "@JKamsker",
+      "remediation": "Route through repo-core (an Action or effect) or move the shared piece into a lower layer; declare a narrow allowed edge only if agents is meant to serve conflicts."
+    },
+    {
+      "from": "conflicts",
+      "to": "changes",
+      "reason": "Legacy cross-feature dependency at adoption (#209): conflicts (features) uses 2 symbols of changes (features), e.g. gitcraft::repo::unity::UnityAct at src/repo/conflict/view.rs:173.",
+      "owner": "@JKamsker",
+      "remediation": "Route through repo-core (an Action or effect) or move the shared piece into a lower layer; declare a narrow allowed edge only if changes is meant to serve conflicts."
+    },
+    {
+      "from": "conflicts",
+      "to": "diff",
+      "reason": "Legacy cross-feature dependency at adoption (#209): conflicts (features) uses 1 symbols of diff (features), e.g. gitcraft::repo::diff::literal_path at src/repo/conflict/rerere/commands.rs:9.",
+      "owner": "@JKamsker",
+      "remediation": "Route through repo-core (an Action or effect) or move the shared piece into a lower layer; declare a narrow allowed edge only if diff is meant to serve conflicts."
+    },
+    {
+      "from": "conflicts",
+      "to": "graph",
+      "reason": "Legacy cross-feature dependency at adoption (#209): conflicts (features) uses 1 symbols of graph (features), e.g. gitcraft::repo::graph_view::row::paint::pill at src/repo/resolver/graph.rs:154.",
+      "owner": "@JKamsker",
+      "remediation": "Route through repo-core (an Action or effect) or move the shared piece into a lower layer; declare a narrow allowed edge only if graph is meant to serve conflicts."
+    },
+    {
+      "from": "conflicts",
+      "to": "sync",
+      "reason": "Legacy cross-feature dependency at adoption (#209): conflicts (features) uses 1 symbols of sync (features), e.g. gitcraft::repo::pull::PullMode at src/repo/core_seams/conflict_badges.rs:98.",
+      "owner": "@JKamsker",
+      "remediation": "Route through repo-core (an Action or effect) or move the shared piece into a lower layer; declare a narrow allowed edge only if sync is meant to serve conflicts."
+    },
+    {
+      "from": "diff",
+      "to": "agents",
+      "reason": "Legacy cross-feature dependency at adoption (#209): diff (features) uses 9 symbols of agents (features), e.g. gitcraft::authorship::Who at src/repo/diff/load.rs:231.",
+      "owner": "@JKamsker",
+      "remediation": "Route through repo-core (an Action or effect) or move the shared piece into a lower layer; declare a narrow allowed edge only if agents is meant to serve diff."
+    },
+    {
+      "from": "diff",
+      "to": "doctor",
+      "reason": "Legacy cross-feature dependency at adoption (#209): diff (features) uses 1 symbols of doctor (features), e.g. gitcraft::repo::activity::display_workflow_error at src/repo/file_comparison/view.rs:290.",
+      "owner": "@JKamsker",
+      "remediation": "Route through repo-core (an Action or effect) or move the shared piece into a lower layer; declare a narrow allowed edge only if doctor is meant to serve diff."
+    },
+    {
+      "from": "diff",
+      "to": "graph",
+      "reason": "Legacy cross-feature dependency at adoption (#209): diff (features) uses 1 symbols of graph (features), e.g. gitcraft::repo::saved_views::reader::Reader at src/repo/line_dossier/mod.rs:4.",
+      "owner": "@JKamsker",
+      "remediation": "Route through repo-core (an Action or effect) or move the shared piece into a lower layer; declare a narrow allowed edge only if graph is meant to serve diff."
+    },
+    {
+      "from": "diff",
+      "to": "review",
+      "reason": "Legacy cross-feature dependency at adoption (#209): diff (features) uses 13 symbols of review (features), e.g. gitcraft::repo::forge_link::LinkMenu at src/repo/diff/link.rs:10.",
+      "owner": "@JKamsker",
+      "remediation": "Route through repo-core (an Action or effect) or move the shared piece into a lower layer; declare a narrow allowed edge only if review is meant to serve diff."
+    },
+    {
+      "from": "doctor",
+      "to": "graph",
+      "reason": "Legacy cross-feature dependency at adoption (#209): doctor (features) uses 1 symbols of graph (features), e.g. gitcraft::repo::history_reader::Reader at src/repo/cleanup.rs:2.",
+      "owner": "@JKamsker",
+      "remediation": "Route through repo-core (an Action or effect) or move the shared piece into a lower layer; declare a narrow allowed edge only if graph is meant to serve doctor."
+    },
+    {
+      "from": "forge",
+      "to": "review",
+      "reason": "Legacy upward dependency at adoption (#209): forge (services) uses 2 symbols of review (features), e.g. gitcraft::repo::issue_work::naming::branch_name at src/forge/mod.rs:267.",
+      "owner": "@JKamsker",
+      "remediation": "Move what forge needs into forge or a lower layer, or pass it in (parameter, callback, event)."
+    },
+    {
+      "from": "git",
+      "to": "agents",
+      "reason": "Legacy upward dependency at adoption (#209): git (services) uses 5 symbols of agents (features), e.g. gitcraft::agent::checkpoint::Turn at src/git/drafts/turn.rs:172.",
+      "owner": "@JKamsker",
+      "remediation": "Move what git needs into git or a lower layer, or pass it in (parameter, callback, event)."
+    },
+    {
+      "from": "git",
+      "to": "app",
+      "reason": "Legacy upward dependency at adoption (#209): git (services) uses 5 symbols of app (shell), e.g. gitcraft::standalone::access at src/git/file_comparison/index_transaction.rs:3.",
+      "owner": "@JKamsker",
+      "remediation": "Move what git needs into git or a lower layer, or pass it in (parameter, callback, event)."
+    },
+    {
+      "from": "git",
+      "to": "bisect",
+      "reason": "Legacy upward dependency at adoption (#209): git (services) uses 3 symbols of bisect (features), e.g. gitcraft::parallel_bisect::bundle::identity at src/git/bundles.rs:155.",
+      "owner": "@JKamsker",
+      "remediation": "Move what git needs into git or a lower layer, or pass it in (parameter, callback, event)."
+    },
+    {
+      "from": "git",
+      "to": "guidance",
+      "reason": "Legacy upward dependency at adoption (#209): git (services) uses 3 symbols of guidance (features), e.g. gitcraft::practice::is_repository at src/git/backend.rs:169.",
+      "owner": "@JKamsker",
+      "remediation": "Move what git needs into git or a lower layer, or pass it in (parameter, callback, event)."
+    },
+    {
+      "from": "git",
+      "to": "repo-core",
+      "reason": "Legacy upward dependency at adoption (#209): git (services) uses 2 symbols of repo-core (coordinator), e.g. gitcraft::repo::hang_diagnostics::stage at src/git/command/local_execution.rs:32.",
+      "owner": "@JKamsker",
+      "remediation": "Move what git needs into git or a lower layer, or pass it in (parameter, callback, event)."
+    },
+    {
+      "from": "git",
+      "to": "sync",
+      "reason": "Legacy upward dependency at adoption (#209): git (services) uses 8 symbols of sync (features), e.g. gitcraft::push_preflight::fix::accept_rewrite at src/git/drafts/deferred/settlement.rs:369.",
+      "owner": "@JKamsker",
+      "remediation": "Move what git needs into git or a lower layer, or pass it in (parameter, callback, event)."
+    },
+    {
+      "from": "git",
+      "to": "worktrees",
+      "reason": "Legacy upward dependency at adoption (#209): git (services) uses 1 symbols of worktrees (features), e.g. gitcraft::teleport::Machine at src/git/machines.rs:259.",
+      "owner": "@JKamsker",
+      "remediation": "Move what git needs into git or a lower layer, or pass it in (parameter, callback, event)."
+    },
+    {
+      "from": "graph",
+      "to": "agents",
+      "reason": "Legacy cross-feature dependency at adoption (#209): graph (features) uses 3 symbols of agents (features), e.g. gitcraft::repo::authorship_view::Lens at src/repo/graph_view/row/paint.rs:119.",
+      "owner": "@JKamsker",
+      "remediation": "Route through repo-core (an Action or effect) or move the shared piece into a lower layer; declare a narrow allowed edge only if agents is meant to serve graph."
+    },
+    {
+      "from": "graph",
+      "to": "bisect",
+      "reason": "Legacy cross-feature dependency at adoption (#209): graph (features) uses 4 symbols of bisect (features), e.g. gitcraft::repo::test_lane::TEST_LANE_TIP at src/repo/graph_view/header.rs:73.",
+      "owner": "@JKamsker",
+      "remediation": "Route through repo-core (an Action or effect) or move the shared piece into a lower layer; declare a narrow allowed edge only if bisect is meant to serve graph."
+    },
+    {
+      "from": "graph",
+      "to": "changes",
+      "reason": "Legacy cross-feature dependency at adoption (#209): graph (features) uses 1 symbols of changes (features), e.g. gitcraft::repo::commit_actions::revert_action at src/repo/graph_view/menu.rs:17.",
+      "owner": "@JKamsker",
+      "remediation": "Route through repo-core (an Action or effect) or move the shared piece into a lower layer; declare a narrow allowed edge only if changes is meant to serve graph."
+    },
+    {
+      "from": "graph",
+      "to": "conflicts",
+      "reason": "Legacy cross-feature dependency at adoption (#209): graph (features) uses 3 symbols of conflicts (features), e.g. gitcraft::repo::conflict_check::Op at src/repo/graph_view/menu.rs:18.",
+      "owner": "@JKamsker",
+      "remediation": "Route through repo-core (an Action or effect) or move the shared piece into a lower layer; declare a narrow allowed edge only if conflicts is meant to serve graph."
+    },
+    {
+      "from": "graph",
+      "to": "doctor",
+      "reason": "Legacy cross-feature dependency at adoption (#209): graph (features) uses 1 symbols of doctor (features), e.g. gitcraft::repo::activity::display_workflow_error at src/repo/history_activity/view.rs:129.",
+      "owner": "@JKamsker",
+      "remediation": "Route through repo-core (an Action or effect) or move the shared piece into a lower layer; declare a narrow allowed edge only if doctor is meant to serve graph."
+    },
+    {
+      "from": "graph",
+      "to": "guidance",
+      "reason": "Legacy cross-feature dependency at adoption (#209): graph (features) uses 2 symbols of guidance (features), e.g. gitcraft::repo::guide::GuideAct at src/repo/graph_view/pills.rs:19.",
+      "owner": "@JKamsker",
+      "remediation": "Route through repo-core (an Action or effect) or move the shared piece into a lower layer; declare a narrow allowed edge only if guidance is meant to serve graph."
+    },
+    {
+      "from": "graph",
+      "to": "release",
+      "reason": "Legacy cross-feature dependency at adoption (#209): graph (features) uses 1 symbols of release (features), e.g. gitcraft::repo::release::ReleaseAct at src/repo/graph_view/menu/references.rs:216.",
+      "owner": "@JKamsker",
+      "remediation": "Route through repo-core (an Action or effect) or move the shared piece into a lower layer; declare a narrow allowed edge only if release is meant to serve graph."
+    },
+    {
+      "from": "graph",
+      "to": "review",
+      "reason": "Legacy cross-feature dependency at adoption (#209): graph (features) uses 4 symbols of review (features), e.g. gitcraft::repo::ci_status at src/repo/graph_view/pills.rs:20.",
+      "owner": "@JKamsker",
+      "remediation": "Route through repo-core (an Action or effect) or move the shared piece into a lower layer; declare a narrow allowed edge only if review is meant to serve graph."
+    },
+    {
+      "from": "graph",
+      "to": "rewrite",
+      "reason": "Legacy cross-feature dependency at adoption (#209): graph (features) uses 9 symbols of rewrite (features), e.g. gitcraft::repo::drag_drop::offers::DragBranch at src/repo/graph_view/drag.rs:10.",
+      "owner": "@JKamsker",
+      "remediation": "Route through repo-core (an Action or effect) or move the shared piece into a lower layer; declare a narrow allowed edge only if rewrite is meant to serve graph."
+    },
+    {
+      "from": "graph",
+      "to": "sidebar",
+      "reason": "Legacy cross-feature dependency at adoption (#209): graph (features) uses 4 symbols of sidebar (features), e.g. gitcraft::repo::sidebar at src/repo/graph_view/badge.rs:6.",
+      "owner": "@JKamsker",
+      "remediation": "Route through repo-core (an Action or effect) or move the shared piece into a lower layer; declare a narrow allowed edge only if sidebar is meant to serve graph."
+    },
+    {
+      "from": "graph",
+      "to": "terminal",
+      "reason": "Legacy cross-feature dependency at adoption (#209): graph (features) uses 2 symbols of terminal (features), e.g. gitcraft::repo::custom_commands::menu_items at src/repo/graph_view/menu.rs:255.",
+      "owner": "@JKamsker",
+      "remediation": "Route through repo-core (an Action or effect) or move the shared piece into a lower layer; declare a narrow allowed edge only if terminal is meant to serve graph."
+    },
+    {
+      "from": "guidance",
+      "to": "app",
+      "reason": "Legacy upward dependency at adoption (#209): guidance (features) uses 2 symbols of app (shell), e.g. gitcraft::manual::command at src/repo/guide/hints.rs:50.",
+      "owner": "@JKamsker",
+      "remediation": "Move what guidance needs into guidance or a lower layer, or pass it in (parameter, callback, event)."
+    },
+    {
+      "from": "guidance",
+      "to": "graph",
+      "reason": "Legacy cross-feature dependency at adoption (#209): guidance (features) uses 3 symbols of graph (features), e.g. gitcraft::repo::branch_visibility::Change at src/repo/guide/mod.rs:18.",
+      "owner": "@JKamsker",
+      "remediation": "Route through repo-core (an Action or effect) or move the shared piece into a lower layer; declare a narrow allowed edge only if graph is meant to serve guidance."
+    },
+    {
+      "from": "insights",
+      "to": "agents",
+      "reason": "Legacy cross-feature dependency at adoption (#209): insights (features) uses 10 symbols of agents (features), e.g. gitcraft::collision at src/insights/conflict_radar/mod.rs:16.",
+      "owner": "@JKamsker",
+      "remediation": "Route through repo-core (an Action or effect) or move the shared piece into a lower layer; declare a narrow allowed edge only if agents is meant to serve insights."
+    },
+    {
+      "from": "insights",
+      "to": "bisect",
+      "reason": "Legacy cross-feature dependency at adoption (#209): insights (features) uses 1 symbols of bisect (features), e.g. gitcraft::repo::test_lane::LaneAct at src/repo/insights/coverage/mod.rs:110.",
+      "owner": "@JKamsker",
+      "remediation": "Route through repo-core (an Action or effect) or move the shared piece into a lower layer; declare a narrow allowed edge only if bisect is meant to serve insights."
+    },
+    {
+      "from": "insights",
+      "to": "conflicts",
+      "reason": "Legacy cross-feature dependency at adoption (#209): insights (features) uses 1 symbols of conflicts (features), e.g. gitcraft::repo::resolver::ResolverAct at src/repo/insights/mod.rs:276.",
+      "owner": "@JKamsker",
+      "remediation": "Route through repo-core (an Action or effect) or move the shared piece into a lower layer; declare a narrow allowed edge only if conflicts is meant to serve insights."
+    },
+    {
+      "from": "insights",
+      "to": "diff",
+      "reason": "Legacy cross-feature dependency at adoption (#209): insights (features) uses 5 symbols of diff (features), e.g. gitcraft::repo::file_view::FileTab at src/repo/atlas/view.rs:436.",
+      "owner": "@JKamsker",
+      "remediation": "Route through repo-core (an Action or effect) or move the shared piece into a lower layer; declare a narrow allowed edge only if diff is meant to serve insights."
+    },
+    {
+      "from": "insights",
+      "to": "doctor",
+      "reason": "Legacy cross-feature dependency at adoption (#209): insights (features) uses 1 symbols of doctor (features), e.g. gitcraft::repo::activity::display_workflow_error at src/repo/atlas/view.rs:125.",
+      "owner": "@JKamsker",
+      "remediation": "Route through repo-core (an Action or effect) or move the shared piece into a lower layer; declare a narrow allowed edge only if doctor is meant to serve insights."
+    },
+    {
+      "from": "insights",
+      "to": "graph",
+      "reason": "Legacy cross-feature dependency at adoption (#209): insights (features) uses 3 symbols of graph (features), e.g. gitcraft::repo::history_reader::Reader at src/repo/atlas/byte_history.rs:2.",
+      "owner": "@JKamsker",
+      "remediation": "Route through repo-core (an Action or effect) or move the shared piece into a lower layer; declare a narrow allowed edge only if graph is meant to serve insights."
+    },
+    {
+      "from": "insights",
+      "to": "release",
+      "reason": "Legacy cross-feature dependency at adoption (#209): insights (features) uses 1 symbols of release (features), e.g. gitcraft::repo::versions::VersionsAct at src/repo/insights/constellation/picture.rs:16.",
+      "owner": "@JKamsker",
+      "remediation": "Route through repo-core (an Action or effect) or move the shared piece into a lower layer; declare a narrow allowed edge only if release is meant to serve insights."
+    },
+    {
+      "from": "insights",
+      "to": "review",
+      "reason": "Legacy cross-feature dependency at adoption (#209): insights (features) uses 1 symbols of review (features), e.g. gitcraft::repo::forge_selection::lifetime at src/repo/insights/context.rs:96.",
+      "owner": "@JKamsker",
+      "remediation": "Route through repo-core (an Action or effect) or move the shared piece into a lower layer; declare a narrow allowed edge only if review is meant to serve insights."
+    },
+    {
+      "from": "insights",
+      "to": "terminal",
+      "reason": "Legacy cross-feature dependency at adoption (#209): insights (features) uses 1 symbols of terminal (features), e.g. gitcraft::repo::terminals::TerminalAct at src/repo/insights/constellation/picture.rs:313.",
+      "owner": "@JKamsker",
+      "remediation": "Route through repo-core (an Action or effect) or move the shared piece into a lower layer; declare a narrow allowed edge only if terminal is meant to serve insights."
+    },
+    {
+      "from": "os",
+      "to": "agents",
+      "reason": "Legacy upward dependency at adoption (#209): os (platform) uses 6 symbols of agents (features), e.g. gitcraft::mcp::wire::Reply at src/instance/client.rs:55.",
+      "owner": "@JKamsker",
+      "remediation": "Move what os needs into os or a lower layer, or pass it in (parameter, callback, event)."
+    },
+    {
+      "from": "os",
+      "to": "app",
+      "reason": "Legacy upward dependency at adoption (#209): os (platform) uses 3 symbols of app (shell), e.g. gitcraft::launch::args::parse at src/instance/message.rs:232.",
+      "owner": "@JKamsker",
+      "remediation": "Move what os needs into os or a lower layer, or pass it in (parameter, callback, event)."
+    },
+    {
+      "from": "os",
+      "to": "remote",
+      "reason": "Legacy upward dependency at adoption (#209): os (platform) uses 6 symbols of remote (services), e.g. gitcraft::remote::askpass::same at src/instance/message.rs:127.",
+      "owner": "@JKamsker",
+      "remediation": "Move what os needs into os or a lower layer, or pass it in (parameter, callback, event)."
+    },
+    {
+      "from": "release",
+      "to": "diff",
+      "reason": "Legacy cross-feature dependency at adoption (#209): release (features) uses 4 symbols of diff (features), e.g. gitcraft::repo::diff at src/repo/versions/mod.rs:13.",
+      "owner": "@JKamsker",
+      "remediation": "Route through repo-core (an Action or effect) or move the shared piece into a lower layer; declare a narrow allowed edge only if diff is meant to serve release."
+    },
+    {
+      "from": "release",
+      "to": "doctor",
+      "reason": "Legacy cross-feature dependency at adoption (#209): release (features) uses 1 symbols of doctor (features), e.g. gitcraft::repo::activity::display_workflow_error at src/repo/postcards/dialog.rs:186.",
+      "owner": "@JKamsker",
+      "remediation": "Route through repo-core (an Action or effect) or move the shared piece into a lower layer; declare a narrow allowed edge only if doctor is meant to serve release."
+    },
+    {
+      "from": "release",
+      "to": "graph",
+      "reason": "Legacy cross-feature dependency at adoption (#209): release (features) uses 3 symbols of graph (features), e.g. gitcraft::repo::history_reader::Reader at src/repo/postcards/mod.rs:6.",
+      "owner": "@JKamsker",
+      "remediation": "Route through repo-core (an Action or effect) or move the shared piece into a lower layer; declare a narrow allowed edge only if graph is meant to serve release."
+    },
+    {
+      "from": "remote",
+      "to": "repo-core",
+      "reason": "Legacy upward dependency at adoption (#209): remote (services) uses 1 symbols of repo-core (coordinator), e.g. gitcraft::repo::widgets::primary_button at src/folder_browser.rs:146.",
+      "owner": "@JKamsker",
+      "remediation": "Move what remote needs into remote or a lower layer, or pass it in (parameter, callback, event)."
+    },
+    {
+      "from": "repo-core",
+      "to": "app",
+      "reason": "Legacy upward dependency at adoption (#209): repo-core (coordinator) uses 8 symbols of app (shell), e.g. gitcraft::tray::watch::owns_fetch at src/repo/core_seams/message_dispatch.rs:103.",
+      "owner": "@JKamsker",
+      "remediation": "Move what repo-core needs into repo-core or a lower layer, or pass it in (parameter, callback, event)."
+    },
+    {
+      "from": "review",
+      "to": "agents",
+      "reason": "Legacy cross-feature dependency at adoption (#209): review (features) uses 11 symbols of agents (features), e.g. gitcraft::repo::agents::AgentAct at src/repo/ci_view/page.rs:213.",
+      "owner": "@JKamsker",
+      "remediation": "Route through repo-core (an Action or effect) or move the shared piece into a lower layer; declare a narrow allowed edge only if agents is meant to serve review."
+    },
+    {
+      "from": "review",
+      "to": "changes",
+      "reason": "Legacy cross-feature dependency at adoption (#209): review (features) uses 1 symbols of changes (features), e.g. gitcraft::repo::detail::files_header at src/repo/pr_view/page.rs:240.",
+      "owner": "@JKamsker",
+      "remediation": "Route through repo-core (an Action or effect) or move the shared piece into a lower layer; declare a narrow allowed edge only if changes is meant to serve review."
+    },
+    {
+      "from": "review",
+      "to": "diff",
+      "reason": "Legacy cross-feature dependency at adoption (#209): review (features) uses 8 symbols of diff (features), e.g. gitcraft::repo::diff::Kind at src/repo/pr_review/lines.rs:7.",
+      "owner": "@JKamsker",
+      "remediation": "Route through repo-core (an Action or effect) or move the shared piece into a lower layer; declare a narrow allowed edge only if diff is meant to serve review."
+    },
+    {
+      "from": "review",
+      "to": "release",
+      "reason": "Legacy cross-feature dependency at adoption (#209): review (features) uses 1 symbols of release (features), e.g. gitcraft::repo::versions::pr_since::since_banner at src/repo/pr_view/page.rs:68.",
+      "owner": "@JKamsker",
+      "remediation": "Route through repo-core (an Action or effect) or move the shared piece into a lower layer; declare a narrow allowed edge only if release is meant to serve review."
+    },
+    {
+      "from": "review",
+      "to": "rewrite",
+      "reason": "Legacy cross-feature dependency at adoption (#209): review (features) uses 4 symbols of rewrite (features), e.g. gitcraft::repo::timeline::Awaiting at src/repo/dco/mod.rs:337.",
+      "owner": "@JKamsker",
+      "remediation": "Route through repo-core (an Action or effect) or move the shared piece into a lower layer; declare a narrow allowed edge only if rewrite is meant to serve review."
+    },
+    {
+      "from": "review",
+      "to": "sidebar",
+      "reason": "Legacy cross-feature dependency at adoption (#209): review (features) uses 2 symbols of sidebar (features), e.g. gitcraft::repo::sidebar::remotes::remote_short at src/repo/gerrit.rs:22.",
+      "owner": "@JKamsker",
+      "remediation": "Route through repo-core (an Action or effect) or move the shared piece into a lower layer; declare a narrow allowed edge only if sidebar is meant to serve review."
+    },
+    {
+      "from": "review",
+      "to": "sync",
+      "reason": "Legacy cross-feature dependency at adoption (#209): review (features) uses 6 symbols of sync (features), e.g. gitcraft::push_preflight::Plan at src/repo/review_workflow/echo.rs:179.",
+      "owner": "@JKamsker",
+      "remediation": "Route through repo-core (an Action or effect) or move the shared piece into a lower layer; declare a narrow allowed edge only if sync is meant to serve review."
+    },
+    {
+      "from": "review",
+      "to": "terminal",
+      "reason": "Legacy cross-feature dependency at adoption (#209): review (features) uses 1 symbols of terminal (features), e.g. gitcraft::custom_commands::program::captured_program at src/repo/review_workflow/choreography/rehearsal.rs:27.",
+      "owner": "@JKamsker",
+      "remediation": "Route through repo-core (an Action or effect) or move the shared piece into a lower layer; declare a narrow allowed edge only if terminal is meant to serve review."
+    },
+    {
+      "from": "rewrite",
+      "to": "agents",
+      "reason": "Legacy cross-feature dependency at adoption (#209): rewrite (features) uses 1 symbols of agents (features), e.g. gitcraft::repo::agent::preview::Preview at src/repo/ghost/mod.rs:295.",
+      "owner": "@JKamsker",
+      "remediation": "Route through repo-core (an Action or effect) or move the shared piece into a lower layer; declare a narrow allowed edge only if agents is meant to serve rewrite."
+    },
+    {
+      "from": "rewrite",
+      "to": "app",
+      "reason": "Legacy upward dependency at adoption (#209): rewrite (features) uses 1 symbols of app (shell), e.g. gitcraft::manual::command at src/repo/timeline/navigation.rs:76.",
+      "owner": "@JKamsker",
+      "remediation": "Move what rewrite needs into rewrite or a lower layer, or pass it in (parameter, callback, event)."
+    },
+    {
+      "from": "rewrite",
+      "to": "diff",
+      "reason": "Legacy cross-feature dependency at adoption (#209): rewrite (features) uses 7 symbols of diff (features), e.g. gitcraft::repo::diff::Kind at src/repo/surgery/absorb/mod.rs:20.",
+      "owner": "@JKamsker",
+      "remediation": "Route through repo-core (an Action or effect) or move the shared piece into a lower layer; declare a narrow allowed edge only if diff is meant to serve rewrite."
+    },
+    {
+      "from": "rewrite",
+      "to": "doctor",
+      "reason": "Legacy cross-feature dependency at adoption (#209): rewrite (features) uses 2 symbols of doctor (features), e.g. gitcraft::repo::activity::display_workflow_error at src/repo/email/mod.rs:225.",
+      "owner": "@JKamsker",
+      "remediation": "Route through repo-core (an Action or effect) or move the shared piece into a lower layer; declare a narrow allowed edge only if doctor is meant to serve rewrite."
+    },
+    {
+      "from": "rewrite",
+      "to": "graph",
+      "reason": "Legacy cross-feature dependency at adoption (#209): rewrite (features) uses 2 symbols of graph (features), e.g. gitcraft::repo::graph_view::menu::rewrite::Rewrite at src/repo/reflog/menu.rs:8.",
+      "owner": "@JKamsker",
+      "remediation": "Route through repo-core (an Action or effect) or move the shared piece into a lower layer; declare a narrow allowed edge only if graph is meant to serve rewrite."
+    },
+    {
+      "from": "rewrite",
+      "to": "sidebar",
+      "reason": "Legacy cross-feature dependency at adoption (#209): rewrite (features) uses 5 symbols of sidebar (features), e.g. gitcraft::repo::sidebar::remotes::remote_of at src/repo/ghost/op.rs:134.",
+      "owner": "@JKamsker",
+      "remediation": "Route through repo-core (an Action or effect) or move the shared piece into a lower layer; declare a narrow allowed edge only if sidebar is meant to serve rewrite."
+    },
+    {
+      "from": "rewrite",
+      "to": "sync",
+      "reason": "Legacy cross-feature dependency at adoption (#209): rewrite (features) uses 1 symbols of sync (features), e.g. gitcraft::repo::pull::PullMode at src/repo/ghost/op.rs:4.",
+      "owner": "@JKamsker",
+      "remediation": "Route through repo-core (an Action or effect) or move the shared piece into a lower layer; declare a narrow allowed edge only if sync is meant to serve rewrite."
+    },
+    {
+      "from": "runtime",
+      "to": "forge",
+      "reason": "Legacy upward dependency at adoption (#209): runtime (platform) uses 2 symbols of forge (services), e.g. gitcraft::forge::cli::ToolReport at src/diagnostics.rs:32.",
+      "owner": "@JKamsker",
+      "remediation": "Move what runtime needs into runtime or a lower layer, or pass it in (parameter, callback, event)."
+    },
+    {
+      "from": "runtime",
+      "to": "git",
+      "reason": "Legacy upward dependency at adoption (#209): runtime (platform) uses 10 symbols of git (services), e.g. gitcraft::git::doctor::config at src/diagnostics.rs:12.",
+      "owner": "@JKamsker",
+      "remediation": "Move what runtime needs into runtime or a lower layer, or pass it in (parameter, callback, event)."
+    },
+    {
+      "from": "runtime",
+      "to": "remote",
+      "reason": "Legacy upward dependency at adoption (#209): runtime (platform) uses 4 symbols of remote (services), e.g. gitcraft::connections::inherit at src/diagnostics.rs:36.",
+      "owner": "@JKamsker",
+      "remediation": "Move what runtime needs into runtime or a lower layer, or pass it in (parameter, callback, event)."
+    },
+    {
+      "from": "runtime",
+      "to": "update",
+      "reason": "Legacy upward dependency at adoption (#209): runtime (platform) uses 1 symbols of update (features), e.g. gitcraft::update::CURRENT at src/diagnostics.rs:88.",
+      "owner": "@JKamsker",
+      "remediation": "Move what runtime needs into runtime or a lower layer, or pass it in (parameter, callback, event)."
+    },
+    {
+      "from": "settings",
+      "to": "agents",
+      "reason": "Legacy upward dependency at adoption (#209): settings (services) uses 10 symbols of agents (features), e.g. gitcraft::mcp::program at src/settings/agents.rs:31.",
+      "owner": "@JKamsker",
+      "remediation": "Move what settings needs into settings or a lower layer, or pass it in (parameter, callback, event)."
+    },
+    {
+      "from": "settings",
+      "to": "app",
+      "reason": "Legacy upward dependency at adoption (#209): settings (services) uses 7 symbols of app (shell), e.g. gitcraft::app_buttons::AppButton at src/settings/appearance_page.rs:51.",
+      "owner": "@JKamsker",
+      "remediation": "Move what settings needs into settings or a lower layer, or pass it in (parameter, callback, event)."
+    },
+    {
+      "from": "settings",
+      "to": "changes",
+      "reason": "Legacy upward dependency at adoption (#209): settings (services) uses 1 symbols of changes (features), e.g. gitcraft::repo::drafts::DraftShape at src/drafts/keeper.rs:9.",
+      "owner": "@JKamsker",
+      "remediation": "Move what settings needs into settings or a lower layer, or pass it in (parameter, callback, event)."
+    },
+    {
+      "from": "settings",
+      "to": "diff",
+      "reason": "Legacy upward dependency at adoption (#209): settings (services) uses 1 symbols of diff (features), e.g. gitcraft::repo::highlight::highlight at src/settings/preview/appearance.rs:21.",
+      "owner": "@JKamsker",
+      "remediation": "Move what settings needs into settings or a lower layer, or pass it in (parameter, callback, event)."
+    },
+    {
+      "from": "settings",
+      "to": "graph",
+      "reason": "Legacy upward dependency at adoption (#209): settings (services) uses 11 symbols of graph (features), e.g. gitcraft::repo::history_filter::edit at src/settings/graph_page.rs:33.",
+      "owner": "@JKamsker",
+      "remediation": "Move what settings needs into settings or a lower layer, or pass it in (parameter, callback, event)."
+    },
+    {
+      "from": "settings",
+      "to": "repo-core",
+      "reason": "Legacy upward dependency at adoption (#209): settings (services) uses 1 symbols of repo-core (coordinator), e.g. gitcraft::repo::widgets::status_color at src/settings/preview/files.rs:104.",
+      "owner": "@JKamsker",
+      "remediation": "Move what settings needs into settings or a lower layer, or pass it in (parameter, callback, event)."
+    },
+    {
+      "from": "settings",
+      "to": "sync",
+      "reason": "Legacy upward dependency at adoption (#209): settings (services) uses 2 symbols of sync (features), e.g. gitcraft::repo::pull::PullMode at src/settings/git_page.rs:56.",
+      "owner": "@JKamsker",
+      "remediation": "Move what settings needs into settings or a lower layer, or pass it in (parameter, callback, event)."
+    },
+    {
+      "from": "settings",
+      "to": "terminal",
+      "reason": "Legacy upward dependency at adoption (#209): settings (services) uses 11 symbols of terminal (features), e.g. gitcraft::custom_commands at src/settings/custom_commands.rs:8.",
+      "owner": "@JKamsker",
+      "remediation": "Move what settings needs into settings or a lower layer, or pass it in (parameter, callback, event)."
+    },
+    {
+      "from": "settings",
+      "to": "update",
+      "reason": "Legacy upward dependency at adoption (#209): settings (services) uses 2 symbols of update (features), e.g. gitcraft::update::CURRENT at src/settings/general_page.rs:127.",
+      "owner": "@JKamsker",
+      "remediation": "Move what settings needs into settings or a lower layer, or pass it in (parameter, callback, event)."
+    },
+    {
+      "from": "sidebar",
+      "to": "agents",
+      "reason": "Legacy cross-feature dependency at adoption (#209): sidebar (features) uses 1 symbols of agents (features), e.g. gitcraft::repo::fence_view::list_violations at src/repo/sidebar/worktrees.rs:53.",
+      "owner": "@JKamsker",
+      "remediation": "Route through repo-core (an Action or effect) or move the shared piece into a lower layer; declare a narrow allowed edge only if agents is meant to serve sidebar."
+    },
+    {
+      "from": "sidebar",
+      "to": "app",
+      "reason": "Legacy upward dependency at adoption (#209): sidebar (features) uses 2 symbols of app (shell), e.g. gitcraft::app::title_bar::FOLDED_STRIP_MOVES_WINDOW at src/repo/sidebar/mod.rs:225.",
+      "owner": "@JKamsker",
+      "remediation": "Move what sidebar needs into sidebar or a lower layer, or pass it in (parameter, callback, event)."
+    },
+    {
+      "from": "sidebar",
+      "to": "bisect",
+      "reason": "Legacy cross-feature dependency at adoption (#209): sidebar (features) uses 1 symbols of bisect (features), e.g. gitcraft::repo::interaction::interaction_item at src/repo/sidebar/branches/checkout.rs:132.",
+      "owner": "@JKamsker",
+      "remediation": "Route through repo-core (an Action or effect) or move the shared piece into a lower layer; declare a narrow allowed edge only if bisect is meant to serve sidebar."
+    },
+    {
+      "from": "sidebar",
+      "to": "changes",
+      "reason": "Legacy cross-feature dependency at adoption (#209): sidebar (features) uses 2 symbols of changes (features), e.g. gitcraft::repo::keep_submodules::update_all at src/repo/sidebar/submodules.rs:9.",
+      "owner": "@JKamsker",
+      "remediation": "Route through repo-core (an Action or effect) or move the shared piece into a lower layer; declare a narrow allowed edge only if changes is meant to serve sidebar."
+    },
+    {
+      "from": "sidebar",
+      "to": "conflicts",
+      "reason": "Legacy cross-feature dependency at adoption (#209): sidebar (features) uses 2 symbols of conflicts (features), e.g. gitcraft::repo::conflict_check::Op at src/repo/sidebar/branches.rs:15.",
+      "owner": "@JKamsker",
+      "remediation": "Route through repo-core (an Action or effect) or move the shared piece into a lower layer; declare a narrow allowed edge only if conflicts is meant to serve sidebar."
+    },
+    {
+      "from": "sidebar",
+      "to": "doctor",
+      "reason": "Legacy cross-feature dependency at adoption (#209): sidebar (features) uses 1 symbols of doctor (features), e.g. gitcraft::repo::repository_tools::Act at src/repo/sidebar/branches/publication.rs:28.",
+      "owner": "@JKamsker",
+      "remediation": "Route through repo-core (an Action or effect) or move the shared piece into a lower layer; declare a narrow allowed edge only if doctor is meant to serve sidebar."
+    },
+    {
+      "from": "sidebar",
+      "to": "graph",
+      "reason": "Legacy cross-feature dependency at adoption (#209): sidebar (features) uses 5 symbols of graph (features), e.g. gitcraft::repo::branch_visibility::local_ref at src/repo/sidebar/branches.rs:14.",
+      "owner": "@JKamsker",
+      "remediation": "Route through repo-core (an Action or effect) or move the shared piece into a lower layer; declare a narrow allowed edge only if graph is meant to serve sidebar."
+    },
+    {
+      "from": "sidebar",
+      "to": "release",
+      "reason": "Legacy cross-feature dependency at adoption (#209): sidebar (features) uses 3 symbols of release (features), e.g. gitcraft::repo::hotfix::HotfixAct at src/repo/sidebar/branches/menu.rs:36.",
+      "owner": "@JKamsker",
+      "remediation": "Route through repo-core (an Action or effect) or move the shared piece into a lower layer; declare a narrow allowed edge only if release is meant to serve sidebar."
+    },
+    {
+      "from": "sidebar",
+      "to": "review",
+      "reason": "Legacy cross-feature dependency at adoption (#209): sidebar (features) uses 6 symbols of review (features), e.g. gitcraft::repo::ci_status at src/repo/sidebar/branches.rs:20.",
+      "owner": "@JKamsker",
+      "remediation": "Route through repo-core (an Action or effect) or move the shared piece into a lower layer; declare a narrow allowed edge only if review is meant to serve sidebar."
+    },
+    {
+      "from": "sidebar",
+      "to": "rewrite",
+      "reason": "Legacy cross-feature dependency at adoption (#209): sidebar (features) uses 4 symbols of rewrite (features), e.g. gitcraft::repo::ghost::offer at src/repo/sidebar/branch_delete.rs:8.",
+      "owner": "@JKamsker",
+      "remediation": "Route through repo-core (an Action or effect) or move the shared piece into a lower layer; declare a narrow allowed edge only if rewrite is meant to serve sidebar."
+    },
+    {
+      "from": "sidebar",
+      "to": "terminal",
+      "reason": "Legacy cross-feature dependency at adoption (#209): sidebar (features) uses 3 symbols of terminal (features), e.g. gitcraft::repo::custom_commands::menu_items at src/repo/sidebar/branches/menu.rs:172.",
+      "owner": "@JKamsker",
+      "remediation": "Route through repo-core (an Action or effect) or move the shared piece into a lower layer; declare a narrow allowed edge only if terminal is meant to serve sidebar."
+    },
+    {
+      "from": "sidebar",
+      "to": "worktrees",
+      "reason": "Legacy cross-feature dependency at adoption (#209): sidebar (features) uses 4 symbols of worktrees (features), e.g. gitcraft::repo::worktree_tab at src/repo/sidebar/worktrees.rs:11.",
+      "owner": "@JKamsker",
+      "remediation": "Route through repo-core (an Action or effect) or move the shared piece into a lower layer; declare a narrow allowed edge only if worktrees is meant to serve sidebar."
+    },
+    {
+      "from": "sync",
+      "to": "doctor",
+      "reason": "Legacy cross-feature dependency at adoption (#209): sync (features) uses 1 symbols of doctor (features), e.g. gitcraft::repo::activity::display_workflow_error at src/repo/ssh_setup/mod.rs:246.",
+      "owner": "@JKamsker",
+      "remediation": "Route through repo-core (an Action or effect) or move the shared piece into a lower layer; declare a narrow allowed edge only if doctor is meant to serve sync."
+    },
+    {
+      "from": "sync",
+      "to": "graph",
+      "reason": "Legacy cross-feature dependency at adoption (#209): sync (features) uses 1 symbols of graph (features), e.g. gitcraft::repo::history_reader::Reader at src/repo/sparse.rs:2.",
+      "owner": "@JKamsker",
+      "remediation": "Route through repo-core (an Action or effect) or move the shared piece into a lower layer; declare a narrow allowed edge only if graph is meant to serve sync."
+    },
+    {
+      "from": "sync",
+      "to": "guidance",
+      "reason": "Legacy cross-feature dependency at adoption (#209): sync (features) uses 1 symbols of guidance (features), e.g. gitcraft::practice::is_repository at src/repo/ssh_setup/worker.rs:27.",
+      "owner": "@JKamsker",
+      "remediation": "Route through repo-core (an Action or effect) or move the shared piece into a lower layer; declare a narrow allowed edge only if guidance is meant to serve sync."
+    },
+    {
+      "from": "sync",
+      "to": "review",
+      "reason": "Legacy cross-feature dependency at adoption (#209): sync (features) uses 2 symbols of review (features), e.g. gitcraft::repo::forks::guard::Scope at src/push_preflight.rs:88.",
+      "owner": "@JKamsker",
+      "remediation": "Route through repo-core (an Action or effect) or move the shared piece into a lower layer; declare a narrow allowed edge only if review is meant to serve sync."
+    },
+    {
+      "from": "sync",
+      "to": "rewrite",
+      "reason": "Legacy cross-feature dependency at adoption (#209): sync (features) uses 4 symbols of rewrite (features), e.g. gitcraft::repo::ghost::offer at src/repo/pull.rs:85.",
+      "owner": "@JKamsker",
+      "remediation": "Route through repo-core (an Action or effect) or move the shared piece into a lower layer; declare a narrow allowed edge only if rewrite is meant to serve sync."
+    },
+    {
+      "from": "sync",
+      "to": "terminal",
+      "reason": "Legacy cross-feature dependency at adoption (#209): sync (features) uses 2 symbols of terminal (features), e.g. gitcraft::terminal::Terminal at src/repo/ssh_setup/mod.rs:13.",
+      "owner": "@JKamsker",
+      "remediation": "Route through repo-core (an Action or effect) or move the shared piece into a lower layer; declare a narrow allowed edge only if terminal is meant to serve sync."
+    },
+    {
+      "from": "terminal",
+      "to": "doctor",
+      "reason": "Legacy cross-feature dependency at adoption (#209): terminal (features) uses 1 symbols of doctor (features), e.g. gitcraft::repo::activity::display_workflow_error at src/repo/devcontainer/mod.rs:258.",
+      "owner": "@JKamsker",
+      "remediation": "Route through repo-core (an Action or effect) or move the shared piece into a lower layer; declare a narrow allowed edge only if doctor is meant to serve terminal."
+    },
+    {
+      "from": "terminal",
+      "to": "guidance",
+      "reason": "Legacy cross-feature dependency at adoption (#209): terminal (features) uses 3 symbols of guidance (features), e.g. gitcraft::practice::is_repository at src/terminal/mod.rs:111.",
+      "owner": "@JKamsker",
+      "remediation": "Route through repo-core (an Action or effect) or move the shared piece into a lower layer; declare a narrow allowed edge only if guidance is meant to serve terminal."
+    },
+    {
+      "from": "ui-kit",
+      "to": "app",
+      "reason": "Legacy upward dependency at adoption (#209): ui-kit (presentation) uses 1 symbols of app (shell), e.g. gitcraft::manual::command at src/keymap.rs:167.",
+      "owner": "@JKamsker",
+      "remediation": "Move what ui-kit needs into ui-kit or a lower layer, or pass it in (parameter, callback, event)."
+    },
+    {
+      "from": "ui-kit",
+      "to": "git",
+      "reason": "Legacy upward dependency at adoption (#209): ui-kit (presentation) uses 1 symbols of git (services), e.g. gitcraft::git::errors::display_error at src/theme/files/display.rs:70.",
+      "owner": "@JKamsker",
+      "remediation": "Move what ui-kit needs into ui-kit or a lower layer, or pass it in (parameter, callback, event)."
+    },
+    {
+      "from": "ui-kit",
+      "to": "settings",
+      "reason": "Legacy upward dependency at adoption (#209): ui-kit (presentation) uses 1 symbols of settings (services), e.g. gitcraft::settings::Settings at src/keymap.rs:144.",
+      "owner": "@JKamsker",
+      "remediation": "Move what ui-kit needs into ui-kit or a lower layer, or pass it in (parameter, callback, event)."
+    }
+  ],
+  "cycles": [
+    {
+      "domains": [
+        "agents",
+        "app",
+        "bisect",
+        "changes",
+        "conflicts",
+        "diff",
+        "doctor",
+        "forge",
+        "git",
+        "graph",
+        "guidance",
+        "insights",
+        "os",
+        "release",
+        "remote",
+        "repo-core",
+        "review",
+        "rewrite",
+        "runtime",
+        "settings",
+        "sidebar",
+        "sync",
+        "terminal",
+        "ui-kit",
+        "update",
+        "worktrees"
+      ],
+      "edges": [
+        [
+          "agents",
+          "app"
+        ],
+        [
+          "agents",
+          "conflicts"
+        ],
+        [
+          "agents",
+          "diff"
+        ],
+        [
+          "agents",
+          "doctor"
+        ],
+        [
+          "agents",
+          "forge"
+        ],
+        [
+          "agents",
+          "git"
+        ],
+        [
+          "agents",
+          "graph"
+        ],
+        [
+          "agents",
+          "os"
+        ],
+        [
+          "agents",
+          "remote"
+        ],
+        [
+          "agents",
+          "repo-core"
+        ],
+        [
+          "agents",
+          "review"
+        ],
+        [
+          "agents",
+          "rewrite"
+        ],
+        [
+          "agents",
+          "runtime"
+        ],
+        [
+          "agents",
+          "settings"
+        ],
+        [
+          "agents",
+          "sidebar"
+        ],
+        [
+          "agents",
+          "terminal"
+        ],
+        [
+          "agents",
+          "ui-kit"
+        ],
+        [
+          "agents",
+          "update"
+        ],
+        [
+          "app",
+          "agents"
+        ],
+        [
+          "app",
+          "bisect"
+        ],
+        [
+          "app",
+          "changes"
+        ],
+        [
+          "app",
+          "conflicts"
+        ],
+        [
+          "app",
+          "diff"
+        ],
+        [
+          "app",
+          "doctor"
+        ],
+        [
+          "app",
+          "forge"
+        ],
+        [
+          "app",
+          "git"
+        ],
+        [
+          "app",
+          "guidance"
+        ],
+        [
+          "app",
+          "os"
+        ],
+        [
+          "app",
+          "remote"
+        ],
+        [
+          "app",
+          "repo-core"
+        ],
+        [
+          "app",
+          "runtime"
+        ],
+        [
+          "app",
+          "settings"
+        ],
+        [
+          "app",
+          "ui-kit"
+        ],
+        [
+          "app",
+          "update"
+        ],
+        [
+          "app",
+          "worktrees"
+        ],
+        [
+          "bisect",
+          "app"
+        ],
+        [
+          "bisect",
+          "doctor"
+        ],
+        [
+          "bisect",
+          "git"
+        ],
+        [
+          "bisect",
+          "graph"
+        ],
+        [
+          "bisect",
+          "os"
+        ],
+        [
+          "bisect",
+          "remote"
+        ],
+        [
+          "bisect",
+          "repo-core"
+        ],
+        [
+          "bisect",
+          "runtime"
+        ],
+        [
+          "bisect",
+          "settings"
+        ],
+        [
+          "bisect",
+          "ui-kit"
+        ],
+        [
+          "changes",
+          "app"
+        ],
+        [
+          "changes",
+          "conflicts"
+        ],
+        [
+          "changes",
+          "diff"
+        ],
+        [
+          "changes",
+          "forge"
+        ],
+        [
+          "changes",
+          "git"
+        ],
+        [
+          "changes",
+          "graph"
+        ],
+        [
+          "changes",
+          "remote"
+        ],
+        [
+          "changes",
+          "repo-core"
+        ],
+        [
+          "changes",
+          "review"
+        ],
+        [
+          "changes",
+          "rewrite"
+        ],
+        [
+          "changes",
+          "runtime"
+        ],
+        [
+          "changes",
+          "settings"
+        ],
+        [
+          "changes",
+          "sidebar"
+        ],
+        [
+          "changes",
+          "ui-kit"
+        ],
+        [
+          "conflicts",
+          "agents"
+        ],
+        [
+          "conflicts",
+          "changes"
+        ],
+        [
+          "conflicts",
+          "diff"
+        ],
+        [
+          "conflicts",
+          "git"
+        ],
+        [
+          "conflicts",
+          "graph"
+        ],
+        [
+          "conflicts",
+          "remote"
+        ],
+        [
+          "conflicts",
+          "repo-core"
+        ],
+        [
+          "conflicts",
+          "runtime"
+        ],
+        [
+          "conflicts",
+          "settings"
+        ],
+        [
+          "conflicts",
+          "sync"
+        ],
+        [
+          "conflicts",
+          "ui-kit"
+        ],
+        [
+          "diff",
+          "agents"
+        ],
+        [
+          "diff",
+          "doctor"
+        ],
+        [
+          "diff",
+          "forge"
+        ],
+        [
+          "diff",
+          "git"
+        ],
+        [
+          "diff",
+          "graph"
+        ],
+        [
+          "diff",
+          "remote"
+        ],
+        [
+          "diff",
+          "repo-core"
+        ],
+        [
+          "diff",
+          "review"
+        ],
+        [
+          "diff",
+          "runtime"
+        ],
+        [
+          "diff",
+          "settings"
+        ],
+        [
+          "diff",
+          "ui-kit"
+        ],
+        [
+          "doctor",
+          "forge"
+        ],
+        [
+          "doctor",
+          "git"
+        ],
+        [
+          "doctor",
+          "graph"
+        ],
+        [
+          "doctor",
+          "remote"
+        ],
+        [
+          "doctor",
+          "repo-core"
+        ],
+        [
+          "doctor",
+          "runtime"
+        ],
+        [
+          "doctor",
+          "settings"
+        ],
+        [
+          "doctor",
+          "ui-kit"
+        ],
+        [
+          "forge",
+          "git"
+        ],
+        [
+          "forge",
+          "remote"
+        ],
+        [
+          "forge",
+          "review"
+        ],
+        [
+          "forge",
+          "runtime"
+        ],
+        [
+          "forge",
+          "settings"
+        ],
+        [
+          "git",
+          "agents"
+        ],
+        [
+          "git",
+          "app"
+        ],
+        [
+          "git",
+          "bisect"
+        ],
+        [
+          "git",
+          "forge"
+        ],
+        [
+          "git",
+          "guidance"
+        ],
+        [
+          "git",
+          "os"
+        ],
+        [
+          "git",
+          "remote"
+        ],
+        [
+          "git",
+          "repo-core"
+        ],
+        [
+          "git",
+          "runtime"
+        ],
+        [
+          "git",
+          "settings"
+        ],
+        [
+          "git",
+          "sync"
+        ],
+        [
+          "git",
+          "worktrees"
+        ],
+        [
+          "graph",
+          "agents"
+        ],
+        [
+          "graph",
+          "bisect"
+        ],
+        [
+          "graph",
+          "changes"
+        ],
+        [
+          "graph",
+          "conflicts"
+        ],
+        [
+          "graph",
+          "doctor"
+        ],
+        [
+          "graph",
+          "forge"
+        ],
+        [
+          "graph",
+          "git"
+        ],
+        [
+          "graph",
+          "guidance"
+        ],
+        [
+          "graph",
+          "release"
+        ],
+        [
+          "graph",
+          "remote"
+        ],
+        [
+          "graph",
+          "repo-core"
+        ],
+        [
+          "graph",
+          "review"
+        ],
+        [
+          "graph",
+          "rewrite"
+        ],
+        [
+          "graph",
+          "runtime"
+        ],
+        [
+          "graph",
+          "settings"
+        ],
+        [
+          "graph",
+          "sidebar"
+        ],
+        [
+          "graph",
+          "terminal"
+        ],
+        [
+          "graph",
+          "ui-kit"
+        ],
+        [
+          "guidance",
+          "app"
+        ],
+        [
+          "guidance",
+          "git"
+        ],
+        [
+          "guidance",
+          "graph"
+        ],
+        [
+          "guidance",
+          "remote"
+        ],
+        [
+          "guidance",
+          "repo-core"
+        ],
+        [
+          "guidance",
+          "runtime"
+        ],
+        [
+          "guidance",
+          "settings"
+        ],
+        [
+          "guidance",
+          "ui-kit"
+        ],
+        [
+          "insights",
+          "agents"
+        ],
+        [
+          "insights",
+          "bisect"
+        ],
+        [
+          "insights",
+          "conflicts"
+        ],
+        [
+          "insights",
+          "diff"
+        ],
+        [
+          "insights",
+          "doctor"
+        ],
+        [
+          "insights",
+          "forge"
+        ],
+        [
+          "insights",
+          "git"
+        ],
+        [
+          "insights",
+          "graph"
+        ],
+        [
+          "insights",
+          "release"
+        ],
+        [
+          "insights",
+          "remote"
+        ],
+        [
+          "insights",
+          "repo-core"
+        ],
+        [
+          "insights",
+          "review"
+        ],
+        [
+          "insights",
+          "runtime"
+        ],
+        [
+          "insights",
+          "terminal"
+        ],
+        [
+          "insights",
+          "ui-kit"
+        ],
+        [
+          "os",
+          "agents"
+        ],
+        [
+          "os",
+          "app"
+        ],
+        [
+          "os",
+          "remote"
+        ],
+        [
+          "os",
+          "runtime"
+        ],
+        [
+          "release",
+          "diff"
+        ],
+        [
+          "release",
+          "doctor"
+        ],
+        [
+          "release",
+          "forge"
+        ],
+        [
+          "release",
+          "git"
+        ],
+        [
+          "release",
+          "graph"
+        ],
+        [
+          "release",
+          "remote"
+        ],
+        [
+          "release",
+          "repo-core"
+        ],
+        [
+          "release",
+          "runtime"
+        ],
+        [
+          "release",
+          "ui-kit"
+        ],
+        [
+          "remote",
+          "forge"
+        ],
+        [
+          "remote",
+          "git"
+        ],
+        [
+          "remote",
+          "os"
+        ],
+        [
+          "remote",
+          "repo-core"
+        ],
+        [
+          "remote",
+          "runtime"
+        ],
+        [
+          "remote",
+          "ui-kit"
+        ],
+        [
+          "repo-core",
+          "agents"
+        ],
+        [
+          "repo-core",
+          "app"
+        ],
+        [
+          "repo-core",
+          "bisect"
+        ],
+        [
+          "repo-core",
+          "changes"
+        ],
+        [
+          "repo-core",
+          "conflicts"
+        ],
+        [
+          "repo-core",
+          "diff"
+        ],
+        [
+          "repo-core",
+          "doctor"
+        ],
+        [
+          "repo-core",
+          "forge"
+        ],
+        [
+          "repo-core",
+          "git"
+        ],
+        [
+          "repo-core",
+          "graph"
+        ],
+        [
+          "repo-core",
+          "guidance"
+        ],
+        [
+          "repo-core",
+          "insights"
+        ],
+        [
+          "repo-core",
+          "release"
+        ],
+        [
+          "repo-core",
+          "remote"
+        ],
+        [
+          "repo-core",
+          "review"
+        ],
+        [
+          "repo-core",
+          "rewrite"
+        ],
+        [
+          "repo-core",
+          "runtime"
+        ],
+        [
+          "repo-core",
+          "settings"
+        ],
+        [
+          "repo-core",
+          "sidebar"
+        ],
+        [
+          "repo-core",
+          "sync"
+        ],
+        [
+          "repo-core",
+          "terminal"
+        ],
+        [
+          "repo-core",
+          "ui-kit"
+        ],
+        [
+          "repo-core",
+          "update"
+        ],
+        [
+          "repo-core",
+          "worktrees"
+        ],
+        [
+          "review",
+          "agents"
+        ],
+        [
+          "review",
+          "changes"
+        ],
+        [
+          "review",
+          "diff"
+        ],
+        [
+          "review",
+          "forge"
+        ],
+        [
+          "review",
+          "git"
+        ],
+        [
+          "review",
+          "release"
+        ],
+        [
+          "review",
+          "remote"
+        ],
+        [
+          "review",
+          "repo-core"
+        ],
+        [
+          "review",
+          "rewrite"
+        ],
+        [
+          "review",
+          "runtime"
+        ],
+        [
+          "review",
+          "settings"
+        ],
+        [
+          "review",
+          "sidebar"
+        ],
+        [
+          "review",
+          "sync"
+        ],
+        [
+          "review",
+          "terminal"
+        ],
+        [
+          "review",
+          "ui-kit"
+        ],
+        [
+          "rewrite",
+          "agents"
+        ],
+        [
+          "rewrite",
+          "app"
+        ],
+        [
+          "rewrite",
+          "diff"
+        ],
+        [
+          "rewrite",
+          "doctor"
+        ],
+        [
+          "rewrite",
+          "forge"
+        ],
+        [
+          "rewrite",
+          "git"
+        ],
+        [
+          "rewrite",
+          "graph"
+        ],
+        [
+          "rewrite",
+          "remote"
+        ],
+        [
+          "rewrite",
+          "repo-core"
+        ],
+        [
+          "rewrite",
+          "runtime"
+        ],
+        [
+          "rewrite",
+          "settings"
+        ],
+        [
+          "rewrite",
+          "sidebar"
+        ],
+        [
+          "rewrite",
+          "sync"
+        ],
+        [
+          "rewrite",
+          "ui-kit"
+        ],
+        [
+          "runtime",
+          "forge"
+        ],
+        [
+          "runtime",
+          "git"
+        ],
+        [
+          "runtime",
+          "os"
+        ],
+        [
+          "runtime",
+          "remote"
+        ],
+        [
+          "runtime",
+          "update"
+        ],
+        [
+          "settings",
+          "agents"
+        ],
+        [
+          "settings",
+          "app"
+        ],
+        [
+          "settings",
+          "changes"
+        ],
+        [
+          "settings",
+          "diff"
+        ],
+        [
+          "settings",
+          "forge"
+        ],
+        [
+          "settings",
+          "git"
+        ],
+        [
+          "settings",
+          "graph"
+        ],
+        [
+          "settings",
+          "os"
+        ],
+        [
+          "settings",
+          "remote"
+        ],
+        [
+          "settings",
+          "repo-core"
+        ],
+        [
+          "settings",
+          "runtime"
+        ],
+        [
+          "settings",
+          "sync"
+        ],
+        [
+          "settings",
+          "terminal"
+        ],
+        [
+          "settings",
+          "ui-kit"
+        ],
+        [
+          "settings",
+          "update"
+        ],
+        [
+          "sidebar",
+          "agents"
+        ],
+        [
+          "sidebar",
+          "app"
+        ],
+        [
+          "sidebar",
+          "bisect"
+        ],
+        [
+          "sidebar",
+          "changes"
+        ],
+        [
+          "sidebar",
+          "conflicts"
+        ],
+        [
+          "sidebar",
+          "doctor"
+        ],
+        [
+          "sidebar",
+          "forge"
+        ],
+        [
+          "sidebar",
+          "git"
+        ],
+        [
+          "sidebar",
+          "graph"
+        ],
+        [
+          "sidebar",
+          "release"
+        ],
+        [
+          "sidebar",
+          "remote"
+        ],
+        [
+          "sidebar",
+          "repo-core"
+        ],
+        [
+          "sidebar",
+          "review"
+        ],
+        [
+          "sidebar",
+          "rewrite"
+        ],
+        [
+          "sidebar",
+          "runtime"
+        ],
+        [
+          "sidebar",
+          "settings"
+        ],
+        [
+          "sidebar",
+          "terminal"
+        ],
+        [
+          "sidebar",
+          "ui-kit"
+        ],
+        [
+          "sidebar",
+          "worktrees"
+        ],
+        [
+          "sync",
+          "doctor"
+        ],
+        [
+          "sync",
+          "forge"
+        ],
+        [
+          "sync",
+          "git"
+        ],
+        [
+          "sync",
+          "graph"
+        ],
+        [
+          "sync",
+          "guidance"
+        ],
+        [
+          "sync",
+          "remote"
+        ],
+        [
+          "sync",
+          "repo-core"
+        ],
+        [
+          "sync",
+          "review"
+        ],
+        [
+          "sync",
+          "rewrite"
+        ],
+        [
+          "sync",
+          "runtime"
+        ],
+        [
+          "sync",
+          "settings"
+        ],
+        [
+          "sync",
+          "terminal"
+        ],
+        [
+          "sync",
+          "ui-kit"
+        ],
+        [
+          "terminal",
+          "doctor"
+        ],
+        [
+          "terminal",
+          "forge"
+        ],
+        [
+          "terminal",
+          "git"
+        ],
+        [
+          "terminal",
+          "guidance"
+        ],
+        [
+          "terminal",
+          "remote"
+        ],
+        [
+          "terminal",
+          "repo-core"
+        ],
+        [
+          "terminal",
+          "runtime"
+        ],
+        [
+          "terminal",
+          "settings"
+        ],
+        [
+          "terminal",
+          "ui-kit"
+        ],
+        [
+          "ui-kit",
+          "app"
+        ],
+        [
+          "ui-kit",
+          "git"
+        ],
+        [
+          "ui-kit",
+          "runtime"
+        ],
+        [
+          "ui-kit",
+          "settings"
+        ],
+        [
+          "update",
+          "os"
+        ],
+        [
+          "update",
+          "runtime"
+        ],
+        [
+          "worktrees",
+          "git"
+        ],
+        [
+          "worktrees",
+          "remote"
+        ],
+        [
+          "worktrees",
+          "repo-core"
+        ],
+        [
+          "worktrees",
+          "runtime"
+        ],
+        [
+          "worktrees",
+          "ui-kit"
+        ]
+      ],
+      "reason": "One strongly connected component at adoption (#209), created by the upward and cross-feature edges recorded in forbidden_edges (feature -> repo-core extension edges are exempt).",
+      "owner": "@JKamsker",
+      "remediation": "Remove upward edges from platform/presentation/services first; each removal can split the component. Run ratchet to shrink this entry."
+    }
+  ],
+  "repo_tab_mutations": [
+    {
+      "domain": "agents",
+      "field": "busy_op",
+      "reason": "Legacy direct mutation at adoption (#209): agents changes RepoTab.busy_op (owned by repo-core) at 1 sites, e.g. src/repo/fence_view/mod.rs:265 (write).",
+      "owner": "@JKamsker",
+      "remediation": "Give repo-core a method or Action for this transition and call it instead of writing the field."
+    },
+    {
+      "domain": "agents",
+      "field": "ci_view",
+      "reason": "Legacy direct mutation at adoption (#209): agents changes RepoTab.ci_view (owned by review) at 1 sites, e.g. src/repo/bakeoff/mod.rs:175 (write).",
+      "owner": "@JKamsker",
+      "remediation": "Give review a method or Action for this transition and call it instead of writing the field."
+    },
+    {
+      "domain": "agents",
+      "field": "commit_body",
+      "reason": "Legacy direct mutation at adoption (#209): agents changes RepoTab.commit_body (owned by repo-core) at 2 sites, e.g. src/repo/ai/message.rs:240 (write).",
+      "owner": "@JKamsker",
+      "remediation": "Give repo-core a method or Action for this transition and call it instead of writing the field."
+    },
+    {
+      "domain": "agents",
+      "field": "commit_summary",
+      "reason": "Legacy direct mutation at adoption (#209): agents changes RepoTab.commit_summary (owned by repo-core) at 2 sites, e.g. src/repo/ai/message.rs:239 (write).",
+      "owner": "@JKamsker",
+      "remediation": "Give repo-core a method or Action for this transition and call it instead of writing the field."
+    },
+    {
+      "domain": "agents",
+      "field": "diff",
+      "reason": "Legacy direct mutation at adoption (#209): agents changes RepoTab.diff (owned by repo-core) at 1 sites, e.g. src/repo/bakeoff/mod.rs:176 (write).",
+      "owner": "@JKamsker",
+      "remediation": "Give repo-core a method or Action for this transition and call it instead of writing the field."
+    },
+    {
+      "domain": "agents",
+      "field": "file_view",
+      "reason": "Legacy direct mutation at adoption (#209): agents changes RepoTab.file_view (owned by diff) at 1 sites, e.g. src/repo/bakeoff/mod.rs:177 (write).",
+      "owner": "@JKamsker",
+      "remediation": "Give diff a method or Action for this transition and call it instead of writing the field."
+    },
+    {
+      "domain": "agents",
+      "field": "open_request",
+      "reason": "Legacy direct mutation at adoption (#209): agents changes RepoTab.open_request (owned by repo-core) at 1 sites, e.g. src/repo/agents/mod.rs:121 (write).",
+      "owner": "@JKamsker",
+      "remediation": "Give repo-core a method or Action for this transition and call it instead of writing the field."
+    },
+    {
+      "domain": "agents",
+      "field": "open_when_done",
+      "reason": "Legacy direct mutation at adoption (#209): agents changes RepoTab.open_when_done (owned by repo-core) at 1 sites, e.g. src/repo/agents/mod.rs:351 (write).",
+      "owner": "@JKamsker",
+      "remediation": "Give repo-core a method or Action for this transition and call it instead of writing the field."
+    },
+    {
+      "domain": "agents",
+      "field": "search",
+      "reason": "Legacy direct mutation at adoption (#209): agents changes RepoTab.search (owned by graph) at 12 sites, e.g. src/repo/authorship_view.rs:179 (mut_call).",
+      "owner": "@JKamsker",
+      "remediation": "Give graph a method or Action for this transition and call it instead of writing the field."
+    },
+    {
+      "domain": "agents",
+      "field": "status",
+      "reason": "Legacy direct mutation at adoption (#209): agents changes RepoTab.status (owned by repo-core) at 8 sites, e.g. src/repo/agent/mod.rs:418 (write).",
+      "owner": "@JKamsker",
+      "remediation": "Give repo-core a method or Action for this transition and call it instead of writing the field."
+    },
+    {
+      "domain": "agents",
+      "field": "terminals",
+      "reason": "Legacy direct mutation at adoption (#209): agents changes RepoTab.terminals (owned by terminal) at 2 sites, e.g. src/repo/agents/handoff.rs:184 (mut_call).",
+      "owner": "@JKamsker",
+      "remediation": "Give terminal a method or Action for this transition and call it instead of writing the field."
+    },
+    {
+      "domain": "bisect",
+      "field": "bakeoff",
+      "reason": "Legacy direct mutation at adoption (#209): bisect changes RepoTab.bakeoff (owned by agents) at 1 sites, e.g. src/repo/local_ci/actions.rs:34 (write).",
+      "owner": "@JKamsker",
+      "remediation": "Give agents a method or Action for this transition and call it instead of writing the field."
+    },
+    {
+      "domain": "bisect",
+      "field": "busy_op",
+      "reason": "Legacy direct mutation at adoption (#209): bisect changes RepoTab.busy_op (owned by repo-core) at 5 sites, e.g. src/repo/bisect/mod.rs:193 (write).",
+      "owner": "@JKamsker",
+      "remediation": "Give repo-core a method or Action for this transition and call it instead of writing the field."
+    },
+    {
+      "domain": "bisect",
+      "field": "dialog",
+      "reason": "Legacy direct mutation at adoption (#209): bisect changes RepoTab.dialog (owned by repo-core) at 2 sites, e.g. src/repo/interaction/mod.rs:82 (write).",
+      "owner": "@JKamsker",
+      "remediation": "Give repo-core a method or Action for this transition and call it instead of writing the field."
+    },
+    {
+      "domain": "bisect",
+      "field": "doctor",
+      "reason": "Legacy direct mutation at adoption (#209): bisect changes RepoTab.doctor (owned by doctor) at 1 sites, e.g. src/repo/local_ci/actions.rs:33 (write).",
+      "owner": "@JKamsker",
+      "remediation": "Give doctor a method or Action for this transition and call it instead of writing the field."
+    },
+    {
+      "domain": "bisect",
+      "field": "finished",
+      "reason": "Legacy direct mutation at adoption (#209): bisect changes RepoTab.finished (owned by repo-core) at 4 sites, e.g. src/repo/bisect/mod.rs:316 (mut_call).",
+      "owner": "@JKamsker",
+      "remediation": "Give repo-core a method or Action for this transition and call it instead of writing the field."
+    },
+    {
+      "domain": "bisect",
+      "field": "op_started",
+      "reason": "Legacy direct mutation at adoption (#209): bisect changes RepoTab.op_started (owned by repo-core) at 5 sites, e.g. src/repo/bisect/mod.rs:194 (write).",
+      "owner": "@JKamsker",
+      "remediation": "Give repo-core a method or Action for this transition and call it instead of writing the field."
+    },
+    {
+      "domain": "bisect",
+      "field": "status",
+      "reason": "Legacy direct mutation at adoption (#209): bisect changes RepoTab.status (owned by repo-core) at 14 sites, e.g. src/repo/bisect/mod.rs:153 (write).",
+      "owner": "@JKamsker",
+      "remediation": "Give repo-core a method or Action for this transition and call it instead of writing the field."
+    },
+    {
+      "domain": "changes",
+      "field": "amend",
+      "reason": "Legacy direct mutation at adoption (#209): changes changes RepoTab.amend (owned by repo-core) at 1 sites, e.g. src/repo/detail/commit_box.rs:79 (write).",
+      "owner": "@JKamsker",
+      "remediation": "Give repo-core a method or Action for this transition and call it instead of writing the field."
+    },
+    {
+      "domain": "changes",
+      "field": "busy_op",
+      "reason": "Legacy direct mutation at adoption (#209): changes changes RepoTab.busy_op (owned by repo-core) at 5 sites, e.g. src/repo/content_recovery/mod.rs:116 (write).",
+      "owner": "@JKamsker",
+      "remediation": "Give repo-core a method or Action for this transition and call it instead of writing the field."
+    },
+    {
+      "domain": "changes",
+      "field": "commit_body",
+      "reason": "Legacy direct mutation at adoption (#209): changes changes RepoTab.commit_body (owned by repo-core) at 4 sites, e.g. src/repo/detail/compose/mod.rs:198 (write).",
+      "owner": "@JKamsker",
+      "remediation": "Give repo-core a method or Action for this transition and call it instead of writing the field."
+    },
+    {
+      "domain": "changes",
+      "field": "commit_summary",
+      "reason": "Legacy direct mutation at adoption (#209): changes changes RepoTab.commit_summary (owned by repo-core) at 5 sites, e.g. src/repo/detail/compose/mod.rs:197 (write).",
+      "owner": "@JKamsker",
+      "remediation": "Give repo-core a method or Action for this transition and call it instead of writing the field."
+    },
+    {
+      "domain": "changes",
+      "field": "compare",
+      "reason": "Legacy direct mutation at adoption (#209): changes changes RepoTab.compare (owned by repo-core) at 1 sites, e.g. src/repo/commit_changes.rs:119 (write).",
+      "owner": "@JKamsker",
+      "remediation": "Give repo-core a method or Action for this transition and call it instead of writing the field."
+    },
+    {
+      "domain": "changes",
+      "field": "conflict",
+      "reason": "Legacy direct mutation at adoption (#209): changes changes RepoTab.conflict (owned by conflicts) at 2 sites, e.g. src/repo/unity/merge.rs:15 (mut_call).",
+      "owner": "@JKamsker",
+      "remediation": "Give conflicts a method or Action for this transition and call it instead of writing the field."
+    },
+    {
+      "domain": "changes",
+      "field": "dco",
+      "reason": "Legacy direct mutation at adoption (#209): changes changes RepoTab.dco (owned by review) at 1 sites, e.g. src/repo/detail/commit_box.rs:58 (mut_call).",
+      "owner": "@JKamsker",
+      "remediation": "Give review a method or Action for this transition and call it instead of writing the field."
+    },
+    {
+      "domain": "changes",
+      "field": "detail_error",
+      "reason": "Legacy direct mutation at adoption (#209): changes changes RepoTab.detail_error (owned by repo-core) at 1 sites, e.g. src/repo/detail_cache.rs:114 (write).",
+      "owner": "@JKamsker",
+      "remediation": "Give repo-core a method or Action for this transition and call it instead of writing the field."
+    },
+    {
+      "domain": "changes",
+      "field": "dialog",
+      "reason": "Legacy direct mutation at adoption (#209): changes changes RepoTab.dialog (owned by repo-core) at 11 sites, e.g. src/repo/checkout_blocked.rs:191 (write).",
+      "owner": "@JKamsker",
+      "remediation": "Give repo-core a method or Action for this transition and call it instead of writing the field."
+    },
+    {
+      "domain": "changes",
+      "field": "diff",
+      "reason": "Legacy direct mutation at adoption (#209): changes changes RepoTab.diff (owned by repo-core) at 5 sites, e.g. src/repo/commit_changes.rs:95 (write).",
+      "owner": "@JKamsker",
+      "remediation": "Give repo-core a method or Action for this transition and call it instead of writing the field."
+    },
+    {
+      "domain": "changes",
+      "field": "doctor",
+      "reason": "Legacy direct mutation at adoption (#209): changes changes RepoTab.doctor (owned by doctor) at 2 sites, e.g. src/repo/commit_changes.rs:60 (write).",
+      "owner": "@JKamsker",
+      "remediation": "Give doctor a method or Action for this transition and call it instead of writing the field."
+    },
+    {
+      "domain": "changes",
+      "field": "drafts_loaded",
+      "reason": "Legacy direct mutation at adoption (#209): changes changes RepoTab.drafts_loaded (owned by repo-core) at 1 sites, e.g. src/repo/drafts.rs:116 (write).",
+      "owner": "@JKamsker",
+      "remediation": "Give repo-core a method or Action for this transition and call it instead of writing the field."
+    },
+    {
+      "domain": "changes",
+      "field": "file_view",
+      "reason": "Legacy direct mutation at adoption (#209): changes changes RepoTab.file_view (owned by diff) at 1 sites, e.g. src/repo/commit_changes.rs:118 (write).",
+      "owner": "@JKamsker",
+      "remediation": "Give diff a method or Action for this transition and call it instead of writing the field."
+    },
+    {
+      "domain": "changes",
+      "field": "focus_commit_summary",
+      "reason": "Legacy direct mutation at adoption (#209): changes changes RepoTab.focus_commit_summary (owned by repo-core) at 1 sites, e.g. src/repo/detail/commit_box.rs:116 (mut_borrow).",
+      "owner": "@JKamsker",
+      "remediation": "Give repo-core a method or Action for this transition and call it instead of writing the field."
+    },
+    {
+      "domain": "changes",
+      "field": "focus_wip",
+      "reason": "Legacy direct mutation at adoption (#209): changes changes RepoTab.focus_wip (owned by repo-core) at 1 sites, e.g. src/repo/revert_piece.rs:169 (write).",
+      "owner": "@JKamsker",
+      "remediation": "Give repo-core a method or Action for this transition and call it instead of writing the field."
+    },
+    {
+      "domain": "changes",
+      "field": "guide",
+      "reason": "Legacy direct mutation at adoption (#209): changes changes RepoTab.guide (owned by guidance) at 1 sites, e.g. src/repo/detail/commit_box.rs:120 (mut_call).",
+      "owner": "@JKamsker",
+      "remediation": "Give guidance a method or Action for this transition and call it instead of writing the field."
+    },
+    {
+      "domain": "changes",
+      "field": "last_op",
+      "reason": "Legacy direct mutation at adoption (#209): changes changes RepoTab.last_op (owned by repo-core) at 1 sites, e.g. src/repo/partial_stash/mod.rs:211 (write).",
+      "owner": "@JKamsker",
+      "remediation": "Give repo-core a method or Action for this transition and call it instead of writing the field."
+    },
+    {
+      "domain": "changes",
+      "field": "nav_jump",
+      "reason": "Legacy direct mutation at adoption (#209): changes changes RepoTab.nav_jump (owned by repo-core) at 1 sites, e.g. src/repo/commit_changes.rs:115 (write).",
+      "owner": "@JKamsker",
+      "remediation": "Give repo-core a method or Action for this transition and call it instead of writing the field."
+    },
+    {
+      "domain": "changes",
+      "field": "op_started",
+      "reason": "Legacy direct mutation at adoption (#209): changes changes RepoTab.op_started (owned by repo-core) at 5 sites, e.g. src/repo/content_recovery/mod.rs:117 (write).",
+      "owner": "@JKamsker",
+      "remediation": "Give repo-core a method or Action for this transition and call it instead of writing the field."
+    },
+    {
+      "domain": "changes",
+      "field": "pending_goto",
+      "reason": "Legacy direct mutation at adoption (#209): changes changes RepoTab.pending_goto (owned by repo-core) at 1 sites, e.g. src/repo/commit_changes.rs:116 (write).",
+      "owner": "@JKamsker",
+      "remediation": "Give repo-core a method or Action for this transition and call it instead of writing the field."
+    },
+    {
+      "domain": "changes",
+      "field": "pr_drafts",
+      "reason": "Legacy direct mutation at adoption (#209): changes changes RepoTab.pr_drafts (owned by repo-core) at 1 sites, e.g. src/repo/drafts.rs:124 (mut_call).",
+      "owner": "@JKamsker",
+      "remediation": "Give repo-core a method or Action for this transition and call it instead of writing the field."
+    },
+    {
+      "domain": "changes",
+      "field": "prompt_session",
+      "reason": "Legacy direct mutation at adoption (#209): changes changes RepoTab.prompt_session (owned by repo-core) at 2 sites, e.g. src/repo/detail/commit.rs:47 (mut_borrow).",
+      "owner": "@JKamsker",
+      "remediation": "Give repo-core a method or Action for this transition and call it instead of writing the field."
+    },
+    {
+      "domain": "changes",
+      "field": "queued",
+      "reason": "Legacy direct mutation at adoption (#209): changes changes RepoTab.queued (owned by repo-core) at 1 sites, e.g. src/repo/detached/mod.rs:269 (mut_call).",
+      "owner": "@JKamsker",
+      "remediation": "Give repo-core a method or Action for this transition and call it instead of writing the field."
+    },
+    {
+      "domain": "changes",
+      "field": "rebase",
+      "reason": "Legacy direct mutation at adoption (#209): changes changes RepoTab.rebase (owned by rewrite) at 1 sites, e.g. src/repo/drafts.rs:143 (write).",
+      "owner": "@JKamsker",
+      "remediation": "Give rewrite a method or Action for this transition and call it instead of writing the field."
+    },
+    {
+      "domain": "changes",
+      "field": "reword",
+      "reason": "Legacy direct mutation at adoption (#209): changes changes RepoTab.reword (owned by repo-core) at 2 sites, e.g. src/repo/detail/commit.rs:115 (mut_call).",
+      "owner": "@JKamsker",
+      "remediation": "Give repo-core a method or Action for this transition and call it instead of writing the field."
+    },
+    {
+      "domain": "changes",
+      "field": "status",
+      "reason": "Legacy direct mutation at adoption (#209): changes changes RepoTab.status (owned by repo-core) at 19 sites, e.g. src/repo/commit_changes.rs:107 (write).",
+      "owner": "@JKamsker",
+      "remediation": "Give repo-core a method or Action for this transition and call it instead of writing the field."
+    },
+    {
+      "domain": "changes",
+      "field": "update_submodules",
+      "reason": "Legacy direct mutation at adoption (#209): changes changes RepoTab.update_submodules (owned by repo-core) at 2 sites, e.g. src/repo/keep_submodules.rs:36 (write).",
+      "owner": "@JKamsker",
+      "remediation": "Give repo-core a method or Action for this transition and call it instead of writing the field."
+    },
+    {
+      "domain": "conflicts",
+      "field": "busy_op",
+      "reason": "Legacy direct mutation at adoption (#209): conflicts changes RepoTab.busy_op (owned by repo-core) at 8 sites, e.g. src/repo/resolver/apply.rs:43 (write).",
+      "owner": "@JKamsker",
+      "remediation": "Give repo-core a method or Action for this transition and call it instead of writing the field."
+    },
+    {
+      "domain": "conflicts",
+      "field": "dialog",
+      "reason": "Legacy direct mutation at adoption (#209): conflicts changes RepoTab.dialog (owned by repo-core) at 1 sites, e.g. src/repo/rehearse/mod.rs:131 (write).",
+      "owner": "@JKamsker",
+      "remediation": "Give repo-core a method or Action for this transition and call it instead of writing the field."
+    },
+    {
+      "domain": "conflicts",
+      "field": "finished",
+      "reason": "Legacy direct mutation at adoption (#209): conflicts changes RepoTab.finished (owned by repo-core) at 2 sites, e.g. src/repo/rehearse/mod.rs:256 (mut_call).",
+      "owner": "@JKamsker",
+      "remediation": "Give repo-core a method or Action for this transition and call it instead of writing the field."
+    },
+    {
+      "domain": "conflicts",
+      "field": "parked",
+      "reason": "Legacy direct mutation at adoption (#209): conflicts changes RepoTab.parked (owned by repo-core) at 1 sites, e.g. src/repo/resolver/mod.rs:205 (mut_call).",
+      "owner": "@JKamsker",
+      "remediation": "Give repo-core a method or Action for this transition and call it instead of writing the field."
+    },
+    {
+      "domain": "conflicts",
+      "field": "queued",
+      "reason": "Legacy direct mutation at adoption (#209): conflicts changes RepoTab.queued (owned by repo-core) at 1 sites, e.g. src/repo/resolver/apply.rs:125 (mut_call).",
+      "owner": "@JKamsker",
+      "remediation": "Give repo-core a method or Action for this transition and call it instead of writing the field."
+    },
+    {
+      "domain": "conflicts",
+      "field": "scroll_to",
+      "reason": "Legacy direct mutation at adoption (#209): conflicts changes RepoTab.scroll_to (owned by repo-core) at 1 sites, e.g. src/repo/resolver/dispatch.rs:138 (write).",
+      "owner": "@JKamsker",
+      "remediation": "Give repo-core a method or Action for this transition and call it instead of writing the field."
+    },
+    {
+      "domain": "conflicts",
+      "field": "status",
+      "reason": "Legacy direct mutation at adoption (#209): conflicts changes RepoTab.status (owned by repo-core) at 34 sites, e.g. src/repo/conflict/decisions/mod.rs:172 (write).",
+      "owner": "@JKamsker",
+      "remediation": "Give repo-core a method or Action for this transition and call it instead of writing the field."
+    },
+    {
+      "domain": "diff",
+      "field": "agents",
+      "reason": "Legacy direct mutation at adoption (#209): diff changes RepoTab.agents (owned by agents) at 1 sites, e.g. src/repo/diff/view.rs:154 (mut_borrow).",
+      "owner": "@JKamsker",
+      "remediation": "Give agents a method or Action for this transition and call it instead of writing the field."
+    },
+    {
+      "domain": "diff",
+      "field": "busy_op",
+      "reason": "Legacy direct mutation at adoption (#209): diff changes RepoTab.busy_op (owned by repo-core) at 3 sites, e.g. src/repo/file_comparison/selection.rs:142 (write).",
+      "owner": "@JKamsker",
+      "remediation": "Give repo-core a method or Action for this transition and call it instead of writing the field."
+    },
+    {
+      "domain": "diff",
+      "field": "ci_view",
+      "reason": "Legacy direct mutation at adoption (#209): diff changes RepoTab.ci_view (owned by review) at 2 sites, e.g. src/repo/diff_split.rs:116 (write).",
+      "owner": "@JKamsker",
+      "remediation": "Give review a method or Action for this transition and call it instead of writing the field."
+    },
+    {
+      "domain": "diff",
+      "field": "conflict",
+      "reason": "Legacy direct mutation at adoption (#209): diff changes RepoTab.conflict (owned by conflicts) at 1 sites, e.g. src/repo/file_view/line_history.rs:32 (write).",
+      "owner": "@JKamsker",
+      "remediation": "Give conflicts a method or Action for this transition and call it instead of writing the field."
+    },
+    {
+      "domain": "diff",
+      "field": "diff",
+      "reason": "Legacy direct mutation at adoption (#209): diff changes RepoTab.diff (owned by repo-core) at 19 sites, e.g. src/repo/diff/algorithm.rs:113 (mut_borrow).",
+      "owner": "@JKamsker",
+      "remediation": "Give repo-core a method or Action for this transition and call it instead of writing the field."
+    },
+    {
+      "domain": "diff",
+      "field": "diff_as_file",
+      "reason": "Legacy direct mutation at adoption (#209): diff changes RepoTab.diff_as_file (owned by repo-core) at 5 sites, e.g. src/repo/diff/encrypted/mod.rs:307 (write).",
+      "owner": "@JKamsker",
+      "remediation": "Give repo-core a method or Action for this transition and call it instead of writing the field."
+    },
+    {
+      "domain": "diff",
+      "field": "diff_rendered",
+      "reason": "Legacy direct mutation at adoption (#209): diff changes RepoTab.diff_rendered (owned by repo-core) at 5 sites, e.g. src/repo/diff/encrypted/mod.rs:308 (write).",
+      "owner": "@JKamsker",
+      "remediation": "Give repo-core a method or Action for this transition and call it instead of writing the field."
+    },
+    {
+      "domain": "diff",
+      "field": "diff_rich_for",
+      "reason": "Legacy direct mutation at adoption (#209): diff changes RepoTab.diff_rich_for (owned by repo-core) at 1 sites, e.g. src/repo/diff/rich/tab.rs:63 (write).",
+      "owner": "@JKamsker",
+      "remediation": "Give repo-core a method or Action for this transition and call it instead of writing the field."
+    },
+    {
+      "domain": "diff",
+      "field": "insights",
+      "reason": "Legacy direct mutation at adoption (#209): diff changes RepoTab.insights (owned by insights) at 1 sites, e.g. src/repo/diff_split.rs:111 (write).",
+      "owner": "@JKamsker",
+      "remediation": "Give insights a method or Action for this transition and call it instead of writing the field."
+    },
+    {
+      "domain": "diff",
+      "field": "last_op",
+      "reason": "Legacy direct mutation at adoption (#209): diff changes RepoTab.last_op (owned by repo-core) at 1 sites, e.g. src/repo/file_comparison/selection.rs:144 (write).",
+      "owner": "@JKamsker",
+      "remediation": "Give repo-core a method or Action for this transition and call it instead of writing the field."
+    },
+    {
+      "domain": "diff",
+      "field": "op_started",
+      "reason": "Legacy direct mutation at adoption (#209): diff changes RepoTab.op_started (owned by repo-core) at 3 sites, e.g. src/repo/file_comparison/selection.rs:143 (write).",
+      "owner": "@JKamsker",
+      "remediation": "Give repo-core a method or Action for this transition and call it instead of writing the field."
+    },
+    {
+      "domain": "diff",
+      "field": "pr_drafts",
+      "reason": "Legacy direct mutation at adoption (#209): diff changes RepoTab.pr_drafts (owned by repo-core) at 1 sites, e.g. src/repo/diff/view.rs:158 (mut_call).",
+      "owner": "@JKamsker",
+      "remediation": "Give repo-core a method or Action for this transition and call it instead of writing the field."
+    },
+    {
+      "domain": "diff",
+      "field": "pr_view",
+      "reason": "Legacy direct mutation at adoption (#209): diff changes RepoTab.pr_view (owned by review) at 1 sites, e.g. src/repo/diff/view.rs:156 (mut_borrow).",
+      "owner": "@JKamsker",
+      "remediation": "Give review a method or Action for this transition and call it instead of writing the field."
+    },
+    {
+      "domain": "diff",
+      "field": "scroll_to",
+      "reason": "Legacy direct mutation at adoption (#209): diff changes RepoTab.scroll_to (owned by repo-core) at 1 sites, e.g. src/repo/diff_split.rs:59 (write).",
+      "owner": "@JKamsker",
+      "remediation": "Give repo-core a method or Action for this transition and call it instead of writing the field."
+    },
+    {
+      "domain": "diff",
+      "field": "search",
+      "reason": "Legacy direct mutation at adoption (#209): diff changes RepoTab.search (owned by graph) at 2 sites, e.g. src/repo/find/keys.rs:69 (write).",
+      "owner": "@JKamsker",
+      "remediation": "Give graph a method or Action for this transition and call it instead of writing the field."
+    },
+    {
+      "domain": "diff",
+      "field": "status",
+      "reason": "Legacy direct mutation at adoption (#209): diff changes RepoTab.status (owned by repo-core) at 2 sites, e.g. src/repo/file_comparison/mod.rs:131 (write).",
+      "owner": "@JKamsker",
+      "remediation": "Give repo-core a method or Action for this transition and call it instead of writing the field."
+    },
+    {
+      "domain": "diff",
+      "field": "structural_pending",
+      "reason": "Legacy direct mutation at adoption (#209): diff changes RepoTab.structural_pending (owned by repo-core) at 3 sites, e.g. src/repo/diff/structural/mod.rs:79 (mut_borrow).",
+      "owner": "@JKamsker",
+      "remediation": "Give repo-core a method or Action for this transition and call it instead of writing the field."
+    },
+    {
+      "domain": "diff",
+      "field": "structural_running",
+      "reason": "Legacy direct mutation at adoption (#209): diff changes RepoTab.structural_running (owned by repo-core) at 2 sites, e.g. src/repo/diff/structural/mod.rs:78 (write).",
+      "owner": "@JKamsker",
+      "remediation": "Give repo-core a method or Action for this transition and call it instead of writing the field."
+    },
+    {
+      "domain": "diff",
+      "field": "tour",
+      "reason": "Legacy direct mutation at adoption (#209): diff changes RepoTab.tour (owned by guidance) at 2 sites, e.g. src/repo/diff_split.rs:109 (write).",
+      "owner": "@JKamsker",
+      "remediation": "Give guidance a method or Action for this transition and call it instead of writing the field."
+    },
+    {
+      "domain": "diff",
+      "field": "versions",
+      "reason": "Legacy direct mutation at adoption (#209): diff changes RepoTab.versions (owned by release) at 1 sites, e.g. src/repo/diff_split.rs:110 (write).",
+      "owner": "@JKamsker",
+      "remediation": "Give release a method or Action for this transition and call it instead of writing the field."
+    },
+    {
+      "domain": "doctor",
+      "field": "busy_op",
+      "reason": "Legacy direct mutation at adoption (#209): doctor changes RepoTab.busy_op (owned by repo-core) at 4 sites, e.g. src/repo/cleanup.rs:220 (write).",
+      "owner": "@JKamsker",
+      "remediation": "Give repo-core a method or Action for this transition and call it instead of writing the field."
+    },
+    {
+      "domain": "doctor",
+      "field": "ci_view",
+      "reason": "Legacy direct mutation at adoption (#209): doctor changes RepoTab.ci_view (owned by review) at 1 sites, e.g. src/repo/doctor/mod.rs:191 (write).",
+      "owner": "@JKamsker",
+      "remediation": "Give review a method or Action for this transition and call it instead of writing the field."
+    },
+    {
+      "domain": "doctor",
+      "field": "dialog",
+      "reason": "Legacy direct mutation at adoption (#209): doctor changes RepoTab.dialog (owned by repo-core) at 12 sites, e.g. src/repo/repository_tools/actions.rs:47 (write).",
+      "owner": "@JKamsker",
+      "remediation": "Give repo-core a method or Action for this transition and call it instead of writing the field."
+    },
+    {
+      "domain": "doctor",
+      "field": "diff",
+      "reason": "Legacy direct mutation at adoption (#209): doctor changes RepoTab.diff (owned by repo-core) at 1 sites, e.g. src/repo/doctor/mod.rs:189 (write).",
+      "owner": "@JKamsker",
+      "remediation": "Give repo-core a method or Action for this transition and call it instead of writing the field."
+    },
+    {
+      "domain": "doctor",
+      "field": "file_view",
+      "reason": "Legacy direct mutation at adoption (#209): doctor changes RepoTab.file_view (owned by diff) at 1 sites, e.g. src/repo/doctor/mod.rs:190 (write).",
+      "owner": "@JKamsker",
+      "remediation": "Give diff a method or Action for this transition and call it instead of writing the field."
+    },
+    {
+      "domain": "doctor",
+      "field": "insights",
+      "reason": "Legacy direct mutation at adoption (#209): doctor changes RepoTab.insights (owned by insights) at 1 sites, e.g. src/repo/doctor/mod.rs:194 (write).",
+      "owner": "@JKamsker",
+      "remediation": "Give insights a method or Action for this transition and call it instead of writing the field."
+    },
+    {
+      "domain": "doctor",
+      "field": "last_op",
+      "reason": "Legacy direct mutation at adoption (#209): doctor changes RepoTab.last_op (owned by repo-core) at 3 sites, e.g. src/repo/repository_tools/dependency_jobs.rs:33 (write).",
+      "owner": "@JKamsker",
+      "remediation": "Give repo-core a method or Action for this transition and call it instead of writing the field."
+    },
+    {
+      "domain": "doctor",
+      "field": "op_started",
+      "reason": "Legacy direct mutation at adoption (#209): doctor changes RepoTab.op_started (owned by repo-core) at 3 sites, e.g. src/repo/repository_tools/dependency_jobs.rs:32 (write).",
+      "owner": "@JKamsker",
+      "remediation": "Give repo-core a method or Action for this transition and call it instead of writing the field."
+    },
+    {
+      "domain": "doctor",
+      "field": "outbox_last",
+      "reason": "Legacy direct mutation at adoption (#209): doctor changes RepoTab.outbox_last (owned by repo-core) at 2 sites, e.g. src/repo/repository_tools/context.rs:9 (write).",
+      "owner": "@JKamsker",
+      "remediation": "Give repo-core a method or Action for this transition and call it instead of writing the field."
+    },
+    {
+      "domain": "doctor",
+      "field": "outbox_reading",
+      "reason": "Legacy direct mutation at adoption (#209): doctor changes RepoTab.outbox_reading (owned by repo-core) at 2 sites, e.g. src/repo/repository_tools/context.rs:8 (write).",
+      "owner": "@JKamsker",
+      "remediation": "Give repo-core a method or Action for this transition and call it instead of writing the field."
+    },
+    {
+      "domain": "doctor",
+      "field": "preflight_selection",
+      "reason": "Legacy direct mutation at adoption (#209): doctor changes RepoTab.preflight_selection (owned by repo-core) at 2 sites, e.g. src/repo/repository_tools/push_continuation.rs:80 (write).",
+      "owner": "@JKamsker",
+      "remediation": "Give repo-core a method or Action for this transition and call it instead of writing the field."
+    },
+    {
+      "domain": "doctor",
+      "field": "stacks",
+      "reason": "Legacy direct mutation at adoption (#209): doctor changes RepoTab.stacks (owned by rewrite) at 1 sites, e.g. src/repo/repository_tools/deferred.rs:121 (write).",
+      "owner": "@JKamsker",
+      "remediation": "Give rewrite a method or Action for this transition and call it instead of writing the field."
+    },
+    {
+      "domain": "doctor",
+      "field": "status",
+      "reason": "Legacy direct mutation at adoption (#209): doctor changes RepoTab.status (owned by repo-core) at 12 sites, e.g. src/repo/doctor/mod.rs:183 (write).",
+      "owner": "@JKamsker",
+      "remediation": "Give repo-core a method or Action for this transition and call it instead of writing the field."
+    },
+    {
+      "domain": "doctor",
+      "field": "tour",
+      "reason": "Legacy direct mutation at adoption (#209): doctor changes RepoTab.tour (owned by guidance) at 1 sites, e.g. src/repo/doctor/mod.rs:193 (write).",
+      "owner": "@JKamsker",
+      "remediation": "Give guidance a method or Action for this transition and call it instead of writing the field."
+    },
+    {
+      "domain": "graph",
+      "field": "authorship",
+      "reason": "Legacy direct mutation at adoption (#209): graph changes RepoTab.authorship (owned by agents) at 3 sites, e.g. src/repo/commit_search.rs:205 (write).",
+      "owner": "@JKamsker",
+      "remediation": "Give agents a method or Action for this transition and call it instead of writing the field."
+    },
+    {
+      "domain": "graph",
+      "field": "ci_view",
+      "reason": "Legacy direct mutation at adoption (#209): graph changes RepoTab.ci_view (owned by review) at 1 sites, e.g. src/repo/history_activity/mod.rs:140 (write).",
+      "owner": "@JKamsker",
+      "remediation": "Give review a method or Action for this transition and call it instead of writing the field."
+    },
+    {
+      "domain": "graph",
+      "field": "commits",
+      "reason": "Legacy direct mutation at adoption (#209): graph changes RepoTab.commits (owned by repo-core) at 2 sites, e.g. src/repo/graph_view/mod.rs:157 (mut_borrow).",
+      "owner": "@JKamsker",
+      "remediation": "Give repo-core a method or Action for this transition and call it instead of writing the field."
+    },
+    {
+      "domain": "graph",
+      "field": "diff",
+      "reason": "Legacy direct mutation at adoption (#209): graph changes RepoTab.diff (owned by repo-core) at 1 sites, e.g. src/repo/history_activity/mod.rs:138 (write).",
+      "owner": "@JKamsker",
+      "remediation": "Give repo-core a method or Action for this transition and call it instead of writing the field."
+    },
+    {
+      "domain": "graph",
+      "field": "file_view",
+      "reason": "Legacy direct mutation at adoption (#209): graph changes RepoTab.file_view (owned by diff) at 1 sites, e.g. src/repo/history_activity/mod.rs:139 (write).",
+      "owner": "@JKamsker",
+      "remediation": "Give diff a method or Action for this transition and call it instead of writing the field."
+    },
+    {
+      "domain": "graph",
+      "field": "ghost",
+      "reason": "Legacy direct mutation at adoption (#209): graph changes RepoTab.ghost (owned by rewrite) at 4 sites, e.g. src/repo/graph_view/mod.rs:156 (mut_call).",
+      "owner": "@JKamsker",
+      "remediation": "Give rewrite a method or Action for this transition and call it instead of writing the field."
+    },
+    {
+      "domain": "graph",
+      "field": "graph",
+      "reason": "Legacy direct mutation at adoption (#209): graph changes RepoTab.graph (owned by repo-core) at 4 sites, e.g. src/repo/branch_bands.rs:177 (write).",
+      "owner": "@JKamsker",
+      "remediation": "Give repo-core a method or Action for this transition and call it instead of writing the field."
+    },
+    {
+      "domain": "graph",
+      "field": "graph_labels",
+      "reason": "Legacy direct mutation at adoption (#209): graph changes RepoTab.graph_labels (owned by repo-core) at 2 sites, e.g. src/repo/graph_view/readability.rs:21 (mut_call).",
+      "owner": "@JKamsker",
+      "remediation": "Give repo-core a method or Action for this transition and call it instead of writing the field."
+    },
+    {
+      "domain": "graph",
+      "field": "history",
+      "reason": "Legacy direct mutation at adoption (#209): graph changes RepoTab.history (owned by repo-core) at 1 sites, e.g. src/repo/snapshot.rs:73 (write).",
+      "owner": "@JKamsker",
+      "remediation": "Give repo-core a method or Action for this transition and call it instead of writing the field."
+    },
+    {
+      "domain": "graph",
+      "field": "index",
+      "reason": "Legacy direct mutation at adoption (#209): graph changes RepoTab.index (owned by repo-core) at 2 sites, e.g. src/repo/graph_view/mod.rs:157 (mut_borrow).",
+      "owner": "@JKamsker",
+      "remediation": "Give repo-core a method or Action for this transition and call it instead of writing the field."
+    },
+    {
+      "domain": "graph",
+      "field": "log_from",
+      "reason": "Legacy direct mutation at adoption (#209): graph changes RepoTab.log_from (owned by repo-core) at 1 sites, e.g. src/repo/branch_visibility.rs:238 (write).",
+      "owner": "@JKamsker",
+      "remediation": "Give repo-core a method or Action for this transition and call it instead of writing the field."
+    },
+    {
+      "domain": "graph",
+      "field": "log_order",
+      "reason": "Legacy direct mutation at adoption (#209): graph changes RepoTab.log_order (owned by repo-core) at 1 sites, e.g. src/repo/graph_order.rs:90 (write).",
+      "owner": "@JKamsker",
+      "remediation": "Give repo-core a method or Action for this transition and call it instead of writing the field."
+    },
+    {
+      "domain": "graph",
+      "field": "refs",
+      "reason": "Legacy direct mutation at adoption (#209): graph changes RepoTab.refs (owned by repo-core) at 1 sites, e.g. src/repo/snapshot.rs:72 (write).",
+      "owner": "@JKamsker",
+      "remediation": "Give repo-core a method or Action for this transition and call it instead of writing the field."
+    },
+    {
+      "domain": "graph",
+      "field": "reload_again",
+      "reason": "Legacy direct mutation at adoption (#209): graph changes RepoTab.reload_again (owned by repo-core) at 2 sites, e.g. src/repo/branch_visibility.rs:235 (write).",
+      "owner": "@JKamsker",
+      "remediation": "Give repo-core a method or Action for this transition and call it instead of writing the field."
+    },
+    {
+      "domain": "graph",
+      "field": "scroll_to",
+      "reason": "Legacy direct mutation at adoption (#209): graph changes RepoTab.scroll_to (owned by repo-core) at 4 sites, e.g. src/repo/core_seams/graph_narration.rs:225 (write).",
+      "owner": "@JKamsker",
+      "remediation": "Give repo-core a method or Action for this transition and call it instead of writing the field."
+    },
+    {
+      "domain": "graph",
+      "field": "selected",
+      "reason": "Legacy direct mutation at adoption (#209): graph changes RepoTab.selected (owned by repo-core) at 3 sites, e.g. src/repo/graph_view/mod.rs:162 (write).",
+      "owner": "@JKamsker",
+      "remediation": "Give repo-core a method or Action for this transition and call it instead of writing the field."
+    },
+    {
+      "domain": "graph",
+      "field": "snapshot_kept",
+      "reason": "Legacy direct mutation at adoption (#209): graph changes RepoTab.snapshot_kept (owned by repo-core) at 1 sites, e.g. src/repo/snapshot.rs:87 (write).",
+      "owner": "@JKamsker",
+      "remediation": "Give repo-core a method or Action for this transition and call it instead of writing the field."
+    },
+    {
+      "domain": "graph",
+      "field": "snapshot_shown",
+      "reason": "Legacy direct mutation at adoption (#209): graph changes RepoTab.snapshot_shown (owned by repo-core) at 1 sites, e.g. src/repo/snapshot.rs:74 (write).",
+      "owner": "@JKamsker",
+      "remediation": "Give repo-core a method or Action for this transition and call it instead of writing the field."
+    },
+    {
+      "domain": "graph",
+      "field": "stash_view",
+      "reason": "Legacy direct mutation at adoption (#209): graph changes RepoTab.stash_view (owned by repo-core) at 1 sites, e.g. src/repo/history_activity/mod.rs:228 (write).",
+      "owner": "@JKamsker",
+      "remediation": "Give repo-core a method or Action for this transition and call it instead of writing the field."
+    },
+    {
+      "domain": "graph",
+      "field": "status",
+      "reason": "Legacy direct mutation at adoption (#209): graph changes RepoTab.status (owned by repo-core) at 4 sites, e.g. src/repo/branch_bands.rs:181 (write).",
+      "owner": "@JKamsker",
+      "remediation": "Give repo-core a method or Action for this transition and call it instead of writing the field."
+    },
+    {
+      "domain": "guidance",
+      "field": "ci_view",
+      "reason": "Legacy direct mutation at adoption (#209): guidance changes RepoTab.ci_view (owned by review) at 2 sites, e.g. src/repo/guide/mod.rs:132 (write).",
+      "owner": "@JKamsker",
+      "remediation": "Give review a method or Action for this transition and call it instead of writing the field."
+    },
+    {
+      "domain": "guidance",
+      "field": "compare",
+      "reason": "Legacy direct mutation at adoption (#209): guidance changes RepoTab.compare (owned by repo-core) at 1 sites, e.g. src/repo/guide/mod.rs:133 (write).",
+      "owner": "@JKamsker",
+      "remediation": "Give repo-core a method or Action for this transition and call it instead of writing the field."
+    },
+    {
+      "domain": "guidance",
+      "field": "diff",
+      "reason": "Legacy direct mutation at adoption (#209): guidance changes RepoTab.diff (owned by repo-core) at 1 sites, e.g. src/repo/tour/mod.rs:43 (write).",
+      "owner": "@JKamsker",
+      "remediation": "Give repo-core a method or Action for this transition and call it instead of writing the field."
+    },
+    {
+      "domain": "guidance",
+      "field": "file_view",
+      "reason": "Legacy direct mutation at adoption (#209): guidance changes RepoTab.file_view (owned by diff) at 1 sites, e.g. src/repo/tour/mod.rs:44 (write).",
+      "owner": "@JKamsker",
+      "remediation": "Give diff a method or Action for this transition and call it instead of writing the field."
+    },
+    {
+      "domain": "guidance",
+      "field": "practice_checking",
+      "reason": "Legacy direct mutation at adoption (#209): guidance changes RepoTab.practice_checking (owned by repo-core) at 1 sites, e.g. src/repo/practice.rs:77 (write).",
+      "owner": "@JKamsker",
+      "remediation": "Give repo-core a method or Action for this transition and call it instead of writing the field."
+    },
+    {
+      "domain": "guidance",
+      "field": "scroll_to",
+      "reason": "Legacy direct mutation at adoption (#209): guidance changes RepoTab.scroll_to (owned by repo-core) at 1 sites, e.g. src/repo/guide/mod.rs:135 (write).",
+      "owner": "@JKamsker",
+      "remediation": "Give repo-core a method or Action for this transition and call it instead of writing the field."
+    },
+    {
+      "domain": "guidance",
+      "field": "status",
+      "reason": "Legacy direct mutation at adoption (#209): guidance changes RepoTab.status (owned by repo-core) at 4 sites, e.g. src/repo/guide/mod.rs:117 (write).",
+      "owner": "@JKamsker",
+      "remediation": "Give repo-core a method or Action for this transition and call it instead of writing the field."
+    },
+    {
+      "domain": "insights",
+      "field": "bakeoff",
+      "reason": "Legacy direct mutation at adoption (#209): insights changes RepoTab.bakeoff (owned by agents) at 1 sites, e.g. src/repo/insights/mod.rs:291 (write).",
+      "owner": "@JKamsker",
+      "remediation": "Give agents a method or Action for this transition and call it instead of writing the field."
+    },
+    {
+      "domain": "insights",
+      "field": "ci_view",
+      "reason": "Legacy direct mutation at adoption (#209): insights changes RepoTab.ci_view (owned by review) at 1 sites, e.g. src/repo/insights/mod.rs:286 (write).",
+      "owner": "@JKamsker",
+      "remediation": "Give review a method or Action for this transition and call it instead of writing the field."
+    },
+    {
+      "domain": "insights",
+      "field": "diff",
+      "reason": "Legacy direct mutation at adoption (#209): insights changes RepoTab.diff (owned by repo-core) at 2 sites, e.g. src/repo/insights/mod.rs:284 (write).",
+      "owner": "@JKamsker",
+      "remediation": "Give repo-core a method or Action for this transition and call it instead of writing the field."
+    },
+    {
+      "domain": "insights",
+      "field": "doctor",
+      "reason": "Legacy direct mutation at adoption (#209): insights changes RepoTab.doctor (owned by doctor) at 1 sites, e.g. src/repo/insights/mod.rs:290 (write).",
+      "owner": "@JKamsker",
+      "remediation": "Give doctor a method or Action for this transition and call it instead of writing the field."
+    },
+    {
+      "domain": "insights",
+      "field": "dossier",
+      "reason": "Legacy direct mutation at adoption (#209): insights changes RepoTab.dossier (owned by diff) at 1 sites, e.g. src/repo/insights/mod.rs:282 (mut_call).",
+      "owner": "@JKamsker",
+      "remediation": "Give diff a method or Action for this transition and call it instead of writing the field."
+    },
+    {
+      "domain": "insights",
+      "field": "file_comparison",
+      "reason": "Legacy direct mutation at adoption (#209): insights changes RepoTab.file_comparison (owned by diff) at 1 sites, e.g. src/repo/insights/mod.rs:279 (write).",
+      "owner": "@JKamsker",
+      "remediation": "Give diff a method or Action for this transition and call it instead of writing the field."
+    },
+    {
+      "domain": "insights",
+      "field": "file_view",
+      "reason": "Legacy direct mutation at adoption (#209): insights changes RepoTab.file_view (owned by diff) at 1 sites, e.g. src/repo/insights/mod.rs:285 (write).",
+      "owner": "@JKamsker",
+      "remediation": "Give diff a method or Action for this transition and call it instead of writing the field."
+    },
+    {
+      "domain": "insights",
+      "field": "review_document",
+      "reason": "Legacy direct mutation at adoption (#209): insights changes RepoTab.review_document (owned by review) at 1 sites, e.g. src/repo/insights/mod.rs:283 (write).",
+      "owner": "@JKamsker",
+      "remediation": "Give review a method or Action for this transition and call it instead of writing the field."
+    },
+    {
+      "domain": "insights",
+      "field": "status",
+      "reason": "Legacy direct mutation at adoption (#209): insights changes RepoTab.status (owned by repo-core) at 1 sites, e.g. src/repo/insights/mod.rs:269 (write).",
+      "owner": "@JKamsker",
+      "remediation": "Give repo-core a method or Action for this transition and call it instead of writing the field."
+    },
+    {
+      "domain": "insights",
+      "field": "symbols",
+      "reason": "Legacy direct mutation at adoption (#209): insights changes RepoTab.symbols (owned by diff) at 1 sites, e.g. src/repo/insights/mod.rs:281 (mut_call).",
+      "owner": "@JKamsker",
+      "remediation": "Give diff a method or Action for this transition and call it instead of writing the field."
+    },
+    {
+      "domain": "insights",
+      "field": "timeline_view",
+      "reason": "Legacy direct mutation at adoption (#209): insights changes RepoTab.timeline_view (owned by rewrite) at 1 sites, e.g. src/repo/insights/mod.rs:289 (write).",
+      "owner": "@JKamsker",
+      "remediation": "Give rewrite a method or Action for this transition and call it instead of writing the field."
+    },
+    {
+      "domain": "insights",
+      "field": "tour",
+      "reason": "Legacy direct mutation at adoption (#209): insights changes RepoTab.tour (owned by guidance) at 1 sites, e.g. src/repo/insights/mod.rs:280 (write).",
+      "owner": "@JKamsker",
+      "remediation": "Give guidance a method or Action for this transition and call it instead of writing the field."
+    },
+    {
+      "domain": "insights",
+      "field": "versions",
+      "reason": "Legacy direct mutation at adoption (#209): insights changes RepoTab.versions (owned by release) at 1 sites, e.g. src/repo/insights/mod.rs:288 (write).",
+      "owner": "@JKamsker",
+      "remediation": "Give release a method or Action for this transition and call it instead of writing the field."
+    },
+    {
+      "domain": "release",
+      "field": "busy_op",
+      "reason": "Legacy direct mutation at adoption (#209): release changes RepoTab.busy_op (owned by repo-core) at 3 sites, e.g. src/repo/release/mod.rs:251 (write).",
+      "owner": "@JKamsker",
+      "remediation": "Give repo-core a method or Action for this transition and call it instead of writing the field."
+    },
+    {
+      "domain": "release",
+      "field": "ci_view",
+      "reason": "Legacy direct mutation at adoption (#209): release changes RepoTab.ci_view (owned by review) at 1 sites, e.g. src/repo/versions/mod.rs:134 (write).",
+      "owner": "@JKamsker",
+      "remediation": "Give review a method or Action for this transition and call it instead of writing the field."
+    },
+    {
+      "domain": "release",
+      "field": "dialog",
+      "reason": "Legacy direct mutation at adoption (#209): release changes RepoTab.dialog (owned by repo-core) at 1 sites, e.g. src/repo/hotfix/mod.rs:70 (write).",
+      "owner": "@JKamsker",
+      "remediation": "Give repo-core a method or Action for this transition and call it instead of writing the field."
+    },
+    {
+      "domain": "release",
+      "field": "diff",
+      "reason": "Legacy direct mutation at adoption (#209): release changes RepoTab.diff (owned by repo-core) at 1 sites, e.g. src/repo/versions/mod.rs:132 (write).",
+      "owner": "@JKamsker",
+      "remediation": "Give repo-core a method or Action for this transition and call it instead of writing the field."
+    },
+    {
+      "domain": "release",
+      "field": "file_view",
+      "reason": "Legacy direct mutation at adoption (#209): release changes RepoTab.file_view (owned by diff) at 1 sites, e.g. src/repo/versions/mod.rs:133 (write).",
+      "owner": "@JKamsker",
+      "remediation": "Give diff a method or Action for this transition and call it instead of writing the field."
+    },
+    {
+      "domain": "release",
+      "field": "finished",
+      "reason": "Legacy direct mutation at adoption (#209): release changes RepoTab.finished (owned by repo-core) at 1 sites, e.g. src/repo/release/mod.rs:401 (mut_call).",
+      "owner": "@JKamsker",
+      "remediation": "Give repo-core a method or Action for this transition and call it instead of writing the field."
+    },
+    {
+      "domain": "release",
+      "field": "op_started",
+      "reason": "Legacy direct mutation at adoption (#209): release changes RepoTab.op_started (owned by repo-core) at 2 sites, e.g. src/repo/release/mod.rs:252 (write).",
+      "owner": "@JKamsker",
+      "remediation": "Give repo-core a method or Action for this transition and call it instead of writing the field."
+    },
+    {
+      "domain": "release",
+      "field": "status",
+      "reason": "Legacy direct mutation at adoption (#209): release changes RepoTab.status (owned by repo-core) at 10 sites, e.g. src/repo/hotfix/mod.rs:60 (write).",
+      "owner": "@JKamsker",
+      "remediation": "Give repo-core a method or Action for this transition and call it instead of writing the field."
+    },
+    {
+      "domain": "review",
+      "field": "avatars_hinted",
+      "reason": "Legacy direct mutation at adoption (#209): review changes RepoTab.avatars_hinted (owned by repo-core) at 1 sites, e.g. src/repo/forge_selection.rs:282 (write).",
+      "owner": "@JKamsker",
+      "remediation": "Give repo-core a method or Action for this transition and call it instead of writing the field."
+    },
+    {
+      "domain": "review",
+      "field": "bakeoff",
+      "reason": "Legacy direct mutation at adoption (#209): review changes RepoTab.bakeoff (owned by agents) at 1 sites, e.g. src/repo/pr_view/select.rs:36 (write).",
+      "owner": "@JKamsker",
+      "remediation": "Give agents a method or Action for this transition and call it instead of writing the field."
+    },
+    {
+      "domain": "review",
+      "field": "branch_health",
+      "reason": "Legacy direct mutation at adoption (#209): review changes RepoTab.branch_health (owned by sidebar) at 1 sites, e.g. src/repo/forge_selection.rs:277 (write).",
+      "owner": "@JKamsker",
+      "remediation": "Give sidebar a method or Action for this transition and call it instead of writing the field."
+    },
+    {
+      "domain": "review",
+      "field": "busy_op",
+      "reason": "Legacy direct mutation at adoption (#209): review changes RepoTab.busy_op (owned by repo-core) at 1 sites, e.g. src/repo/forks/completion.rs:99 (write).",
+      "owner": "@JKamsker",
+      "remediation": "Give repo-core a method or Action for this transition and call it instead of writing the field."
+    },
+    {
+      "domain": "review",
+      "field": "commits",
+      "reason": "Legacy direct mutation at adoption (#209): review changes RepoTab.commits (owned by repo-core) at 1 sites, e.g. src/repo/pr_view/select.rs:174 (mut_call).",
+      "owner": "@JKamsker",
+      "remediation": "Give repo-core a method or Action for this transition and call it instead of writing the field."
+    },
+    {
+      "domain": "review",
+      "field": "compare",
+      "reason": "Legacy direct mutation at adoption (#209): review changes RepoTab.compare (owned by repo-core) at 4 sites, e.g. src/repo/forge_selection.rs:271 (write).",
+      "owner": "@JKamsker",
+      "remediation": "Give repo-core a method or Action for this transition and call it instead of writing the field."
+    },
+    {
+      "domain": "review",
+      "field": "compare_requests",
+      "reason": "Legacy direct mutation at adoption (#209): review changes RepoTab.compare_requests (owned by repo-core) at 1 sites, e.g. src/repo/pr_view/select.rs:75 (write).",
+      "owner": "@JKamsker",
+      "remediation": "Give repo-core a method or Action for this transition and call it instead of writing the field."
+    },
+    {
+      "domain": "review",
+      "field": "dialog",
+      "reason": "Legacy direct mutation at adoption (#209): review changes RepoTab.dialog (owned by repo-core) at 5 sites, e.g. src/repo/forge_selection.rs:284 (write).",
+      "owner": "@JKamsker",
+      "remediation": "Give repo-core a method or Action for this transition and call it instead of writing the field."
+    },
+    {
+      "domain": "review",
+      "field": "diff",
+      "reason": "Legacy direct mutation at adoption (#209): review changes RepoTab.diff (owned by repo-core) at 5 sites, e.g. src/repo/ci_view/mod.rs:137 (write).",
+      "owner": "@JKamsker",
+      "remediation": "Give repo-core a method or Action for this transition and call it instead of writing the field."
+    },
+    {
+      "domain": "review",
+      "field": "doctor",
+      "reason": "Legacy direct mutation at adoption (#209): review changes RepoTab.doctor (owned by doctor) at 1 sites, e.g. src/repo/pr_view/select.rs:35 (write).",
+      "owner": "@JKamsker",
+      "remediation": "Give doctor a method or Action for this transition and call it instead of writing the field."
+    },
+    {
+      "domain": "review",
+      "field": "dossier",
+      "reason": "Legacy direct mutation at adoption (#209): review changes RepoTab.dossier (owned by diff) at 2 sites, e.g. src/repo/review_workflow/continuous.rs:70 (write).",
+      "owner": "@JKamsker",
+      "remediation": "Give diff a method or Action for this transition and call it instead of writing the field."
+    },
+    {
+      "domain": "review",
+      "field": "file_comparison",
+      "reason": "Legacy direct mutation at adoption (#209): review changes RepoTab.file_comparison (owned by diff) at 2 sites, e.g. src/repo/review_workflow/continuous.rs:68 (write).",
+      "owner": "@JKamsker",
+      "remediation": "Give diff a method or Action for this transition and call it instead of writing the field."
+    },
+    {
+      "domain": "review",
+      "field": "file_view",
+      "reason": "Legacy direct mutation at adoption (#209): review changes RepoTab.file_view (owned by diff) at 4 sites, e.g. src/repo/ci_view/mod.rs:138 (write).",
+      "owner": "@JKamsker",
+      "remediation": "Give diff a method or Action for this transition and call it instead of writing the field."
+    },
+    {
+      "domain": "review",
+      "field": "finished",
+      "reason": "Legacy direct mutation at adoption (#209): review changes RepoTab.finished (owned by repo-core) at 1 sites, e.g. src/repo/pr_review/send.rs:193 (mut_call).",
+      "owner": "@JKamsker",
+      "remediation": "Give repo-core a method or Action for this transition and call it instead of writing the field."
+    },
+    {
+      "domain": "review",
+      "field": "forge_generation",
+      "reason": "Legacy direct mutation at adoption (#209): review changes RepoTab.forge_generation (owned by repo-core) at 1 sites, e.g. src/repo/forge_selection.rs:230 (write).",
+      "owner": "@JKamsker",
+      "remediation": "Give repo-core a method or Action for this transition and call it instead of writing the field."
+    },
+    {
+      "domain": "review",
+      "field": "forge_repository_generation",
+      "reason": "Legacy direct mutation at adoption (#209): review changes RepoTab.forge_repository_generation (owned by repo-core) at 1 sites, e.g. src/repo/forge_selection.rs:232 (write).",
+      "owner": "@JKamsker",
+      "remediation": "Give repo-core a method or Action for this transition and call it instead of writing the field."
+    },
+    {
+      "domain": "review",
+      "field": "hosting",
+      "reason": "Legacy direct mutation at adoption (#209): review changes RepoTab.hosting (owned by repo-core) at 1 sites, e.g. src/repo/forge_selection.rs:234 (write).",
+      "owner": "@JKamsker",
+      "remediation": "Give repo-core a method or Action for this transition and call it instead of writing the field."
+    },
+    {
+      "domain": "review",
+      "field": "hotfix",
+      "reason": "Legacy direct mutation at adoption (#209): review changes RepoTab.hotfix (owned by release) at 1 sites, e.g. src/repo/forge_selection.rs:267 (write).",
+      "owner": "@JKamsker",
+      "remediation": "Give release a method or Action for this transition and call it instead of writing the field."
+    },
+    {
+      "domain": "review",
+      "field": "last_op",
+      "reason": "Legacy direct mutation at adoption (#209): review changes RepoTab.last_op (owned by repo-core) at 6 sites, e.g. src/repo/forks/completion.rs:168 (write).",
+      "owner": "@JKamsker",
+      "remediation": "Give repo-core a method or Action for this transition and call it instead of writing the field."
+    },
+    {
+      "domain": "review",
+      "field": "nav_jump",
+      "reason": "Legacy direct mutation at adoption (#209): review changes RepoTab.nav_jump (owned by repo-core) at 1 sites, e.g. src/repo/pr_view/select.rs:39 (write).",
+      "owner": "@JKamsker",
+      "remediation": "Give repo-core a method or Action for this transition and call it instead of writing the field."
+    },
+    {
+      "domain": "review",
+      "field": "op_started",
+      "reason": "Legacy direct mutation at adoption (#209): review changes RepoTab.op_started (owned by repo-core) at 1 sites, e.g. src/repo/forks/completion.rs:100 (write).",
+      "owner": "@JKamsker",
+      "remediation": "Give repo-core a method or Action for this transition and call it instead of writing the field."
+    },
+    {
+      "domain": "review",
+      "field": "open_when_done",
+      "reason": "Legacy direct mutation at adoption (#209): review changes RepoTab.open_when_done (owned by repo-core) at 1 sites, e.g. src/repo/issue_work/mod.rs:300 (write).",
+      "owner": "@JKamsker",
+      "remediation": "Give repo-core a method or Action for this transition and call it instead of writing the field."
+    },
+    {
+      "domain": "review",
+      "field": "pending_goto",
+      "reason": "Legacy direct mutation at adoption (#209): review changes RepoTab.pending_goto (owned by repo-core) at 1 sites, e.g. src/repo/pr_view/select.rs:40 (write).",
+      "owner": "@JKamsker",
+      "remediation": "Give repo-core a method or Action for this transition and call it instead of writing the field."
+    },
+    {
+      "domain": "review",
+      "field": "pending_prs",
+      "reason": "Legacy direct mutation at adoption (#209): review changes RepoTab.pending_prs (owned by repo-core) at 1 sites, e.g. src/repo/forge_selection.rs:245 (write).",
+      "owner": "@JKamsker",
+      "remediation": "Give repo-core a method or Action for this transition and call it instead of writing the field."
+    },
+    {
+      "domain": "review",
+      "field": "pr_drafts",
+      "reason": "Legacy direct mutation at adoption (#209): review changes RepoTab.pr_drafts (owned by repo-core) at 12 sites, e.g. src/repo/forge_selection.rs:252 (mut_call).",
+      "owner": "@JKamsker",
+      "remediation": "Give repo-core a method or Action for this transition and call it instead of writing the field."
+    },
+    {
+      "domain": "review",
+      "field": "pr_error",
+      "reason": "Legacy direct mutation at adoption (#209): review changes RepoTab.pr_error (owned by repo-core) at 1 sites, e.g. src/repo/forge_selection.rs:246 (write).",
+      "owner": "@JKamsker",
+      "remediation": "Give repo-core a method or Action for this transition and call it instead of writing the field."
+    },
+    {
+      "domain": "review",
+      "field": "pr_graph_head",
+      "reason": "Legacy direct mutation at adoption (#209): review changes RepoTab.pr_graph_head (owned by repo-core) at 3 sites, e.g. src/repo/forge_selection.rs:262 (write).",
+      "owner": "@JKamsker",
+      "remediation": "Give repo-core a method or Action for this transition and call it instead of writing the field."
+    },
+    {
+      "domain": "review",
+      "field": "pr_requests",
+      "reason": "Legacy direct mutation at adoption (#209): review changes RepoTab.pr_requests (owned by repo-core) at 1 sites, e.g. src/repo/pr_view/mod.rs:133 (write).",
+      "owner": "@JKamsker",
+      "remediation": "Give repo-core a method or Action for this transition and call it instead of writing the field."
+    },
+    {
+      "domain": "review",
+      "field": "pr_selection_request",
+      "reason": "Legacy direct mutation at adoption (#209): review changes RepoTab.pr_selection_request (owned by repo-core) at 3 sites, e.g. src/repo/forge_selection.rs:269 (mut_call).",
+      "owner": "@JKamsker",
+      "remediation": "Give repo-core a method or Action for this transition and call it instead of writing the field."
+    },
+    {
+      "domain": "review",
+      "field": "preflight_after",
+      "reason": "Legacy direct mutation at adoption (#209): review changes RepoTab.preflight_after (owned by repo-core) at 1 sites, e.g. src/repo/forks/completion.rs:220 (write).",
+      "owner": "@JKamsker",
+      "remediation": "Give repo-core a method or Action for this transition and call it instead of writing the field."
+    },
+    {
+      "domain": "review",
+      "field": "prs",
+      "reason": "Legacy direct mutation at adoption (#209): review changes RepoTab.prs (owned by repo-core) at 1 sites, e.g. src/repo/forge_selection.rs:243 (mut_call).",
+      "owner": "@JKamsker",
+      "remediation": "Give repo-core a method or Action for this transition and call it instead of writing the field."
+    },
+    {
+      "domain": "review",
+      "field": "prs_loaded",
+      "reason": "Legacy direct mutation at adoption (#209): review changes RepoTab.prs_loaded (owned by repo-core) at 1 sites, e.g. src/repo/forge_selection.rs:247 (write).",
+      "owner": "@JKamsker",
+      "remediation": "Give repo-core a method or Action for this transition and call it instead of writing the field."
+    },
+    {
+      "domain": "review",
+      "field": "reload_again",
+      "reason": "Legacy direct mutation at adoption (#209): review changes RepoTab.reload_again (owned by repo-core) at 1 sites, e.g. src/repo/forge_selection.rs:186 (write).",
+      "owner": "@JKamsker",
+      "remediation": "Give repo-core a method or Action for this transition and call it instead of writing the field."
+    },
+    {
+      "domain": "review",
+      "field": "scroll_to",
+      "reason": "Legacy direct mutation at adoption (#209): review changes RepoTab.scroll_to (owned by repo-core) at 1 sites, e.g. src/repo/pr_view/select.rs:115 (write).",
+      "owner": "@JKamsker",
+      "remediation": "Give repo-core a method or Action for this transition and call it instead of writing the field."
+    },
+    {
+      "domain": "review",
+      "field": "selected",
+      "reason": "Legacy direct mutation at adoption (#209): review changes RepoTab.selected (owned by repo-core) at 2 sites, e.g. src/repo/pr_view/select.rs:114 (write).",
+      "owner": "@JKamsker",
+      "remediation": "Give repo-core a method or Action for this transition and call it instead of writing the field."
+    },
+    {
+      "domain": "review",
+      "field": "stacks",
+      "reason": "Legacy direct mutation at adoption (#209): review changes RepoTab.stacks (owned by rewrite) at 1 sites, e.g. src/repo/forge_selection.rs:281 (write).",
+      "owner": "@JKamsker",
+      "remediation": "Give rewrite a method or Action for this transition and call it instead of writing the field."
+    },
+    {
+      "domain": "review",
+      "field": "stash_view",
+      "reason": "Legacy direct mutation at adoption (#209): review changes RepoTab.stash_view (owned by repo-core) at 1 sites, e.g. src/repo/pr_view/select.rs:117 (write).",
+      "owner": "@JKamsker",
+      "remediation": "Give repo-core a method or Action for this transition and call it instead of writing the field."
+    },
+    {
+      "domain": "review",
+      "field": "status",
+      "reason": "Legacy direct mutation at adoption (#209): review changes RepoTab.status (owned by repo-core) at 34 sites, e.g. src/repo/ci_view/mod.rs:131 (write).",
+      "owner": "@JKamsker",
+      "remediation": "Give repo-core a method or Action for this transition and call it instead of writing the field."
+    },
+    {
+      "domain": "review",
+      "field": "symbols",
+      "reason": "Legacy direct mutation at adoption (#209): review changes RepoTab.symbols (owned by diff) at 2 sites, e.g. src/repo/review_workflow/continuous.rs:69 (write).",
+      "owner": "@JKamsker",
+      "remediation": "Give diff a method or Action for this transition and call it instead of writing the field."
+    },
+    {
+      "domain": "review",
+      "field": "timeline",
+      "reason": "Legacy direct mutation at adoption (#209): review changes RepoTab.timeline (owned by rewrite) at 1 sites, e.g. src/repo/dco/mod.rs:336 (mut_borrow).",
+      "owner": "@JKamsker",
+      "remediation": "Give rewrite a method or Action for this transition and call it instead of writing the field."
+    },
+    {
+      "domain": "review",
+      "field": "tour",
+      "reason": "Legacy direct mutation at adoption (#209): review changes RepoTab.tour (owned by guidance) at 2 sites, e.g. src/repo/ci_view/mod.rs:139 (write).",
+      "owner": "@JKamsker",
+      "remediation": "Give guidance a method or Action for this transition and call it instead of writing the field."
+    },
+    {
+      "domain": "review",
+      "field": "versions",
+      "reason": "Legacy direct mutation at adoption (#209): review changes RepoTab.versions (owned by release) at 4 sites, e.g. src/repo/forge_selection.rs:263 (mut_call).",
+      "owner": "@JKamsker",
+      "remediation": "Give release a method or Action for this transition and call it instead of writing the field."
+    },
+    {
+      "domain": "rewrite",
+      "field": "amend",
+      "reason": "Legacy direct mutation at adoption (#209): rewrite changes RepoTab.amend (owned by repo-core) at 1 sites, e.g. src/repo/fold/mod.rs:282 (write).",
+      "owner": "@JKamsker",
+      "remediation": "Give repo-core a method or Action for this transition and call it instead of writing the field."
+    },
+    {
+      "domain": "rewrite",
+      "field": "busy_op",
+      "reason": "Legacy direct mutation at adoption (#209): rewrite changes RepoTab.busy_op (owned by repo-core) at 13 sites, e.g. src/repo/bundles.rs:134 (write).",
+      "owner": "@JKamsker",
+      "remediation": "Give repo-core a method or Action for this transition and call it instead of writing the field."
+    },
+    {
+      "domain": "rewrite",
+      "field": "ci_view",
+      "reason": "Legacy direct mutation at adoption (#209): rewrite changes RepoTab.ci_view (owned by review) at 3 sites, e.g. src/repo/reflog/mod.rs:178 (write).",
+      "owner": "@JKamsker",
+      "remediation": "Give review a method or Action for this transition and call it instead of writing the field."
+    },
+    {
+      "domain": "rewrite",
+      "field": "commit_body",
+      "reason": "Legacy direct mutation at adoption (#209): rewrite changes RepoTab.commit_body (owned by repo-core) at 1 sites, e.g. src/repo/fold/mod.rs:281 (mut_call).",
+      "owner": "@JKamsker",
+      "remediation": "Give repo-core a method or Action for this transition and call it instead of writing the field."
+    },
+    {
+      "domain": "rewrite",
+      "field": "commit_summary",
+      "reason": "Legacy direct mutation at adoption (#209): rewrite changes RepoTab.commit_summary (owned by repo-core) at 1 sites, e.g. src/repo/fold/mod.rs:280 (mut_call).",
+      "owner": "@JKamsker",
+      "remediation": "Give repo-core a method or Action for this transition and call it instead of writing the field."
+    },
+    {
+      "domain": "rewrite",
+      "field": "compare",
+      "reason": "Legacy direct mutation at adoption (#209): rewrite changes RepoTab.compare (owned by repo-core) at 1 sites, e.g. src/repo/reflog/mod.rs:395 (write).",
+      "owner": "@JKamsker",
+      "remediation": "Give repo-core a method or Action for this transition and call it instead of writing the field."
+    },
+    {
+      "domain": "rewrite",
+      "field": "conflict",
+      "reason": "Legacy direct mutation at adoption (#209): rewrite changes RepoTab.conflict (owned by conflicts) at 1 sites, e.g. src/repo/rewrite.rs:214 (write).",
+      "owner": "@JKamsker",
+      "remediation": "Give conflicts a method or Action for this transition and call it instead of writing the field."
+    },
+    {
+      "domain": "rewrite",
+      "field": "detail",
+      "reason": "Legacy direct mutation at adoption (#209): rewrite changes RepoTab.detail (owned by repo-core) at 1 sites, e.g. src/repo/reflog/mod.rs:223 (write).",
+      "owner": "@JKamsker",
+      "remediation": "Give repo-core a method or Action for this transition and call it instead of writing the field."
+    },
+    {
+      "domain": "rewrite",
+      "field": "detail_hash",
+      "reason": "Legacy direct mutation at adoption (#209): rewrite changes RepoTab.detail_hash (owned by repo-core) at 1 sites, e.g. src/repo/reflog/mod.rs:224 (write).",
+      "owner": "@JKamsker",
+      "remediation": "Give repo-core a method or Action for this transition and call it instead of writing the field."
+    },
+    {
+      "domain": "rewrite",
+      "field": "dialog",
+      "reason": "Legacy direct mutation at adoption (#209): rewrite changes RepoTab.dialog (owned by repo-core) at 5 sites, e.g. src/repo/bundles.rs:12 (write).",
+      "owner": "@JKamsker",
+      "remediation": "Give repo-core a method or Action for this transition and call it instead of writing the field."
+    },
+    {
+      "domain": "rewrite",
+      "field": "diff",
+      "reason": "Legacy direct mutation at adoption (#209): rewrite changes RepoTab.diff (owned by repo-core) at 4 sites, e.g. src/repo/reflog/mod.rs:180 (write).",
+      "owner": "@JKamsker",
+      "remediation": "Give repo-core a method or Action for this transition and call it instead of writing the field."
+    },
+    {
+      "domain": "rewrite",
+      "field": "file_view",
+      "reason": "Legacy direct mutation at adoption (#209): rewrite changes RepoTab.file_view (owned by diff) at 4 sites, e.g. src/repo/reflog/mod.rs:179 (write).",
+      "owner": "@JKamsker",
+      "remediation": "Give diff a method or Action for this transition and call it instead of writing the field."
+    },
+    {
+      "domain": "rewrite",
+      "field": "finished",
+      "reason": "Legacy direct mutation at adoption (#209): rewrite changes RepoTab.finished (owned by repo-core) at 2 sites, e.g. src/repo/stack/publish.rs:181 (mut_call).",
+      "owner": "@JKamsker",
+      "remediation": "Give repo-core a method or Action for this transition and call it instead of writing the field."
+    },
+    {
+      "domain": "rewrite",
+      "field": "focus_wip",
+      "reason": "Legacy direct mutation at adoption (#209): rewrite changes RepoTab.focus_wip (owned by repo-core) at 1 sites, e.g. src/repo/stack/restack.rs:183 (write).",
+      "owner": "@JKamsker",
+      "remediation": "Give repo-core a method or Action for this transition and call it instead of writing the field."
+    },
+    {
+      "domain": "rewrite",
+      "field": "last_op",
+      "reason": "Legacy direct mutation at adoption (#209): rewrite changes RepoTab.last_op (owned by repo-core) at 3 sites, e.g. src/repo/bundles.rs:138 (write).",
+      "owner": "@JKamsker",
+      "remediation": "Give repo-core a method or Action for this transition and call it instead of writing the field."
+    },
+    {
+      "domain": "rewrite",
+      "field": "op_started",
+      "reason": "Legacy direct mutation at adoption (#209): rewrite changes RepoTab.op_started (owned by repo-core) at 9 sites, e.g. src/repo/bundles.rs:135 (write).",
+      "owner": "@JKamsker",
+      "remediation": "Give repo-core a method or Action for this transition and call it instead of writing the field."
+    },
+    {
+      "domain": "rewrite",
+      "field": "plain_rebase_request",
+      "reason": "Legacy direct mutation at adoption (#209): rewrite changes RepoTab.plain_rebase_request (owned by repo-core) at 1 sites, e.g. src/repo/rewrite.rs:234 (write).",
+      "owner": "@JKamsker",
+      "remediation": "Give repo-core a method or Action for this transition and call it instead of writing the field."
+    },
+    {
+      "domain": "rewrite",
+      "field": "prs_loaded",
+      "reason": "Legacy direct mutation at adoption (#209): rewrite changes RepoTab.prs_loaded (owned by repo-core) at 1 sites, e.g. src/repo/stack/publish.rs:187 (write).",
+      "owner": "@JKamsker",
+      "remediation": "Give repo-core a method or Action for this transition and call it instead of writing the field."
+    },
+    {
+      "domain": "rewrite",
+      "field": "queued",
+      "reason": "Legacy direct mutation at adoption (#209): rewrite changes RepoTab.queued (owned by repo-core) at 1 sites, e.g. src/repo/timeline/navigation.rs:98 (mut_call).",
+      "owner": "@JKamsker",
+      "remediation": "Give repo-core a method or Action for this transition and call it instead of writing the field."
+    },
+    {
+      "domain": "rewrite",
+      "field": "reword",
+      "reason": "Legacy direct mutation at adoption (#209): rewrite changes RepoTab.reword (owned by repo-core) at 3 sites, e.g. src/repo/quick_edit.rs:260 (write).",
+      "owner": "@JKamsker",
+      "remediation": "Give repo-core a method or Action for this transition and call it instead of writing the field."
+    },
+    {
+      "domain": "rewrite",
+      "field": "scroll_to",
+      "reason": "Legacy direct mutation at adoption (#209): rewrite changes RepoTab.scroll_to (owned by repo-core) at 2 sites, e.g. src/repo/reflog/mod.rs:220 (write).",
+      "owner": "@JKamsker",
+      "remediation": "Give repo-core a method or Action for this transition and call it instead of writing the field."
+    },
+    {
+      "domain": "rewrite",
+      "field": "selected",
+      "reason": "Legacy direct mutation at adoption (#209): rewrite changes RepoTab.selected (owned by repo-core) at 1 sites, e.g. src/repo/reflog/mod.rs:404 (write).",
+      "owner": "@JKamsker",
+      "remediation": "Give repo-core a method or Action for this transition and call it instead of writing the field."
+    },
+    {
+      "domain": "rewrite",
+      "field": "stash_view",
+      "reason": "Legacy direct mutation at adoption (#209): rewrite changes RepoTab.stash_view (owned by repo-core) at 1 sites, e.g. src/repo/reflog/mod.rs:397 (write).",
+      "owner": "@JKamsker",
+      "remediation": "Give repo-core a method or Action for this transition and call it instead of writing the field."
+    },
+    {
+      "domain": "rewrite",
+      "field": "status",
+      "reason": "Legacy direct mutation at adoption (#209): rewrite changes RepoTab.status (owned by repo-core) at 76 sites, e.g. src/repo/bundles.rs:69 (write).",
+      "owner": "@JKamsker",
+      "remediation": "Give repo-core a method or Action for this transition and call it instead of writing the field."
+    },
+    {
+      "domain": "rewrite",
+      "field": "timeline_error",
+      "reason": "Legacy direct mutation at adoption (#209): rewrite changes RepoTab.timeline_error (owned by repo-core) at 1 sites, e.g. src/repo/timeline/tab.rs:130 (write).",
+      "owner": "@JKamsker",
+      "remediation": "Give repo-core a method or Action for this transition and call it instead of writing the field."
+    },
+    {
+      "domain": "rewrite",
+      "field": "tour",
+      "reason": "Legacy direct mutation at adoption (#209): rewrite changes RepoTab.tour (owned by guidance) at 1 sites, e.g. src/repo/timeline/view.rs:88 (write).",
+      "owner": "@JKamsker",
+      "remediation": "Give guidance a method or Action for this transition and call it instead of writing the field."
+    },
+    {
+      "domain": "sidebar",
+      "field": "branch_filter",
+      "reason": "Legacy direct mutation at adoption (#209): sidebar changes RepoTab.branch_filter (owned by repo-core) at 1 sites, e.g. src/repo/sidebar/mod.rs:48 (mut_borrow).",
+      "owner": "@JKamsker",
+      "remediation": "Give repo-core a method or Action for this transition and call it instead of writing the field."
+    },
+    {
+      "domain": "sidebar",
+      "field": "dialog",
+      "reason": "Legacy direct mutation at adoption (#209): sidebar changes RepoTab.dialog (owned by repo-core) at 1 sites, e.g. src/repo/branch_cleanup.rs:92 (write).",
+      "owner": "@JKamsker",
+      "remediation": "Give repo-core a method or Action for this transition and call it instead of writing the field."
+    },
+    {
+      "domain": "sidebar",
+      "field": "focus_branch_filter",
+      "reason": "Legacy direct mutation at adoption (#209): sidebar changes RepoTab.focus_branch_filter (owned by repo-core) at 1 sites, e.g. src/repo/sidebar/mod.rs:53 (mut_borrow).",
+      "owner": "@JKamsker",
+      "remediation": "Give repo-core a method or Action for this transition and call it instead of writing the field."
+    },
+    {
+      "domain": "sidebar",
+      "field": "open_request",
+      "reason": "Legacy direct mutation at adoption (#209): sidebar changes RepoTab.open_request (owned by repo-core) at 1 sites, e.g. src/repo/sidebar/pull_requests/worktrees.rs:96 (write).",
+      "owner": "@JKamsker",
+      "remediation": "Give repo-core a method or Action for this transition and call it instead of writing the field."
+    },
+    {
+      "domain": "sidebar",
+      "field": "open_when_done",
+      "reason": "Legacy direct mutation at adoption (#209): sidebar changes RepoTab.open_when_done (owned by repo-core) at 1 sites, e.g. src/repo/sidebar/pull_requests/worktrees.rs:106 (write).",
+      "owner": "@JKamsker",
+      "remediation": "Give repo-core a method or Action for this transition and call it instead of writing the field."
+    },
+    {
+      "domain": "sidebar",
+      "field": "pending_prs",
+      "reason": "Legacy direct mutation at adoption (#209): sidebar changes RepoTab.pending_prs (owned by repo-core) at 3 sites, e.g. src/repo/sidebar/pull_requests.rs:154 (write).",
+      "owner": "@JKamsker",
+      "remediation": "Give repo-core a method or Action for this transition and call it instead of writing the field."
+    },
+    {
+      "domain": "sidebar",
+      "field": "pr_error",
+      "reason": "Legacy direct mutation at adoption (#209): sidebar changes RepoTab.pr_error (owned by repo-core) at 1 sites, e.g. src/repo/sidebar/pull_requests.rs:143 (write).",
+      "owner": "@JKamsker",
+      "remediation": "Give repo-core a method or Action for this transition and call it instead of writing the field."
+    },
+    {
+      "domain": "sidebar",
+      "field": "prs",
+      "reason": "Legacy direct mutation at adoption (#209): sidebar changes RepoTab.prs (owned by repo-core) at 2 sites, e.g. src/repo/sidebar/pull_requests.rs:168 (write).",
+      "owner": "@JKamsker",
+      "remediation": "Give repo-core a method or Action for this transition and call it instead of writing the field."
+    },
+    {
+      "domain": "sidebar",
+      "field": "prs_from_cache",
+      "reason": "Legacy direct mutation at adoption (#209): sidebar changes RepoTab.prs_from_cache (owned by repo-core) at 2 sites, e.g. src/repo/sidebar/pull_requests.rs:169 (write).",
+      "owner": "@JKamsker",
+      "remediation": "Give repo-core a method or Action for this transition and call it instead of writing the field."
+    },
+    {
+      "domain": "sidebar",
+      "field": "sidebar_jump",
+      "reason": "Legacy direct mutation at adoption (#209): sidebar changes RepoTab.sidebar_jump (owned by repo-core) at 2 sites, e.g. src/repo/sidebar/mod.rs:66 (mut_call).",
+      "owner": "@JKamsker",
+      "remediation": "Give repo-core a method or Action for this transition and call it instead of writing the field."
+    },
+    {
+      "domain": "sidebar",
+      "field": "sidebar_reveal",
+      "reason": "Legacy direct mutation at adoption (#209): sidebar changes RepoTab.sidebar_reveal (owned by repo-core) at 2 sites, e.g. src/repo/sidebar/mod.rs:69 (mut_call).",
+      "owner": "@JKamsker",
+      "remediation": "Give repo-core a method or Action for this transition and call it instead of writing the field."
+    },
+    {
+      "domain": "sidebar",
+      "field": "status",
+      "reason": "Legacy direct mutation at adoption (#209): sidebar changes RepoTab.status (owned by repo-core) at 2 sites, e.g. src/repo/sidebar/pull_requests/worktrees.rs:78 (write).",
+      "owner": "@JKamsker",
+      "remediation": "Give repo-core a method or Action for this transition and call it instead of writing the field."
+    },
+    {
+      "domain": "sync",
+      "field": "avatars_hinted",
+      "reason": "Legacy direct mutation at adoption (#209): sync changes RepoTab.avatars_hinted (owned by repo-core) at 1 sites, e.g. src/repo/offline.rs:131 (write).",
+      "owner": "@JKamsker",
+      "remediation": "Give repo-core a method or Action for this transition and call it instead of writing the field."
+    },
+    {
+      "domain": "sync",
+      "field": "busy_op",
+      "reason": "Legacy direct mutation at adoption (#209): sync changes RepoTab.busy_op (owned by repo-core) at 5 sites, e.g. src/repo/push/completion.rs:132 (write).",
+      "owner": "@JKamsker",
+      "remediation": "Give repo-core a method or Action for this transition and call it instead of writing the field."
+    },
+    {
+      "domain": "sync",
+      "field": "dialog",
+      "reason": "Legacy direct mutation at adoption (#209): sync changes RepoTab.dialog (owned by repo-core) at 8 sites, e.g. src/repo/https_recovery.rs:56 (write).",
+      "owner": "@JKamsker",
+      "remediation": "Give repo-core a method or Action for this transition and call it instead of writing the field."
+    },
+    {
+      "domain": "sync",
+      "field": "fetch_time_asked",
+      "reason": "Legacy direct mutation at adoption (#209): sync changes RepoTab.fetch_time_asked (owned by repo-core) at 1 sites, e.g. src/repo/offline.rs:138 (write).",
+      "owner": "@JKamsker",
+      "remediation": "Give repo-core a method or Action for this transition and call it instead of writing the field."
+    },
+    {
+      "domain": "sync",
+      "field": "finished",
+      "reason": "Legacy direct mutation at adoption (#209): sync changes RepoTab.finished (owned by repo-core) at 1 sites, e.g. src/repo/https_recovery.rs:133 (mut_call).",
+      "owner": "@JKamsker",
+      "remediation": "Give repo-core a method or Action for this transition and call it instead of writing the field."
+    },
+    {
+      "domain": "sync",
+      "field": "https_checking",
+      "reason": "Legacy direct mutation at adoption (#209): sync changes RepoTab.https_checking (owned by repo-core) at 1 sites, e.g. src/repo/https_recovery.rs:54 (write).",
+      "owner": "@JKamsker",
+      "remediation": "Give repo-core a method or Action for this transition and call it instead of writing the field."
+    },
+    {
+      "domain": "sync",
+      "field": "https_generation",
+      "reason": "Legacy direct mutation at adoption (#209): sync changes RepoTab.https_generation (owned by repo-core) at 1 sites, e.g. src/repo/https_recovery.rs:52 (write).",
+      "owner": "@JKamsker",
+      "remediation": "Give repo-core a method or Action for this transition and call it instead of writing the field."
+    },
+    {
+      "domain": "sync",
+      "field": "network_paused",
+      "reason": "Legacy direct mutation at adoption (#209): sync changes RepoTab.network_paused (owned by repo-core) at 1 sites, e.g. src/repo/offline.rs:129 (mut_borrow).",
+      "owner": "@JKamsker",
+      "remediation": "Give repo-core a method or Action for this transition and call it instead of writing the field."
+    },
+    {
+      "domain": "sync",
+      "field": "preflight_pending",
+      "reason": "Legacy direct mutation at adoption (#209): sync changes RepoTab.preflight_pending (owned by repo-core) at 1 sites, e.g. src/repo/push_preflight.rs:135 (mut_call).",
+      "owner": "@JKamsker",
+      "remediation": "Give repo-core a method or Action for this transition and call it instead of writing the field."
+    },
+    {
+      "domain": "sync",
+      "field": "preflight_selection",
+      "reason": "Legacy direct mutation at adoption (#209): sync changes RepoTab.preflight_selection (owned by repo-core) at 2 sites, e.g. src/repo/push_preflight.rs:41 (mut_call).",
+      "owner": "@JKamsker",
+      "remediation": "Give repo-core a method or Action for this transition and call it instead of writing the field."
+    },
+    {
+      "domain": "sync",
+      "field": "preflight_timeline",
+      "reason": "Legacy direct mutation at adoption (#209): sync changes RepoTab.preflight_timeline (owned by repo-core) at 1 sites, e.g. src/repo/push_preflight.rs:142 (write).",
+      "owner": "@JKamsker",
+      "remediation": "Give repo-core a method or Action for this transition and call it instead of writing the field."
+    },
+    {
+      "domain": "sync",
+      "field": "prs_loaded",
+      "reason": "Legacy direct mutation at adoption (#209): sync changes RepoTab.prs_loaded (owned by repo-core) at 1 sites, e.g. src/repo/offline.rs:132 (write).",
+      "owner": "@JKamsker",
+      "remediation": "Give repo-core a method or Action for this transition and call it instead of writing the field."
+    },
+    {
+      "domain": "sync",
+      "field": "status",
+      "reason": "Legacy direct mutation at adoption (#209): sync changes RepoTab.status (owned by repo-core) at 21 sites, e.g. src/repo/https_recovery.rs:26 (write).",
+      "owner": "@JKamsker",
+      "remediation": "Give repo-core a method or Action for this transition and call it instead of writing the field."
+    },
+    {
+      "domain": "terminal",
+      "field": "busy_op",
+      "reason": "Legacy direct mutation at adoption (#209): terminal changes RepoTab.busy_op (owned by repo-core) at 3 sites, e.g. src/repo/devcontainer/mod.rs:184 (write).",
+      "owner": "@JKamsker",
+      "remediation": "Give repo-core a method or Action for this transition and call it instead of writing the field."
+    },
+    {
+      "domain": "terminal",
+      "field": "dialog",
+      "reason": "Legacy direct mutation at adoption (#209): terminal changes RepoTab.dialog (owned by repo-core) at 2 sites, e.g. src/repo/custom_commands/mod.rs:291 (write).",
+      "owner": "@JKamsker",
+      "remediation": "Give repo-core a method or Action for this transition and call it instead of writing the field."
+    },
+    {
+      "domain": "terminal",
+      "field": "finished",
+      "reason": "Legacy direct mutation at adoption (#209): terminal changes RepoTab.finished (owned by repo-core) at 3 sites, e.g. src/repo/custom_commands/mod.rs:319 (mut_call).",
+      "owner": "@JKamsker",
+      "remediation": "Give repo-core a method or Action for this transition and call it instead of writing the field."
+    },
+    {
+      "domain": "terminal",
+      "field": "status",
+      "reason": "Legacy direct mutation at adoption (#209): terminal changes RepoTab.status (owned by repo-core) at 2 sites, e.g. src/repo/custom_commands/run.rs:18 (write).",
+      "owner": "@JKamsker",
+      "remediation": "Give repo-core a method or Action for this transition and call it instead of writing the field."
+    },
+    {
+      "domain": "worktrees",
+      "field": "finished",
+      "reason": "Legacy direct mutation at adoption (#209): worktrees changes RepoTab.finished (owned by repo-core) at 1 sites, e.g. src/repo/worktree_tab/mod.rs:260 (mut_call).",
+      "owner": "@JKamsker",
+      "remediation": "Give repo-core a method or Action for this transition and call it instead of writing the field."
+    },
+    {
+      "domain": "worktrees",
+      "field": "parked",
+      "reason": "Legacy direct mutation at adoption (#209): worktrees changes RepoTab.parked (owned by repo-core) at 10 sites, e.g. src/repo/worktree_tab/mod.rs:190 (mut_call).",
+      "owner": "@JKamsker",
+      "remediation": "Give repo-core a method or Action for this transition and call it instead of writing the field."
+    },
+    {
+      "domain": "worktrees",
+      "field": "parked_status",
+      "reason": "Legacy direct mutation at adoption (#209): worktrees changes RepoTab.parked_status (owned by repo-core) at 1 sites, e.g. src/repo/worktree_tab/mod.rs:265 (write).",
+      "owner": "@JKamsker",
+      "remediation": "Give repo-core a method or Action for this transition and call it instead of writing the field."
+    },
+    {
+      "domain": "worktrees",
+      "field": "prs",
+      "reason": "Legacy direct mutation at adoption (#209): worktrees changes RepoTab.prs (owned by repo-core) at 1 sites, e.g. src/repo/worktree_tab/mod.rs:234 (write).",
+      "owner": "@JKamsker",
+      "remediation": "Give repo-core a method or Action for this transition and call it instead of writing the field."
+    },
+    {
+      "domain": "worktrees",
+      "field": "scroll_to",
+      "reason": "Legacy direct mutation at adoption (#209): worktrees changes RepoTab.scroll_to (owned by repo-core) at 1 sites, e.g. src/repo/worktree_tab/mod.rs:247 (write).",
+      "owner": "@JKamsker",
+      "remediation": "Give repo-core a method or Action for this transition and call it instead of writing the field."
+    },
+    {
+      "domain": "worktrees",
+      "field": "terminals",
+      "reason": "Legacy direct mutation at adoption (#209): worktrees changes RepoTab.terminals (owned by terminal) at 1 sites, e.g. src/repo/worktree_tab/mod.rs:172 (mut_call).",
+      "owner": "@JKamsker",
+      "remediation": "Give terminal a method or Action for this transition and call it instead of writing the field."
+    },
+    {
+      "domain": "worktrees",
+      "field": "worktrees",
+      "reason": "Legacy direct mutation at adoption (#209): worktrees changes RepoTab.worktrees (owned by repo-core) at 1 sites, e.g. src/repo/worktree_tab/mod.rs:218 (write).",
+      "owner": "@JKamsker",
+      "remediation": "Give repo-core a method or Action for this transition and call it instead of writing the field."
+    }
+  ],
+  "reexports": [
+    {
+      "module": "gitcraft::agent::sh",
+      "path": "crate::remote::sh_quote",
+      "target_domain": "remote",
+      "reason": "Legacy cross-domain re-export at adoption (#209) of crate::remote::sh_quote from remote.",
+      "owner": "@JKamsker",
+      "remediation": "Import from remote where it is used and make this `use` private."
+    },
+    {
+      "module": "gitcraft::app::clone::fields",
+      "path": "crate::a11y::singleline_enter",
+      "target_domain": "ui-kit",
+      "reason": "Legacy cross-domain re-export at adoption (#209) of crate::a11y::singleline_enter from ui-kit.",
+      "owner": "@JKamsker",
+      "remediation": "Import from ui-kit where it is used and make this `use` private."
+    },
+    {
+      "module": "gitcraft::app::lifecycle",
+      "path": "crate::instance::Start",
+      "target_domain": "os",
+      "reason": "Legacy cross-domain re-export at adoption (#209) of crate::instance::Start from os.",
+      "owner": "@JKamsker",
+      "remediation": "Import from os where it is used and make this `use` private."
+    },
+    {
+      "module": "gitcraft::repo",
+      "path": "drafts::DraftShape",
+      "target_domain": "changes",
+      "reason": "Legacy cross-domain re-export at adoption (#209) of drafts::DraftShape from changes.",
+      "owner": "@JKamsker",
+      "remediation": "Import from changes where it is used and make this `use` private."
+    },
+    {
+      "module": "gitcraft::repo",
+      "path": "test_lane::TEST_LANE_TIP",
+      "target_domain": "bisect",
+      "reason": "Legacy cross-domain re-export at adoption (#209) of test_lane::TEST_LANE_TIP from bisect.",
+      "owner": "@JKamsker",
+      "remediation": "Import from bisect where it is used and make this `use` private."
+    },
+    {
+      "module": "gitcraft::repo::parallel_bisect",
+      "path": "crate::repo::dialogs::ParallelForm",
+      "target_domain": "repo-core",
+      "reason": "Legacy cross-domain re-export at adoption (#209) of crate::repo::dialogs::ParallelForm from repo-core.",
+      "owner": "@JKamsker",
+      "remediation": "Import from repo-core where it is used and make this `use` private."
+    },
+    {
+      "module": "gitcraft::repo::state",
+      "path": "super::commit_search::Search",
+      "target_domain": "graph",
+      "reason": "Legacy cross-domain re-export at adoption (#209) of super::commit_search::Search from graph.",
+      "owner": "@JKamsker",
+      "remediation": "Import from graph where it is used and make this `use` private."
+    },
+    {
+      "module": "gitcraft::repo::widgets",
+      "path": "crate::a11y::a11y",
+      "target_domain": "ui-kit",
+      "reason": "Legacy cross-domain re-export at adoption (#209) of crate::a11y::a11y from ui-kit.",
+      "owner": "@JKamsker",
+      "remediation": "Import from ui-kit where it is used and make this `use` private."
+    },
+    {
+      "module": "gitcraft::repo::widgets",
+      "path": "crate::a11y::a11y_selected",
+      "target_domain": "ui-kit",
+      "reason": "Legacy cross-domain re-export at adoption (#209) of crate::a11y::a11y_selected from ui-kit.",
+      "owner": "@JKamsker",
+      "remediation": "Import from ui-kit where it is used and make this `use` private."
+    }
+  ],
+  "budgets": {
+    "agents": {
+      "domains": 18,
+      "exported": 200
+    },
+    "app": {
+      "domains": 17,
+      "exported": 58
+    },
+    "bisect": {
+      "domains": 10,
+      "exported": 46
+    },
+    "changes": {
+      "domains": 14,
+      "exported": 88
+    },
+    "conflicts": {
+      "domains": 11,
+      "exported": 88
+    },
+    "dev": {
+      "domains": 0,
+      "exported": 0
+    },
+    "diff": {
+      "domains": 11,
+      "exported": 90
+    },
+    "doctor": {
+      "domains": 8,
+      "exported": 34
+    },
+    "forge": {
+      "domains": 5,
+      "exported": 165
+    },
+    "git": {
+      "domains": 12,
+      "exported": 375
+    },
+    "graph": {
+      "domains": 18,
+      "exported": 52
+    },
+    "guidance": {
+      "domains": 8,
+      "exported": 44
+    },
+    "insights": {
+      "domains": 15,
+      "exported": 293
+    },
+    "os": {
+      "domains": 4,
+      "exported": 26
+    },
+    "release": {
+      "domains": 9,
+      "exported": 55
+    },
+    "remote": {
+      "domains": 6,
+      "exported": 69
+    },
+    "repo-core": {
+      "domains": 24,
+      "symbols": 608,
+      "exported": 91
+    },
+    "review": {
+      "domains": 15,
+      "exported": 71
+    },
+    "rewrite": {
+      "domains": 14,
+      "exported": 89
+    },
+    "runtime": {
+      "domains": 5,
+      "exported": 101
+    },
+    "settings": {
+      "domains": 15,
+      "symbols": 179,
+      "exported": 34
+    },
+    "sidebar": {
+      "domains": 19,
+      "exported": 31
+    },
+    "sync": {
+      "domains": 13,
+      "exported": 27
+    },
+    "terminal": {
+      "domains": 9,
+      "exported": 23
+    },
+    "tooling": {
+      "domains": 0,
+      "exported": 0
+    },
+    "ui-kit": {
+      "domains": 4,
+      "exported": 98
+    },
+    "update": {
+      "domains": 2,
+      "exported": 10
+    },
+    "worktrees": {
+      "domains": 5,
+      "exported": 52
+    }
+  }
+}

@@ -35,5 +35,7 @@ any action by name.
 - [Development](development.md): building, testing (also against real forges and machines),
   headless screenshots, releases.
 - [Code layout](code-layout.md): where things live in `src/`.
+- [Architecture boundaries](architecture-boundaries.md): feature domains, allowed dependency
+  directions, `RepoTab` state ownership and the CI fitness checks.
 - [CPU performance](cpu-performance.md), [workflow suite](cpu-workflows.md),
   [process orchestration](process-orchestration.md): measurements and how to reproduce them.

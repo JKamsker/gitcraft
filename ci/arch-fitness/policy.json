@@ -1,0 +1,584 @@
+{
+  "schema": 1,
+  "version": "2026-11-13.1",
+  "crates": [
+    {
+      "name": "gitcraft",
+      "root": "src/lib.rs",
+      "externs": {
+        "gitcraft_os": "gitcraft_os"
+      },
+      "cfg": {
+        "recovery_recording": false
+      }
+    },
+    {
+      "name": "gitcraft_bin",
+      "root": "src/main.rs",
+      "externs": {
+        "gitcraft": "gitcraft",
+        "gitcraft_os": "gitcraft_os"
+      },
+      "domain": "app"
+    },
+    {
+      "name": "gitcraft_os",
+      "root": "crates/gitcraft-os/src/lib.rs",
+      "domain": "os"
+    },
+    {
+      "name": "build",
+      "root": "build.rs",
+      "test": true,
+      "domain": "dev"
+    },
+    {
+      "name": "os_build",
+      "root": "crates/gitcraft-os/build.rs",
+      "test": true,
+      "domain": "dev"
+    },
+    {
+      "name": "test",
+      "root": "tests/*.rs",
+      "externs": {
+        "gitcraft": "gitcraft"
+      },
+      "test": true,
+      "domain": "dev"
+    },
+    {
+      "name": "example",
+      "root": "examples/*.rs",
+      "externs": {
+        "gitcraft": "gitcraft"
+      },
+      "test": true,
+      "domain": "dev"
+    },
+    {
+      "name": "recovery",
+      "root": "src/resolver/park/checks/lib.rs",
+      "test": true,
+      "cfg": {
+        "recovery_recording": true
+      },
+      "domain": "dev"
+    },
+    {
+      "name": "arch_fitness",
+      "root": "ci/arch-fitness/src/lib.rs",
+      "test": true,
+      "domain": "tooling"
+    },
+    {
+      "name": "arch_fitness_bin",
+      "root": "ci/arch-fitness/src/main.rs",
+      "externs": {
+        "gitcraft_arch_fitness": "arch_fitness"
+      },
+      "test": true,
+      "domain": "tooling"
+    },
+    {
+      "name": "arch_fitness_test",
+      "root": "ci/arch-fitness/tests/*.rs",
+      "externs": {
+        "gitcraft_arch_fitness": "arch_fitness"
+      },
+      "test": true,
+      "domain": "tooling"
+    }
+  ],
+  "ignored_files": [
+    {
+      "path": "src/repo/repository_tools/lifetime_checks.rs",
+      "reason": "compiled only by src/repo/repository_tools/pure_checks.py through a #[path] module it writes"
+    }
+  ],
+  "layers": [
+    {
+      "name": "platform",
+      "peers": true,
+      "description": "Operating system, processes, workers and file access; no product concepts."
+    },
+    {
+      "name": "presentation",
+      "peers": true,
+      "description": "Reusable presentation without repository state."
+    },
+    {
+      "name": "services",
+      "peers": true,
+      "description": "Git, forges, remotes and settings: capabilities features use; no feature UI."
+    },
+    {
+      "name": "features",
+      "peers": false,
+      "description": "Product features. A feature may not depend on another feature unless an allowed edge says so."
+    },
+    {
+      "name": "coordinator",
+      "peers": false,
+      "description": "RepoTab: composes feature state and dispatches Actions."
+    },
+    {
+      "name": "shell",
+      "peers": true,
+      "description": "The application window, entry points and dev harnesses."
+    }
+  ],
+  "domains": {
+    "runtime": {
+      "layer": "platform",
+      "owner": "@JKamsker",
+      "description": "Process event loop, bounded workers, timing, safe file reads, PATH, network policy, portable mode, catalogs, sound, diagnostics and secret scrubbing.",
+      "modules": [
+        "gitcraft::processes",
+        "gitcraft::tasks",
+        "gitcraft::timing",
+        "gitcraft::safe_read",
+        "gitcraft::shell_path",
+        "gitcraft::network",
+        "gitcraft::portable",
+        "gitcraft::i18n",
+        "gitcraft::audio",
+        "gitcraft::diagnostics"
+      ]
+    },
+    "os": {
+      "layer": "platform",
+      "owner": "@JKamsker",
+      "description": "The gitcraft-os crate and OS shell integration: taskbar, single instance, desktop/Finder/Nautilus entries.",
+      "modules": [
+        "gitcraft::os_shell",
+        "gitcraft::instance",
+        "gitcraft::desktop_entry",
+        "gitcraft::finder_actions",
+        "gitcraft::nautilus_scripts"
+      ]
+    },
+    "ui-kit": {
+      "layer": "presentation",
+      "owner": "@JKamsker",
+      "description": "Shared presentation: theme tokens, icons, widgets without product state, accessibility, key list.",
+      "modules": [
+        "gitcraft::theme",
+        "gitcraft::icons",
+        "gitcraft::spinner",
+        "gitcraft::menu_item",
+        "gitcraft::a11y",
+        "gitcraft::glossary",
+        "gitcraft::svg",
+        "gitcraft::image_cache",
+        "gitcraft::image_fit",
+        "gitcraft::vscode_theme",
+        "gitcraft::tab_look",
+        "gitcraft::keymap",
+        "gitcraft::operation_labels"
+      ]
+    },
+    "git": {
+      "layer": "services",
+      "owner": "@JKamsker",
+      "description": "Typed Git operations, graph lane layout and merge drivers.",
+      "modules": [
+        "gitcraft::git",
+        "gitcraft::graph",
+        "gitcraft::mergiraf"
+      ]
+    },
+    "forge": {
+      "layer": "services",
+      "owner": "@JKamsker",
+      "description": "Forge APIs (GitHub, GitLab, Forgejo, Gitea, Gerrit), pull requests, CI runs, issue trackers, avatars, CODEOWNERS.",
+      "modules": [
+        "gitcraft::forge",
+        "gitcraft::pull_request",
+        "gitcraft::pr_post",
+        "gitcraft::pr_threads",
+        "gitcraft::ci",
+        "gitcraft::gerrit",
+        "gitcraft::trackers",
+        "gitcraft::avatars",
+        "gitcraft::codeowners"
+      ]
+    },
+    "remote": {
+      "layer": "services",
+      "owner": "@JKamsker",
+      "description": "Repositories on other machines (WSL, SSH) and connection profiles.",
+      "modules": [
+        "gitcraft::remote",
+        "gitcraft::folder_browser",
+        "gitcraft::connections",
+        "gitcraft::connection_doctor"
+      ]
+    },
+    "settings": {
+      "layer": "services",
+      "owner": "@JKamsker",
+      "description": "User settings, the settings window, the portable setup file and persisted drafts.",
+      "modules": [
+        "gitcraft::settings",
+        "gitcraft::portability",
+        "gitcraft::drafts"
+      ]
+    },
+    "agents": {
+      "layer": "features",
+      "owner": "@JKamsker",
+      "description": "Coding agents: worktree tasks, the MCP server, AI commit messages, authorship, collisions, drift and the agent fence.",
+      "modules": [
+        "gitcraft::agent",
+        "gitcraft::ai",
+        "gitcraft::authorship",
+        "gitcraft::collision",
+        "gitcraft::drift",
+        "gitcraft::fence",
+        "gitcraft::mcp",
+        "gitcraft::repo::agent",
+        "gitcraft::repo::agents",
+        "gitcraft::repo::bakeoff",
+        "gitcraft::repo::ai",
+        "gitcraft::repo::authorship_view",
+        "gitcraft::repo::collision_view",
+        "gitcraft::repo::drift_view",
+        "gitcraft::repo::fence_view"
+      ]
+    },
+    "conflicts": {
+      "layer": "features",
+      "owner": "@JKamsker",
+      "description": "Conflict editing, conflict prediction, agent resolution, remerge diffs and rehearsals.",
+      "modules": [
+        "gitcraft::resolver",
+        "gitcraft::repo::conflict",
+        "gitcraft::repo::conflict_check",
+        "gitcraft::repo::resolver",
+        "gitcraft::repo::remerge",
+        "gitcraft::repo::rehearse",
+        "gitcraft::repo::external_tools"
+      ]
+    },
+    "terminal": {
+      "layer": "features",
+      "owner": "@JKamsker",
+      "description": "The integrated terminal, custom commands and per-worktree environments.",
+      "modules": [
+        "gitcraft::terminal",
+        "gitcraft::custom_commands",
+        "gitcraft::repo::terminals",
+        "gitcraft::repo::custom_commands",
+        "gitcraft::repo::devcontainer"
+      ]
+    },
+    "review": {
+      "layer": "features",
+      "owner": "@JKamsker",
+      "description": "Pull requests, reviews and CI in the tab, forge links, forks, DCO, issues and CODEOWNERS views.",
+      "modules": [
+        "gitcraft::repo::pr_view",
+        "gitcraft::repo::pr_review",
+        "gitcraft::repo::pr_merge",
+        "gitcraft::repo::ci_view",
+        "gitcraft::repo::ci_status",
+        "gitcraft::repo::forge_selection",
+        "gitcraft::repo::forge_link",
+        "gitcraft::repo::forks",
+        "gitcraft::repo::gerrit",
+        "gitcraft::repo::dco",
+        "gitcraft::repo::issue_work",
+        "gitcraft::repo::review_workflow",
+        "gitcraft::repo::owners"
+      ]
+    },
+    "sync": {
+      "layer": "features",
+      "owner": "@JKamsker",
+      "description": "Push, pull and their preflight, sign-in recovery, SSH setup, offline mode and remote watching.",
+      "modules": [
+        "gitcraft::push_preflight",
+        "gitcraft::repo::push",
+        "gitcraft::repo::pull",
+        "gitcraft::repo::push_preflight",
+        "gitcraft::repo::https_recovery",
+        "gitcraft::repo::ssh_setup",
+        "gitcraft::repo::offline",
+        "gitcraft::repo::watch_remote",
+        "gitcraft::repo::sparse"
+      ]
+    },
+    "graph": {
+      "layer": "features",
+      "owner": "@JKamsker",
+      "description": "The commit graph and its history reading, ordering, filters, search, saved views and bands.",
+      "modules": [
+        "gitcraft::repo::graph_view",
+        "gitcraft::repo::graph_motion",
+        "gitcraft::repo::graph_order",
+        "gitcraft::repo::graph_walk",
+        "gitcraft::repo::branch_bands",
+        "gitcraft::repo::branch_visibility",
+        "gitcraft::repo::columns",
+        "gitcraft::repo::history_reader",
+        "gitcraft::repo::history_filter",
+        "gitcraft::repo::history_activity",
+        "gitcraft::repo::commit_search",
+        "gitcraft::repo::saved_views",
+        "gitcraft::repo::cochanges",
+        "gitcraft::repo::snapshot"
+      ]
+    },
+    "changes": {
+      "layer": "features",
+      "owner": "@JKamsker",
+      "description": "The commit detail pane: working tree, staging, the commit box, partial stashes, LFS, Unity, recovery.",
+      "modules": [
+        "gitcraft::repo::detail",
+        "gitcraft::repo::detail_cache",
+        "gitcraft::repo::commit_changes",
+        "gitcraft::repo::commit_actions",
+        "gitcraft::repo::drafts",
+        "gitcraft::repo::working_drafts",
+        "gitcraft::repo::partial_stash",
+        "gitcraft::repo::hooks",
+        "gitcraft::repo::keep_submodules",
+        "gitcraft::repo::lfs_locks",
+        "gitcraft::repo::lfs_storage",
+        "gitcraft::repo::unity",
+        "gitcraft::repo::content_recovery",
+        "gitcraft::repo::checkout_blocked",
+        "gitcraft::repo::detached",
+        "gitcraft::repo::revert_piece"
+      ]
+    },
+    "diff": {
+      "layer": "features",
+      "owner": "@JKamsker",
+      "description": "Diffs, file views and comparisons, find, folding, highlighting, line dossiers, symbol history, weakened checks.",
+      "modules": [
+        "gitcraft::weakened",
+        "gitcraft::repo::diff",
+        "gitcraft::repo::diff_split",
+        "gitcraft::repo::file_view",
+        "gitcraft::repo::file_text",
+        "gitcraft::repo::file_comparison",
+        "gitcraft::repo::find",
+        "gitcraft::repo::folding",
+        "gitcraft::repo::highlight",
+        "gitcraft::repo::line_dossier",
+        "gitcraft::repo::symbol_biography",
+        "gitcraft::repo::weakened_marks"
+      ]
+    },
+    "rewrite": {
+      "layer": "features",
+      "owner": "@JKamsker",
+      "description": "History rewriting: interactive rebase, surgery, stacks, fold, quick edit, drag and drop, ghost runs, timeline/undo, reflog, patches.",
+      "modules": [
+        "gitcraft::repo::rebase",
+        "gitcraft::repo::rewrite",
+        "gitcraft::repo::surgery",
+        "gitcraft::repo::stack",
+        "gitcraft::repo::fold",
+        "gitcraft::repo::quick_edit",
+        "gitcraft::repo::drag_drop",
+        "gitcraft::repo::ghost",
+        "gitcraft::repo::timeline",
+        "gitcraft::repo::reflog",
+        "gitcraft::repo::bundles",
+        "gitcraft::repo::patches",
+        "gitcraft::repo::email"
+      ]
+    },
+    "sidebar": {
+      "layer": "features",
+      "owner": "@JKamsker",
+      "description": "The sidebar: branches as a tree, their order, health and cleanup, pinned sections.",
+      "modules": [
+        "gitcraft::repo::sidebar",
+        "gitcraft::repo::branch_tree",
+        "gitcraft::repo::branch_order",
+        "gitcraft::repo::branch_health",
+        "gitcraft::repo::branch_cleanup",
+        "gitcraft::repo::pinned_sections"
+      ]
+    },
+    "worktrees": {
+      "layer": "features",
+      "owner": "@JKamsker",
+      "description": "Worktree tabs, teleport and cross-repository views.",
+      "modules": [
+        "gitcraft::teleport",
+        "gitcraft::across",
+        "gitcraft::repo::worktree_tab"
+      ]
+    },
+    "bisect": {
+      "layer": "features",
+      "owner": "@JKamsker",
+      "description": "Bisect, parallel bisect, the test lane, interaction finding and local CI.",
+      "modules": [
+        "gitcraft::parallel_bisect",
+        "gitcraft::repo::bisect",
+        "gitcraft::repo::parallel_bisect",
+        "gitcraft::repo::test_lane",
+        "gitcraft::repo::interaction",
+        "gitcraft::repo::local_ci"
+      ]
+    },
+    "release": {
+      "layer": "features",
+      "owner": "@JKamsker",
+      "description": "Releases, hotfixes, package previews, range-diff versions and postcards.",
+      "modules": [
+        "gitcraft::release",
+        "gitcraft::package",
+        "gitcraft::repo::release",
+        "gitcraft::repo::hotfix",
+        "gitcraft::repo::package",
+        "gitcraft::repo::versions",
+        "gitcraft::repo::postcards"
+      ]
+    },
+    "insights": {
+      "layer": "features",
+      "owner": "@JKamsker",
+      "description": "Insights views, the folder atlas and file-tree growth.",
+      "modules": [
+        "gitcraft::insights",
+        "gitcraft::repo::insights",
+        "gitcraft::repo::atlas",
+        "gitcraft::repo::growth"
+      ]
+    },
+    "guidance": {
+      "layer": "features",
+      "owner": "@JKamsker",
+      "description": "Practice repositories, the first-day tour, guidance and celebrations.",
+      "modules": [
+        "gitcraft::practice",
+        "gitcraft::tour",
+        "gitcraft::repo::practice",
+        "gitcraft::repo::tour",
+        "gitcraft::repo::guide",
+        "gitcraft::repo::celebration"
+      ]
+    },
+    "doctor": {
+      "layer": "features",
+      "owner": "@JKamsker",
+      "description": "The repository doctor, repository tools, cleanup, error cards and the activity log.",
+      "modules": [
+        "gitcraft::error_card",
+        "gitcraft::repo::doctor",
+        "gitcraft::repo::repository_tools",
+        "gitcraft::repo::cleanup",
+        "gitcraft::repo::error_help",
+        "gitcraft::repo::activity"
+      ]
+    },
+    "update": {
+      "layer": "features",
+      "owner": "@JKamsker",
+      "description": "New versions of gitcraft.",
+      "modules": [
+        "gitcraft::update"
+      ]
+    },
+    "repo-core": {
+      "layer": "coordinator",
+      "owner": "@JKamsker",
+      "description": "RepoTab: composition, dispatch of Actions, background messages, lifecycle, loading, navigation, operations, dialogs, palette, layout.",
+      "modules": [
+        "=gitcraft::repo",
+        "gitcraft::repo::tab_model",
+        "gitcraft::repo::tab_construction",
+        "gitcraft::repo::apply",
+        "gitcraft::repo::actions",
+        "gitcraft::repo::state",
+        "gitcraft::repo::messages",
+        "gitcraft::repo::lifecycle",
+        "gitcraft::repo::load",
+        "gitcraft::repo::notice",
+        "gitcraft::repo::operations",
+        "gitcraft::repo::running",
+        "gitcraft::repo::navigate",
+        "gitcraft::repo::navigation",
+        "gitcraft::repo::nav_history",
+        "gitcraft::repo::layout",
+        "gitcraft::repo::keys",
+        "gitcraft::repo::keyboard",
+        "gitcraft::repo::toolbar",
+        "gitcraft::repo::commands",
+        "gitcraft::repo::watch",
+        "gitcraft::repo::dialogs",
+        "gitcraft::repo::popout",
+        "gitcraft::repo::palette",
+        "gitcraft::repo::slow_banner",
+        "gitcraft::repo::widgets",
+        "gitcraft::repo::prompt_session",
+        "gitcraft::repo::hang_diagnostics",
+        "gitcraft::repo::cpu_benchmarks",
+        "gitcraft::repo::process_benchmarks",
+        "gitcraft::repo::tests",
+        "gitcraft::repo::samples",
+        "gitcraft::repo::worktree_tests",
+        "gitcraft::repo::drafts_tests",
+        "gitcraft::repo::line_history_tests",
+        "gitcraft::repo::revert_tests"
+      ]
+    },
+    "app": {
+      "layer": "shell",
+      "owner": "@JKamsker",
+      "description": "The window shell, entry points (CLI, MCP stdio host, tray, standalone tools), manual and the gitcraft binary.",
+      "modules": [
+        "=gitcraft",
+        "gitcraft::app",
+        "gitcraft::app_buttons",
+        "gitcraft::manual",
+        "gitcraft::launch",
+        "gitcraft::standalone",
+        "gitcraft::tray"
+      ]
+    },
+    "dev": {
+      "layer": "shell",
+      "owner": "@JKamsker",
+      "description": "Integration tests, examples, build scripts and the recovery-recording harness (test-only).",
+      "modules": []
+    },
+    "tooling": {
+      "layer": "shell",
+      "owner": "@JKamsker",
+      "description": "This architecture checker.",
+      "modules": []
+    }
+  },
+  "allowed_edges": [
+    {
+      "from": "layer:features",
+      "to": "repo-core",
+      "cycles": false,
+      "reason": "Features extend the coordinator: `impl RepoTab` blocks, Action/Msg/notice/dialog types and repo-wide helpers. Field writes are governed separately by the repo_tab rules."
+    }
+  ],
+  "repo_tab": {
+    "path": "gitcraft::repo::tab_model::RepoTab",
+    "coordinators": [
+      "repo-core"
+    ],
+    "owners": {},
+    "owner_layers": [
+      "features"
+    ],
+    "default_owner": "repo-core"
+  },
+  "enforce_tests": false,
+  "symbol_budget_domains": [
+    "repo-core",
+    "settings"
+  ]
+}
