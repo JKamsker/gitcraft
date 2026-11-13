@@ -22,6 +22,9 @@ pub(super) fn stopped_message(stopped: Stopped, found: usize) -> String {
         Stopped::Asked => {
             crate::i18n::message("interaction-scan-asked", &[("found", found.into())])
         }
+        // Only the library's scans end so (this one goes on past an unreadable folder).
+        Stopped::Unreadable => crate::i18n::text("interaction-library-limit-unreadable").into(),
+        Stopped::Full => crate::i18n::text("interaction-library-limit-full").into(),
     }
 }
 

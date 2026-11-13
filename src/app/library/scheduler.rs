@@ -11,7 +11,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc::{Receiver, Sender, channel};
 
 use super::model::{Library, Outcome, ScanResult, Source};
-use crate::app::repo_scan::{self, Found, Progress, ScanEvent, ScanLimits};
+use crate::app::repo_scan::{self, Found, Progress, ScanEvent, ScanLimits, Stopped};
 
 /// The most scans running at once. A scan stopped while a slow mount blocks it keeps its
 /// slot until its thread really ends: a blocked call never makes another thread start.
@@ -211,7 +211,10 @@ impl Scheduler {
                 }
                 Msg::Done(result) => {
                     let outcome = match &result {
-                        Ok(found) => found.stopped.map_or(Outcome::Complete, Outcome::Partial),
+                        Ok(found) => found
+                            .stopped
+                            .or(found.unreadable.then_some(Stopped::Unreadable))
+                            .map_or(Outcome::Complete, Outcome::Partial),
                         Err(e) => Outcome::Failed(e.clone()),
                     };
                     let repos = std::mem::take(&mut run.found);
@@ -288,9 +291,13 @@ fn run(
         }
     };
     let result = runner(&job, cancel, &mut |event| match event {
-        ScanEvent::Repo(path) => batch
-            .borrow_mut()
-            .push(repo_scan::top_folder(path.to_owned())),
+        ScanEvent::Repo(path) => {
+            let top = repo_scan::top_folder(path.to_owned());
+            // A path that isn't valid UTF-8 couldn't be saved (nor anything saved with it).
+            if top.to_str().is_some() {
+                batch.borrow_mut().push(top);
+            }
+        }
         ScanEvent::Progress(p) => {
             flush();
             send(Msg::Progress(p));

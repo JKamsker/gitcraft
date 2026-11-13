@@ -106,3 +106,7 @@ interaction-library-limit-folders = Ordner-Grenze erreicht
 interaction-library-limit-time = hat zu lange gedauert
 
 interaction-library-limit-asked = angehalten
+
+interaction-library-limit-unreadable = manche Ordner waren nicht lesbar
+
+interaction-library-limit-full = die Bibliothek ist voll

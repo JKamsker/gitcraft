@@ -4,6 +4,7 @@
 //! (`repo_scan::engine`); the window thread only reads what they sent.
 
 mod actions;
+mod checks;
 mod identity;
 mod model;
 mod roots_dialog;
@@ -14,7 +15,7 @@ mod status;
 mod view;
 
 pub(super) use model::Libraries;
-use model::{Library, Outcome, Source};
+use model::{Library, Source};
 use scheduler::{Job, Scheduler};
 pub(super) use view::{LibraryClick, search_id};
 
@@ -37,6 +38,7 @@ pub(in crate::app) const STALE_AFTER: i64 = 15 * 60;
 pub(super) struct LibraryState {
     saved: Libraries,
     scheduler: Scheduler,
+    checks: checks::Checks,
     /// When the window was first looked after.
     started: Option<Instant>,
     checked: Option<Instant>,
@@ -86,11 +88,13 @@ impl LibraryState {
     /// in use), scans the enabled roots whose last scan is old.
     fn tick(&mut self, profile: u64, active: bool, ctx: &egui::Context) {
         self.scheduler.set_repaint(ctx);
+        self.checks.set_repaint(ctx);
         let now = now_secs();
         let lib = self.saved.entry(profile).or_default();
         if self.scheduler.poll(profile, lib, now) {
             self.rev += 1;
         }
+        self.answered(profile);
         let started = *self.started.get_or_insert_with(Instant::now);
         if started.elapsed() < START_AFTER {
             ctx.request_repaint_after(START_AFTER);
@@ -154,18 +158,52 @@ impl LibraryState {
         }
     }
 
-    /// A local repository at `root` was opened: its folder's other repositories are looked
-    /// for, unless that folder was looked in lately or is too broad. Nothing here touches
-    /// the file system: `root` is already the repository's canonical top folder.
+    /// Applies what the file-system checks found (for `profile`, the one in use).
+    fn answered(&mut self, profile: u64) {
+        for answer in self.checks.poll() {
+            match answer {
+                checks::Answer::Nearby {
+                    profile: p,
+                    parent: Some(parent),
+                } if p == profile => self.look_nearby(profile, parent),
+                checks::Answer::Gone { profile: p, path } if p == profile => {
+                    if let Some(lib) = self.saved.get_mut(&profile)
+                        && lib.drop_entry(&path)
+                    {
+                        self.rev += 1;
+                    }
+                }
+                _ => {}
+            }
+        }
+    }
+
+    /// A local repository at `root` (its canonical top folder) was opened: its folder's other
+    /// repositories are looked for, unless that folder was looked in lately or is too broad.
+    /// Whether it is (against the canonical home and temporary folders, and mounts) is found
+    /// on another thread.
     pub fn noticed_open(&mut self, profile: u64, root: &Path) {
+        if !self.get(profile).is_none_or(|l| l.nearby_enabled)
+            || identity::is_far(root)
+            || !root.is_absolute()
+        {
+            return;
+        }
+        self.checks.nearby(profile, root.to_owned());
+    }
+
+    /// A row's repository at `path` didn't open: once found gone from the disk, the library
+    /// forgets it (Recent keeps what it has).
+    pub fn open_failed(&mut self, profile: u64, path: &Path) {
+        self.checks.gone(profile, path.to_owned());
+    }
+
+    /// Looks in `parent`, a folder fit to look in near a repository opened, unless it was
+    /// looked in lately (however that went: only the user asks for it again sooner).
+    fn look_nearby(&mut self, profile: u64, parent: PathBuf) {
         if !self.get(profile).is_none_or(|l| l.nearby_enabled) {
             return;
         }
-        let home = super::clone::home_dir();
-        let temp = std::env::temp_dir();
-        let Some(parent) = identity::nearby_parent(root, home.as_deref(), Some(&temp)) else {
-            return;
-        };
         let lib = self.lib(profile);
         let gone = lib.note_nearby(parent);
         // As the library spells it (a folder noted before keeps its first spelling).
@@ -176,7 +214,7 @@ impl LibraryState {
         let fresh = first
             .last
             .as_ref()
-            .is_some_and(|l| l.outcome == Outcome::Complete && now_secs() - l.at < STALE_AFTER);
+            .is_some_and(|l| now_secs() - l.at < STALE_AFTER);
         for parent in gone {
             self.scheduler.retire(&Source::Nearby(parent));
         }
@@ -185,9 +223,20 @@ impl LibraryState {
         }
     }
 
-    /// Adds `path` as a root `depth` deep and scans it.
+    /// Adds `path` as a root `depth` deep (a root already, at least that deep) and scans it.
+    /// A path that isn't valid UTF-8 can't be saved: it isn't added.
     pub fn add_root(&mut self, profile: u64, path: PathBuf, depth: u8) {
-        let id = self.lib(profile).add_root(path, depth);
+        if path.to_str().is_none() {
+            return;
+        }
+        let lib = self.lib(profile);
+        let before = lib.root_at(&path, None).and_then(|id| lib.root(id)).map(|r| r.depth);
+        let id = lib.add_root(path, depth);
+        let after = lib.root(id).map(|r| r.depth);
+        // Deeper now: a scan under way for the old depth is dropped.
+        if before.is_some() && before != after {
+            self.scheduler.retire(&Source::Root(id));
+        }
         self.rescan(profile, &Source::Root(id));
     }
 
@@ -215,8 +264,15 @@ impl LibraryState {
         self.rescan(profile, &Source::Root(id));
     }
 
-    /// Root `id` is `path` now: what the old folder found goes.
+    /// Root `id` is `path` now: what the old folder found goes. Not when another root has that
+    /// folder already (nor for a path that couldn't be saved).
     pub fn move_root(&mut self, profile: u64, id: u64, path: PathBuf) {
+        let taken = self
+            .get(profile)
+            .is_some_and(|l| l.root_at(&path, Some(id)).is_some());
+        if taken || path.to_str().is_none() {
+            return;
+        }
         let source = Source::Root(id);
         self.scheduler.retire(&source);
         let lib = self.lib(profile);

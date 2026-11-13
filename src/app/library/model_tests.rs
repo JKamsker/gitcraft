@@ -12,6 +12,14 @@ fn done(repos: &[&str], outcome: Outcome) -> ScanResult {
     }
 }
 
+fn done_owned(repos: &[PathBuf], outcome: Outcome) -> ScanResult {
+    ScanResult {
+        repos: repos.to_vec(),
+        outcome,
+        at: 100,
+    }
+}
+
 fn paths(lib: &Library) -> Vec<String> {
     let mut v: Vec<_> = lib
         .entries
@@ -149,18 +157,52 @@ fn the_index_is_bounded() {
     let many: Vec<PathBuf> = (0..MAX_INDEX + 10)
         .map(|i| p(&format!("/big/{i}")))
         .collect();
-    assert_eq!(lib.add_found(&Source::Root(id), &many), MAX_INDEX);
+    assert_eq!(lib.add_found(&Source::Root(id), &many), (MAX_INDEX, 10));
     assert_eq!(lib.entries.len(), MAX_INDEX);
+    // A complete scan that couldn't add all it found says so, and keeps what it has.
+    lib.finish(&Source::Root(id), done_owned(&many, Outcome::Complete));
+    assert_eq!(lib.entries.len(), MAX_INDEX);
+    let last = lib.root(id).and_then(|r| r.last.clone());
+    assert_eq!(
+        last.map(|l| l.outcome),
+        Some(Outcome::Partial(Stopped::Full))
+    );
+    // What is gone makes room: a complete scan then takes all it found.
+    let fewer = &many[10..];
+    lib.finish(&Source::Root(id), done_owned(fewer, Outcome::Complete));
+    assert_eq!(lib.entries.len(), MAX_INDEX);
+    let last = lib.root(id).and_then(|r| r.last.clone());
+    assert_eq!(last.map(|l| l.outcome), Some(Outcome::Complete));
+}
+
+/// Adding a folder that is a root already scans it as deep as asked, if that is deeper; a
+/// root can't be moved onto another one's folder.
+#[test]
+fn a_root_added_again_goes_deeper_and_roots_stay_distinct() {
+    let mut lib = Library::default();
+    let a = lib.add_root(p("/work"), 1);
+    assert_eq!(lib.add_root(p("/work/"), 3), a);
+    assert_eq!(lib.root(a).map(|r| r.depth), Some(3));
+    assert_eq!(lib.add_root(p("/work"), 1), a);
+    assert_eq!(lib.root(a).map(|r| r.depth), Some(3), "never shallower");
+    let b = lib.add_root(p("/other"), 1);
+    assert_eq!(lib.root_at(Path::new("/work"), Some(b)), Some(a));
+    assert_eq!(lib.root_at(Path::new("/work"), Some(a)), None);
 }
 
 /// A saved library from before any field existed, or with fields unknown, reads with safe
 /// defaults; a saved one reads back the same.
 #[test]
 fn saved_libraries_read_back() {
-    let old: Library = ron::from_str("()").unwrap_or_default();
+    // A parse failure fails the test (rather than reading as the default it is compared to).
+    let old: Result<Library, _> = ron::from_str("()");
+    assert!(old.is_ok(), "{old:?}");
+    let old = old.unwrap_or_default();
     assert_eq!(old, Library::default());
     assert!(old.nearby_enabled);
-    let partial: Library = ron::from_str("(roots: [(id: 3, path: \"/x\")])").unwrap_or_default();
+    let partial: Result<Library, _> = ron::from_str("(roots: [(id: 3, path: \"/x\")])");
+    assert!(partial.is_ok(), "{partial:?}");
+    let partial = partial.unwrap_or_default();
     assert_eq!(partial.roots[0].depth, 1);
     assert!(partial.roots[0].enabled);
     let mut lib = Library::default();

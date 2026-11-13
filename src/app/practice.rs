@@ -69,7 +69,8 @@ impl App {
             Ok(path) => {
                 app.practice_open = false;
                 // The worker already made and validated the repository root. No git on UI.
-                app.open_root(path, ctx);
+                // A practice repository's folder (in the temporary folder) isn't looked in.
+                app.open_root_as(path, ctx, false);
             }
             Err(error) => {
                 app.practice_open = false;

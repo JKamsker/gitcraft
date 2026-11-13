@@ -11,8 +11,14 @@ impl App {
     /// Opens `path` in the active tab if it's a start page, otherwise in a new tab. One on
     /// another machine opens once it is reached, in the background.
     pub(super) fn open_repo(&mut self, path: &Path, ctx: &egui::Context) {
+        self.try_open_repo(path, ctx);
+    }
+
+    /// [`Self::open_repo`], saying whether it opened (or is being reached): `false` when the
+    /// error is shown.
+    pub(super) fn try_open_repo(&mut self, path: &Path, ctx: &egui::Context) -> bool {
         if self.focus_elsewhere(path, ctx) {
-            return;
+            return true;
         }
         if crate::remote::is_remote(path) {
             // Already open: no need to reach it first.
@@ -23,13 +29,16 @@ impl App {
             {
                 self.remember(path);
                 self.active = i;
-                return;
+                return true;
             }
             self.connect(path.to_owned(), None, ctx);
-            return;
+            return true;
         }
         match repo_root(path) {
-            Ok(root) => self.open_root(root, ctx),
+            Ok(root) => {
+                self.open_root(root, ctx);
+                true
+            }
             Err(e) => {
                 let old = self.error_card.take();
                 self.error_card = match old {
@@ -45,6 +54,7 @@ impl App {
                     },
                 };
                 self.report(e);
+                false
             }
         }
     }
@@ -61,11 +71,17 @@ impl App {
 
     /// Opens the repository whose top folder is `root` (see [`Self::open_repo`]).
     pub(super) fn open_root(&mut self, root: PathBuf, ctx: &egui::Context) {
+        self.open_root_as(root, ctx, true);
+    }
+
+    /// [`Self::open_root`]; `nearby` says whether its folder's other repositories are looked
+    /// for (not for a practice repository, made in the temporary folder).
+    pub(super) fn open_root_as(&mut self, root: PathBuf, ctx: &egui::Context, nearby: bool) {
         if self.focus_elsewhere(&root, ctx) {
             return;
         }
         self.remember(&root);
-        if !crate::remote::is_remote(&root) {
+        if nearby && !crate::remote::is_remote(&root) {
             self.library_noticed_open(&root);
         }
         self.error = None;

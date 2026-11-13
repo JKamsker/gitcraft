@@ -141,11 +141,23 @@ impl Library {
         self.roots.iter_mut().find(|r| r.id == id)
     }
 
-    /// Adds `path` as a root (or returns the one it already is). Returns its id.
+    /// The root other than `except` whose folder `path` is.
+    pub fn root_at(&self, path: &Path, except: Option<u64>) -> Option<u64> {
+        let key = PathKey::of(path);
+        self.roots
+            .iter()
+            .find(|r| Some(r.id) != except && PathKey::of(&r.path) == key)
+            .map(|r| r.id)
+    }
+
+    /// Adds `path` as a root (or returns the one it already is, scanned at least `depth`
+    /// deep from now on). Returns its id.
     pub fn add_root(&mut self, path: PathBuf, depth: u8) -> u64 {
-        let key = PathKey::of(&path);
-        if let Some(root) = self.roots.iter().find(|r| PathKey::of(&r.path) == key) {
-            return root.id;
+        if let Some(id) = self.root_at(&path, None) {
+            if let Some(root) = self.root_mut(id) {
+                root.depth = root.depth.max(depth.min(MAX_DEPTH));
+            }
+            return id;
         }
         let id = self.roots.iter().map(|r| r.id).max().unwrap_or(0) + 1;
         self.roots.push(Root {
@@ -238,15 +250,16 @@ impl Library {
     }
 
     /// Adds what a scan of `source` found so far, merged by path with what other sources
-    /// found. Returns how many were new to the library.
-    pub fn add_found(&mut self, source: &Source, repos: &[PathBuf]) -> usize {
+    /// found. Returns how many were new to the library, and how many weren't added because it
+    /// holds [`MAX_INDEX`] already.
+    pub fn add_found(&mut self, source: &Source, repos: &[PathBuf]) -> (usize, usize) {
         let mut index: BTreeMap<PathKey, usize> = self
             .entries
             .iter()
             .enumerate()
             .map(|(i, e)| (PathKey::of(&e.path), i))
             .collect();
-        let mut new = 0;
+        let (mut new, mut left_out) = (0, 0);
         for repo in repos {
             let key = PathKey::of(repo);
             if let Some(&i) = index.get(&key) {
@@ -261,16 +274,18 @@ impl Library {
                     unconfirmed: BTreeSet::new(),
                 });
                 new += 1;
+            } else {
+                left_out += 1;
             }
         }
-        new
+        (new, left_out)
     }
 
     /// Settles `source`'s scan: what it found is added; what it found before and not now
     /// leaves the library when the scan was complete (unless another source has it), and is
-    /// kept as stale when the scan wasn't. Its record says how it went.
+    /// kept as stale when the scan wasn't. Its record says how it went: partial when the
+    /// library was too full to take all it found.
     pub fn finish(&mut self, source: &Source, result: ScanResult) {
-        self.add_found(source, &result.repos);
         let seen: BTreeSet<PathKey> = result.repos.iter().map(|p| PathKey::of(p)).collect();
         let complete = result.outcome == Outcome::Complete;
         for entry in &mut self.entries {
@@ -285,13 +300,28 @@ impl Library {
             }
         }
         self.entries.retain(|e| !e.sources.is_empty());
+        // After what is gone made room.
+        let (_, left_out) = self.add_found(source, &result.repos);
+        let outcome = match result.outcome {
+            Outcome::Complete if left_out > 0 => Outcome::Partial(Stopped::Full),
+            outcome => outcome,
+        };
         if let Some(record) = self.record_mut(source) {
             *record = Some(ScanRecord {
                 at: result.at,
                 found: result.repos.len(),
-                outcome: result.outcome,
+                outcome,
             });
         }
+    }
+
+    /// Forgets the repository at `path` (gone from the disk), whatever found it. Returns
+    /// whether the library had it.
+    pub fn drop_entry(&mut self, path: &Path) -> bool {
+        let key = PathKey::of(path);
+        let before = self.entries.len();
+        self.entries.retain(|e| PathKey::of(&e.path) != key);
+        self.entries.len() != before
     }
 
     /// Hides `path` from the library for good (it stays in Recent, and can be opened).

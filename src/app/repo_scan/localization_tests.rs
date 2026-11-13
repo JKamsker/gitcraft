@@ -36,6 +36,7 @@ fn actual_inert_scan_progress_result_and_error_paint_preserve_original_open_requ
     h.state_mut().0.result = Some(Ok(Found {
         repos: vec![path.clone()],
         stopped: Some(Stopped::Asked),
+        ..Default::default()
     }));
     h.run();
     h.get_by_label("Angehalten: Bisher 1 gefunden.");

@@ -29,7 +29,12 @@ impl App {
     pub(in crate::app) fn library_click(&mut self, click: LibraryClick, ctx: &egui::Context) {
         let profile = self.profile();
         match click {
-            LibraryClick::Open(path) => self.open_repo(&path, ctx),
+            LibraryClick::Open(path) => {
+                // One gone (a worktree cleaned up) leaves the library once found so.
+                if !self.try_open_repo(&path, ctx) {
+                    self.library.open_failed(profile, &path);
+                }
+            }
             LibraryClick::Hide(path) => self.library.hide(profile, &path),
             LibraryClick::Manage => self.library_open = true,
             LibraryClick::AddRoot => {
@@ -55,7 +60,8 @@ impl App {
     }
 
     /// _Save as root_ after _Scan a folder_: as deep as the deepest repository it found
-    /// there (at least 1, at most [`model::MAX_DEPTH`]); the roots dialog shows it.
+    /// there (at least 1, at most [`model::MAX_DEPTH`]; a root already goes as deep, if that
+    /// is deeper); the roots dialog shows it.
     pub(in crate::app) fn save_scan_as_root(&mut self, root: PathBuf, deepest: usize) {
         let depth = deepest.clamp(1, usize::from(model::MAX_DEPTH)) as u8;
         let profile = self.profile();

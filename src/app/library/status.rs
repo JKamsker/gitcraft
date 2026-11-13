@@ -62,6 +62,8 @@ fn stopped_words(stopped: Stopped) -> &'static str {
         Stopped::Folders | Stopped::Entries => "interaction-library-limit-folders",
         Stopped::Time => "interaction-library-limit-time",
         Stopped::Asked => "interaction-library-limit-asked",
+        Stopped::Unreadable => "interaction-library-limit-unreadable",
+        Stopped::Full => "interaction-library-limit-full",
     })
 }
 

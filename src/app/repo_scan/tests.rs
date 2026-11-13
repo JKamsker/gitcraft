@@ -127,7 +127,8 @@ fn a_missing_folder_is_an_error_and_an_empty_one_finds_nothing() {
         scan(&root, LIMITS, &stopped, &mut |_| {}),
         Ok(Found {
             repos: Vec::new(),
-            stopped: Some(Stopped::Asked)
+            stopped: Some(Stopped::Asked),
+            ..Default::default()
         })
     );
     let _ = std::fs::remove_dir_all(&root);

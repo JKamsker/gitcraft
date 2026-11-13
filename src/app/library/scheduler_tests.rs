@@ -31,6 +31,7 @@ fn finds_one() -> Runner {
         Ok(Found {
             repos: vec![repo],
             stopped: None,
+            ..Default::default()
         })
     })
 }
@@ -152,6 +153,7 @@ fn a_real_scan_applies_incrementally() {
         Ok(Found {
             repos: Vec::new(),
             stopped: Some(Stopped::Asked),
+            ..Default::default()
         })
     }));
     s.queue(7, job(source.clone(), "/x"));
