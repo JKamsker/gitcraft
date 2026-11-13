@@ -48,6 +48,13 @@ fn block_scoped_imports_name_the_tab_type() {
 }
 
 #[test]
+fn block_scoped_value_imports_do_not_hide_the_tab_type() {
+    let source = "use crate::hub::Tab as T; pub struct State; pub fn f(tabs: &mut [T]) { \
+        use crate::beta::go as T; let t: &mut T = &mut tabs[0]; t.status.clear(); }";
+    assert_eq!(mutations(source), 1);
+}
+
+#[test]
 fn cfg_and_test_attributes_of_other_items_scope_their_references() {
     let test_only = [
         "pub struct State; #[cfg(test)] const FIXTURE: crate::beta::Thing = crate::beta::Thing;",
