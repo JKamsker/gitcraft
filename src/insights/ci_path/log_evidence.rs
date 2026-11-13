@@ -5,19 +5,56 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
+mod lines;
+
 /// So many cache lines, toolchains and error annotations are kept per log.
-pub const MAX_NOTES: usize = 16;
+pub(in crate::insights) const MAX_NOTES: usize = 16;
 const MAX_LINE: usize = 200;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum Outcome {
+pub(in crate::insights) enum Outcome {
     Passed,
     Failed,
     Ignored,
 }
 
-/// A test by the cargo target that ran it (`unittests src/lib.rs`) and its libtest path.
-pub type TestId = (String, String);
+/// A test by the suite that ran it (the test binary without its build hash, and for cargo the
+/// target: `gitcraft (unittests src/lib.rs)`) and its libtest path.
+pub(in crate::insights) type TestId = (String, String);
+
+/// Every outcome one log reported for one test: a test binary run twice, or two binaries the
+/// log can't tell apart (same name, same test path), can report it more than once.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub(in crate::insights) struct Seen {
+    passed: bool,
+    failed: bool,
+    ignored: bool,
+}
+
+impl Seen {
+    fn add(&mut self, outcome: Outcome) {
+        match outcome {
+            Outcome::Passed => self.passed = true,
+            Outcome::Failed => self.failed = true,
+            Outcome::Ignored => self.ignored = true,
+        }
+    }
+
+    /// The outcome every report agrees on; `None` when they conflict.
+    pub(in crate::insights) fn outcome(self) -> Option<Outcome> {
+        match (self.passed, self.failed, self.ignored) {
+            (true, false, false) => Some(Outcome::Passed),
+            (false, true, false) => Some(Outcome::Failed),
+            (false, false, true) => Some(Outcome::Ignored),
+            _ => None,
+        }
+    }
+
+    /// At least one report said it failed.
+    pub(in crate::insights) fn failed(self) -> bool {
+        self.failed
+    }
+}
 
 /// How much of the test report the log holds.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -25,7 +62,7 @@ pub enum Report {
     /// No libtest output recognized.
     Missing,
     /// A test binary started without its summary, reported fewer results than it announced,
-    /// or the log was cut.
+    /// cargo stopped at a failing binary, or the log was cut.
     Incomplete,
     Complete,
 }
@@ -43,21 +80,23 @@ impl Report {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct Cache {
-    pub hit: bool,
-    pub key: String,
+pub(in crate::insights) struct Cache {
+    pub(in crate::insights) hit: bool,
+    pub(in crate::insights) key: String,
 }
 
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct LogEvidence {
-    /// `None`: this one log reported conflicting outcomes for the test.
-    pub tests: BTreeMap<TestId, Option<Outcome>>,
-    pub caches: Vec<Cache>,
-    pub toolchains: BTreeSet<String>,
-    pub errors: Vec<String>,
+    pub(in crate::insights) tests: BTreeMap<TestId, Seen>,
+    pub(in crate::insights) caches: Vec<Cache>,
+    pub(in crate::insights) toolchains: BTreeSet<String>,
+    pub(in crate::insights) errors: Vec<String>,
+    /// Test binaries started: a cargo or shard-script header, or `running N tests` without one.
     started: usize,
     finished: usize,
     short: bool,
+    /// cargo stopped at a failing binary; later binaries never ran.
+    stopped: bool,
     cut: bool,
 }
 
@@ -69,140 +108,115 @@ impl LogEvidence {
             } else {
                 Report::Incomplete
             }
-        } else if self.started == self.finished && !self.short && !self.cut {
+        } else if self.started == self.finished && !self.short && !self.stopped && !self.cut {
             Report::Complete
         } else {
             Report::Incomplete
         }
     }
+
+    /// The log's cache lines, or that it records none.
+    pub fn caches(&self) -> String {
+        listed(
+            self.caches
+                .iter()
+                .map(|c| format!("{} {}", if c.hit { "hit" } else { "miss" }, c.key))
+                .collect(),
+        )
+    }
+
+    /// The log's toolchain version lines, or that it records none.
+    pub fn toolchains(&self) -> String {
+        listed(self.toolchains.iter().cloned().collect())
+    }
+}
+
+fn listed(items: Vec<String>) -> String {
+    if items.is_empty() {
+        "not recorded in the log".to_owned()
+    } else {
+        items.join("; ")
+    }
 }
 
 /// `text` is the log; `cut` says it was read only in part.
-pub fn parse(text: &str, cut: bool) -> LogEvidence {
-    let mut evidence = LogEvidence {
-        cut,
-        ..LogEvidence::default()
+pub(in crate::insights) fn parse(text: &str, cut: bool) -> LogEvidence {
+    let mut parser = Parser {
+        evidence: LogEvidence {
+            cut,
+            ..LogEvidence::default()
+        },
+        ..Parser::default()
     };
-    let mut suite = String::new();
-    // Tests the open binary announced, and how many it has reported.
-    let mut open: Option<(usize, usize)> = None;
     for raw in text.lines() {
-        let line = plain(raw);
-        let line = line.trim();
-        if let Some(target) = cargo_target(line) {
-            suite = target;
-        } else if let Some(count) = announced(line) {
+        parser.line(lines::plain(raw).trim());
+    }
+    parser.evidence
+}
+
+/// Reads libtest's pretty output the way ci/libtest_watchdog.py does, `--nocapture` included.
+#[derive(Default)]
+struct Parser {
+    evidence: LogEvidence,
+    suite: String,
+    /// A binary's header was seen and its `running N tests` not yet.
+    header: bool,
+    /// Tests the open binary announced, and how many it has reported.
+    open: Option<(usize, usize)>,
+    /// A test that started (`test name ... `) and whose outcome is on a later line.
+    pending: Option<String>,
+}
+
+impl Parser {
+    fn line(&mut self, line: &str) {
+        let evidence = &mut self.evidence;
+        if let Some(suite) = lines::binary(line) {
             evidence.started += 1;
-            open = Some((count, 0));
+            (self.suite, self.header, self.open, self.pending) = (suite, true, None, None);
+        } else if let Some(count) = lines::announced(line) {
+            if !std::mem::take(&mut self.header) {
+                evidence.started += 1;
+            }
+            (self.open, self.pending) = (Some((count, 0)), None);
         } else if line.starts_with("test result: ") {
             evidence.finished += 1;
-            match open.take() {
+            self.pending = None;
+            match self.open.take() {
                 Some((announced, seen)) if seen >= announced => {}
                 _ => evidence.short = true,
             }
-        } else if let Some((name, outcome)) = test_line(line) {
-            if let Some((_, seen)) = open.as_mut() {
-                *seen += 1;
+        } else if let Some((name, after)) = lines::test_start(line) {
+            match lines::outcome(after) {
+                Some(outcome) => self.record(name.to_owned(), outcome),
+                None => self.pending = Some(name.to_owned()),
             }
-            let entry = evidence
-                .tests
-                .entry((suite.clone(), name.to_owned()))
-                .or_insert(Some(outcome));
-            if *entry != Some(outcome) {
-                *entry = None;
-            }
+        } else if let Some(outcome) = lines::outcome(line).filter(|_| self.pending.is_some()) {
+            let name = self.pending.take().unwrap_or_default();
+            self.record(name, outcome);
+        } else if lines::stopped(line) {
+            evidence.stopped = true;
         } else {
-            notes(&mut evidence, line);
+            notes(evidence, line);
         }
     }
-    evidence
-}
 
-/// GitHub's timestamp prefix, terminal colours and what a carriage return wrote over removed.
-fn plain(raw: &str) -> String {
-    let raw = raw.strip_prefix('\u{feff}').unwrap_or(raw);
-    let raw = match raw.split_once(' ') {
-        Some((stamp, rest)) if timestamp(stamp) => rest,
-        _ => raw,
-    };
-    let raw = raw.trim_end_matches('\r');
-    let raw = raw.rsplit('\r').next().unwrap_or(raw);
-    let mut out = String::with_capacity(raw.len());
-    let mut chars = raw.chars().peekable();
-    while let Some(c) = chars.next() {
-        if c == '\u{1b}' {
-            if chars.next_if_eq(&'[').is_some() {
-                while chars.next().is_some_and(|c| !c.is_ascii_alphabetic()) {}
-            }
-        } else {
-            out.push(c);
+    fn record(&mut self, name: String, outcome: Outcome) {
+        self.pending = None;
+        if let Some((_, seen)) = self.open.as_mut() {
+            *seen += 1;
         }
+        let test = (self.suite.clone(), name);
+        self.evidence.tests.entry(test).or_default().add(outcome);
     }
-    out
-}
-
-fn timestamp(stamp: &str) -> bool {
-    let b = stamp.as_bytes();
-    b.len() >= 20
-        && b[..4].iter().all(u8::is_ascii_digit)
-        && b[4] == b'-'
-        && b[10] == b'T'
-        && stamp.ends_with('Z')
-}
-
-/// cargo's `Running unittests src/lib.rs (target/debug/deps/gitcraft-0123abcd)` without the
-/// build hash, or `Doc-tests gitcraft`.
-fn cargo_target(line: &str) -> Option<String> {
-    if let Some(name) = line.strip_prefix("Doc-tests ") {
-        return Some(format!("doc-tests {}", name.trim()));
-    }
-    let target = line.strip_prefix("Running ")?;
-    let (target, binary) = target.split_once(" (")?;
-    binary
-        .ends_with(')')
-        .then(|| target.trim().to_owned())
-        .filter(|t| !t.is_empty())
-}
-
-/// libtest's `running 12 tests` / `running 1 test`.
-fn announced(line: &str) -> Option<usize> {
-    let rest = line.strip_prefix("running ")?;
-    let (count, word) = rest.split_once(' ')?;
-    matches!(word, "test" | "tests")
-        .then(|| count.parse().ok())
-        .flatten()
-}
-
-/// libtest's `test path::name ... ok` (also `FAILED`, `ignored`, `ignored, reason`).
-fn test_line(line: &str) -> Option<(&str, Outcome)> {
-    let (name, result) = line.strip_prefix("test ")?.rsplit_once(" ... ")?;
-    let outcome = match result.trim() {
-        "ok" => Outcome::Passed,
-        "FAILED" => Outcome::Failed,
-        r if r == "ignored" || r.starts_with("ignored, ") => Outcome::Ignored,
-        _ => return None,
-    };
-    (!name.is_empty()).then_some((name, outcome))
 }
 
 fn notes(evidence: &mut LogEvidence, line: &str) {
     let short = |text: &str| text.trim().chars().take(MAX_LINE).collect::<String>();
-    let cache = if let Some(key) = line.strip_prefix("Cache restored from key:") {
-        Some((true, short(key)))
-    } else if let Some(key) = line.strip_prefix("Cache not found for input keys:") {
-        Some((false, short(key)))
-    } else if let Some(key) = line.strip_prefix("Restored from cache key ") {
-        Some((true, short(key.trim_matches('"'))))
-    } else if line == "No cache found." {
-        Some((false, "(key not logged)".to_owned()))
-    } else {
-        None
-    };
-    if let Some((hit, key)) = cache {
+    if let Some((hit, key)) = lines::cache(line, short) {
         if evidence.caches.len() < MAX_NOTES {
             evidence.caches.push(Cache { hit, key });
         }
-    } else if toolchain(line) {
+    } else if lines::toolchain(line) {
         if evidence.toolchains.len() < MAX_NOTES {
             evidence.toolchains.insert(short(line));
         }
@@ -212,22 +226,6 @@ fn notes(evidence: &mut LogEvidence, line: &str) {
             evidence.errors.push(message);
         }
     }
-}
-
-/// A version line of the Rust toolchain: `rustc 1.95.0 (…)`, `cargo 1.95.0 (…)`.
-fn toolchain(line: &str) -> bool {
-    ["rustc ", "cargo ", "rustfmt ", "clippy "]
-        .iter()
-        .any(|tool| {
-            line.strip_prefix(tool).is_some_and(|rest| {
-                let version = rest.split(' ').next().unwrap_or_default();
-                version.split('.').count() >= 3
-                    && version
-                        .split(['.', '-'])
-                        .next()
-                        .is_some_and(|major| major.parse::<u32>().is_ok())
-            })
-        })
 }
 
 #[cfg(test)]

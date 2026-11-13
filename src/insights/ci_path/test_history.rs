@@ -14,7 +14,7 @@ use crate::ci::timing::TimedJob;
 use crate::ci::timing::history::RunKey;
 
 /// So many tests with a signal are listed; the rest are counted.
-pub const MAX_ROWS: usize = 200;
+pub(in crate::insights) const MAX_ROWS: usize = 200;
 
 /// One exact job log to read.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -97,8 +97,18 @@ impl Read {
         self.log.as_ref().ok().map(LogEvidence::report)
     }
 
+    /// The test's outcome when every report of it in this log agrees.
     fn outcome(&self, test: &TestId) -> Option<Outcome> {
-        self.log.as_ref().ok()?.tests.get(test).copied().flatten()
+        self.log.as_ref().ok()?.tests.get(test)?.outcome()
+    }
+
+    /// Some report of the test in this log said it failed.
+    fn failed(&self, test: &TestId) -> bool {
+        self.log
+            .as_ref()
+            .ok()
+            .and_then(|log| log.tests.get(test))
+            .is_some_and(|seen| seen.failed())
     }
 }
 
@@ -108,8 +118,20 @@ pub struct TestRow {
     pub test: TestId,
     pub transition: Transition,
     pub intermittent: bool,
+    /// This run's log reported it more than once, failed at least once and otherwise not.
+    pub ambiguous: bool,
     /// Its outcome in each read log at this SHA, oldest first.
     pub history: Vec<Observation>,
+}
+
+impl TestRow {
+    pub fn label(&self) -> &'static str {
+        if self.ambiguous {
+            "ambiguous: failed in one report of it in this run's log, not in another"
+        } else {
+            self.transition.label()
+        }
+    }
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -163,7 +185,7 @@ fn state(outcome: Option<Outcome>) -> Option<CheckState> {
     }
 }
 
-pub(crate) fn assemble(
+fn assemble(
     plan: Plan,
     now: Read,
     before: Option<Read>,
@@ -193,7 +215,10 @@ pub(crate) fn assemble(
             })
             .collect();
         let intermittent = diagnostics::intermittent(&observed);
-        let failed_now = now.outcome(test) == Some(Outcome::Failed);
+        // Any failure in this run's log is listed, even one another report of the same test
+        // contradicts: it never only adds to the unknown count.
+        let failed_now = now.failed(test);
+        let ambiguous = failed_now && now.outcome(test).is_none();
         let signal = intermittent
             || failed_now
             || matches!(transition, Transition::NewlyFailed | Transition::Fixed);
@@ -202,6 +227,7 @@ pub(crate) fn assemble(
                 test: test.clone(),
                 transition,
                 intermittent,
+                ambiguous,
                 history: observed,
             }),
             Transition::Passed => passed_both += 1,
@@ -238,31 +264,17 @@ fn rank(row: &TestRow) -> u8 {
         (Transition::NewlyFailed, _) => 0,
         (_, true) => 1,
         (Transition::ConsistentlyFailed, _) => 2,
+        _ if row.ambiguous => 2,
         (Transition::Fixed, _) => 3,
         _ => 4,
     }
 }
 
-/// The log's cache lines, or that it records none.
-pub fn caches(log: &LogEvidence) -> String {
-    listed(
-        log.caches
-            .iter()
-            .map(|c| format!("{} {}", if c.hit { "hit" } else { "miss" }, c.key))
-            .collect(),
-    )
-}
-
-/// The log's toolchain version lines, or that it records none.
-pub fn toolchains(log: &LogEvidence) -> String {
-    listed(log.toolchains.iter().cloned().collect())
-}
-
 fn differences(now: &LogEvidence, before: &LogEvidence) -> Vec<Difference> {
     let report = |log: &LogEvidence| log.report().label().to_owned();
     [
-        ("cache", caches(now), caches(before)),
-        ("toolchain", toolchains(now), toolchains(before)),
+        ("cache", now.caches(), before.caches()),
+        ("toolchain", now.toolchains(), before.toolchains()),
         ("test report", report(now), report(before)),
     ]
     .into_iter()
@@ -273,14 +285,6 @@ fn differences(now: &LogEvidence, before: &LogEvidence) -> Vec<Difference> {
         now,
     })
     .collect()
-}
-
-fn listed(items: Vec<String>) -> String {
-    if items.is_empty() {
-        "not recorded in the log".to_owned()
-    } else {
-        items.join("; ")
-    }
 }
 
 fn new_errors(now: &LogEvidence, before: &LogEvidence) -> Vec<String> {

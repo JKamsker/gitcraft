@@ -93,7 +93,7 @@ fn show(ui: &mut Ui, evidence: &JobEvidence) {
             "{} › {}: {}{flaky}",
             row.test.0,
             row.test.1,
-            row.transition.label()
+            row.label()
         ))
         .id_salt(("ci-test-history", &row.test))
         .show(ui, |ui| diagnostic_view::history_links(ui, &row.history));
@@ -107,11 +107,8 @@ fn show(ui: &mut Ui, evidence: &JobEvidence) {
         evidence.passed_both, evidence.unknown
     ));
     if let Ok(log) = &evidence.now.log {
-        ui.label(format!("Cache (this run): {}", test_history::caches(log)));
-        ui.label(format!(
-            "Toolchain (this run): {}",
-            test_history::toolchains(log)
-        ));
+        ui.label(format!("Cache (this run): {}", log.caches()));
+        ui.label(format!("Toolchain (this run): {}", log.toolchains()));
     }
     for difference in &evidence.differences {
         ui.label(format!(

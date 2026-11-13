@@ -3,8 +3,8 @@
 
 use super::*;
 
-/// So much of a log is read; past it the log counts as incomplete.
-pub const MAX_LOG_BYTES: usize = 64 * 1024 * 1024;
+/// So much of a log is read; past it the log is cut and counts as incomplete.
+const MAX_LOG_BYTES: usize = 64 * 1024 * 1024;
 
 /// A job's log text, and whether it had to be cut at [`MAX_LOG_BYTES`].
 pub fn job_log(repo: &Path, project: &Project, job: u64) -> Result<(String, bool), String> {
@@ -14,12 +14,14 @@ pub fn job_log(repo: &Path, project: &Project, job: u64) -> Result<(String, bool
     if job == 0 {
         return Err("The job has no recorded ID.".into());
     }
-    let text = gh_api(
-        repo,
-        project,
-        &format!("repos/{}/actions/jobs/{job}/logs", project.path),
-    )?;
-    Ok(bounded(text))
+    // Captured up to the log bound, not the usual tool output limit: a longer log comes back
+    // cut there instead of unreadable.
+    let endpoint = format!("repos/{}/actions/jobs/{job}/logs", project.path);
+    let (text, cut) = project
+        .hosting()
+        .tool_capped(repo, &["api", &endpoint], MAX_LOG_BYTES)?;
+    let (text, bounded) = bounded(text);
+    Ok((text, cut || bounded))
 }
 
 fn bounded(mut text: String) -> (String, bool) {

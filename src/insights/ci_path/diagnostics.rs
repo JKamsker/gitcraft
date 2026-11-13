@@ -120,7 +120,7 @@ pub fn observations(
 
 /// Job `index` of `current` in `run`, only when `run` is the same workflow/branch at exactly the
 /// same SHA and the job aligns unambiguously.
-pub fn same_sha_job<'a>(
+pub(in crate::insights) fn same_sha_job<'a>(
     current: &TimedRun,
     index: usize,
     run: &'a TimedRun,
