@@ -238,5 +238,34 @@ impl super::RepoTab {
 }
 
 #[cfg(test)]
+impl super::RepoTab {
+    /// Closes the tab as dropping it does (what it started is cancelled), then waits until
+    /// every job it started has returned. Each job holds the tab's job sender until it ends,
+    /// after the `git` it ran was stopped and waited for, so the tab's channel disconnects only
+    /// once none is left. A test deleting the repository next needs this: on Windows a folder
+    /// that a running `git -C` has as its current directory, or that a read holds open without
+    /// sharing deletion (see `safe_read`), cannot be deleted ("being used by another
+    /// process", os error 32).
+    pub(crate) fn close_and_wait(mut self, within: Duration) -> Result<(), String> {
+        use std::sync::mpsc::RecvTimeoutError;
+        let rx = std::mem::replace(&mut self.rx, std::sync::mpsc::channel().1);
+        drop(self);
+        let until = Instant::now() + within;
+        loop {
+            match rx.recv_timeout(until.saturating_duration_since(Instant::now())) {
+                // A closed tab reads none of what its jobs still send.
+                Ok(_) => {}
+                Err(RecvTimeoutError::Disconnected) => return Ok(()),
+                Err(RecvTimeoutError::Timeout) => {
+                    return Err(format!(
+                        "A closed tab's jobs were still running after {within:?}"
+                    ));
+                }
+            }
+        }
+    }
+}
+
+#[cfg(test)]
 #[path = "direct_tests/lifecycle_tests.rs"]
 mod tests;

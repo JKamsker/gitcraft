@@ -224,6 +224,32 @@ mod tests {
             Some(Scenario::Detached)
         );
         let root = path.parent().ok_or("Practice root missing")?.to_owned();
+        // The tab opened in the frame the practice repository arrived: its first read is still
+        // running `git -C` there. Let it finish, as the user sees it, before closing the tab.
+        let until = Instant::now() + Duration::from_secs(15);
+        loop {
+            match harness.state().tabs.get(harness.state().active) {
+                Some(super::super::Tab::Repo(tab)) if !tab.opening() && !tab.is_busy() => break,
+                Some(super::super::Tab::Repo(_)) => {}
+                _ => return Err("The practice tab went away".to_owned()),
+            }
+            if Instant::now() >= until {
+                return Err("The practice tab did not finish reading".to_owned());
+            }
+            harness.step();
+            std::thread::sleep(Duration::from_millis(10));
+        }
+        let active = harness.state().active;
+        let tab = std::mem::replace(
+            &mut harness.state_mut().tabs[active],
+            super::super::Tab::Home,
+        );
+        let super::super::Tab::Repo(tab) = tab else {
+            return Err("Practice did not keep its repository tab".to_owned());
+        };
+        // Dropping the app only cancels what the tab started. Windows refuses to delete a
+        // folder a `git` still running there holds (os error 32), so wait until all of it ends.
+        (*tab).close_and_wait(Duration::from_secs(30))?;
         drop(harness);
         std::fs::remove_dir_all(root).map_err(|e| e.to_string())?;
         Ok(())
