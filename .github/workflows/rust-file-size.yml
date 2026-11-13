@@ -1,4 +1,7 @@
 # Required by PR/mainline CI and release validation; no path or change filters.
+# The architecture fitness steps (#209) test the checker, then hold the candidate to the
+# reviewed policy and baseline, which CI never rewrites. The checker reads every cfg
+# branch statically, so this one Linux run also covers Windows-only code.
 name: Rust file size
 
 on:
@@ -25,3 +28,7 @@ jobs:
         run: python3 ci/rust_file_size.py --revision HEAD
       - name: Prevent complexity policy overrides in the candidate tree
         run: python3 ci/complexity_policy.py --revision HEAD
+      - name: Architecture fitness checker tests
+        run: cargo test --locked --manifest-path ci/arch-fitness/Cargo.toml
+      - name: Enforce architecture boundaries on the candidate tree
+        run: cargo run --locked --release --manifest-path ci/arch-fitness/Cargo.toml -- check --revision HEAD --markdown "$GITHUB_STEP_SUMMARY"

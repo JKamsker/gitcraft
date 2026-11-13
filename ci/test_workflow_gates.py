@@ -17,6 +17,9 @@ COMPLEXITY_CHECK = "python3 ci/complexity_policy.py --revision HEAD"
 SIZE_CHECK = "python3 ci/rust_file_size.py --revision HEAD"
 TOOLING_CHECK = "python3 -m unittest discover -s ci -p 'test_*.py' -v"
 CLIPPY_CHECK = "python ci/clippy_packages.py"
+ARCH_TESTS = "cargo test --locked --manifest-path ci/arch-fitness/Cargo.toml"
+ARCH_CHECK = ('cargo run --locked --release --manifest-path ci/arch-fitness/Cargo.toml -- '
+              'check --revision HEAD --markdown "$GITHUB_STEP_SUMMARY"')
 
 
 def require(condition, message):
@@ -129,7 +132,7 @@ def verify_shared_gate(text):
     require(not re.search(rf"^\s*(?:- )?{forbidden}:", text, re.M), "shared gate can skip, soften, or retarget checks")
     command = r"^\s+(?:- )?run: python3 ci/rust_file_size\.py --revision HEAD\s*$"
     require(re.search(command, text, re.M), "shared gate must check the complete immutable candidate")
-    verify_required_commands(text, "check", (SIZE_CHECK, COMPLEXITY_CHECK, TOOLING_CHECK))
+    verify_required_commands(text, "check", (SIZE_CHECK, COMPLEXITY_CHECK, TOOLING_CHECK, ARCH_TESTS, ARCH_CHECK))
 
 
 def verify_callers(text):
@@ -205,6 +208,8 @@ class WorkflowGateTests(unittest.TestCase):
         yield "shared-size", self.shared, "check", SIZE_CHECK
         yield "shared-policy", self.shared, "check", COMPLEXITY_CHECK
         yield "shared-tooling", self.shared, "check", TOOLING_CHECK
+        yield "shared-architecture-tests", self.shared, "check", ARCH_TESTS
+        yield "shared-architecture", self.shared, "check", ARCH_CHECK
         for name, text, job in self.clippy:
             yield name, text, job, CLIPPY_CHECK
 
@@ -216,6 +221,12 @@ class WorkflowGateTests(unittest.TestCase):
                                COMPLEXITY_CHECK.replace("HEAD", "HEAD~1")),
             TOOLING_CHECK: (TOOLING_CHECK.replace("test_*.py", "test_complexity*.py"),
                             TOOLING_CHECK + " -k architecture"),
+            ARCH_TESTS: (ARCH_TESTS + " -- --skip rules", ARCH_TESTS.replace("--locked ", "")),
+            ARCH_CHECK: (ARCH_CHECK.replace(" check ", " report "),
+                         ARCH_CHECK.replace(" check ", " ratchet "),
+                         ARCH_CHECK.replace("--revision HEAD", "--revision HEAD~1"),
+                         ARCH_CHECK.replace("--revision HEAD ", ""),
+                         ARCH_CHECK.replace("check ", "check --baseline elsewhere.json ")),
             CLIPPY_CHECK: ("cargo clippy --locked --all-targets -- -D warnings",
                           CLIPPY_CHECK + " --root elsewhere",
                           CLIPPY_CHECK + " --package app"),
