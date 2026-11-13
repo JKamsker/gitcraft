@@ -94,6 +94,8 @@ yaml-rust2 = "0.13.0"
 mailparse = "0.18"
 # Private, atomically created staging repositories for verified independent object packs.
 tempfile = "3"
+# Opt-in archives of a worktree's untracked text files before it is cleaned up (ZIP + manifest).
+zip = { version = "2", default-features = false, features = ["deflate-flate2", "flate2"] }
 
 [target.'cfg(any(windows, target_os = "macos"))'.dependencies]
 # Created only after opt-in, in the running native event loop.

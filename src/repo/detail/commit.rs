@@ -14,9 +14,7 @@ use crate::ci::Status;
 use crate::git::{CommitDetail, Stash};
 use crate::icons;
 use crate::repo::remerge::Mode;
-use crate::repo::{
-    Action, DiffKey, Refresh, RepoTab, Reword, branch_tree, ci_status, sidebar, widgets,
-};
+use crate::repo::{Action, DiffKey, Refresh, RepoTab, Reword, ci_status, sidebar, widgets};
 use crate::theme::{self, Tokens};
 
 impl RepoTab {
@@ -39,7 +37,7 @@ impl RepoTab {
                         sidebar::stash_menu(ui, acts, stash, idle);
                     });
             }
-            branch_tree::files_toggle(ui);
+            // Files as a tree or a list: Settings → Appearance → Changed files (#213).
         });
         if stash.is_none() && self.detail_hash.is_some() {
             ui.horizontal(|ui| {
