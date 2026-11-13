@@ -1,0 +1,17 @@
+2026-11-01T20:00:16.0000000Z Current runner version: '2.319.1'
+2026-11-01T20:00:16.0000000Z ##[group]Runner Image
+2026-11-01T20:00:16.0000000Z Image: ubuntu-24.04
+2026-11-01T20:00:16.0000000Z Version: 20261025.2.0
+2026-11-01T20:00:16.0000000Z ##[endgroup]
+2026-11-01T20:00:21.0000000Z Cache restored from key: cargo-Linux-abc123
+2026-11-01T20:00:22.0000000Z rustc 1.91.1 (aaaaaaaaa 2026-10-01)
+2026-11-01T20:02:00.0000000Z      Running unittests src/lib.rs (target/debug/deps/gitcraft-99aa88bb77cc66dd)
+2026-11-01T20:02:00.0000000Z test ci::a ... ok
+2026-11-01T20:02:00.0000000Z test ci::b ... ok
+2026-11-01T20:02:00.0000000Z test ci::gone ... ok
+2026-11-01T20:02:00.0000000Z test ci::slow ... ignored
+2026-11-01T20:02:01.0000000Z test result: ok. 3 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 0.80s
+2026-11-01T20:02:01.0000000Z      Running tests/cli.rs (target/debug/deps/cli-1234123412341234)
+2026-11-01T20:02:01.0000000Z test ci::a ... ok
+2026-11-01T20:02:01.0000000Z test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+2026-11-01T20:02:02.0000000Z Cache saved with key: cargo-Linux-abc123

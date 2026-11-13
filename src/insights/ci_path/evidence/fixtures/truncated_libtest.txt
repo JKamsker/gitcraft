@@ -1,0 +1,5 @@
+2026-11-02T22:00:00.0000000Z      Running unittests src/lib.rs (target/debug/deps/gitcraft-1f2e3d4c5b6a7980)
+2026-11-02T22:00:00.0000000Z running 3 tests
+2026-11-02T22:00:00.0000000Z test ci::a ... ok
+2026-11-02T22:00:00.0000000Z test ci::b ... 
+2026-11-02T22:00:00.0000000Z thread 'ci::b' panicked at src/ci.rs:1:1:

@@ -111,6 +111,7 @@ pub(super) fn explorer() -> Explorer {
         critical: critical_path(&before.jobs, &timing_deps(&before.jobs)),
         comparison: compare::compare(&run, &before),
         run: before,
+        workflow: crate::insights::ci_path::revision::WorkflowFile::Unknown("fixture".into()),
     };
     let project = Project {
         forge: crate::forge::Forge::GitHub,

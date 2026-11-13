@@ -1,0 +1,32 @@
+2026-11-02T20:00:16.0000000Z Current runner version: '2.320.0'
+2026-11-02T20:00:16.0000000Z ##[group]Operating System
+2026-11-02T20:00:16.0000000Z Ubuntu
+2026-11-02T20:00:16.0000000Z 24.04.1
+2026-11-02T20:00:16.0000000Z LTS
+2026-11-02T20:00:16.0000000Z ##[endgroup]
+2026-11-02T20:00:16.0000000Z ##[group]Runner Image
+2026-11-02T20:00:16.0000000Z Image: ubuntu-24.04
+2026-11-02T20:00:16.0000000Z Version: 20261101.1.0
+2026-11-02T20:00:16.0000000Z ##[endgroup]
+2026-11-02T20:00:16.0000000Z ##[group]Runner Image Provisioner
+2026-11-02T20:00:16.0000000Z Version: 2.0.999
+2026-11-02T20:00:16.0000000Z ##[endgroup]
+2026-11-02T20:00:20.0000000Z ##[group]Run actions/cache@v4
+2026-11-02T20:00:21.0000000Z Cache not found for input keys: cargo-Linux-abc123
+2026-11-02T20:00:21.0000000Z ##[endgroup]
+2026-11-02T20:00:22.0000000Z rustc 1.92.0 (ded5c06cf 2026-10-30)
+2026-11-02T20:00:22.0000000Z cargo 1.92.0 (2b3c4d5e6 2026-10-20)
+2026-11-02T20:02:00.0000000Z      Running unittests src/lib.rs (target/debug/deps/gitcraft-1f2e3d4c5b6a7980)
+2026-11-02T20:02:00.0000000Z 
+2026-11-02T20:02:00.0000000Z running 3 tests
+2026-11-02T20:02:00.0000000Z test ci::a ... ok
+2026-11-02T20:02:00.0000000Z test ci::b ... FAILED
+2026-11-02T20:02:00.0000000Z test ci::slow ... ignored, needs a network
+2026-11-02T20:02:01.0000000Z 
+2026-11-02T20:02:01.0000000Z test result: FAILED. 1 passed; 1 failed; 1 ignored; 0 measured; 0 filtered out; finished in 0.81s
+2026-11-02T20:02:01.0000000Z      Running tests/cli.rs (target/debug/deps/cli-0a9b8c7d6e5f4321)
+2026-11-02T20:02:01.0000000Z running 1 test
+2026-11-02T20:02:01.0000000Z test ci::a ... ok
+2026-11-02T20:02:01.0000000Z test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+2026-11-02T20:02:02.0000000Z ##[error]Process completed with exit code 101.
+2026-11-02T20:02:02.0000000Z ##[error]Process completed with exit code 101.

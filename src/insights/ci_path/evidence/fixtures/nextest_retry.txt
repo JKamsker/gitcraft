@@ -1,0 +1,12 @@
+2026-11-02T21:00:00.0000000Z Restored from cache key "v0-rust-test-Linux-x64-1a2b" full match: true.
+2026-11-02T21:00:10.0000000Z     Starting 3 tests across 1 binary (1 test skipped)
+2026-11-02T21:00:11.0000000Z         PASS [   0.004s] gitcraft ci::a
+2026-11-02T21:00:11.0000000Z         FAIL [   0.010s] gitcraft ci::flaky
+2026-11-02T21:00:11.0000000Z   RETRY 2/3 [         ] gitcraft ci::flaky
+2026-11-02T21:00:11.0000000Z    TRY 2 PASS [   0.009s] gitcraft ci::flaky
+2026-11-02T21:00:12.0000000Z      SIGSEGV [   0.200s] gitcraft ci::crash
+2026-11-02T21:00:12.0000000Z ------------
+2026-11-02T21:00:12.0000000Z      Summary [   0.300s] 3 tests run: 2 passed (1 flaky), 1 failed, 1 skipped
+2026-11-02T21:00:12.0000000Z        FLAKY 2/3 [   0.009s] gitcraft ci::flaky
+2026-11-02T21:00:12.0000000Z      SIGSEGV [   0.200s] gitcraft ci::crash
+2026-11-02T21:00:12.0000000Z error: test run failed

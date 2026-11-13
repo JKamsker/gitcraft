@@ -9,7 +9,11 @@
 pub mod alignment;
 pub mod compare;
 pub mod diagnostics;
+pub mod evidence;
 mod load;
+pub mod log_read;
+pub mod revision;
+pub mod test_history;
 pub mod workflow;
 pub use load::{read, read_pinned};
 
@@ -302,6 +306,8 @@ pub struct Compared {
     pub run: TimedRun,
     pub critical: Critical,
     pub comparison: Comparison,
+    /// Whether the two runs came from the same workflow file.
+    pub workflow: revision::WorkflowFile,
 }
 
 /// Everything the view shows of one run.

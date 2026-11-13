@@ -205,6 +205,7 @@ fn comparison(
         workflow::at_revision(repo, sha, path)
     });
     let critical = critical_path(&before.jobs, &deps);
+    let workflow = super::revision::compare(repo, &now.info, &before.info);
     if project.forge != Forge::GitHub {
         let comparison = compare::compare(now, &before);
         return Ok((
@@ -212,6 +213,7 @@ fn comparison(
                 run: before,
                 critical,
                 comparison,
+                workflow,
             },
             Vec::new(),
         ));
@@ -228,6 +230,7 @@ fn comparison(
             run: before,
             critical,
             comparison,
+            workflow,
         },
         observed,
     ))
