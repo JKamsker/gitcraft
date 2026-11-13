@@ -1,14 +1,29 @@
 fn direct_tab(w: &World, ctx: &egui::Context) -> Result<crate::repo::RepoTab, String> {
-    let mut tab = crate::repo::RepoTab::new_deferred(w.mine.clone(), ctx);
-    tab.start_deferred(ctx);
+    let mut tab = crate::repo::hang_diagnostics::run(format_args!("open live tab"), || {
+        let mut tab = crate::repo::RepoTab::new_deferred(w.mine.clone(), ctx);
+        tab.start_deferred(ctx);
+        tab
+    });
     settle(&mut tab, ctx)?;
     Ok(tab)
 }
 
+/// Closes a live tab, watcher included, as the app does before another one opens on the same
+/// worktree: the app never keeps two tabs on one worktree (it focuses the open one).
+fn close_tab(tab: crate::repo::RepoTab) {
+    crate::repo::hang_diagnostics::run(format_args!("close live tab"), || drop(tab));
+}
+
+/// Removes the fixture repositories once no tab is left on them.
+fn remove_world(w: World) {
+    crate::repo::hang_diagnostics::run(format_args!("remove repositories"), || drop(w));
+}
+
 fn settle(tab: &mut crate::repo::RepoTab, ctx: &egui::Context) -> Result<(), String> {
+    let _stage = crate::repo::hang_diagnostics::stage(format_args!("settle"));
     let deadline = std::time::Instant::now() + std::time::Duration::from_secs(30);
     loop {
-        tab.poll(ctx);
+        crate::repo::hang_diagnostics::poll(tab, ctx);
         if !tab.opening() && !tab.loading && tab.busy_op.is_none() { return Ok(()); }
         if std::time::Instant::now() >= deadline { return Err(format!("Push did not settle: {:?}", tab.status)); }
         std::thread::sleep(std::time::Duration::from_millis(10));
@@ -51,6 +66,9 @@ fn toolbar_refusal_preserves_remote_and_offers_explicit_force_review() -> Result
 
 #[test]
 fn toolbar_publish_starts_directly_with_one_remote_and_asks_with_two() -> Result<(), String> {
+    let _trace = crate::repo::hang_diagnostics::trace(
+        "toolbar_publish_starts_directly_with_one_remote_and_asks_with_two",
+    );
     let w = world("direct-publish")?;
     run(&w.mine, &["checkout", "-b", "topic"])?;
     let head = commit(&w.mine, "topic")?;
@@ -61,12 +79,15 @@ fn toolbar_publish_starts_directly_with_one_remote_and_asks_with_two() -> Result
     settle(&mut tab, &ctx)?;
     assert_eq!(git::resolve(&w.bare, "refs/heads/topic")?, head);
     assert_eq!(run(&w.mine, &["rev-parse", "--abbrev-ref", "@{upstream}"])?.trim(), "origin/topic");
+    close_tab(tab);
     run(&w.mine, &["checkout", "-b", "ambiguous"])?;
     run(&w.mine, &["remote", "add", "second", &path(&w.bare)])?;
     let mut tab = direct_tab(&w, &ctx)?;
     tab.apply(crate::repo::Action::Push, &ctx);
     assert!(matches!(tab.push_flow.banner, Some(super::Banner::NoUpstream { .. })));
     assert!(git::resolve(&w.bare, "refs/heads/ambiguous").is_err());
+    close_tab(tab);
+    remove_world(w);
     Ok(())
 }
 
@@ -100,6 +121,7 @@ fn toolbar_honors_push_remote_and_keeps_gone_upstream_target() -> Result<(), Str
     settle(&mut tab, &ctx)?;
     assert_eq!(git::resolve(&other, "refs/heads/main")?, head);
     assert_eq!(remote_main(&w), before);
+    close_tab(tab);
     // A gone upstream must still use Git's configured route, rather than offer a
     // new remote or silently publish somewhere else.
     run(&w.mine, &["config", "--unset", "branch.main.pushRemote"])?;
@@ -110,6 +132,8 @@ fn toolbar_honors_push_remote_and_keeps_gone_upstream_target() -> Result<(), Str
     settle(&mut tab, &ctx)?;
     assert!(tab.push_flow.banner.is_none());
     assert_eq!(remote_main(&w), head);
+    close_tab(tab);
+    remove_world(w);
     Ok(())
 }
 

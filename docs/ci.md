@@ -112,3 +112,8 @@ In both cases the shard fails with a report instead of a bare `KeyboardInterrupt
 These limits are bounds for diagnosis. Never raise them to make a hang pass.
 The `repo::stack`, `repo::test_lane`, `repo::reflog` and ACL hangs are still
 unexplained. They need native Windows repro runs with these diagnostics.
+`repo::push::tests::toolbar_publish_starts_directly_with_one_remote_and_asks_with_two`
+stalled once (run 43430908730) with no child process left in its Job Object. Its
+cause is not proven. The test now closes its first tab before it changes the
+repository, as the app would, and traces its stages (`[hang-stage …]`), so a
+repeat names the step it stopped in.
