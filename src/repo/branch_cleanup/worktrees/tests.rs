@@ -3,7 +3,8 @@
 
 use std::path::PathBuf;
 
-use super::{auto_restore, evidence, rows, window};
+use super::jobs::auto_restore;
+use super::{evidence, rows, window};
 use crate::git;
 use crate::git::stack::test_repo::TestRepo;
 use crate::git::worktree_cleanup::archive::Store;

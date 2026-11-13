@@ -350,6 +350,33 @@ mod tests {
         Ok(())
     }
 
+    /// Worktrees of merged branches are offered beside the branches (#213), even with no
+    /// branch to delete, and the button opens their review.
+    #[test]
+    fn worktrees_of_merged_branches_are_offered() {
+        use egui_kittest::kittest::Queryable;
+        let mut dialog = CleanupDialog::new(Vec::new(), false, None);
+        dialog.offer_worktrees(2);
+        let mut opened = false;
+        let mut styled = false;
+        let mut h = egui_kittest::Harness::new_ui(|ui| {
+            if !std::mem::replace(&mut styled, true) {
+                crate::theme::install_fonts(ui.ctx());
+                return;
+            }
+            if let Outcome::Done(action) = cleanup(ui, &mut dialog) {
+                opened |= matches!(*action, Action::Cleanup(CleanupAct::Worktrees));
+            }
+        });
+        h.run();
+        h.get_by_label_contains("2 worktrees have a merged branch")
+            .rect();
+        h.get_by_label("Review worktree cleanup…").click();
+        h.run();
+        drop(h);
+        assert!(opened);
+    }
+
     #[test]
     fn labels_count_the_branches() {
         assert_eq!(delete_label(1, None), "Delete 1 branch");
