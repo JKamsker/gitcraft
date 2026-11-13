@@ -7,9 +7,12 @@
 mod controls;
 mod detail;
 mod diagnostic_view;
+mod evidence_view;
 mod reads;
 mod waterfall;
 
+#[cfg(test)]
+mod evidence_tests;
 #[cfg(test)]
 mod lifecycle_tests;
 #[cfg(test)]
@@ -56,6 +59,8 @@ pub(crate) struct State {
     selected: Option<usize>,
     /// The jobs whose steps are shown.
     expanded: HashSet<usize>,
+    /// What the picked job's logs record, read on request.
+    logs: Slot<analysis::test_history::JobEvidence>,
 }
 
 impl State {
@@ -99,6 +104,8 @@ pub(crate) enum Act {
     Expand(usize),
     /// Read the run shown again.
     ReloadRun,
+    /// Read the logs of this job, its baseline job and its same-SHA attempts.
+    ReadLogs(usize),
 }
 
 /// Whether `error` says the forge's tool is missing or not signed in: what is needed, rather
@@ -177,13 +184,19 @@ impl RepoTab {
                     self.ci_path_read_run(ctx);
                 }
             }
-            Act::Select(job) => state.selected = job,
+            Act::Select(job) => {
+                if job != state.selected {
+                    state.logs = Slot::default();
+                }
+                state.selected = job;
+            }
             Act::Expand(job) => {
                 if !state.expanded.remove(&job) {
                     state.expanded.insert(job);
                 }
             }
             Act::ReloadRun => self.ci_path_read_run(ctx),
+            Act::ReadLogs(job) => self.ci_path_read_logs(job, ctx),
         }
     }
 
@@ -268,6 +281,7 @@ impl RepoTab {
                 if let Some(job) = state.selected {
                     detail::job(ui, explorer, job, state.expanded.contains(&job), acts);
                     diagnostic_view::job(ui, explorer, job);
+                    evidence_view::job(ui, state, explorer, job, acts);
                 } else {
                     ui.add_space(6.0);
                     common::empty(

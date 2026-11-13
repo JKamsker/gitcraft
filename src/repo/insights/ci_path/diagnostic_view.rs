@@ -98,7 +98,7 @@ pub(super) fn job(ui: &mut Ui, explorer: &Explorer, index: usize) {
     }
 }
 
-fn history_links(ui: &mut Ui, observations: &[diagnostics::Observation]) {
+pub(super) fn history_links(ui: &mut Ui, observations: &[diagnostics::Observation]) {
     if observations.is_empty() {
         ui.label("History unknown: no recorded attempts available.");
     }
