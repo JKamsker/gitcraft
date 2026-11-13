@@ -13,6 +13,8 @@ installed `git` command line, so a user's config, credentials and hooks apply as
   CPU benchmarks, stack profiles and source-line coverage.
 - [Process orchestration](process-orchestration.md): subprocess limits, lifecycle handling and
   before/after stress measurements.
+- [CI and releases](ci.md): the verification contract, the required check, merge-queue
+  settings, the pre-push command (`python3 ci/check.py`) and how to read a failed job.
 
 ## Build and run
 
@@ -58,9 +60,9 @@ unstaged deletions; index/revision modes check their own snapshots, including
 staged renames/deletions. Symlinks count their Git link contents, never an external
 target. Unmerged Rust entries or unreadable content fail closed.
 
-The unconditional `rust-file-size` job in PR/mainline CI (master/main), dev
-validation and tag/manual release builds calls the shared workflow and checks
-`--revision HEAD`. For PRs, checkout supplies the candidate merge tree. Downstream
+The unconditional `rust-file-size` job in CI (pull requests, merge-queue
+candidates, pushes to dev/master/main and tags) and in tag/manual release builds
+calls the shared workflow and checks `--revision HEAD`. For PRs, checkout supplies the candidate merge tree. Downstream
 checks/builds depend on this gate, and publishing depends on those builds.
 CI remains authoritative even when local checks are skipped. The lexical
 [architecture survey](architecture.md) stays advisory alongside this hard cap.
@@ -151,3 +153,5 @@ A release is built by `.github/workflows/release.yml` whenever a `v*` tag is pus
 | macOS universal app, `.dmg` and `.zip` | `packaging/macos/build-app.sh` (job currently off) |
 
 Every change to `dev` also publishes a prerelease, which is what the dev update channel follows.
+Nothing is published until CI passed for that exact commit, and pull requests already build
+the same packages with a prerelease version ([CI and releases](ci.md)).

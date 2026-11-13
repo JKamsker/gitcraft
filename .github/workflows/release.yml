@@ -3,6 +3,10 @@
 # `vX.Y.Z-dev.N` (N is the run number), and creates its tag on that commit: no tag is needed
 # beforehand.
 # Run it by hand (Actions › Release › Run workflow) to only build and download the artifacts.
+#
+# Verification is not repeated here: CI runs on the same push (and on merge-queue candidates),
+# and nothing is published until CI's required `CI result` job passed for this exact commit
+# (ci/await_ci.py). The packages are built by the same workflow the CI packaging smoke uses.
 name: Release
 
 on:
@@ -11,8 +15,8 @@ on:
     branches: [dev]
   workflow_dispatch:
 
-# Read-only for the builds (they run tests, build scripts and downloaded tools); only the
-# release job below can write.
+# Read-only for the builds (they run build scripts and downloaded tools); only the release job
+# below can write.
 permissions:
   contents: read
 
@@ -27,9 +31,7 @@ jobs:
   rust-file-size:
     uses: ./.github/workflows/rust-file-size.yml
 
-  # The version this run builds and the name its files carry. A tag or a run by hand builds
-  # Cargo.toml's version. A dev push builds the next patch after the last release, as a
-  # prerelease (Cargo.toml's version itself while it has no tag yet).
+  # The version this run builds and the name its files carry (ci/release_version.py).
   version:
     needs: rust-file-size
     runs-on: ubuntu-latest
@@ -44,207 +46,36 @@ jobs:
           DEV: ${{ github.event_name == 'push' && github.ref == 'refs/heads/dev' }}
           REF_NAME: ${{ github.ref_name }}
           RUN_NUMBER: ${{ github.run_number }}
-        run: |
-          version="$(grep -m 1 '^version = ' Cargo.toml | cut -d '"' -f 2)"
-          if [ "$DEV" = true ]; then
-            if git ls-remote --exit-code --tags origin "refs/tags/v$version" > /dev/null; then
-              patch="${version##*.}"
-              version="${version%.*}.$((patch + 1))"
-            fi
-            version="$version-dev.$RUN_NUMBER"
-            label="v$version"
-          else
-            # Made safe for a file name (a branch like `feature/x` has a slash).
-            label="$(printf '%s' "$REF_NAME" | tr -c 'A-Za-z0-9._-' '-')"
-          fi
-          echo "$version, files named $label"
-          echo "version=$version" >> "$GITHUB_OUTPUT"
-          echo "label=$label" >> "$GITHUB_OUTPUT"
-          echo "prerelease=$DEV" >> "$GITHUB_OUTPUT"
+        run: python3 ci/release_version.py compute --dev "$DEV" --ref-name "$REF_NAME" --run-number "$RUN_NUMBER" --output "$GITHUB_OUTPUT"
 
-  # Compile once and fan out the Windows tests, alongside the release builds.
-  windows-tests:
+  # Waits for CI on this exact commit; publishing depends on it. A run by hand publishes
+  # nothing, so it does not wait.
+  ci-gate:
+    name: CI passed for this commit
     needs: rust-file-size
-    uses: ./.github/workflows/windows-tests.yml
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    timeout-minutes: 160
+    permissions:
+      actions: read
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - name: Wait for CI's required check on this commit
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python3 ci/await_ci.py --repo "$GITHUB_REPOSITORY" --sha "$GITHUB_SHA"
 
   build:
     needs: version
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - os: windows-latest
-            name: windows-x86_64
-          # The oldest supported runner, so the binary runs on older glibc too.
-          - os: ubuntu-22.04
-            name: linux-x86_64
-          # Builds for Apple silicon and Intel, joined into one universal app. Off for now: the
-          # macOS runners aren't picking the job up (a known issue); put it back once they do.
-          # - os: macos-latest
-          #   name: macos-universal
-    runs-on: ${{ matrix.os }}
-    env:
-      VERSION: ${{ needs.version.outputs.version }}
-      # The base of every file name.
-      PKG: gitcraft-${{ needs.version.outputs.label }}-${{ matrix.name }}
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: '3.12'
-      - uses: dtolnay/rust-toolchain@stable
-        with:
-          components: clippy
-      - uses: Swatinem/rust-cache@v2
-
-      # The version into Cargo.toml and Cargo.lock, so the app, the .exe's details and the
-      # packages all carry it (nothing changes unless this is a dev build). On Windows the
-      # checkout has CRLF line ends.
-      - name: Version
-        shell: bash
-        run: |
-          perl -0pi.bak -e 's/^version = "[^"]*"/version = "$ENV{VERSION}"/m' Cargo.toml
-          perl -0pi.bak -e 's/(name = "gitcraft"\r?\nversion = ")[^"]*/$1$ENV{VERSION}/' Cargo.lock
-          rm Cargo.toml.bak Cargo.lock.bak
-          grep -q "^version = \"$VERSION\"" Cargo.toml
-          grep -q "^version = \"$VERSION\"" Cargo.lock
-
-      - name: Linux build dependencies
-        if: runner.os == 'Linux'
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y libxkbcommon-dev libwayland-dev libx11-dev libxcursor-dev \
-            libxrandr-dev libxi-dev libgtk-3-dev libdbus-1-dev libasound2-dev pkg-config
-
-      # Match ci.yml's isolation of tests sensitive to parallel subprocess load.
-      # Keep their original time limits; run them separately instead of weakening assertions.
-      # Windows runs the shared shards in parallel with this packaging job.
-      - name: Clippy and complexity gate
-        run: python ci/clippy_packages.py
-
-      - name: Test
-        if: runner.os != 'Windows'
-        run: cargo test --locked -- --skip parallel_bisect::tests::a_test_past_its_limit_is_stopped_and_skipped --skip app::palette::tests::thousands_of_branches_open_and_filter_quickly
-
-      - name: Large-branch palette responsiveness (isolated)
-        if: runner.os != 'Windows'
-        timeout-minutes: 5
-        run: cargo test --locked -p gitcraft --lib app::palette::tests::thousands_of_branches_open_and_filter_quickly -- --exact --nocapture --test-threads=1
-
-      - name: Timed-out subprocess cleanup (isolated)
-        if: runner.os != 'Windows'
-        timeout-minutes: 5
-        run: cargo test --locked -p gitcraft --lib parallel_bisect::tests::a_test_past_its_limit_is_stopped_and_skipped -- --exact --nocapture
-
-      - name: Build
-        if: runner.os != 'macOS'
-        run: cargo build --release --locked
-
-      - name: Build (macOS)
-        if: runner.os == 'macOS'
-        env:
-          MACOSX_DEPLOYMENT_TARGET: "11.0"
-        run: |
-          rustup target add aarch64-apple-darwin x86_64-apple-darwin
-          cargo build --release --locked --target aarch64-apple-darwin
-          cargo build --release --locked --target x86_64-apple-darwin
-
-      - name: App, dmg and zip (macOS)
-        if: runner.os == 'macOS'
-        run: |
-          name="$PKG"
-          # Bundle versions are numbers only, without the `-dev.N`.
-          sh packaging/macos/build-app.sh "${VERSION%%-*}" "$name"
-          # Both architectures, signed, and the disk image is sound.
-          mkdir check
-          ditto -x -k "$name.zip" check
-          lipo -archs check/gitcraft.app/Contents/MacOS/gitcraft
-          lipo -archs check/gitcraft.app/Contents/MacOS/gitcraft | grep -q x86_64
-          lipo -archs check/gitcraft.app/Contents/MacOS/gitcraft | grep -q arm64
-          codesign --verify --strict check/gitcraft.app
-          plutil -lint check/gitcraft.app/Contents/Info.plist
-          hdiutil verify "$name.dmg"
-
-      - name: Package (Windows)
-        if: runner.os == 'Windows'
-        shell: pwsh
-        run: |
-          $dir = $env:PKG
-          New-Item -ItemType Directory $dir | Out-Null
-          Copy-Item target/release/gitcraft.exe, README.md, ATTRIBUTION.md, LICENSE-MIT, LICENSE-APACHE $dir
-          Compress-Archive -Path $dir -DestinationPath "$dir.zip"
-
-      - name: Installer (Windows)
-        if: runner.os == 'Windows'
-        shell: pwsh
-        run: |
-          choco install innosetup --no-progress -y
-          & "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe" /Qp "/DAppVersion=$($env:VERSION)" "/DOutputName=$($env:PKG)-setup" packaging\windows\gitcraft.iss
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          Move-Item dist\*.exe .
-
-      - name: Package (Linux)
-        if: runner.os == 'Linux'
-        run: |
-          dir="$PKG"
-          mkdir "$dir"
-          cp target/release/gitcraft README.md ATTRIBUTION.md LICENSE-MIT LICENSE-APACHE \
-            packaging/gitcraft.desktop packaging/linux/gitcraft-link.desktop \
-            packaging/linux/gitcraft-servicemenu.desktop "$dir/"
-          cp assets/app-icon/gitcraft-256.png "$dir/gitcraft.png"
-          strip "$dir/gitcraft"
-          tar czf "$dir.tar.gz" "$dir"
-
-      - name: AppImage (Linux)
-        if: runner.os == 'Linux'
-        env:
-          # The runner has no FUSE: appimagetool unpacks itself instead.
-          APPIMAGE_EXTRACT_AND_RUN: "1"
-        run: |
-          sudo curl -fsSL -o /usr/local/bin/appimagetool \
-            https://github.com/AppImage/appimagetool/releases/download/continuous/appimagetool-x86_64.AppImage
-          sudo chmod +x /usr/local/bin/appimagetool
-          sh packaging/linux/build-appimage.sh "$PKG.AppImage"
-
-      - uses: taiki-e/install-action@v2
-        if: runner.os == 'Linux'
-        with:
-          tool: cargo-deb,cargo-generate-rpm
-
-      - name: deb and rpm (Linux)
-        if: runner.os == 'Linux'
-        run: |
-          name="$PKG"
-          strip target/release/gitcraft
-          cargo deb --no-build --output "$name.deb"
-          # rpm has no `-` in a version: `0.3.4~dev.6`, which comes before 0.3.4 (cargo deb
-          # does the same on its own).
-          rpm_version="$(printf '%s' "$VERSION" | tr '-' '~')"
-          cargo generate-rpm --output "$name.rpm" --set-metadata "version = \"$rpm_version\""
-          # The .deb installs, with its menu entry and icon; the .rpm holds the same files.
-          sudo apt-get install -y desktop-file-utils rpm "./$name.deb"
-          desktop-file-validate /usr/share/applications/gitcraft.desktop
-          desktop-file-validate /usr/share/applications/gitcraft-link.desktop
-          test -x /usr/bin/gitcraft
-          test -f /usr/share/icons/hicolor/256x256/apps/gitcraft.png
-          rpm -qp --requires "$name.rpm"
-          rpm -qlp "$name.rpm"
-
-      - uses: actions/upload-artifact@v4
-        with:
-          name: gitcraft-${{ matrix.name }}
-          path: |
-            gitcraft-*.zip
-            gitcraft-*.dmg
-            gitcraft-*.tar.gz
-            gitcraft-*-setup.exe
-            gitcraft-*.AppImage
-            gitcraft-*.deb
-            gitcraft-*.rpm
+    uses: ./.github/workflows/package.yml
+    with:
+      version: ${{ needs.version.outputs.version }}
+      label: ${{ needs.version.outputs.label }}
 
   release:
-    needs: [version, build, windows-tests]
-    if: startsWith(github.ref, 'refs/tags/') || needs.version.outputs.prerelease == 'true'
+    needs: [version, build, ci-gate]
+    if: github.event_name == 'push' && (startsWith(github.ref, 'refs/tags/') || needs.version.outputs.prerelease == 'true')
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -252,7 +83,6 @@ jobs:
       - uses: actions/download-artifact@v4
         with:
           path: dist
-          # Exclude the precompiled Windows test artifact from published files.
           pattern: gitcraft-*
           merge-multiple: true
       # A dev build tags its own commit and never becomes the latest release, the one the

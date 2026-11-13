@@ -1,0 +1,179 @@
+# Builds the release binaries, installers and packages for one version. Shared by Release (which
+# publishes them) and CI (a packaging smoke on every pull request and merge-queue candidate, with
+# a prerelease version), so a package that cannot be built fails before it is merged: the same
+# steps, scripts and tool versions run in both.
+name: Package
+
+on:
+  workflow_call:
+    inputs:
+      version:
+        description: The version written into Cargo.toml/Cargo.lock, e.g. 0.3.4-dev.6.
+        required: true
+        type: string
+      label:
+        description: The base of every file name, e.g. v0.3.4-dev.6.
+        required: true
+        type: string
+      retention-days:
+        description: How long the artifacts are kept (0 is the repository default).
+        required: false
+        type: number
+        default: 0
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            name: windows-x86_64
+          # The oldest supported runner, so the binary runs on older glibc too.
+          - os: ubuntu-22.04
+            name: linux-x86_64
+          # Builds for Apple silicon and Intel, joined into one universal app. Off for now: the
+          # macOS runners aren't picking the job up (a known issue); put it back once they do.
+          # - os: macos-latest
+          #   name: macos-universal
+    name: package (${{ matrix.name }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 60
+    env:
+      VERSION: ${{ inputs.version }}
+      # The base of every file name.
+      PKG: gitcraft-${{ inputs.label }}-${{ matrix.name }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+
+      # The version into Cargo.toml and Cargo.lock, so the app, the .exe's details and the
+      # packages all carry it. On Windows the checkout has CRLF line ends.
+      - name: Version
+        shell: bash
+        run: python ci/release_version.py apply "$VERSION"
+
+      - name: Linux build dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libxkbcommon-dev libwayland-dev libx11-dev libxcursor-dev \
+            libxrandr-dev libxi-dev libgtk-3-dev libdbus-1-dev libasound2-dev pkg-config
+
+      - name: Build
+        if: runner.os != 'macOS'
+        run: cargo build --release --locked
+
+      - name: Build (macOS)
+        if: runner.os == 'macOS'
+        env:
+          MACOSX_DEPLOYMENT_TARGET: "11.0"
+        run: |
+          rustup target add aarch64-apple-darwin x86_64-apple-darwin
+          cargo build --release --locked --target aarch64-apple-darwin
+          cargo build --release --locked --target x86_64-apple-darwin
+
+      - name: App, dmg and zip (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          name="$PKG"
+          # Bundle versions are numbers only, without the `-dev.N`.
+          sh packaging/macos/build-app.sh "${VERSION%%-*}" "$name"
+          # Both architectures, signed, and the disk image is sound.
+          mkdir check
+          ditto -x -k "$name.zip" check
+          lipo -archs check/gitcraft.app/Contents/MacOS/gitcraft
+          lipo -archs check/gitcraft.app/Contents/MacOS/gitcraft | grep -q x86_64
+          lipo -archs check/gitcraft.app/Contents/MacOS/gitcraft | grep -q arm64
+          codesign --verify --strict check/gitcraft.app
+          plutil -lint check/gitcraft.app/Contents/Info.plist
+          hdiutil verify "$name.dmg"
+
+      - name: Package (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $dir = $env:PKG
+          New-Item -ItemType Directory $dir | Out-Null
+          Copy-Item target/release/gitcraft.exe, README.md, ATTRIBUTION.md, LICENSE-MIT, LICENSE-APACHE $dir
+          Compress-Archive -Path $dir -DestinationPath "$dir.zip"
+
+      - name: Installer (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          choco install innosetup --no-progress -y
+          & "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe" /Qp "/DAppVersion=$($env:VERSION)" "/DOutputName=$($env:PKG)-setup" packaging\windows\gitcraft.iss
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          Move-Item dist\*.exe .
+
+      - name: Package (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          dir="$PKG"
+          mkdir "$dir"
+          cp target/release/gitcraft README.md ATTRIBUTION.md LICENSE-MIT LICENSE-APACHE \
+            packaging/gitcraft.desktop packaging/linux/gitcraft-link.desktop \
+            packaging/linux/gitcraft-servicemenu.desktop "$dir/"
+          cp assets/app-icon/gitcraft-256.png "$dir/gitcraft.png"
+          strip "$dir/gitcraft"
+          tar czf "$dir.tar.gz" "$dir"
+
+      - name: AppImage (Linux)
+        if: runner.os == 'Linux'
+        env:
+          # The runner has no FUSE: appimagetool unpacks itself instead.
+          APPIMAGE_EXTRACT_AND_RUN: "1"
+        run: |
+          sudo curl -fsSL -o /usr/local/bin/appimagetool \
+            https://github.com/AppImage/appimagetool/releases/download/continuous/appimagetool-x86_64.AppImage
+          sudo chmod +x /usr/local/bin/appimagetool
+          sh packaging/linux/build-appimage.sh "$PKG.AppImage"
+
+      - uses: taiki-e/install-action@v2
+        if: runner.os == 'Linux'
+        with:
+          tool: cargo-deb,cargo-generate-rpm
+
+      - name: deb and rpm (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          name="$PKG"
+          strip target/release/gitcraft
+          cargo deb --no-build --output "$name.deb"
+          # rpm has no `-` in a version: `0.3.4~dev.6`, which comes before 0.3.4 (cargo deb
+          # does the same on its own). ci/test_release_version.py keeps the historical
+          # `invalid version "0.3.4-dev.6"` failure as a fixture.
+          rpm_version="$(python ci/release_version.py rpm "$VERSION")"
+          cargo generate-rpm --output "$name.rpm" --set-metadata "version = \"$rpm_version\""
+          # The .deb installs, with its menu entry and icon; the .rpm holds the same files.
+          sudo apt-get install -y desktop-file-utils rpm "./$name.deb"
+          desktop-file-validate /usr/share/applications/gitcraft.desktop
+          desktop-file-validate /usr/share/applications/gitcraft-link.desktop
+          test -x /usr/bin/gitcraft
+          test -f /usr/share/icons/hicolor/256x256/apps/gitcraft.png
+          test "$(rpm -qp --queryformat '%{VERSION}' "$name.rpm")" = "$rpm_version"
+          rpm -qp --requires "$name.rpm"
+          rpm -qlp "$name.rpm"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: gitcraft-${{ matrix.name }}
+          retention-days: ${{ inputs.retention-days }}
+          # A re-run replaces the previous attempt's packages.
+          overwrite: true
+          path: |
+            gitcraft-*.zip
+            gitcraft-*.dmg
+            gitcraft-*.tar.gz
+            gitcraft-*-setup.exe
+            gitcraft-*.AppImage
+            gitcraft-*.deb
+            gitcraft-*.rpm

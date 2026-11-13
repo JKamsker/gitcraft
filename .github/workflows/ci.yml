@@ -1,21 +1,33 @@
-# Checks every push and pull request: formatting, lints and tests on Windows and Linux, and
-# the forge code against a real Forgejo and a real Gitea (started by ci/forge-server.sh).
+# The one verification contract for gitcraft (issue #211): formatting, lints and complexity
+# gates, the tests on Linux (Ubuntu 22.04, which releases build on, and the latest Ubuntu) and in
+# complete, disjoint Windows shards, and a packaging smoke with a prerelease version through the
+# same workflow Release builds with. The live Forgejo/Gitea matrix runs for changes to the forge
+# code, nightly and by hand. `CI result` is the single required check; Release publishes a
+# commit only after it passed for that exact commit.
 name: CI
 
-# Pull requests, as they would be merged into their base, and the default branch as it is. Any
-# other branch can be checked by hand (Actions › CI › Run workflow).
+# Pull requests, as they would be merged into their base; merge-queue candidates (the exact tree
+# that will land); pushes to dev, master/main and release tags (the post-merge guard Release
+# waits for); nightly on the default branch; any other branch by hand (Actions › CI › Run workflow).
 on:
   push:
-    branches: [master, main]
+    branches: [dev, master, main]
+    tags: ["v*"]
   pull_request:
+  merge_group:
+    types: [checks_requested]
+  schedule:
+    - cron: "17 3 * * *"
   workflow_dispatch:
 
 permissions:
   contents: read
 
+# A newer push to a pull request cancels the run for its older commit. Nothing else is ever
+# cancelled: each merge-queue candidate, push, nightly or manual run has a group of its own commit.
 concurrency:
-  group: ci-${{ github.ref }}
-  cancel-in-progress: true
+  group: ci-${{ github.event_name }}-${{ github.ref }}${{ github.event_name != 'pull_request' && format('-{0}', github.sha) || '' }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 env:
   CARGO_TERM_COLOR: always
@@ -49,11 +61,19 @@ jobs:
 
   test:
     needs: rust-file-size
-    name: test (ubuntu-latest)
-    runs-on: ubuntu-latest
+    name: test (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        # 22.04 is what releases build on (the oldest glibc they support); keep the latest too.
+        os: [ubuntu-22.04, ubuntu-latest]
+    runs-on: ${{ matrix.os }}
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
         with:
@@ -65,30 +85,53 @@ jobs:
             libxrandr-dev libxi-dev libgtk-3-dev libdbus-1-dev libasound2-dev pkg-config openssh-server
       - name: Build tests
         run: cargo test --locked --no-run
+      # Each step runs under the test watchdog: a bounded deadline below the step timeout, a
+      # heartbeat, and ci-reports/<name>/ with per-test outcomes, JUnit and capped logs.
       - name: Test
         timeout-minutes: 30
         env:
           RUST_BACKTRACE: "1"
-        run: cargo test --locked -- --nocapture --skip parallel_bisect::tests::a_test_past_its_limit_is_stopped_and_skipped --skip app::palette::tests::thousands_of_branches_open_and_filter_quickly
+        run: >-
+          python ci/libtest_watchdog.py --name linux-main --report-dir ci-reports/linux-main
+          --deadline 1680 --stall 600 --
+          cargo test --locked -- --nocapture
+          --skip parallel_bisect::tests::a_test_past_its_limit_is_stopped_and_skipped
+          --skip app::palette::tests::thousands_of_branches_open_and_filter_quickly
       # Keep the palette's wall-clock budget meaningful by avoiding contention
       # with the full subprocess-heavy suite, as the Windows shards already do.
       - name: Large-branch palette responsiveness (isolated)
         timeout-minutes: 5
         env:
           RUST_BACKTRACE: "1"
-        run: cargo test --locked -p gitcraft --lib app::palette::tests::thousands_of_branches_open_and_filter_quickly -- --exact --nocapture --test-threads=1
+        run: >-
+          python ci/libtest_watchdog.py --name linux-palette --report-dir ci-reports/linux-palette
+          --deadline 270 --
+          cargo test --locked -p gitcraft --lib app::palette::tests::thousands_of_branches_open_and_filter_quickly
+          -- --exact --nocapture --test-threads=1
       # This fixture checks its own recorded child PIDs. Run it separately so
       # subprocess-heavy fixtures do not contend with its timeout budget.
       - name: Timed-out subprocess cleanup (isolated)
         timeout-minutes: 5
         env:
           RUST_BACKTRACE: "1"
-        run: cargo test --locked -p gitcraft --lib parallel_bisect::tests::a_test_past_its_limit_is_stopped_and_skipped -- --exact --nocapture
+        run: >-
+          python ci/libtest_watchdog.py --name linux-bisect-cleanup --report-dir ci-reports/linux-bisect-cleanup
+          --deadline 270 --
+          cargo test --locked -p gitcraft --lib parallel_bisect::tests::a_test_past_its_limit_is_stopped_and_skipped
+          -- --exact --nocapture
       - name: Real OpenSSH transport reuse and recovery
         timeout-minutes: 5
         run: |
           sudo mkdir -p /run/sshd
           python3 ci/test-ssh-transport.py
+      - name: Upload test reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-report-${{ matrix.os }}-attempt-${{ github.run_attempt }}
+          path: ci-reports/
+          if-no-files-found: warn
+          retention-days: 14
 
   windows-tests:
     needs: rust-file-size
@@ -96,9 +139,10 @@ jobs:
 
   windows-test-result:
     # Preserve the required branch protection check while running Windows tests in parallel.
+    # It always runs: a skipped required check would count as passing.
     name: test (windows-latest)
     needs: windows-tests
-    if: ${{ always() && !cancelled() }}
+    if: ${{ always() }}
     runs-on: ubuntu-latest
     steps:
       - name: Require the Windows build and every shard to pass
@@ -107,13 +151,51 @@ jobs:
         run: |
           test "$TESTS_RESULT" = success
 
-  forges:
+  # The packaging smoke: a dev prerelease version (computed like Release computes it) through
+  # the same packaging workflow Release builds with.
+  package-version:
     needs: rust-file-size
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      label: ${{ steps.version.outputs.label }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: version
+        env:
+          RUN_NUMBER: ${{ github.run_number }}
+        run: python3 ci/release_version.py compute --dev true --run-number "$RUN_NUMBER" --output "$GITHUB_OUTPUT"
+
+  package-smoke:
+    needs: package-version
+    uses: ./.github/workflows/package.yml
+    with:
+      version: ${{ needs.package-version.outputs.version }}
+      label: ${{ needs.package-version.outputs.label }}
+      retention-days: 3
+
+  # Whether this change reaches the forge code (ci/changed_paths.py).
+  changes:
+    needs: rust-file-size
+    runs-on: ubuntu-latest
+    outputs:
+      forge: ${{ steps.paths.outputs.forge }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - id: paths
+        env:
+          # A pull request's checkout is its merge commit: HEAD^1 is the base it merges into.
+          BASE: ${{ github.event_name == 'pull_request' && 'HEAD^1' || github.event.merge_group.base_sha || github.event.before }}
+        run: python3 ci/changed_paths.py --base "$BASE" --output "$GITHUB_OUTPUT"
+
+  forges:
+    needs: [rust-file-size, changes]
     name: forges (Forgejo ${{ matrix.forgejo }}, Gitea ${{ matrix.gitea }})
-    # Off for pull requests and pushes for now: with dozens of pull requests open at once, these
-    # jobs held up the queue of every one of them. Run them by hand (Actions › CI › Run workflow)
-    # for a branch that touches the forge code.
-    if: github.event_name == 'workflow_dispatch'
+    # Slow, so only for changes to the forge code (adapters, HTTP transport, the lane itself, the
+    # lockfile), nightly, and by hand (Actions › CI › Run workflow).
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' || needs.changes.outputs.forge == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 30
     strategy:
@@ -168,3 +250,35 @@ jobs:
             cat "$log"
             echo "::endgroup::"
           done
+
+  # The single required check (branch protection and the merge queue): every job above must
+  # succeed; only the conditional forge lane may be skipped. It always runs, so a failed,
+  # cancelled or skipped dependency fails it instead of skipping it. It also summarizes and
+  # classifies every recorded test failure (ci/ci_summary.py).
+  ci-result:
+    name: CI result
+    needs: [rust-file-size, lint, test, windows-tests, windows-test-result, package-version, package-smoke, changes, forges]
+    if: ${{ always() }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download test reports
+        continue-on-error: true
+        uses: actions/download-artifact@v4
+        with:
+          path: ci-reports
+          pattern: test-report-*
+      - name: Failure summary
+        env:
+          NEEDS: ${{ toJSON(needs) }}
+        run: python3 ci/ci_summary.py ci-reports --json ci-summary.json
+      - name: Upload the failure summary
+        uses: actions/upload-artifact@v4
+        with:
+          name: ci-summary-attempt-${{ github.run_attempt }}
+          path: ci-summary.json
+          if-no-files-found: warn
+      - name: Require every job to pass
+        env:
+          NEEDS: ${{ toJSON(needs) }}
+        run: python3 ci/require_results.py --allow-skipped forges

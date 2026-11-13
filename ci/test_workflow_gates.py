@@ -17,6 +17,11 @@ COMPLEXITY_CHECK = "python3 ci/complexity_policy.py --revision HEAD"
 SIZE_CHECK = "python3 ci/rust_file_size.py --revision HEAD"
 TOOLING_CHECK = "python3 -m unittest discover -s ci -p 'test_*.py' -v"
 CLIPPY_CHECK = "python ci/clippy_packages.py"
+AGGREGATE = "ci-result"
+AGGREGATE_CHECK = "python3 ci/require_results.py --allow-skipped forges"
+# A required check that is skipped counts as passing, so status jobs must run even
+# after a cancellation: `!cancelled()` would let a cancelled run skip them.
+STATUS_CONDITION = "${{ always() }}"
 ARCH_TESTS = "cargo test --locked --manifest-path ci/arch-fitness/Cargo.toml"
 ARCH_CHECK = ('cargo run --locked --release --manifest-path ci/arch-fitness/Cargo.toml -- '
               'check --revision HEAD --markdown "$GITHUB_STEP_SUMMARY"')
@@ -157,13 +162,14 @@ def verify_callers(text):
         require("continue-on-error" not in job, f"job {name} softens required failures")
         condition = job.get("if", ("",))[0]
         if re.search(r"\b(?:always|failure|cancelled)\s*\(", condition):
-            # This existing status-only job must run after a failed/skipped
-            # Windows dependency to preserve the branch-protection result.
-            body = jobs[name][1]
+            # Status-only jobs run after a failed/skipped/cancelled dependency
+            # and fail on it, preserving the branch-protection result.
+            body = "\n".join(line for line in jobs[name][1].splitlines() if not line.lstrip().startswith("#"))
             status_only = (name == "windows-test-result" and edges[name] == {"windows-tests"}
                            and not re.search(r"^\s+(?:- )?uses:", body, re.M)
                            and re.search(r'run: \|\n          test "\$TESTS_RESULT" = success\s*$', body))
-            require(status_only, f"job {name} bypasses dependency status")
+            require(condition == STATUS_CONDITION and (status_only or (name == AGGREGATE and aggregate_step(body))),
+                    f"job {name} bypasses dependency status")
 
     def reaches_gate(name, visiting):
         require(name in jobs, f"unknown dependency: {name}")
@@ -175,6 +181,24 @@ def verify_callers(text):
 
     for name in jobs:
         require(reaches_gate(name, set()), f"job {name} bypasses the size gate")
+    if AGGREGATE in jobs:
+        missing = set(jobs) - {AGGREGATE} - edges[AGGREGATE]
+        require(not missing, f"jobs bypass the required {AGGREGATE}: {sorted(missing)}")
+
+
+def aggregate_step(body):
+    """The aggregate ends by deciding on every needed result, unsoftened."""
+    fields = mapping(body, 4)
+    require("steps" in fields and not fields["steps"][0], "aggregate has no steps")
+    blocks = re.split(r"(?m)^      - ", fields["steps"][1])
+    steps = [mapping("        " + block, 8) for block in blocks[1:]]
+    require(bool(steps), "aggregate has no steps")
+    last = steps[-1]
+    if (last.get("run", (None,))[0] != AGGREGATE_CHECK or last["run"][1].strip()
+            or set(last) - {"name", "run", "env"}):
+        return False
+    variables = nested(last, "env", 10) if "env" in last else {}
+    return variables == {"NEEDS": ("${{ toJSON(needs) }}", "")}
 
 
 class WorkflowGateTests(unittest.TestCase):
@@ -184,9 +208,10 @@ class WorkflowGateTests(unittest.TestCase):
         cls.shared = (workflows / "rust-file-size.yml").read_text(encoding="utf-8")
         cls.callers = {name: (workflows / name).read_text(encoding="utf-8")
                        for name in ("ci.yml", "release.yml")}
+        # Release lints nothing itself: it publishes only after CI (lint, windows-build)
+        # passed for the same commit (ci/test_workflow_policy.py).
         cls.clippy = [(name, (workflows / name).read_text(encoding="utf-8"), job)
-                      for name, job in (("ci.yml", "lint"), ("release.yml", "build"),
-                                        ("windows-tests.yml", "windows-build"))]
+                      for name, job in (("ci.yml", "lint"), ("windows-tests.yml", "windows-build"))]
 
     def test_shared_gate_checks_the_full_immutable_candidate(self):
         verify_shared_gate(self.shared)
@@ -353,8 +378,28 @@ class WorkflowGateTests(unittest.TestCase):
                 for field in ("if: always()", "continue-on-error: true"):
                     with self.subTest(field=field), self.assertRaisesRegex(ValueError, "bypasses dependency status|softens"):
                         verify_callers(text.replace("    needs: rust-file-size\n", f"    needs: rust-file-size\n    {field}\n", 1))
-        with self.assertRaisesRegex(ValueError, "bypasses dependency status"):
-            verify_callers(self.callers["ci.yml"].replace('test "$TESTS_RESULT" = success', 'echo ignored'))
+        ci = self.callers["ci.yml"]
+        for old, new in (('test "$TESTS_RESULT" = success', 'echo ignored'),
+                         ("if: ${{ always() }}", "if: ${{ always() && !cancelled() }}"),
+                         (AGGREGATE_CHECK, AGGREGATE_CHECK + " || true"),
+                         (AGGREGATE_CHECK, AGGREGATE_CHECK + " --allow-skipped test"),
+                         (AGGREGATE_CHECK, AGGREGATE_CHECK + "\n          || true"),
+                         ("NEEDS: ${{ toJSON(needs) }}\n        run: " + AGGREGATE_CHECK,
+                          "NEEDS: '{}'\n        run: " + AGGREGATE_CHECK),
+                         ("run: " + AGGREGATE_CHECK, "continue-on-error: true\n        run: " + AGGREGATE_CHECK)):
+            changed = ci.replace(old, new)
+            self.assertNotEqual(changed, ci, old)
+            with self.subTest(old=old, new=new), self.assertRaisesRegex(ValueError, "bypasses dependency status"):
+                verify_callers(changed)
+
+    def test_every_ci_job_is_required_by_the_aggregate(self):
+        ci = self.callers["ci.yml"]
+        for job in ("lint", "test", "windows-tests", "package-smoke", "forges"):
+            changed = re.sub(rf"(    needs: \[[^\]]*?)\b{job}, ", r"\1", ci, count=1)
+            changed = re.sub(rf"(    needs: \[[^\]]*?), {job}\]", r"\1]", changed, count=1)
+            self.assertNotEqual(changed, ci, job)
+            with self.subTest(job=job), self.assertRaisesRegex(ValueError, "bypass the required"):
+                verify_callers(changed)
 
     def test_unknown_and_cyclic_dependencies_fail_even_with_a_gate_dependency(self):
         for dependency in ("missing", "ungated"):
