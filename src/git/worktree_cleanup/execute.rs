@@ -74,6 +74,9 @@ pub(crate) fn remove(
 /// Archives the untracked files, then takes each out of the worktree, as checked just before;
 /// should one fail, those taken out are put back and the archive goes.
 fn archive_and_clear(store: &Store, target: &Target, now: &Inspection) -> Result<Listed, String> {
+    if store.is_inside(&target.path) {
+        return Err(crate::i18n::text("worktree-cleanup-archive-inside").to_owned());
+    }
     let repository = archive::repository(&target.path)?;
     let listed = archive::create(
         store,
@@ -107,8 +110,8 @@ fn archive_and_clear(store: &Store, target: &Target, now: &Inspection) -> Result
 /// back. Says what happened.
 fn put_back(store: &Store, listed: &Listed, worktree: &Path, error: &str) -> String {
     match store.restore(listed, worktree) {
-        Ok(report) if report.failed.is_empty() => {
-            // Every file is back in place: the archive would only be a second copy.
+        Ok(report) if report.failed.is_empty() && report.renamed.is_empty() => {
+            // Every file is back where it was: the archive would only be a second copy.
             let _ = store.delete(listed);
             crate::i18n::message(
                 "worktree-cleanup-put-back",

@@ -34,6 +34,7 @@ worktree-cleanup-archive-no-name = Could not find a free name for the archive
 worktree-cleanup-archive-unverified = The archive could not be read back as it was written
 worktree-cleanup-archive-changed = { $path } changed while it was being archived
 worktree-cleanup-archive-not-text = { $path } is not a text file
+worktree-cleanup-archive-inside = The archive location is inside this worktree, which would delete the archive with it. Choose another folder in Settings → Git → Worktree archives.
 worktree-cleanup-archive-failed = Archiving failed, so the worktree was kept: { $error }
 worktree-cleanup-restore-other-repository = That archive belongs to another repository
 worktree-cleanup-restore-not-top = Archived files are restored into a worktree's top folder only

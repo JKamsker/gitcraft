@@ -34,6 +34,7 @@ worktree-cleanup-archive-no-name = Kein freier Name für das Archiv gefunden
 worktree-cleanup-archive-unverified = Das Archiv ließ sich nicht so zurücklesen, wie es geschrieben wurde
 worktree-cleanup-archive-changed = { $path } hat sich beim Archivieren geändert
 worktree-cleanup-archive-not-text = { $path } ist keine Textdatei
+worktree-cleanup-archive-inside = Der Archivordner liegt in diesem Arbeitsverzeichnis und würde mit ihm gelöscht. Wähle unter Einstellungen → Git → Arbeitsverzeichnis-Archive einen anderen Ordner.
 worktree-cleanup-archive-failed = Das Archivieren ist fehlgeschlagen, das Arbeitsverzeichnis bleibt: { $error }
 worktree-cleanup-restore-other-repository = Dieses Archiv gehört zu einem anderen Repository
 worktree-cleanup-restore-not-top = Archivierte Dateien werden nur in den obersten Ordner eines Arbeitsverzeichnisses wiederhergestellt

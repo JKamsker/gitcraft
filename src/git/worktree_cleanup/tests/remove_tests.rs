@@ -173,3 +173,22 @@ fn files_come_back_when_git_refuses_and_a_retry_works() -> Result<(), String> {
     assert_eq!(f.store.list(None).len(), 1);
     Ok(())
 }
+
+/// An archive location inside the worktree being removed would go with it: refused, and the
+/// worktree kept whole.
+#[test]
+fn archives_are_never_kept_in_the_worktree_being_removed() -> Result<(), String> {
+    let mut f = Fixture::new("remove inside")?;
+    let wt = f.merged_worktree("done")?;
+    write(&wt, "a.txt", b"keep\n")?;
+    let target = f.target(&wt, "done")?;
+    f.store.root = wt.join("not made yet").join("archives");
+    let preview = inspect(f.repo.path(), &target)?;
+    let outcome = remove(f.repo.path(), &target, &preview, Some(&f.store));
+    assert!(
+        matches!(&outcome, Outcome::Failed(e) if e.contains("inside")),
+        "{outcome:?}"
+    );
+    assert!(wt.join("a.txt").exists() && !wt.join("not made yet").exists());
+    Ok(())
+}

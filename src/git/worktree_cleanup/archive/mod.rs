@@ -150,6 +150,31 @@ impl Store {
         Ok(())
     }
 
+    /// Whether the archives would be kept in `folder` (or a folder in it): never in the worktree
+    /// being removed. A folder not made yet is judged by where it would be made.
+    pub(in crate::git) fn is_inside(&self, folder: &Path) -> bool {
+        let real = |p: &Path| {
+            let mut existing = p.to_path_buf();
+            let mut rest = Vec::new();
+            while !existing.exists() {
+                match (
+                    existing.file_name().map(|n| n.to_owned()),
+                    existing.parent(),
+                ) {
+                    (Some(name), Some(parent)) => {
+                        rest.push(name);
+                        existing = parent.to_path_buf();
+                    }
+                    _ => break,
+                }
+            }
+            let mut out = existing.canonicalize().unwrap_or(existing);
+            out.extend(rest.iter().rev());
+            out
+        };
+        real(&self.root).starts_with(real(folder))
+    }
+
     /// The archives of the repository `repo` (any of its worktrees) is part of.
     pub fn list_for(&self, repo: &Path) -> Result<Vec<Listed>, String> {
         Ok(self.list(Some(&repository(repo)?.key)))
