@@ -168,16 +168,24 @@ class OwnedProcess:
             except OSError as error:
                 self.warnings.append(f"no Job Object, only the direct child can be stopped: {error}")
             flags = 0x4 if self.job else 0  # CREATE_SUSPENDED until the child is in the job
-            self.popen = subprocess.Popen(command, creationflags=flags, **common)
+            try:
+                self.popen = subprocess.Popen(command, creationflags=flags, **common)
+            except OSError:
+                self.close_job()
+                raise
             if self.job:
                 try:
                     self.job.assign(self.popen._handle)
                 except OSError as error:
                     self.warnings.append(f"Job Object assignment failed: {error}")
-                    self.job.close()
-                    self.job = None
-                finally:
+                    self.close_job()
+                try:
                     _resume(self.popen._handle)
+                except OSError:
+                    self.popen.kill()  # never leave a suspended child behind
+                    self.popen.wait()
+                    self.close_job()
+                    raise
         else:
             self.popen = subprocess.Popen(command, start_new_session=True, **common)
         self.pid = self.popen.pid
@@ -233,9 +241,12 @@ class OwnedProcess:
         except ProcessLookupError:
             return "process group already gone"
 
-    def close(self):
-        if self.popen.stdout:
-            self.popen.stdout.close()
+    def close_job(self):
         if self.job:
             self.job.close()
             self.job = None
+
+    def close(self):
+        if self.popen.stdout:
+            self.popen.stdout.close()
+        self.close_job()
