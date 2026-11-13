@@ -1,10 +1,31 @@
 #!/usr/bin/env python3
-"""Compile Windows test executables once and record the exact Cargo test targets."""
+"""Compile Windows test executables once and record the exact Cargo test targets.
+
+Cargo decides where test executables live: target/debug/deps/ in the classic
+layout, target/debug/build/<package>/<hash>/out/ in the build-dir layout of newer
+toolchains. The manifest records Cargo's reported paths, and the same list goes to
+the step output `upload-paths`, so the uploaded artifact holds exactly the
+executables the shards load, wherever Cargo put them.
+"""
 
 import json
+import os
 from pathlib import Path
 import subprocess
 import sys
+
+
+def write_upload_paths(paths):
+    """Hand the artifact step the exact files to upload (a no-op outside Actions)."""
+    github_output = os.environ.get("GITHUB_OUTPUT")
+    if not github_output:
+        return
+    delimiter = "GITCRAFT_UPLOAD_PATHS"
+    if any(delimiter in path for path in paths):
+        raise RuntimeError("upload path collides with the step output delimiter")
+    with open(github_output, "a", encoding="utf-8") as handle:
+        handle.write(f"upload-paths<<{delimiter}\n" + "".join(f"{path}\n" for path in paths)
+                     + f"{delimiter}\n")
 
 
 def main():
@@ -72,6 +93,7 @@ def main():
     output.write_text(
         json.dumps({"binaries": [binaries[name] for name in sorted(binaries)]}, indent=2) + "\n"
     )
+    write_upload_paths([*sorted(binaries), output.relative_to(root).as_posix()])
     print(f"Built {len(binaries)} Windows test executables: {sorted(binaries)}", flush=True)
     return 0
 

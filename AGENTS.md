@@ -17,6 +17,11 @@
 - Use exactly `Jonas Kamsker <11245306+JKamsker@users.noreply.github.com>`, matching commit `028242cd4bc3c82ced848ea0fa73639981cd71d7`, for this Codex recovery and PR #164 follow-up task. For unrelated work, use the contributor's configured author identity. Verify the commit author before pushing. Do not use the earlier session email.
 - Preserve published WIP/recovery branches. Build the final PR branch from `dev` with one commit per feature under this author identity; keep provenance and verify the final source matches the accepted combined implementation.
 
+# CI failures
+
+- Before pushing, run `python3 ci/check.py` (add `--test <filter>` for what you changed). It runs CI's exact gates.
+- When CI fails, inspect the exact failed job and test first: `gh run view <id> --log-failed`, the `CI result` summary, and the `test-report-*` artifacts. Reproduce it locally, make a scoped fix, rerun the check, then push once. Never edit on a guess, and never raise timeouts or skip tests to get green. A passing re-run does not prove a failure harmless. See `docs/ci.md`.
+
 # CI timing
 
 - Do not start, dispatch, re-run, or wait on GitHub CI during implementation. Keep work-branch pushes outside CI triggers. Finish all implementation, final history assembly, local checks and independent adversarial reviews first; only then use CI for the final candidate.
