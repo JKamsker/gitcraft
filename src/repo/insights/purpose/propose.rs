@@ -60,7 +60,11 @@ pub(in crate::repo::insights) fn propose(
     units: &Units,
     generated: &dyn Fn(&str) -> Option<String>,
 ) -> Proposal {
-    let (rules, errors) = units.config.as_deref().map(rules::parse).unwrap_or_default();
+    let (rules, errors) = units
+        .config
+        .as_deref()
+        .map(rules::parse)
+        .unwrap_or_default();
     let placements: Vec<rules::Placement> = units
         .units
         .iter()
@@ -81,7 +85,13 @@ pub(in crate::repo::insights) fn propose(
     for (i, (unit, placement)) in units.units.iter().zip(&placements).enumerate() {
         let (rank, id, title, why, purpose) = match &placement.target {
             Target::Named(name) => (
-                (0, rules.iter().position(|r| r.target == placement.target).unwrap_or(0)),
+                (
+                    0,
+                    rules
+                        .iter()
+                        .position(|r| r.target == placement.target)
+                        .unwrap_or(0),
+                ),
                 format!("named:{name}"),
                 name.clone(),
                 format!("named by the rules in {}", super::units::CONFIG),
@@ -155,7 +165,10 @@ fn plain(p: Purpose, within: usize) -> ((usize, usize), String, String, String, 
         (1 + p as usize, within),
         format!("purpose:{p:?}"),
         p.title().to_owned(),
-        format!("proposed by the built-in rules for {}", p.title().to_lowercase()),
+        format!(
+            "proposed by the built-in rules for {}",
+            p.title().to_lowercase()
+        ),
         Some(p),
     )
 }

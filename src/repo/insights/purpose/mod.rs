@@ -13,9 +13,9 @@ mod propose;
 mod rows;
 mod rules;
 mod store;
-mod units;
 #[cfg(test)]
 mod tests;
+mod units;
 
 use std::collections::{BTreeSet, HashMap};
 use std::sync::{Arc, Mutex};
@@ -74,7 +74,10 @@ pub(crate) enum Act {
     /// Forget the arrangement: the rules' groups again.
     Reset,
     /// Scroll the diff of `key` to a line (old side or not, number) once it is open.
-    Jump { key: DiffKey, at: (bool, u32) },
+    Jump {
+        key: DiffKey,
+        at: (bool, u32),
+    },
 }
 
 pub(super) fn act(a: Act) -> Action {
@@ -132,8 +135,13 @@ impl RepoTab {
                 let (saved, dropped) = arrange::carry_over(saved, units);
                 state.notice = Some((
                     match dropped {
-                        0 => "Your grouping is carried over: every change you placed is still there".to_owned(),
-                        n => format!("Your grouping is carried over; {n} changes you placed changed since and are where the rules put them"),
+                        0 => {
+                            "Your grouping is carried over: every change you placed is still there"
+                                .to_owned()
+                        }
+                        n => format!(
+                            "Your grouping is carried over; {n} changes you placed changed since and are where the rules put them"
+                        ),
                     },
                     false,
                 ));

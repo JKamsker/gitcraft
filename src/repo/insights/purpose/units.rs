@@ -155,13 +155,21 @@ pub(in crate::repo::insights) fn build(
         .map(|(i, f)| (f.path.as_str(), i))
         .collect();
     // In the pull request's order of files; hunks of a file in their own order.
-    hunks.sort_by_key(|(i, h)| (order.get(h.path.as_str()).copied().unwrap_or(usize::MAX), *i));
+    hunks.sort_by_key(|(i, h)| {
+        (
+            order.get(h.path.as_str()).copied().unwrap_or(usize::MAX),
+            *i,
+        )
+    });
     let mut seen: HashMap<String, usize> = HashMap::new();
     let mut by_path: HashMap<&str, Vec<Unit>> = HashMap::new();
     let mut strays = Vec::new();
     for (index, h) in hunks {
         let file = of_file.get(h.path.as_str());
-        let digest = format!("{:x}", md5::compute(format!("{:?}{:?}", h.removed, h.added)));
+        let digest = format!(
+            "{:x}",
+            md5::compute(format!("{:?}{:?}", h.removed, h.added))
+        );
         let n = seen.entry(format!("{}\0{digest}", h.path)).or_insert(0);
         *n += 1;
         let unit = Unit {
@@ -277,7 +285,11 @@ fn repeated_of(t: &Transform) -> Found {
         .into_iter()
         .filter_map(|(h, m)| m.map(|m| (h, m)))
         .collect();
-    let layout = layout.into_iter().filter(|&(_, l)| l).map(|(h, _)| h).collect();
+    let layout = layout
+        .into_iter()
+        .filter(|&(_, l)| l)
+        .map(|(h, _)| h)
+        .collect();
     (repeated, by_hunk, layout)
 }
 

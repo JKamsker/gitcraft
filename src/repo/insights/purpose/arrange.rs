@@ -169,14 +169,13 @@ pub(in crate::repo::insights) fn check(arranged: &Arranged, units: &Units) -> Re
     let mut count = vec![0usize; units.units.len()];
     for g in &arranged.groups {
         for &u in &g.group.units {
-            *count.get_mut(u).ok_or("a group holds a change that isn't there")? += 1;
+            *count
+                .get_mut(u)
+                .ok_or("a group holds a change that isn't there")? += 1;
         }
     }
     match count.iter().position(|&n| n != 1) {
-        Some(u) => Err(format!(
-            "{} is in {} groups",
-            units.units[u].path, count[u]
-        )),
+        Some(u) => Err(format!("{} is in {} groups", units.units[u].path, count[u])),
         None => Ok(()),
     }
 }
@@ -184,17 +183,34 @@ pub(in crate::repo::insights) fn check(arranged: &Arranged, units: &Units) -> Re
 /// A change made by hand.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(crate) enum Edit {
-    Rename { group: String, title: String },
+    Rename {
+        group: String,
+        title: String,
+    },
     /// Units (by key) to another group.
-    Move { units: Vec<String>, to: String },
+    Move {
+        units: Vec<String>,
+        to: String,
+    },
     /// Units (by key) of `from` to a new group shown after it.
-    Split { units: Vec<String>, from: String },
+    Split {
+        units: Vec<String>,
+        from: String,
+    },
     /// All of `from` into `into`.
-    Merge { from: String, into: String },
+    Merge {
+        from: String,
+        into: String,
+    },
     /// The units of a group are where they belong.
-    Confirm { group: String },
+    Confirm {
+        group: String,
+    },
     /// A group up or down the list.
-    Shift { group: String, up: bool },
+    Shift {
+        group: String,
+        up: bool,
+    },
 }
 
 /// The arrangement `edit` makes of what is shown.
@@ -236,7 +252,13 @@ pub(in crate::repo::insights) fn edit(
             .groups
             .iter()
             .find(|s| s.group.id == id)
-            .map(|s| s.group.units.iter().map(|&u| units.units[u].key.clone()).collect())
+            .map(|s| {
+                s.group
+                    .units
+                    .iter()
+                    .map(|&u| units.units[u].key.clone())
+                    .collect()
+            })
             .unwrap_or_default()
     };
     match edit {
@@ -296,8 +318,13 @@ fn place(saved: &mut Saved, keys: &[String], g: usize, units: &Units) -> Result<
     if keys.is_empty() {
         return Err("Nothing is selected".to_owned());
     }
-    if let Some(k) = keys.iter().find(|k| !units.units.iter().any(|u| &u.key == *k)) {
-        return Err(format!("A change is gone ({k}): the pull request changed since"));
+    if let Some(k) = keys
+        .iter()
+        .find(|k| !units.units.iter().any(|u| &u.key == *k))
+    {
+        return Err(format!(
+            "A change is gone ({k}): the pull request changed since"
+        ));
     }
     for sg in &mut saved.groups {
         sg.units.retain(|k| !keys.contains(k));

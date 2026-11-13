@@ -172,8 +172,17 @@ fn put(purpose: Purpose, why: impl Into<String>) -> Placement {
 }
 
 /// Folders and names of tests.
-const TEST_DIRS: [&str; 6] = ["tests/", "test/", "__tests__/", "spec/", "testdata/", "e2e/"];
-const TEST_NAMES: [&str; 7] = ["_test.", "_tests.", ".test.", ".spec.", "_spec.", "Test.", "Tests."];
+const TEST_DIRS: [&str; 6] = [
+    "tests/",
+    "test/",
+    "__tests__/",
+    "spec/",
+    "testdata/",
+    "e2e/",
+];
+const TEST_NAMES: [&str; 7] = [
+    "_test.", "_tests.", ".test.", ".spec.", "_spec.", "Test.", "Tests.",
+];
 const DOC_EXT: [&str; 5] = [".md", ".rst", ".adoc", ".txt", ".ftl"];
 const DOC_NAMES: [&str; 5] = ["README", "CHANGELOG", "LICENSE", "CONTRIBUTING", "NOTICE"];
 const CONFIG_EXT: [&str; 9] = [
@@ -189,7 +198,14 @@ const CONFIG_NAMES: [&str; 8] = [
     ".editorconfig",
     "Justfile",
 ];
-const API_PATHS: [&str; 6] = ["api/", "proto/", "openapi", "schema/", "include/", "contracts/"];
+const API_PATHS: [&str; 6] = [
+    "api/",
+    "proto/",
+    "openapi",
+    "schema/",
+    "include/",
+    "contracts/",
+];
 const API_EXT: [&str; 4] = [".proto", ".graphql", ".d.ts", ".thrift"];
 const SOURCE_EXT: [&str; 22] = [
     ".rs", ".py", ".js", ".mjs", ".ts", ".tsx", ".jsx", ".go", ".java", ".kt", ".swift", ".c",
@@ -222,11 +238,7 @@ pub(in crate::repo::insights) fn place(
         if let Some(p) = rule.patterns.iter().find(|p| matches(p, path)) {
             return Placement {
                 target: rule.target.clone(),
-                why: format!(
-                    "`{p}` (line {} of {})",
-                    rule.line,
-                    super::units::CONFIG
-                ),
+                why: format!("`{p}` (line {} of {})", rule.line, super::units::CONFIG),
             };
         }
     }
@@ -287,8 +299,7 @@ fn by_path(unit: &Unit, path: &str, name: &str) -> Placement {
     if let Some(why) = in_dir(path, &API_PATHS) {
         return put(Purpose::Api, why);
     }
-    if DOC_NAMES.iter().any(|n| name.starts_with(n)) || in_dir(path, &["docs/", "doc/"]).is_some()
-    {
+    if DOC_NAMES.iter().any(|n| name.starts_with(n)) || in_dir(path, &["docs/", "doc/"]).is_some() {
         return put(Purpose::Docs, "documentation by its name or folder");
     }
     if let Some(e) = DOC_EXT.iter().find(|e| name.ends_with(*e)) {

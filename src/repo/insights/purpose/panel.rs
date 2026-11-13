@@ -39,7 +39,9 @@ impl RepoTab {
         if state.asked.as_ref() != Some(&subject) {
             acts.push(act(Act::Load));
         }
-        let unknown = self.folding.unknown(files.files.iter().map(|f| f.path.as_str()));
+        let unknown = self
+            .folding
+            .unknown(files.files.iter().map(|f| f.path.as_str()));
         if !unknown.is_empty() {
             acts.push(Action::FoldAttributes(unknown));
         }

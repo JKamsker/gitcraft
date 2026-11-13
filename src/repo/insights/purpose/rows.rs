@@ -96,7 +96,11 @@ pub(super) fn group(ui: &mut Ui, ctx: &Ctx, g: usize, shown: &Shown, acts: &mut 
     } else {
         ""
     };
-    let title = format!("{}  ·  {}{mark}", shown.group.title, shown.group.units.len());
+    let title = format!(
+        "{}  ·  {}{mark}",
+        shown.group.title,
+        shown.group.units.len()
+    );
     let header = egui::CollapsingHeader::new(RichText::new(title).strong())
         .id_salt(("purpose-group", id))
         .default_open(true)
@@ -120,7 +124,9 @@ pub(super) fn group(ui: &mut Ui, ctx: &Ctx, g: usize, shown: &Shown, acts: &mut 
             }
             ui.label(RichText::new(&shown.group.why).small().color(t.text_faint));
             if let Some(kind) = insight_of(shown.group.purpose)
-                && ui.small_button(format!("Open in {}", kind.title())).clicked()
+                && ui
+                    .small_button(format!("Open in {}", kind.title()))
+                    .clicked()
             {
                 acts.push(Action::Insights(InsightsAct::Open(kind)));
             }
@@ -154,7 +160,10 @@ pub(super) fn group(ui: &mut Ui, ctx: &Ctx, g: usize, shown: &Shown, acts: &mut 
             .filter(|k| ctx.selected.contains(k))
             .collect();
         let split = format!("Split the {} selected into a new group", picked.len());
-        if ui.add_enabled(!picked.is_empty(), egui::Button::new(split)).clicked() {
+        if ui
+            .add_enabled(!picked.is_empty(), egui::Button::new(split))
+            .clicked()
+        {
             acts.push(act(Act::Edit(Edit::Split {
                 units: picked,
                 from: id.clone(),
@@ -204,13 +213,20 @@ fn unit_row(ui: &mut Ui, ctx: &Ctx, u: usize, g: usize, acts: &mut Vec<Action>) 
         };
         let place = match (&unit.body, line_of(unit)) {
             (Body::File(why), _) => format!("whole file, {}", why.label()),
-            (_, Some((old, n))) => format!("{}{n}  {}", if old { "old line " } else { "line " }, unit.preview),
+            (_, Some((old, n))) => format!(
+                "{}{n}  {}",
+                if old { "old line " } else { "line " },
+                unit.preview
+            ),
             _ => String::new(),
         };
         let mut text = format!("{name}  +{} −{}", unit.added, unit.removed);
         let threads = threads_on(ctx.threads, unit);
         if threads > 0 {
-            text.push_str(&format!("  · {threads} open thread{}", if threads == 1 { "" } else { "s" }));
+            text.push_str(&format!(
+                "  · {threads} open thread{}",
+                if threads == 1 { "" } else { "s" }
+            ));
         }
         if *placed == Placed::Yours {
             text.push_str("  ✓");
@@ -233,7 +249,13 @@ fn unit_row(ui: &mut Ui, ctx: &Ctx, u: usize, g: usize, acts: &mut Vec<Action>) 
         }
         r.context_menu(|ui| {
             ui.menu_button("Move to", |ui| {
-                for (o, other) in ctx.arranged.groups.iter().enumerate().filter(|(o, _)| *o != g) {
+                for (o, other) in ctx
+                    .arranged
+                    .groups
+                    .iter()
+                    .enumerate()
+                    .filter(|(o, _)| *o != g)
+                {
                     if ui.button(&other.group.title).clicked() {
                         acts.push(act(Act::Edit(Edit::Move {
                             units: vec![unit.key.clone()],
