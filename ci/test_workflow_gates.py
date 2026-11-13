@@ -22,6 +22,9 @@ AGGREGATE_CHECK = "python3 ci/require_results.py --allow-skipped forges"
 # A required check that is skipped counts as passing, so status jobs must run even
 # after a cancellation: `!cancelled()` would let a cancelled run skip them.
 STATUS_CONDITION = "${{ always() }}"
+ARCH_TESTS = "cargo test --locked --manifest-path ci/arch-fitness/Cargo.toml"
+ARCH_CHECK = ('cargo run --locked --release --manifest-path ci/arch-fitness/Cargo.toml -- '
+              'check --revision HEAD --markdown "$GITHUB_STEP_SUMMARY"')
 
 
 def require(condition, message):
@@ -134,7 +137,12 @@ def verify_shared_gate(text):
     require(not re.search(rf"^\s*(?:- )?{forbidden}:", text, re.M), "shared gate can skip, soften, or retarget checks")
     command = r"^\s+(?:- )?run: python3 ci/rust_file_size\.py --revision HEAD\s*$"
     require(re.search(command, text, re.M), "shared gate must check the complete immutable candidate")
-    verify_required_commands(text, "check", (SIZE_CHECK, COMPLEXITY_CHECK, TOOLING_CHECK))
+    verify_required_commands(text, "check", (SIZE_CHECK, COMPLEXITY_CHECK, TOOLING_CHECK, ARCH_TESTS, ARCH_CHECK))
+    steps = job_steps(text, "check")
+    for command in (ARCH_TESTS, ARCH_CHECK):
+        step = next(step for step in steps if step.get("run", (None,))[0] == command)
+        limit = step.get("timeout-minutes", ("",))[0]
+        require(limit.isdigit() and 0 < int(limit) <= 15, f"architecture step needs a short timeout: {command}")
 
 
 def verify_callers(text):
@@ -230,6 +238,8 @@ class WorkflowGateTests(unittest.TestCase):
         yield "shared-size", self.shared, "check", SIZE_CHECK
         yield "shared-policy", self.shared, "check", COMPLEXITY_CHECK
         yield "shared-tooling", self.shared, "check", TOOLING_CHECK
+        yield "shared-architecture-tests", self.shared, "check", ARCH_TESTS
+        yield "shared-architecture", self.shared, "check", ARCH_CHECK
         for name, text, job in self.clippy:
             yield name, text, job, CLIPPY_CHECK
 
@@ -241,6 +251,12 @@ class WorkflowGateTests(unittest.TestCase):
                                COMPLEXITY_CHECK.replace("HEAD", "HEAD~1")),
             TOOLING_CHECK: (TOOLING_CHECK.replace("test_*.py", "test_complexity*.py"),
                             TOOLING_CHECK + " -k architecture"),
+            ARCH_TESTS: (ARCH_TESTS + " -- --skip rules", ARCH_TESTS.replace("--locked ", "")),
+            ARCH_CHECK: (ARCH_CHECK.replace(" check ", " report "),
+                         ARCH_CHECK.replace(" check ", " ratchet "),
+                         ARCH_CHECK.replace("--revision HEAD", "--revision HEAD~1"),
+                         ARCH_CHECK.replace("--revision HEAD ", ""),
+                         ARCH_CHECK.replace("check ", "check --baseline elsewhere.json ")),
             CLIPPY_CHECK: ("cargo clippy --locked --all-targets -- -D warnings",
                           CLIPPY_CHECK + " --root elsewhere",
                           CLIPPY_CHECK + " --package app"),
@@ -260,6 +276,16 @@ class WorkflowGateTests(unittest.TestCase):
         for replacement in mutations:
             with self.subTest(replacement=replacement), self.assertRaisesRegex(ValueError, "exact command"):
                 verify_shared_gate(self.shared.replace(TOOLING_CHECK, replacement))
+
+    def test_shared_gate_bounds_the_architecture_steps(self):
+        verify_shared_gate(self.shared)
+        for command in (ARCH_TESTS, ARCH_CHECK):
+            for replacement in ("", "timeout-minutes: 360", "timeout-minutes: 0", "timeout-minutes: ${{ 360 }}"):
+                changed = self.shared.replace(f"timeout-minutes: 10\n        run: {command}",
+                                              f"{replacement}\n        run: {command}")
+                with self.subTest(command=command, replacement=replacement), self.assertRaisesRegex(ValueError, "short timeout"):
+                    self.assertNotEqual(changed, self.shared)
+                    verify_shared_gate(changed)
 
     def test_shared_gate_rejects_duplicate_tooling_discovery(self):
         duplicated = self.shared + f"\n      - name: Duplicate tooling check\n        run: {TOOLING_CHECK}\n"

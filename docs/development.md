@@ -7,6 +7,8 @@ installed `git` command line, so a user's config, credentials and hooks apply as
 - [Code layout](code-layout.md): where things live in `src/`.
 - [Architecture](architecture.md): ownership conventions, reproducible hotspot metrics,
   lifecycle/operation inventories and the phased refactoring plan.
+- [Architecture boundaries](architecture-boundaries.md): the domain policy, `RepoTab` state
+  ownership and the enforced fitness checks.
 - [CPU performance](cpu-performance.md) and the [workflow suite](cpu-workflows.md): reproducible
   CPU benchmarks, stack profiles and source-line coverage.
 - [Process orchestration](process-orchestration.md): subprocess limits, lifecycle handling and
@@ -64,6 +66,22 @@ calls the shared workflow and checks `--revision HEAD`. For PRs, checkout suppli
 checks/builds depend on this gate, and publishing depends on those builds.
 CI remains authoritative even when local checks are skipped. The lexical
 [architecture survey](architecture.md) stays advisory alongside this hard cap.
+
+## Architecture boundaries
+
+The same shared gate holds each candidate to the [domain boundary
+policy](architecture-boundaries.md): no new forbidden cross-domain edges or domain cycles,
+no new cross-feature `RepoTab` writes, no unreviewed re-exports or visibility growth, and
+per-domain fan-out budgets. Run it before pushing:
+
+```sh
+cargo run --release --manifest-path ci/arch-fitness/Cargo.toml -- check
+cargo test --manifest-path ci/arch-fitness/Cargo.toml
+```
+
+The baseline only shrinks: after removing coupling, run `-- ratchet` and commit the smaller
+`ci/arch-fitness/baseline.json`. A new module under `src/repo/` must be added to a domain in
+`ci/arch-fitness/policy.json`.
 
 ## Tests
 

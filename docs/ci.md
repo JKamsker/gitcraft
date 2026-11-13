@@ -12,7 +12,7 @@ pull requests (the merge commit), merge-queue candidates (`merge_group`), pushes
 
 | Stage | Jobs |
 | --- | --- |
-| Fast preflight | `rust-file-size / check` (tooling tests, file-size and complexity-policy gates), `lint` (rustfmt, strict Clippy for every package) |
+| Fast preflight | `rust-file-size / check` (tooling tests, file-size, complexity-policy, and architecture fitness gates), `lint` (rustfmt, strict Clippy for every package) |
 | Correctness matrix | `test (ubuntu-22.04)`, `test (ubuntu-latest)`, the Windows build plus ten complete, disjoint shards (`windows-tests.yml`) aggregated as `test (windows-latest)` |
 | Release smoke | `package-version` computes a dev prerelease version the way Release does. `package-smoke` builds the Windows zip and installer, the tarball, AppImage, `.deb` and `.rpm` through `package.yml`, the workflow Release builds with. |
 | Live services | `forges`: real Forgejo and Gitea, run for changes to `src/forge/`, `ci/forge-server.sh`, `Cargo.lock` or `ci.yml` (`ci/changed_paths.py`), nightly, and by hand |
