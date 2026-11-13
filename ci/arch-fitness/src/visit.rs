@@ -107,7 +107,9 @@ impl<'r, 'a> Visitor<'r, 'a> {
                     self.item(nested);
                 }
             }
-            other => self.frame(|v| visit::visit_item(v, other)),
+            other => self.scoped(crate::declare::item_attrs(other), |v| {
+                v.frame(|v| visit::visit_item(v, other));
+            }),
         }
     }
 
@@ -200,7 +202,7 @@ impl<'r, 'a> Visitor<'r, 'a> {
                 v.visit_expr(&c.expr);
             }),
             syn::ImplItem::Type(t) => self.scoped(&t.attrs, |v| v.visit_type(&t.ty)),
-            syn::ImplItem::Macro(m) => self.visit_macro(&m.mac),
+            syn::ImplItem::Macro(m) => self.scoped(&m.attrs, |v| v.visit_macro(&m.mac)),
             _ => {}
         }
     }
@@ -246,6 +248,21 @@ impl<'r, 'a> Visitor<'r, 'a> {
         }
     }
 
+    /// What a path names here: block-scoped imports of enclosing frames, then the module.
+    pub(crate) fn lookup(&self, segs: &[String], ns: Ns, global: bool) -> Vec<Def> {
+        let scoped = self
+            .frames
+            .iter()
+            .rev()
+            .find_map(|f| f.uses.get(&segs[0]).cloned());
+        match scoped {
+            Some(start) if !global => self.res.walk(start, &segs[1..], ns),
+            _ => self
+                .res
+                .resolve(self.module, segs, ns, global, &self.self_ty),
+        }
+    }
+
     /// Resolve and record one path; returns what it names.
     pub fn path(&mut self, path: &syn::Path, ns: Ns, kind: RefKind) -> Vec<Def> {
         let segs = syntax::path_idents(path);
@@ -254,17 +271,7 @@ impl<'r, 'a> Visitor<'r, 'a> {
         if !global && segs.len() == 1 && self.local(&segs[0]).is_some() {
             return Vec::new();
         }
-        let scoped = self
-            .frames
-            .iter()
-            .rev()
-            .find_map(|f| f.uses.get(&segs[0]).cloned());
-        let defs = match scoped {
-            Some(start) if !global => self.res.walk(start, &segs[1..], ns),
-            _ => self
-                .res
-                .resolve(self.module, &segs, ns, global, &self.self_ty),
-        };
+        let defs = self.lookup(&segs, ns, global);
         let written = segs.join("::");
         if defs.is_empty() && kind != RefKind::Macro {
             if segs.len() > 1 || ["crate", "self", "super"].contains(&segs[0].as_str()) {

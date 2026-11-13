@@ -52,6 +52,8 @@ const STD_MUTATING: &[&str] = &[
     "sort_by",
     "sort_by_key",
     "sort_unstable",
+    "sort_unstable_by",
+    "sort_unstable_by_key",
     "reverse",
     "swap",
     "swap_remove",

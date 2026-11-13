@@ -372,7 +372,17 @@ fn budgets(a: &Analysis, policy: &Policy, baseline: &Baseline, out: &mut Outcome
                 "remove the new dependency; a budget increase needs a reviewed reason in the pull request",
             ));
         }
-        if let (true, Some(limit)) = (policy.symbol_budget_domains.contains(name), budget.symbols)
+        let symbol_budgeted = policy.symbol_budget_domains.contains(name);
+        if symbol_budgeted && budget.symbols.is_none() {
+            out.violations.push(v(
+                "fan-out-budget",
+                format!("domain {name} has a symbol budget in policy.json but no symbol limit (references {} foreign symbols)", d.fan_out_symbols),
+                None,
+                None,
+                "record the limit by running `ratchet` locally and commit the reviewed baseline.json",
+            ));
+        }
+        if let (true, Some(limit)) = (symbol_budgeted, budget.symbols)
             && d.fan_out_symbols > limit
         {
             out.violations.push(v(

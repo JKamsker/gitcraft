@@ -21,20 +21,21 @@ pub fn refuse_in_ci() -> Result<(), String> {
     Ok(())
 }
 
-/// Refuse to rewrite the baseline from an incomplete inventory: missing edges would drop
-/// reviewed exceptions and lower budgets to partial measurements.
+/// Refuse to rewrite the baseline from an incomplete inventory or mapping: missing edges, or
+/// modules that left their domain, would drop reviewed exceptions and lower budgets to
+/// partial measurements.
 pub fn refuse_with_gaps(outcome: &Outcome) -> Result<(), String> {
     let gaps: Vec<&str> = outcome
         .violations
         .iter()
-        .filter(|v| v.rule == "analysis-gap")
+        .filter(|v| v.rule == "analysis-gap" || v.rule == "unmapped-module")
         .map(|v| v.message.as_str())
         .collect();
     if gaps.is_empty() {
         return Ok(());
     }
     Err(format!(
-        "the analysis has gaps, so the baseline is not rewritten; fix them first: {}",
+        "the analysis has gaps or unmapped modules, so the baseline is not rewritten; fix them first: {}",
         gaps.join("; ")
     ))
 }

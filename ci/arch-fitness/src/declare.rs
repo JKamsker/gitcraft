@@ -133,27 +133,7 @@ impl Collector<'_> {
                 ItemKind::Static,
                 vec![Ns::Value],
             ),
-            Item::Macro(mac) => {
-                let line = line_of(&mac.mac);
-                match &mac.ident {
-                    Some(ident) => {
-                        let site = self.child_site(ctx, &mac.attrs, line);
-                        self.push_item(
-                            ctx.module,
-                            &ident.to_string(),
-                            ItemKind::Macro,
-                            vec![Ns::Macro],
-                            &syn::Visibility::Inherited,
-                            site,
-                        );
-                    }
-                    None => {
-                        let name = syntax::tokens(&mac.mac.path);
-                        self.inv.gap("item-macro", &ctx.file, line, name);
-                    }
-                }
-                return;
-            }
+            Item::Macro(mac) => return self.register_macro(ctx, mac),
             _ => return,
         };
         if ident == "_" {
@@ -161,6 +141,41 @@ impl Collector<'_> {
         }
         let site = self.child_site(ctx, attrs, line_of(ident));
         self.push_item(ctx.module, &ident.to_string(), kind, ns, vis, site);
+    }
+
+    /// A named `macro_rules!`; `#[macro_export]` also names it, public, at the crate root
+    /// (`crate::name!`), while the item stays in its module for textual scope.
+    fn register_macro(&mut self, ctx: &Ctx, mac: &syn::ItemMacro) {
+        let line = line_of(&mac.mac);
+        let Some(ident) = &mac.ident else {
+            let name = syntax::tokens(&mac.mac.path);
+            self.inv.gap("item-macro", &ctx.file, line, name);
+            return;
+        };
+        let site = self.child_site(ctx, &mac.attrs, line);
+        let exported = mac.attrs.iter().any(|a| a.path().is_ident("macro_export"));
+        let vis = if exported {
+            syn::Visibility::Public(Default::default())
+        } else {
+            syn::Visibility::Inherited
+        };
+        let name = ident.to_string();
+        let id = self.push_item(
+            ctx.module,
+            &name,
+            ItemKind::Macro,
+            vec![Ns::Macro],
+            &vis,
+            site,
+        );
+        let root = self.inv.crates[self.inv.modules[ctx.module].krate].root;
+        if exported && root != ctx.module {
+            self.inv.modules[root]
+                .items
+                .entry(name)
+                .or_default()
+                .push(id);
+        }
     }
 }
 

@@ -65,9 +65,6 @@ pub fn eval_cfg(
 
 /// Whether every `#[cfg]` of these attributes may hold for the crate's fixed flags.
 pub fn cfg_active(attrs: &[Attribute], known: &std::collections::BTreeMap<String, bool>) -> bool {
-    if known.is_empty() {
-        return true;
-    }
     attrs.iter().filter(|a| a.path().is_ident("cfg")).all(|a| {
         a.parse_args::<Meta>()
             .map_or(true, |m| eval_cfg(&m, known) != Some(false))

@@ -53,32 +53,48 @@ fn text(bytes: Vec<u8>) -> Result<String, String> {
     String::from_utf8(bytes).map_err(|e| e.to_string())
 }
 
-/// Regular `.rs` blobs from `ls-files -s` / `ls-tree -r` lines: (object id, path).
-fn rust_entries(listing: &[u8]) -> Vec<(String, String)> {
-    listing
-        .split(|b| *b == 0)
-        .filter_map(|entry| {
-            let entry = std::str::from_utf8(entry).ok()?;
-            let (meta, path) = entry.split_once('\t')?;
-            let fields: Vec<&str> = meta.split_whitespace().collect();
-            let mode = *fields.first()?;
-            // `ls-files -s`: mode oid stage; `ls-tree`: mode type oid.
-            let oid = if fields.get(1) == Some(&"blob") {
-                fields.get(2)?
-            } else {
-                fields.get(1)?
-            };
-            let regular = mode == "100644" || mode == "100755";
-            (regular && path.ends_with(".rs")).then(|| ((*oid).to_owned(), path.to_owned()))
-        })
-        .collect()
+/// Regular `.rs` blobs from `ls-files -s` / `ls-tree -r` lines: (object id, path). A
+/// tracked Rust path that is not UTF-8 is an error, never silently left out.
+fn rust_entries(listing: &[u8]) -> Result<Vec<(String, String)>, String> {
+    let mut out = Vec::new();
+    for entry in listing.split(|b| *b == 0) {
+        let Some(tab) = entry.iter().position(|b| *b == b'\t') else {
+            continue;
+        };
+        let (meta, path) = (&entry[..tab], &entry[tab + 1..]);
+        let Ok(meta) = std::str::from_utf8(meta) else {
+            continue;
+        };
+        let fields: Vec<&str> = meta.split_whitespace().collect();
+        // `ls-files -s`: mode oid stage; `ls-tree`: mode type oid.
+        let oid = if fields.get(1) == Some(&"blob") {
+            fields.get(2)
+        } else {
+            fields.get(1)
+        };
+        let (Some(mode), Some(oid)) = (fields.first(), oid) else {
+            continue;
+        };
+        let regular = *mode == "100644" || *mode == "100755";
+        if !regular || !path.ends_with(b".rs") {
+            continue;
+        }
+        let path = std::str::from_utf8(path).map_err(|_| {
+            format!(
+                "tracked Rust path is not UTF-8: {}",
+                String::from_utf8_lossy(path)
+            )
+        })?;
+        out.push(((*oid).to_owned(), path.to_owned()));
+    }
+    Ok(out)
 }
 
 /// The working-tree contents of every tracked, regular Rust file (symlinks are excluded).
 pub fn working_tree(root: &Path) -> Result<(BTreeMap<String, String>, SourceInfo), String> {
     let listing = git(root, &["ls-files", "-s", "-z"], None)?;
     let mut files = BTreeMap::new();
-    for (_, path) in rust_entries(&listing) {
+    for (_, path) in rust_entries(&listing)? {
         match std::fs::read_to_string(root.join(&path)) {
             Ok(source) => {
                 files.insert(path, source);
@@ -108,7 +124,7 @@ pub fn revision(
         None,
     )?)?;
     let listing = git(root, &["ls-tree", "-rz", "--full-tree", &commit], None)?;
-    let entries = rust_entries(&listing);
+    let entries = rust_entries(&listing)?;
     let request: String = entries.iter().map(|(oid, _)| format!("{oid}\n")).collect();
     let blobs = git(root, &["cat-file", "--batch"], Some(request.as_bytes()))?;
     let mut files = BTreeMap::new();
@@ -137,4 +153,25 @@ pub fn revision(
         tree: Some(tree.trim().to_owned()),
     };
     Ok((files, info))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::rust_entries;
+
+    #[test]
+    fn non_utf8_rust_paths_are_errors_and_other_paths_are_skipped() {
+        let oid = "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391";
+        let mut listing = format!("100644 {oid} 0\tsrc/ok.rs\0").into_bytes();
+        listing.extend(format!("100644 blob {oid}\tdocs/").as_bytes());
+        listing.extend(b"\xff.md\0");
+        assert_eq!(
+            rust_entries(&listing),
+            Ok(vec![(oid.to_owned(), "src/ok.rs".to_owned())])
+        );
+        listing.extend(format!("100644 blob {oid}\tsrc/").as_bytes());
+        listing.extend(b"\xff.rs\0");
+        let err = rust_entries(&listing).err().unwrap_or_default();
+        assert!(err.contains("not UTF-8"), "{err}");
+    }
 }
