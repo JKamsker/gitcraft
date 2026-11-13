@@ -1,11 +1,11 @@
 //! Line streaming through the shared process owner, including SSH/WSL supervisors.
 use std::path::Path;
-use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::{Arc, mpsc};
 use std::time::Duration;
 
 use super::command::{Extra, remote_request, repository_command};
 use crate::remote;
+
+mod queue;
 
 const DRAIN: Duration = Duration::from_millis(300);
 
@@ -28,8 +28,8 @@ pub struct Ended {
 }
 
 /// Drain callbacks on the existing caller, keeping the service event loop nonblocking.
-/// The bounded chunk queue stops an operation whose consumer cannot keep up; it never
-/// silently loses output or grows an unbounded pipe-reader queue.
+/// The output queue, bounded by the bytes it holds, stops an operation whose consumer cannot
+/// keep up; it never silently loses output or grows an unbounded pipe-reader queue.
 pub fn stream(
     dir: &Path,
     args: &[&str],
@@ -43,29 +43,19 @@ pub fn stream(
         });
     }
     let _timer = super::backend::CliTimer::new(args);
-    let (sent, received) = mpsc::sync_channel(64);
-    let overflow = Arc::new(AtomicBool::new(false));
+    let (sent, received) = queue::queue(queue::LIMIT);
     let stopping = stopper.clone();
-    let full = overflow.clone();
+    let full = sent.clone();
     let mut options = crate::processes::Options {
         background: true,
         drain_for: DRAIN,
-        cancelled: Some(Box::new(move || {
-            stopping.stopped() || full.load(Ordering::Acquire)
-        })),
+        cancelled: Some(Box::new(move || stopping.stopped() || full.full())),
         ..Default::default()
     };
     for is_err in [false, true] {
         let sent = sent.clone();
-        let full = overflow.clone();
-        let callback: crate::processes::Chunk = Box::new(move |bytes| {
-            if sent
-                .try_send((usize::from(is_err), bytes.to_vec()))
-                .is_err()
-            {
-                full.store(true, Ordering::Release);
-            }
-        });
+        let callback: crate::processes::Chunk =
+            Box::new(move |bytes| sent.push(usize::from(is_err), bytes));
         if is_err {
             options.stderr = Some(callback);
         } else {
@@ -85,26 +75,22 @@ pub fn stream(
     let ticket = crate::processes::service()?.submit(command, options)?;
     let mut pending = [Vec::new(), Vec::new()];
     let result = loop {
-        match received.recv_timeout(Duration::from_millis(20)) {
-            Ok((which, bytes)) => {
-                if let Err(error) = feed(&mut pending[which], &bytes, &mut line) {
-                    ticket.cancel();
-                    return stream_completion(
-                        crate::processes::checked(ticket.wait()),
-                        stopper.stopped(),
-                        Some(error),
-                    );
-                }
-            }
-            Err(mpsc::RecvTimeoutError::Timeout) => {}
-            Err(mpsc::RecvTimeoutError::Disconnected) => {}
+        if let Some((which, bytes)) = received.recv_timeout(Duration::from_millis(20))
+            && let Err(error) = feed(&mut pending[which], &bytes, &mut line)
+        {
+            ticket.cancel();
+            return stream_completion(
+                crate::processes::checked(ticket.wait()),
+                stopper.stopped(),
+                Some(error),
+            );
         }
         if let Some(result) = ticket.try_result() {
             break crate::processes::checked(result);
         }
     };
     let mut content_error = None;
-    while let Ok((which, bytes)) = received.try_recv() {
+    while let Some((which, bytes)) = received.try_recv() {
         if content_error.is_none() {
             content_error = feed(&mut pending[which], &bytes, &mut line).err();
         }
@@ -118,7 +104,7 @@ pub fn stream(
             );
         }
     }
-    if overflow.load(Ordering::Acquire) {
+    if received.full() {
         content_error.get_or_insert_with(|| {
             crate::i18n::text("backend-stream-consumer-exceeded-the-bounded-output-queue-101b12")
                 .into()
@@ -246,6 +232,34 @@ mod tests {
                 stopped: false
             }
         );
+        Ok(())
+    }
+
+    /// Many short writes wait for a consumer that falls behind for a moment: none is lost,
+    /// and the command's end comes with them.
+    #[test]
+    fn many_short_lines_wait_for_a_slow_consumer() -> Result<(), String> {
+        let dir = repo("slow")?;
+        let mut lines = Vec::new();
+        let ended = stream(
+            &dir,
+            &[
+                "-c",
+                "alias.say=!i=0; while [ $i -lt 300 ]; do echo $i; i=$((i+1)); done; exit 3",
+                "say",
+            ],
+            &Stopper::default(),
+            |l| {
+                if lines.is_empty() {
+                    std::thread::sleep(Duration::from_millis(200));
+                }
+                lines.push(l);
+            },
+        );
+        let _ = std::fs::remove_dir_all(&dir);
+        assert_eq!(ended?.code, Some(3));
+        let want: Vec<String> = (0..300).map(|i| i.to_string()).collect();
+        assert_eq!(lines, want);
         Ok(())
     }
 

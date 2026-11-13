@@ -216,7 +216,7 @@ fn the_last_lines_come_with_the_result() -> Result<(), String> {
     let (repo, _) = branch_with_a_break("lines", 1, 9)?;
     let command = "i=0; while [ $i -lt 300 ]; do echo \"line $i ü\"; i=$((i+1)); done; exit 3";
     let (summary, events) = run_branch(&repo, &plan(command, 1))?;
-    assert_eq!(summary.bad, 1);
+    assert_eq!(summary.bad, 1, "{:?}", summary.failed);
     let Some(TestEvent::Done { lines, end, .. }) = events.last() else {
         return Err(format!("no end: {events:?}"));
     };
