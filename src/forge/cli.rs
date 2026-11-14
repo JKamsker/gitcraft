@@ -355,3 +355,5 @@ use auth::*;
 mod routing;
 pub(crate) use routing::tool_location;
 use routing::*;
+
+pub(super) mod discovery;

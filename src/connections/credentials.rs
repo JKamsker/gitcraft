@@ -362,3 +362,13 @@ pub fn credential_helper() -> Option<i32> {
         }
     })
 }
+
+/// Prepare a read using the exact selected token after verifying its owner.
+#[allow(dead_code)] // Wired into Home in the next commit unit.
+pub(crate) fn discovery_command(account: &Account) -> Result<Command, String> {
+    let secret = token("gh", account)?;
+    verify_user("gh", account, &secret)?;
+    let mut command = account_command("gh", account)?;
+    install_token(&mut command, "gh", account, &secret);
+    Ok(command)
+}

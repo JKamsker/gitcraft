@@ -3,6 +3,7 @@
 //! user ([`issues`]).
 
 mod details;
+pub(crate) mod discovery;
 mod issues;
 mod post;
 mod threads;
