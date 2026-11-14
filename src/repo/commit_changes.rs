@@ -51,13 +51,22 @@ fn completed(
     })
 }
 impl RepoTab {
-    /// A branch pill reveals commit details without requesting an automatic file diff.
-    pub(super) fn select_branch_tip(&mut self, row: usize, ctx: &egui::Context) {
+    /// Graph rows and branch tips reveal details without requesting an automatic file diff.
+    pub(super) fn select_graph_row(&mut self, row: usize, ctx: &egui::Context) {
         if row >= self.commits.len() {
             return;
         }
         self.leave_pages();
         self.doctor = None;
+        // A link's automatic diff belongs to its history-follow presentation. Retire
+        // both together, including when select() returns early for the current row.
+        if self
+            .diff
+            .as_ref()
+            .is_some_and(|view| self.commit_changes.graph_with_diff(&view.key))
+        {
+            self.diff = None;
+        }
         self.commit_changes.stop();
         self.select(row, ctx);
         crate::settings::Settings::set_show_detail(ctx, true);
@@ -218,6 +227,10 @@ mod tests {
 #[cfg(test)]
 #[path = "commit_changes/reveal_tests.rs"]
 mod reveal_tests;
+
+#[cfg(test)]
+#[path = "commit_changes/selection_tests.rs"]
+mod selection_tests;
 
 /// Owned actual detail/diff loading coverage. Compile only until containment is cleared.
 #[cfg(test)]
