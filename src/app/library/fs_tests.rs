@@ -2,6 +2,7 @@
 //! (links, case, Unicode), large trees stopped within bounds, and the window's cost of a
 //! full library.
 
+#[cfg(windows)]
 use crate::app::library::test_support::AssertValue;
 use std::time::{Duration, Instant};
 
