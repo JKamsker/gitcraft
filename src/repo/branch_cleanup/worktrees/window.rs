@@ -68,6 +68,7 @@ impl RepoTab {
         }
         if asks.look_again {
             self.read_worktrees(ctx);
+            self.read_archives(ctx);
         }
         if let Some((listed, into)) = asks.restore {
             self.restore_archive(listed, into, ctx);

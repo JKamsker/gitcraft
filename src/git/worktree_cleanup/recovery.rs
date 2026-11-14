@@ -33,6 +33,11 @@ fn root(repo: &Path) -> Result<PathBuf, String> {
     Ok(root)
 }
 
+fn vacant(path: &Path) -> bool {
+    path.symlink_metadata()
+        .is_err_and(|e| e.kind() == std::io::ErrorKind::NotFound)
+}
+
 fn plain_dir(path: &Path) -> bool {
     std::fs::symlink_metadata(path).is_ok_and(|m| m.is_dir())
 }
@@ -87,7 +92,7 @@ impl Capture {
     /// Best-effort rollback. Rename cannot overwrite a nonempty directory. On failure the
     /// retained copy stays discoverable and the error names its location.
     pub fn rollback(&self, error: &str) -> String {
-        if self.record.original.symlink_metadata().is_err()
+        if vacant(&self.record.original)
             && std::fs::rename(self.tree(), &self.record.original).is_ok()
         {
             return error.to_owned();
@@ -140,16 +145,17 @@ impl Store {
     }
 
     /// Restore the full tree and its index, refusing an occupied original path. The record
-    /// stays behind on partial failure; retries finish the metadata move safely.
+    /// stays behind on partial failure; no registration is restored without a retained tree.
     pub fn restore_recovery(repo: &Path, directory: &Path) -> Result<(), String> {
         let record = record(repo, directory)?;
         let tree = directory.join("tree");
-        if tree.symlink_metadata().is_ok() {
-            if !plain_dir(&tree) || record.original.symlink_metadata().is_ok() {
-                return Err("Original worktree path is occupied; recovery kept".into());
-            }
-            std::fs::rename(&tree, &record.original).map_err(|e| e.to_string())?;
+        if !plain_dir(&tree) || !vacant(&record.original) {
+            return Err(
+                "Original path is occupied or the retained tree is unavailable; recovery kept"
+                    .into(),
+            );
         }
+        std::fs::rename(&tree, &record.original).map_err(|e| e.to_string())?;
         let state = directory.join("git-state");
         if plain_dir(&state) {
             if record.admin.symlink_metadata().is_ok() {

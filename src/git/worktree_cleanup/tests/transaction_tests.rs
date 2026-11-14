@@ -138,3 +138,40 @@ fn cross_device_capture_refuses_without_copying_or_removing() -> Result {
     assert!(Store::recoveries(f.repo.path())?.is_empty());
     Ok(())
 }
+
+#[test]
+fn missing_retained_tree_cannot_restore_a_phantom_registration() -> Result {
+    let f = Fixture::new("missing recovery tree")?;
+    let wt = f.merged_worktree("done")?;
+    let target = f.target(&wt, "done")?;
+    let preview = inspect(f.repo.path(), &target)?;
+    assert!(matches!(
+        remove(f.repo.path(), &target, &preview, Some(&f.store), false),
+        Outcome::Removed { .. }
+    ));
+    let items = Store::recoveries(f.repo.path())?;
+    let directory = &items[0].0;
+    std::fs::rename(directory.join("tree"), f.scratch.join("moved-by-user"))?;
+    assert!(Store::restore_recovery(f.repo.path(), directory).is_err());
+    assert!(directory.join("git-state/index").is_file());
+    assert!(!wt.exists());
+    Ok(())
+}
+
+#[cfg(unix)]
+#[test]
+fn symlinked_recovery_area_is_refused_before_moving_content() -> Result {
+    let f = Fixture::new("recovery root symlink")?;
+    let wt = f.merged_worktree("done")?;
+    let own = f.repo.path().join(".git/gitcraft");
+    std::fs::create_dir_all(&own)?;
+    std::os::unix::fs::symlink(&f.scratch, own.join("recovery"))?;
+    let target = f.target(&wt, "done")?;
+    let preview = inspect(f.repo.path(), &target)?;
+    assert!(matches!(
+        remove(f.repo.path(), &target, &preview, Some(&f.store), false),
+        Outcome::Failed(_)
+    ));
+    assert!(wt.join("done.txt").exists());
+    Ok(())
+}

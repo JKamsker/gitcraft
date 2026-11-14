@@ -114,7 +114,7 @@ worktree-cleanup-in-use-terminals = { $count } Terminals darin geöffnet
 worktree-cleanup-in-use-agent = Agent-Aufgabe: { $agent }
 
 worktree-cleanup-recovery-title = Wiederherstellbare Worktrees
-worktree-cleanup-recovery-hint = Vollständige Verzeichnisse und Git-Metadaten bleiben bis zum ausdrücklichen Löschen erhalten. Bereinigung gibt 0 Bytes frei.
+worktree-cleanup-recovery-hint = Vollständige Verzeichnisse und Git-Metadaten bleiben bis zum ausdrücklichen Löschen erhalten. Bereinigung gibt 0 Bytes frei. Das ZIP-Limit gilt nicht für aufbewahrte Verzeichnisse.
 worktree-cleanup-recovery-empty = Keine wiederherstellbaren Worktrees.
 worktree-cleanup-recovery-restore = Worktree wiederherstellen
 worktree-cleanup-purge = Endgültig löschen…

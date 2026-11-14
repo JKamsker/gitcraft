@@ -114,7 +114,7 @@ worktree-cleanup-in-use-terminals = { $count } terminals open in it
 worktree-cleanup-in-use-agent = agent task: { $agent }
 
 worktree-cleanup-recovery-title = Recoverable worktrees
-worktree-cleanup-recovery-hint = Full trees and Git metadata stay here until you explicitly purge them. Cleanup reclaims 0 bytes.
+worktree-cleanup-recovery-hint = Full trees and Git metadata stay here until you explicitly purge them. Cleanup reclaims 0 bytes. The ZIP quota does not cover retained trees.
 worktree-cleanup-recovery-empty = No recoverable worktrees.
 worktree-cleanup-recovery-restore = Restore full worktree
 worktree-cleanup-purge = Purge…
