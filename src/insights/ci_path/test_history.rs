@@ -185,12 +185,7 @@ fn state(outcome: Option<Outcome>) -> Option<CheckState> {
     }
 }
 
-fn assemble(
-    plan: Plan,
-    now: Read,
-    before: Option<Read>,
-    history: Vec<Read>,
-) -> JobEvidence {
+fn assemble(plan: Plan, now: Read, before: Option<Read>, history: Vec<Read>) -> JobEvidence {
     let mut timeline: Vec<&Read> = history.iter().chain([&now]).collect();
     timeline.sort_by_key(|read| (read.target.key.run, read.target.key.attempt));
     let tests: BTreeSet<&TestId> = timeline
