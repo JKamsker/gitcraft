@@ -126,7 +126,10 @@ pub(super) fn group(ui: &mut Ui, ctx: &Ctx, g: usize, shown: &Shown, acts: &mut 
             ui.label(RichText::new(&shown.group.why).small().color(t.text_faint));
             if let Some(kind) = insight_of(shown.group.purpose)
                 && ui
-                    .small_button(format!("Open in {}", kind.title()))
+                    .small_button(crate::i18n::message(
+                        "purpose-open-insight",
+                        &[("insight", kind.title().into())],
+                    ))
                     .clicked()
             {
                 acts.push(Action::Insights(InsightsAct::Open(kind)));

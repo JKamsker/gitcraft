@@ -7786,3 +7786,5 @@ purpose-diagnostic-16 = Einige Dateien überschreiten die Grenze für einzelne �
 
 purpose-made-by-you = von Ihnen erstellt
 purpose-split-title = { $title } (Teilung { $count })
+
+purpose-open-insight = In { $insight } öffnen

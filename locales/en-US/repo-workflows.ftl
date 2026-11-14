@@ -7788,3 +7788,5 @@ purpose-diagnostic-16 = some files are past the limits of what is split into hun
 
 purpose-made-by-you = made by you
 purpose-split-title = { $title } (split { $count })
+
+purpose-open-insight = Open in { $insight }
