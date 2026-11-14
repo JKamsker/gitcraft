@@ -59,7 +59,7 @@ pub struct Terminal {
     /// input buffer is full (a big paste while a program isn't reading), which must not freeze
     /// the app. Shared with the parser, which answers the shell's cursor-position queries.
     writer: Sender<Vec<u8>>,
-    master: Box<dyn MasterPty + Send>,
+    master: Arc<Mutex<Box<dyn MasterPty + Send>>>,
     child: Box<dyn Child + Send + Sync>,
     exited: Arc<AtomicBool>,
     exit_code: Option<u32>,
@@ -190,11 +190,26 @@ impl Terminal {
         }
 
         let shell = shell.label.clone();
-        let location = location::probe(child.process_id());
+        let master = Arc::new(Mutex::new(pair.master));
+        let observed = master.clone();
+        let foreground = Arc::new(move || {
+            #[cfg(unix)]
+            {
+                lock(&observed)
+                    .process_group_leader()
+                    .and_then(|pid| u32::try_from(pid).ok())
+            }
+            #[cfg(not(unix))]
+            {
+                let _ = &observed;
+                None
+            }
+        });
+        let location = location::probe(child.process_id(), foreground);
         Ok(Self {
             parser,
             writer,
-            master: pair.master,
+            master,
             child,
             exited,
             exit_code: None,

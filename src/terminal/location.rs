@@ -6,7 +6,10 @@ use std::sync::Arc;
 
 type Probe = Arc<dyn Fn() -> Option<PathBuf> + Send + Sync>;
 
-pub(super) fn probe(pid: Option<u32>) -> Probe {
+pub(super) fn probe(
+    pid: Option<u32>,
+    foreground: Arc<dyn Fn() -> Option<u32> + Send + Sync>,
+) -> Probe {
     #[cfg(target_os = "linux")]
     {
         let identity = pid.and_then(|pid| birth(pid).map(|birth| (pid, birth)));
@@ -15,13 +18,17 @@ pub(super) fn probe(pid: Option<u32>) -> Probe {
             if birth(*pid).as_ref() != Some(expected) {
                 return None;
             }
-            let path = std::fs::read_link(format!("/proc/{pid}/cwd")).ok()?;
-            (birth(*pid).as_ref() == Some(expected)).then_some(path)
+            let active = foreground()?;
+            let active_birth = birth(active)?;
+            let path = std::fs::read_link(format!("/proc/{active}/cwd")).ok()?;
+            (birth(*pid).as_ref() == Some(expected)
+                && birth(active).as_ref() == Some(&active_birth))
+            .then_some(path)
         })
     }
     #[cfg(not(target_os = "linux"))]
     {
-        let _ = pid;
+        let _ = (pid, foreground);
         Arc::new(|| None)
     }
 }
@@ -54,9 +61,12 @@ mod tests {
 
     #[test]
     fn current_owned_process_cwd_is_observed() -> Result<(), Box<dyn std::error::Error>> {
-        let probe = super::probe(Some(std::process::id()));
+        let probe = super::probe(
+            Some(std::process::id()),
+            std::sync::Arc::new(|| Some(std::process::id())),
+        );
         assert_eq!(probe(), Some(std::env::current_dir()?));
-        assert!(super::probe(None)().is_none());
+        assert!(super::probe(None, std::sync::Arc::new(|| None))().is_none());
         Ok(())
     }
 }
