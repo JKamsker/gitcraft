@@ -98,3 +98,73 @@ fn changing_job_attempt_or_baseline_retires_log_evidence_and_late_answers() -> R
     }
     Ok(())
 }
+
+#[test]
+fn failed_current_baseline_or_history_logs_offer_a_retry_and_recover() -> Result<(), String> {
+    use egui_kittest::{Harness, kittest::Queryable};
+    for failed in ["now", "baseline", "history"] {
+        let mut explorer = tests::explorer();
+        explorer.diagnostics = analysis::diagnostics::compare(
+            &explorer.run,
+            &explorer.compared.as_ref().ok_or("baseline")?.run,
+            None,
+            None,
+        );
+        let mut past = explorer.run.clone();
+        past.info.attempt = 2;
+        past.jobs[1].id = 42;
+        explorer.history.runs.push(past);
+        let plan = test_history::plan(&explorer, 1).ok_or("plan")?;
+        let success = test_history::read(plan, |_| {
+            Ok((
+            "running 1 test\ntest sample ... ok\ntest result: ok. 1 passed; 0 failed; 0 ignored\n".into(), false,
+        ))
+        });
+        let mut evidence = success.clone();
+        let read = match failed {
+            "baseline" => evidence.before.as_mut().ok_or("baseline read")?,
+            "history" => evidence.history.first_mut().ok_or("history read")?,
+            _ => &mut evidence.now,
+        };
+        read.log = Err("temporary outage".into());
+        let mut state = State::default();
+        let request = state.logs.start();
+        assert!(state.logs.accept(request, Ok(evidence)));
+        let mut installed = false;
+        let mut h = Harness::new_ui_state(
+            |ui, fixture: &mut (State, Explorer, Vec<Action>)| {
+                if !installed {
+                    crate::theme::install_fonts(ui.ctx());
+                    installed = true;
+                    ui.ctx().request_discard("install supplied fonts");
+                    return;
+                }
+                evidence_view::job(ui, &fixture.0, &fixture.1, 1, &mut fixture.2);
+            },
+            (state, explorer, Vec::new()),
+        );
+        h.run();
+        h.get_by_label("Retry job logs (2)").click();
+        h.run();
+        assert!(h.state().2.iter().any(|action| matches!(
+            action,
+            Action::Insights(InsightsAct::CiPath(Act::ReadLogs(1)))
+        )));
+        let state = &mut h.state_mut().0;
+        let request = state.logs.start();
+        h.run();
+        assert_eq!(
+            h.get_all_by_label("Retry job logs (2)").count(),
+            0,
+            "no duplicate retry while loading"
+        );
+        assert!(h.state_mut().0.logs.accept(request, Ok(success)));
+        h.run();
+        assert_eq!(
+            h.get_all_by_label("Retry job logs (2)").count(),
+            0,
+            "successful evidence needs no retry"
+        );
+    }
+    Ok(())
+}

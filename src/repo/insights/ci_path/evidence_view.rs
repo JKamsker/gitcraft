@@ -27,12 +27,21 @@ pub(super) fn job(
         .collect::<HashSet<_>>()
         .len();
     let current = state.logs.ready().filter(|evidence| evidence.plan == plan);
-    if current.is_none() && !state.logs.loading {
+    let retry = current.is_some_and(|evidence| {
+        std::iter::once(&evidence.now)
+            .chain(&evidence.before)
+            .chain(&evidence.history)
+            .any(|read| read.log.is_err())
+    });
+    if (current.is_none() || retry) && !state.logs.loading {
         if let Some(error) = state.logs.error() {
             ui.label(format!("The job logs couldn't be read: {error}"));
         }
         if ui
-            .button(format!("Read job logs ({reads})"))
+            .button(format!(
+                "{} job logs ({reads})",
+                if retry { "Retry" } else { "Read" }
+            ))
             .on_hover_text(
                 "Test outcomes, cache hits, toolchain versions and errors from this job's log, \
                  its baseline job's and each same-SHA attempt's",
@@ -41,7 +50,9 @@ pub(super) fn job(
         {
             acts.push(act(Act::ReadLogs(index)));
         }
-        return;
+        if current.is_none() {
+            return;
+        }
     }
     let Some(evidence) = current else {
         ui.label(format!("Reading {reads} job logs…"));
