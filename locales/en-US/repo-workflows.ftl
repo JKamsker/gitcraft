@@ -7785,3 +7785,6 @@ purpose-diagnostic-13 = { $file } is larger than { $limit } KiB: its rules are n
 purpose-diagnostic-14 = the diff read has a change to { $path }, which the pull request doesn't list
 purpose-diagnostic-15 = a group holds a change that isn't there
 purpose-diagnostic-16 = some files are past the limits of what is split into hunks
+
+purpose-made-by-you = made by you
+purpose-split-title = { $title } (split { $count })

@@ -101,7 +101,7 @@ pub(in crate::repo::insights) struct Units {
     /// What they say of each unit (see [`Units::set_config`]).
     pub(in crate::repo::insights) ruled: Ruled,
     /// What `.gitattributes` at the base says about folding the files, by path; `None` when
-    /// Git can't read them there (before 2.40): the working tree's apply.
+    /// Git can't read them there: only names and custom patterns apply, with a diagnostic.
     pub(in crate::repo::insights) attrs: Option<HashMap<String, FoldAttr>>,
 }
 

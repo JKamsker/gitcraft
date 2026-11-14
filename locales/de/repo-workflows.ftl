@@ -7783,3 +7783,6 @@ purpose-diagnostic-13 = { $file } ist größer als { $limit } KiB: Die Regeln we
 purpose-diagnostic-14 = Der gelesene Diff enthält eine Änderung an { $path }, die im Pull Request fehlt
 purpose-diagnostic-15 = Eine Gruppe enthält eine fehlende Änderung
 purpose-diagnostic-16 = Einige Dateien überschreiten die Grenze für einzelne Änderungsblöcke
+
+purpose-made-by-you = von Ihnen erstellt
+purpose-split-title = { $title } (Teilung { $count })

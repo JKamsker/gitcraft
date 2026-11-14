@@ -99,7 +99,7 @@ pub(in crate::repo::insights) fn arrange(
                 group: Group {
                     id: sg.id.clone(),
                     title: sg.title.clone(),
-                    why: "made by you".to_owned(),
+                    why: crate::i18n::text("purpose-made-by-you").to_owned(),
                     purpose: None,
                     units: Vec::new(),
                 },
@@ -284,7 +284,13 @@ pub(in crate::repo::insights) fn edit(
         Edit::Split { units: keys, from } => {
             let f = find(&saved, &from)?;
             saved.next += 1;
-            let title = format!("{} (split {})", saved.groups[f].title, saved.next);
+            let title = crate::i18n::message(
+                "purpose-split-title",
+                &[
+                    ("title", saved.groups[f].title.clone().into()),
+                    ("count", saved.next.into()),
+                ],
+            );
             saved.groups.insert(
                 f + 1,
                 SavedGroup {
