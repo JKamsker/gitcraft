@@ -80,7 +80,8 @@ fn main() -> eframe::Result {
             }
         };
         let options = eframe::NativeOptions {
-            viewport: app::window_viewport()
+            // The standalone tools have no tab strip to provide window controls.
+            viewport: egui::ViewportBuilder::default()
                 .with_title(gitcraft::standalone::window_title())
                 .with_inner_size([1400.0, 860.0])
                 .with_icon(app::window_icon()),

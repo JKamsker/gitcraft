@@ -1,0 +1,34 @@
+# Repackage the official Linux release without compiling Rust.
+pkgname=gitcraft-bin
+pkgver=0.3.5
+pkgrel=1
+pkgdesc='A small, personal visual git client'
+arch=('x86_64')
+url='https://github.com/JKamsker/gitcraft'
+license=('MIT OR Apache-2.0')
+depends=('git' 'gcc-libs' 'glibc' 'alsa-lib' 'libxkbcommon' 'libx11'
+         'libxcursor' 'libxi' 'libxrandr' 'wayland')
+provides=("gitcraft=$pkgver")
+conflicts=('gitcraft')
+options=('!strip')
+optdepends=('vulkan-driver: Vulkan graphics backend'
+            'mesa: OpenGL graphics backend'
+            'org.freedesktop.secrets: save connection credentials'
+            'xdg-desktop-portal: native file dialogs'
+            'xdg-utils: open links in the default browser'
+            'git-lfs: Git LFS support')
+source=("$url/releases/download/v$pkgver/gitcraft-v$pkgver-linux-x86_64.tar.gz")
+sha256sums=('2e4f3d224640efe9092cbedc1308d359ad192d6a43c106e2e8ed1084ba17f837')
+
+package() {
+    cd "$srcdir/gitcraft-v$pkgver-linux-x86_64"
+    install -Dm755 gitcraft "$pkgdir/usr/bin/gitcraft"
+    install -Dm644 gitcraft.desktop "$pkgdir/usr/share/applications/gitcraft.desktop"
+    install -Dm644 gitcraft-link.desktop "$pkgdir/usr/share/applications/gitcraft-link.desktop"
+    install -Dm755 gitcraft-servicemenu.desktop "$pkgdir/usr/share/kio/servicemenus/gitcraft.desktop"
+    install -Dm644 gitcraft.png "$pkgdir/usr/share/icons/hicolor/256x256/apps/gitcraft.png"
+    install -Dm644 ATTRIBUTION.md "$pkgdir/usr/share/doc/gitcraft/ATTRIBUTION.md"
+    install -Dm644 README.md "$pkgdir/usr/share/doc/gitcraft/README.md"
+    install -Dm644 LICENSE-MIT "$pkgdir/usr/share/licenses/gitcraft/LICENSE-MIT"
+    install -Dm644 LICENSE-APACHE "$pkgdir/usr/share/licenses/gitcraft/LICENSE-APACHE"
+}

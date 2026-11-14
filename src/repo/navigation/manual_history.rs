@@ -166,15 +166,16 @@ fn user_case(saved: bool, by_hash: bool, same_file: bool, readiness: Readiness) 
         };
         act(&mut tab, action, &ctx);
         let ready = matches!(readiness, Readiness::Ready | Readiness::Cached);
+        let automatic = by_hash && ready;
         assert_eq!(
             tab.diff.as_ref().map(|view| view.key.clone()),
-            ready.then(|| commit_key(&head, first))
+            automatic.then(|| commit_key(&head, first))
         );
         let manual = commit_key(&head, FILE);
         act(&mut tab, Action::OpenDiff(manual.clone()), &ctx);
         // The explicit same-file action toggles a ready automatic diff, but opens
         // when its first file differs or the detail has not arrived yet.
-        let expected = (!(ready && same_file)).then_some(manual);
+        let expected = (!(automatic && same_file)).then_some(manual);
         assert_eq!(tab.diff.as_ref().map(|view| view.key.clone()), expected);
         deliver(&mut tab, &head, first, &ctx);
         assert_eq!(tab.diff.as_ref().map(|view| view.key.clone()), expected);

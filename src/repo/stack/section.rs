@@ -370,7 +370,7 @@ impl RepoTab {
         if r.double_clicked() && !branch.is_head && idle {
             acts.push(Action::Checkout(branch.name.clone()));
         } else if r.clicked() {
-            acts.push(Action::SelectHash(branch.target.clone()));
+            acts.push(Action::SelectBranch(branch.target.clone()));
         }
         crate::menu_item::context(&r)
             .style(crate::theme::menu_style)

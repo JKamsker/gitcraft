@@ -37,15 +37,12 @@ fn the_keys_step_through_the_drawn_tab() {
     harness.key_press(Key::ArrowDown);
     frames(&mut harness);
     assert_eq!(harness.state().selected_hash(), Some(base));
+    assert!(harness.state().diff.is_none());
     harness.key_press(Key::ArrowUp);
     frames(&mut harness);
 
     let key = commit_key(&head, &file);
-    assert_eq!(harness.state().diff.as_ref().map(|view| &view.key), Some(&key));
-    // History navigation already revealed it; start the explicit manual-open path
-    // from the graph, retaining the original split and back/forward assertions.
-    harness.state_mut().queue(Action::CloseDiff);
-    frames(&mut harness);
+    // Moving through graph rows shows details; a file is opened explicitly.
     assert!(harness.state().diff.is_none());
     harness.state_mut().queue(Action::OpenDiff(key.clone()));
     frames(&mut harness);

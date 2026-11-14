@@ -183,6 +183,7 @@ impl RepoTab {
             Action::Select(_)
             | Action::SelectBranchTip(_)
             | Action::SelectHash(_)
+            | Action::SelectBranch(_)
             | Action::OpenCommitChanges(_)
             | Action::SelectPr(_)
             | Action::SelectStash(_)
