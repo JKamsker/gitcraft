@@ -2,7 +2,8 @@
 # Put first in PATH by gitcraft only where this machine's Git predates --no-lazy-fetch
 # (Git 2.44). That Git can't be told not to download promised objects, so the option is
 # dropped only in repositories without partial-clone or promisor configuration, where no
-# object is ever promised; elsewhere the command is refused instead of fetching.
+# object is ever promised, and with every transport disallowed so nothing it starts can
+# fetch either; elsewhere the command is refused instead of fetching.
 real=$GITCRAFT_LEGACY_GIT
 case $real in
 /*) ;;
@@ -48,4 +49,8 @@ case $code in
     ;;
 esac
 shift "$n"
+# Git spawned by this one (a submodule's diff, say) may be in a partial clone the check
+# above never saw; allowing no transport at all keeps it from fetching too.
+GIT_ALLOW_PROTOCOL=gitcraft-no-lazy-fetch
+export GIT_ALLOW_PROTOCOL
 eval "exec \"\$real\" $keep \"\$@\""
