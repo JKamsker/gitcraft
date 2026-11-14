@@ -20,7 +20,7 @@ pub(in crate::remote) fn start_shell(host: &Host) -> Result<Shell, String> {
 /// What a new shell is sent first: its temporary folder (removed when the shell ends, also on
 /// a hang-up or a signal), its PATH, then [`READY`] and its process (see [`parse_ready`]).
 pub(in crate::remote) fn setup_script() -> String {
-    format!("{MORE_PATH}\n{}", super::super::supervisor::setup())
+    format!("{}\n{}", shell_path(), super::super::supervisor::setup())
 }
 
 /// The process that runs `sh` on `host`, reading its script from its input, and (over SSH)

@@ -24,6 +24,11 @@ pub(super) const READY: &str = "__GITCRAFT_READY__";
 const MORE_PATH: &str =
     "PATH=\"$PATH:$HOME/.local/bin:$HOME/bin:/usr/local/bin:/opt/homebrew/bin\"; export PATH";
 
+/// What every new shell runs first: [`MORE_PATH`], then the shim an old Git needs.
+fn shell_path() -> String {
+    format!("{MORE_PATH}\n{}", legacy_git::setup())
+}
+
 /// What a command's error output starts with when its folder isn't there.
 const NO_FOLDER: &str = "gitcraft: no such folder: ";
 
@@ -317,7 +322,8 @@ pub(crate) fn streaming_command_bounded(
     let (command, attempt) = shell_command(host, false);
     let nonce = nonce();
     let input = format!(
-        "{MORE_PATH}\n{}",
+        "{}\n{}",
+        shell_path(),
         super::supervisor::streaming_bounded(
             req,
             &nonce,
@@ -344,7 +350,7 @@ type ClaimCommand = (Command, Vec<u8>, Option<Box<dyn FnOnce() + Send>>);
 
 pub(super) fn claim_command(host: &Host, data: &str) -> ClaimCommand {
     let (command, connection) = shell_command(host, false);
-    let input = format!("{MORE_PATH}\n{}", super::supervisor::claim(data)).into_bytes();
+    let input = format!("{}\n{}", shell_path(), super::supervisor::claim(data)).into_bytes();
     (
         command,
         input,
@@ -466,4 +472,6 @@ use connection::*;
 pub(super) use connection::{setup_script, start_shell};
 
 mod framing;
+
+mod legacy_git;
 pub(super) use framing::{framed, nonce, parse_header, parse_ready};
