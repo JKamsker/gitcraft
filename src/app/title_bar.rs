@@ -1,4 +1,4 @@
-//! Tabs in the title bar (Windows and macOS): the window is made without the system's title bar.
+//! Tabs in the title bar (Windows, macOS and Linux): the window is made without the system's title bar.
 //! The tab strip takes its place, as in a browser. The strip's empty space moves the window and a
 //! double click on it maximizes it, the caption buttons (minimize, maximize, close) sit at the
 //! strip's end, and the window's edges resize it. On macOS the maximize button enters
@@ -43,7 +43,7 @@ static DECORATED_AT_START: AtomicBool = AtomicBool::new(true);
 
 /// Whether the tab strip stands in for the system's title bar.
 pub(super) fn wanted(settings: &Settings) -> bool {
-    cfg!(any(windows, target_os = "macos")) && settings.tabs_in_title_bar
+    cfg!(any(windows, target_os = "macos", target_os = "linux")) && settings.tabs_in_title_bar
 }
 
 /// Whether to make the window with the system's title bar, from the settings eframe saved in
@@ -99,9 +99,14 @@ pub(super) fn viewport(decorated: bool) -> egui::ViewportBuilder {
 }
 
 /// Gives the window the system's title bar back or takes it away, when that changes.
-/// `decorated` is what the window has now.
-pub(super) fn apply(ctx: &egui::Context, settings: &Settings, decorated: &mut bool) {
-    let want = !wanted(settings);
+/// `decorated` is what the window has now. Screens without a tab strip need native controls.
+pub(super) fn apply(
+    ctx: &egui::Context,
+    settings: &Settings,
+    has_tab_strip: bool,
+    decorated: &mut bool,
+) {
+    let want = !has_tab_strip || !wanted(settings);
     if *decorated != want {
         *decorated = want;
         // macOS keeps the native frame; sync_border updates its title bar in place.
@@ -118,10 +123,10 @@ pub(super) fn apply(ctx: &egui::Context, settings: &Settings, decorated: &mut bo
 /// On macOS this synchronizes the transparent native title bar instead.
 pub(super) fn sync_border(
     window: &impl raw_window_handle::HasWindowHandle,
-    settings: &Settings,
+    decorated: bool,
     shown: &mut Option<bool>,
 ) {
-    let want = !wanted(settings);
+    let want = decorated;
     if *shown != Some(want) {
         *shown = Some(want);
         set_window_border(window, want);

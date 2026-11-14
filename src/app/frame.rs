@@ -116,9 +116,14 @@ impl App {
         crate::portable::set_credential_store(self.settings.portable_credential_store);
         crate::network::set_choices(self.settings.offline, self.settings.pause_on_metered);
         crate::network::start_watching(&ctx);
-        title_bar::apply(&ctx, &self.settings, &mut self.decorated);
+        title_bar::apply(
+            &ctx,
+            &self.settings,
+            self.git_version.is_ok(),
+            &mut self.decorated,
+        );
         if let Some(frame) = frame {
-            title_bar::sync_border(frame, &self.settings, &mut self.window_border);
+            title_bar::sync_border(frame, self.decorated, &mut self.window_border);
         }
         self.close_root_with_children(&ctx);
         crate::app_buttons::set_current_theme(&ctx, &self.theme);

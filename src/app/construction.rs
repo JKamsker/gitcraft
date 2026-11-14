@@ -122,7 +122,12 @@ impl App {
             inbox_seen: saved.inbox_seen,
         };
         // Before the window first shows, so its title bar doesn't flash.
-        title_bar::apply(ctx, &app.settings, &mut app.decorated);
+        title_bar::apply(
+            ctx,
+            &app.settings,
+            app.git_version.is_ok(),
+            &mut app.decorated,
+        );
         update::clean_up();
         if let crate::portable::Mode::Unusable(why) = crate::portable::mode() {
             app.toasts.push(Toast::new(why.clone(), true));

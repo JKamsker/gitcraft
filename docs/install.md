@@ -20,6 +20,12 @@ The `.zip` is the same program without installing.
 
 ## Linux
 
+- **Arch Linux:** copy either `packaging/arch/gitcraft/PKGBUILD` (source build) or
+  `packaging/arch/gitcraft-bin/PKGBUILD` (prebuilt x86_64 release) into an empty
+  directory, then run `makepkg -si` there as your normal user. The source build
+  requires Rust 1.95 or newer. See [Arch packaging](../packaging/arch/README.md)
+  for validation and AUR submission instructions.
+  Update the package with pacman rather than the in-app updater.
 - **Debian, Ubuntu, Mint…:** `sudo apt install ./gitcraft-…-linux-x86_64.deb`
 - **Fedora, openSUSE…:** `sudo dnf install ./gitcraft-…-linux-x86_64.rpm`
 - **Any distribution:** make `gitcraft-…-linux-x86_64.AppImage` executable (`chmod +x`) and run it.

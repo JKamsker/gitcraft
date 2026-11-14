@@ -52,6 +52,38 @@ fn branch_selection_reopens_details_without_scheduling_or_completing_a_diff() {
     }
 }
 
+#[test]
+fn sidebar_branch_selection_by_hash_never_opens_a_diff() {
+    use crate::repo::{Action, Msg};
+    // No diff and hidden details are the states in which a history selection reveals one.
+    for show_detail in [false, true] {
+        let ctx = egui::Context::default();
+        let mut tab = RepoTab::new_deferred("/recording-only/sidebar-branch".into(), &ctx);
+        // A deferred tab only parks the target; a live one selects it straight away.
+        tab.life.phase = crate::repo::lifecycle::Phase::Live;
+        let hash = "a".repeat(40);
+        tab.commits.push(std::sync::Arc::new(crate::git::Commit {
+            hash: hash.clone(),
+            ..Default::default()
+        }));
+        tab.index.insert(hash.clone(), 0);
+        let mut settings = crate::settings::Settings::get(&ctx);
+        settings.show_detail = show_detail;
+        settings.put_for_test(&ctx);
+        crate::repo::messages::record_jobs(|| {
+            tab.apply(Action::SelectBranch(hash.clone()), &ctx);
+            tab.handle(Msg::Detail(hash.clone(), Ok(detail(&hash))), &ctx);
+        });
+        assert_eq!(tab.selected, Some(0));
+        assert_eq!(tab.scroll_to, Some(0));
+        assert!(tab.detail.is_some());
+        assert!(tab.diff.is_none());
+        assert!(tab.commit_changes.pending.is_none());
+        assert!(!tab.commit_changes.follows_history());
+        assert!(crate::settings::Settings::get(&ctx).show_detail);
+    }
+}
+
 fn key(hash: &str) -> DiffKey {
     DiffKey::Commit {
         hash: hash.into(),
@@ -59,7 +91,7 @@ fn key(hash: &str) -> DiffKey {
     }
 }
 
-fn detail(hash: &str) -> crate::git::CommitDetail {
+pub(super) fn detail(hash: &str) -> crate::git::CommitDetail {
     crate::git::CommitDetail {
         hash: hash.into(),
         parents: Vec::new(),
@@ -82,83 +114,74 @@ fn detail(hash: &str) -> crate::git::CommitDetail {
 }
 
 #[test]
-fn row_and_hash_navigation_reveal_new_diff_and_reject_old_details_and_diff_results()
--> Result<(), String> {
+fn hash_navigation_reveals_new_diff_and_rejects_old_details_and_diff_results() -> Result<(), String>
+{
     use crate::repo::{Action, Msg, diff};
-    for by_hash in [false, true] {
-        let ctx = egui::Context::default();
-        let mut tab = RepoTab::new_deferred("/recording-only/history-selection".into(), &ctx);
-        // Model a displayed tab without starting its filesystem watchers or initial reads.
-        tab.life.shown(std::time::Instant::now());
-        for (i, hash) in ["a".repeat(40), "b".repeat(40)].into_iter().enumerate() {
-            tab.index.insert(hash.clone(), i);
-            tab.commits.push(std::sync::Arc::new(crate::git::Commit {
-                hash,
-                ..Default::default()
-            }));
-        }
-        let select = |i: usize| {
-            if by_hash {
-                Action::SelectHash(if i == 0 { "a" } else { "b" }.repeat(40))
-            } else {
-                Action::Select(i)
-            }
-        };
-        let (result, _) = crate::repo::messages::record_jobs(|| -> Result<(), String> {
-            tab.apply(select(0), &ctx);
-            tab.handle(
-                Msg::Detail("a".repeat(40), Ok(detail(&"a".repeat(40)))),
-                &ctx,
-            );
-            let old = tab
-                .diff
-                .as_ref()
-                .ok_or("first selection did not reveal a diff")?
-                .request;
-            tab.apply(select(1), &ctx);
-            assert!(
-                tab.diff.is_none(),
-                "previous selection must not remain on screen"
-            );
-            tab.handle(
-                Msg::Detail("a".repeat(40), Ok(detail(&"a".repeat(40)))),
-                &ctx,
-            );
-            assert!(tab.diff.is_none());
-            tab.handle(
-                Msg::Detail("b".repeat(40), Ok(detail(&"b".repeat(40)))),
-                &ctx,
-            );
-            let current = tab
-                .diff
-                .as_ref()
-                .ok_or("second selection did not reveal a diff")?
-                .request;
-            assert_ne!(old, current);
-            assert_eq!(
-                tab.diff.as_ref().map(|view| view.key.clone()),
-                Some(key(&"b".repeat(40)))
-            );
-            tab.handle(Msg::Diff(old, Err("stale failure".into())), &ctx);
-            assert!(tab.diff.as_ref().is_some_and(|view| view.data.is_none()));
-            let mut data = diff::DiffData::default();
-            data.lines = diff::parse("@@ -1 +1 @@\n-old\n+newly selected\n");
-            tab.handle(Msg::Diff(current, Ok(Box::new(data))), &ctx);
-            assert!(
-                tab.diff
-                    .as_ref()
-                    .and_then(|view| view.data.as_ref())
-                    .is_some_and(|data| data.as_ref().is_ok_and(|data| data
-                        .lines
-                        .iter()
-                        .any(|line| line.text == "newly selected")))
-            );
-            tab.apply(select(1), &ctx);
-            assert_eq!(tab.diff.as_ref().map(|view| view.request), Some(current));
-            Ok(())
-        });
-        result?;
+    let ctx = egui::Context::default();
+    let mut tab = RepoTab::new_deferred("/recording-only/history-selection".into(), &ctx);
+    // Model a displayed tab without starting its filesystem watchers or initial reads.
+    tab.life.shown(std::time::Instant::now());
+    for (i, hash) in ["a".repeat(40), "b".repeat(40)].into_iter().enumerate() {
+        tab.index.insert(hash.clone(), i);
+        tab.commits.push(std::sync::Arc::new(crate::git::Commit {
+            hash,
+            ..Default::default()
+        }));
     }
+    let select = |i: usize| Action::SelectHash(if i == 0 { "a" } else { "b" }.repeat(40));
+    let (result, _) = crate::repo::messages::record_jobs(|| -> Result<(), String> {
+        tab.apply(select(0), &ctx);
+        tab.handle(
+            Msg::Detail("a".repeat(40), Ok(detail(&"a".repeat(40)))),
+            &ctx,
+        );
+        let old = tab
+            .diff
+            .as_ref()
+            .ok_or("first selection did not reveal a diff")?
+            .request;
+        tab.apply(select(1), &ctx);
+        assert!(
+            tab.diff.is_none(),
+            "previous selection must not remain on screen"
+        );
+        tab.handle(
+            Msg::Detail("a".repeat(40), Ok(detail(&"a".repeat(40)))),
+            &ctx,
+        );
+        assert!(tab.diff.is_none());
+        tab.handle(
+            Msg::Detail("b".repeat(40), Ok(detail(&"b".repeat(40)))),
+            &ctx,
+        );
+        let current = tab
+            .diff
+            .as_ref()
+            .ok_or("second selection did not reveal a diff")?
+            .request;
+        assert_ne!(old, current);
+        assert_eq!(
+            tab.diff.as_ref().map(|view| view.key.clone()),
+            Some(key(&"b".repeat(40)))
+        );
+        tab.handle(Msg::Diff(old, Err("stale failure".into())), &ctx);
+        assert!(tab.diff.as_ref().is_some_and(|view| view.data.is_none()));
+        let mut data = diff::DiffData::default();
+        data.lines = diff::parse("@@ -1 +1 @@\n-old\n+newly selected\n");
+        tab.handle(Msg::Diff(current, Ok(Box::new(data))), &ctx);
+        assert!(
+            tab.diff
+                .as_ref()
+                .and_then(|view| view.data.as_ref())
+                .is_some_and(|data| data
+                    .as_ref()
+                    .is_ok_and(|data| data.lines.iter().any(|line| line.text == "newly selected")))
+        );
+        tab.apply(select(1), &ctx);
+        assert_eq!(tab.diff.as_ref().map(|view| view.request), Some(current));
+        Ok(())
+    });
+    result?;
     Ok(())
 }
 

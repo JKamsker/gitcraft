@@ -14,6 +14,7 @@ fn destinations() -> Vec<Action> {
     let mut actions = vec![
         Action::Select(0),
         Action::SelectHash(hash.clone()),
+        Action::SelectBranch(hash.clone()),
         Action::SelectStash(0),
         Action::SelectPr(1),
         Action::FocusCommit,

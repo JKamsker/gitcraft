@@ -187,6 +187,7 @@ fn history_reveal_keeps_popped_diff_ownership_for_both_saved_layouts() {
         for popped in [false, true] {
             let ctx = egui::Context::default();
             let mut tab = RepoTab::new_deferred("/recording-only/popped-history-diff".into(), &ctx);
+            tab.life.phase = crate::repo::lifecycle::Phase::Live;
             let mut settings = Settings::get(&ctx);
             settings.diff_beside_graph = saved;
             settings.put_for_test(&ctx);
@@ -194,6 +195,7 @@ fn history_reveal_keeps_popped_diff_ownership_for_both_saved_layouts() {
                 tab.popouts.pop_out(Panel::Diff); // Existing window waiting for its next diff.
             }
             for hash in ["a".repeat(40), "b".repeat(40)] {
+                tab.index.insert(hash.clone(), tab.commits.len());
                 tab.commits.push(std::sync::Arc::new(git::Commit {
                     hash: hash.clone(),
                     ..Default::default()
@@ -201,7 +203,8 @@ fn history_reveal_keeps_popped_diff_ownership_for_both_saved_layouts() {
                 tab.detail_cache.insert(&tab.refs.head, detail(hash));
             }
             for row in 0..2 {
-                crate::repo::messages::record_jobs(|| tab.apply(Action::Select(row), &ctx));
+                let hash = tab.commits[row].hash.clone();
+                crate::repo::messages::record_jobs(|| tab.apply(Action::SelectHash(hash), &ctx));
                 let shown = tab.diff.as_ref().map(|view| view.key.clone());
                 assert_eq!(
                     shown,

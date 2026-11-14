@@ -73,13 +73,7 @@ impl RepoTab {
             Action::Story(act) => self.story_act(act, ctx),
             Action::Freshness(act) => self.freshness_act(act, ctx),
             Action::Review(act) => self.review_act(act, ctx),
-            Action::Select(row) => {
-                self.leave_pages();
-                self.doctor = None;
-                self.select_history(row, ctx);
-                self.hint_after_select(row, ctx);
-            }
-            Action::SelectBranchTip(row) => self.select_branch_tip(row, ctx),
+            Action::Select(row) | Action::SelectBranchTip(row) => self.select_graph_row(row, ctx),
             Action::ActivityCommit(hash) => self.activity_commit(hash, ctx),
             Action::OpenCommitChanges(hash) => self.open_commit_changes(hash, ctx),
             Action::SelectHash(hash) => {
@@ -89,6 +83,7 @@ impl RepoTab {
                 self.doctor = None;
                 self.goto(&hash, ctx);
             }
+            Action::SelectBranch(hash) => self.select_branch(hash, ctx),
             Action::SelectPr(number) => self.select_pr(number, ctx),
             Action::SelectStash(i) => {
                 self.leave_pages();
