@@ -52,6 +52,38 @@ fn branch_selection_reopens_details_without_scheduling_or_completing_a_diff() {
     }
 }
 
+#[test]
+fn sidebar_branch_selection_by_hash_never_opens_a_diff() {
+    use crate::repo::{Action, Msg};
+    // No diff and hidden details are the states in which a history selection reveals one.
+    for show_detail in [false, true] {
+        let ctx = egui::Context::default();
+        let mut tab = RepoTab::new_deferred("/recording-only/sidebar-branch".into(), &ctx);
+        // A deferred tab only parks the target; a live one selects it straight away.
+        tab.life.phase = crate::repo::lifecycle::Phase::Live;
+        let hash = "a".repeat(40);
+        tab.commits.push(std::sync::Arc::new(crate::git::Commit {
+            hash: hash.clone(),
+            ..Default::default()
+        }));
+        tab.index.insert(hash.clone(), 0);
+        let mut settings = crate::settings::Settings::get(&ctx);
+        settings.show_detail = show_detail;
+        settings.put_for_test(&ctx);
+        crate::repo::messages::record_jobs(|| {
+            tab.apply(Action::SelectBranch(hash.clone()), &ctx);
+            tab.handle(Msg::Detail(hash.clone(), Ok(detail(&hash))), &ctx);
+        });
+        assert_eq!(tab.selected, Some(0));
+        assert_eq!(tab.scroll_to, Some(0));
+        assert!(tab.detail.is_some());
+        assert!(tab.diff.is_none());
+        assert!(tab.commit_changes.pending.is_none());
+        assert!(!tab.commit_changes.follows_history());
+        assert!(crate::settings::Settings::get(&ctx).show_detail);
+    }
+}
+
 fn key(hash: &str) -> DiffKey {
     DiffKey::Commit {
         hash: hash.into(),

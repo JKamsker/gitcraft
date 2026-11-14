@@ -183,7 +183,7 @@ impl RepoTab {
         } else if r.double_clicked() && !b.is_head && idle {
             acts.push(Action::Checkout(b.name.clone()));
         } else if r.clicked() {
-            acts.push(Action::SelectHash(b.target.clone()));
+            acts.push(Action::SelectBranch(b.target.clone()));
         }
         crate::menu_item::context(&r)
             .style(crate::theme::menu_style)
