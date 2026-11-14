@@ -63,11 +63,3 @@ fn changed_terminal_cwd_and_nested_directories_are_protected()
     assert!(Presence::using(&root.join("work"), None).is_empty());
     Ok(())
 }
-
-#[test]
-fn unavailable_terminal_cwd_blocks_instead_of_using_launch_path() {
-    let root = std::env::temp_dir().join("224-unknown-cwd");
-    let mut view = Presence::new(&root.join("tab"));
-    view.terminals(vec![std::sync::Arc::new(|| None)]);
-    assert!(!Presence::using(&root.join("worktree"), None).is_empty());
-}

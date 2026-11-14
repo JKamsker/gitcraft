@@ -66,35 +66,53 @@ impl Presence {
     }
 
     pub(super) fn using(path: &Path, except: Option<u64>) -> Vec<String> {
-        let same = |other: &Path| crate::remote::same_dir(path, other);
-        let root = path.canonicalize().unwrap_or_else(|_| path.to_owned());
-        let (mut views, mut terminals, mut unknown) = (0, 0, false);
-        for entry in open().iter() {
-            views += usize::from(Some(entry.id) != except && same(&entry.path));
-            for probe in &entry.terminals {
-                match probe() {
-                    Some(cwd) => {
-                        let cwd = cwd.canonicalize().unwrap_or(cwd);
-                        terminals += usize::from(cwd.starts_with(&root));
-                    }
-                    None => unknown = true,
+        reasons(path, except, &open())
+    }
+}
+
+fn reasons(path: &Path, except: Option<u64>, entries: &[Open]) -> Vec<String> {
+    let same = |other: &Path| crate::remote::same_dir(path, other);
+    let root = path.canonicalize().unwrap_or_else(|_| path.to_owned());
+    let (mut views, mut terminals, mut unknown) = (0, 0, false);
+    for entry in entries {
+        views += usize::from(Some(entry.id) != except && same(&entry.path));
+        for probe in &entry.terminals {
+            match probe() {
+                Some(cwd) => {
+                    let cwd = cwd.canonicalize().unwrap_or(cwd);
+                    terminals += usize::from(cwd.starts_with(&root));
                 }
+                None => unknown = true,
             }
         }
-        let mut why = Vec::new();
-        if views > 0 {
-            why.push(crate::i18n::text("worktree-cleanup-in-use-tab").to_owned());
-        }
-        if unknown {
-            why.push(crate::i18n::text("worktree-cleanup-terminal-unknown").to_owned());
-        }
-        if terminals > 0 {
-            why.push(crate::i18n::message(
-                "worktree-cleanup-in-use-terminals",
-                &[("count", terminals.into())],
-            ));
-        }
-        why
+    }
+    let mut why = Vec::new();
+    if views > 0 {
+        why.push(crate::i18n::text("worktree-cleanup-in-use-tab").to_owned());
+    }
+    if unknown {
+        why.push(crate::i18n::text("worktree-cleanup-terminal-unknown").to_owned());
+    }
+    if terminals > 0 {
+        why.push(crate::i18n::message(
+            "worktree-cleanup-in-use-terminals",
+            &[("count", terminals.into())],
+        ));
+    }
+    why
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn unavailable_terminal_cwd_blocks_instead_of_using_launch_path() {
+        let root = std::env::temp_dir().join("224-unknown-cwd");
+        let entry = super::Open {
+            id: 0,
+            path: root.join("tab"),
+            terminals: vec![std::sync::Arc::new(|| None)],
+        };
+        assert!(!super::reasons(&root.join("worktree"), None, &[entry]).is_empty());
     }
 }
 
