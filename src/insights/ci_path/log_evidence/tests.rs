@@ -134,7 +134,7 @@ fn conflicting_outcomes_in_one_log_are_ambiguous_and_odd_lines_are_ignored() {
         None
     );
     assert_eq!(evidence.tests.len(), 1);
-    assert_eq!(evidence.report(), Report::Complete);
+    assert_eq!(evidence.report(), Report::Incomplete);
     assert_eq!(
         evidence.caches.iter().map(|c| c.hit).collect::<Vec<_>>(),
         [false, false]

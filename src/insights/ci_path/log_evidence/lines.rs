@@ -143,3 +143,32 @@ pub(super) fn cache(line: &str, short: impl Fn(&str) -> String) -> Option<(bool,
         None
     }
 }
+
+/// Counts of passed, failed and ignored tests in libtest's final summary.
+pub(super) fn summary(line: &str) -> Option<[usize; 3]> {
+    let (_, counts) = line.strip_prefix("test result: ")?.split_once(". ")?;
+    let mut totals = [None, None, Some(0)];
+    for part in counts.split(';') {
+        let Some((count, word)) = part.trim().split_once(' ') else {
+            continue;
+        };
+        if let Some(index) = ["passed", "failed", "ignored"]
+            .iter()
+            .position(|&w| w == word)
+        {
+            totals[index] = Some(count.parse::<usize>().ok()?);
+        }
+    }
+    Some([totals[0]?, totals[1]?, totals[2]?])
+}
+
+pub(super) fn shard_binary(line: &str) -> bool {
+    !line.starts_with("Running ") && !line.starts_with("Doc-tests ") && binary(line).is_some()
+}
+
+/// The completion line printed only after ci/test-shards.py ran its entire plan.
+pub(super) fn shard_passed(line: &str) -> bool {
+    line.strip_prefix("Passed ")
+        .and_then(|rest| rest.split_once(" tests in "))
+        .is_some_and(|(count, shard)| count.parse::<usize>().is_ok() && !shard.is_empty())
+}

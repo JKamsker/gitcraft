@@ -5,7 +5,14 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
+mod binary;
 mod lines;
+mod parser;
+
+/// Limits both retained test identities and their maximum byte lengths.
+pub(in crate::insights) const MAX_TESTS: usize = 8192;
+const MAX_NAME_BYTES: usize = 1024;
+const MAX_PARSE_LINE: usize = 16 * 1024;
 
 /// So many cache lines, toolchains and error annotations are kept per log.
 pub(in crate::insights) const MAX_NOTES: usize = 16;
@@ -29,6 +36,7 @@ pub(in crate::insights) struct Seen {
     passed: bool,
     failed: bool,
     ignored: bool,
+    uncertain: bool,
 }
 
 impl Seen {
@@ -40,8 +48,18 @@ impl Seen {
         }
     }
 
+    fn merge(&mut self, other: Self) {
+        self.passed |= other.passed;
+        self.failed |= other.failed;
+        self.ignored |= other.ignored;
+        self.uncertain |= other.uncertain;
+    }
+
     /// The outcome every report agrees on; `None` when they conflict.
     pub(in crate::insights) fn outcome(self) -> Option<Outcome> {
+        if self.uncertain {
+            return None;
+        }
         match (self.passed, self.failed, self.ignored) {
             (true, false, false) => Some(Outcome::Passed),
             (false, true, false) => Some(Outcome::Failed),
@@ -144,75 +162,12 @@ fn listed(items: Vec<String>) -> String {
 
 /// `text` is the log; `cut` says it was read only in part.
 pub(in crate::insights) fn parse(text: &str, cut: bool) -> LogEvidence {
-    let mut parser = Parser {
-        evidence: LogEvidence {
-            cut,
-            ..LogEvidence::default()
-        },
-        ..Parser::default()
-    };
-    for raw in text.lines() {
-        parser.line(lines::plain(raw).trim());
-    }
-    parser.evidence
+    parse_bounded(text, cut, MAX_TESTS)
 }
 
-/// Reads libtest's pretty output the way ci/libtest_watchdog.py does, `--nocapture` included.
-#[derive(Default)]
-struct Parser {
-    evidence: LogEvidence,
-    suite: String,
-    /// A binary's header was seen and its `running N tests` not yet.
-    header: bool,
-    /// Tests the open binary announced, and how many it has reported.
-    open: Option<(usize, usize)>,
-    /// A test that started (`test name ... `) and whose outcome is on a later line.
-    pending: Option<String>,
-}
-
-impl Parser {
-    fn line(&mut self, line: &str) {
-        let evidence = &mut self.evidence;
-        if let Some(suite) = lines::binary(line) {
-            evidence.started += 1;
-            (self.suite, self.header, self.open, self.pending) = (suite, true, None, None);
-        } else if let Some(count) = lines::announced(line) {
-            if !std::mem::take(&mut self.header) {
-                evidence.started += 1;
-            }
-            (self.open, self.pending) = (Some((count, 0)), None);
-        } else if line.starts_with("test result: ") {
-            evidence.finished += 1;
-            self.pending = None;
-            match self.open.take() {
-                Some((announced, seen)) if seen >= announced => {}
-                _ => evidence.short = true,
-            }
-        } else if let Some((name, after)) = lines::test_start(line) {
-            match lines::outcome(after) {
-                Some(outcome) => self.record(name.to_owned(), outcome),
-                None => self.pending = Some(name.to_owned()),
-            }
-        } else if let Some(outcome) = lines::outcome(line).filter(|_| self.pending.is_some()) {
-            let name = self.pending.take().unwrap_or_default();
-            self.record(name, outcome);
-        } else if lines::stopped(line) {
-            evidence.stopped = true;
-        } else {
-            notes(evidence, line);
-        }
-    }
-
-    fn record(&mut self, name: String, outcome: Outcome) {
-        if self.pending.as_deref() == Some(&name) {
-            self.pending = None;
-        }
-        if let Some((_, seen)) = self.open.as_mut() {
-            *seen += 1;
-        }
-        let test = (self.suite.clone(), name);
-        self.evidence.tests.entry(test).or_default().add(outcome);
-    }
+/// A caller may allocate a smaller share of its aggregate evidence budget to this log.
+pub(in crate::insights) fn parse_bounded(text: &str, cut: bool, limit: usize) -> LogEvidence {
+    parser::parse(text, cut, limit.min(MAX_TESTS))
 }
 
 fn notes(evidence: &mut LogEvidence, line: &str) {
@@ -238,3 +193,6 @@ mod tests;
 
 #[cfg(test)]
 mod review_tests;
+
+#[cfg(test)]
+mod reconciliation_tests;

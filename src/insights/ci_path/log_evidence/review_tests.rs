@@ -29,7 +29,7 @@ fn windows_shards_and_serial_nocapture_keep_suite_and_delayed_outcomes() {
     assert_eq!(log.report(), Report::Complete);
     assert_eq!(
         outcome(&log, "gitcraft", "standalone::tests::saves"),
-        Some(Outcome::Failed)
+        Some(Outcome::Passed)
     );
     assert_eq!(
         outcome(&log, "gitcraft", "standalone::tests::opens"),

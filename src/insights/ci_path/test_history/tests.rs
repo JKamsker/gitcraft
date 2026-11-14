@@ -76,7 +76,16 @@ fn log(tests: &[(&str, &str)]) -> String {
     for (name, result) in tests {
         text.push_str(&format!("test {name} ... {result}\n"));
     }
-    text + "test result: ok.\n"
+    let passed = tests.iter().filter(|(_, result)| *result == "ok").count();
+    let failed = tests
+        .iter()
+        .filter(|(_, result)| *result == "FAILED")
+        .count();
+    let ignored = tests.len() - passed - failed;
+    text + &format!(
+        "test result: {}. {passed} passed; {failed} failed; {ignored} ignored\n",
+        if failed > 0 { "FAILED" } else { "ok" }
+    )
 }
 
 fn row<'a>(evidence: &'a JobEvidence, name: &str) -> Option<&'a TestRow> {
@@ -249,6 +258,7 @@ fn crate_identity_keeps_failure_visible_and_repeated_conflicts_get_a_row() -> Re
                 text.into()
             } else {
                 text.replace("FAILED", "ok")
+                    .replace("0 passed; 1 failed", "1 passed; 0 failed")
             },
             false,
         ))

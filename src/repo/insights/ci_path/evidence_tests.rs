@@ -42,7 +42,7 @@ fn ready(tab: &mut RepoTab, ctx: &egui::Context) -> Result<test_history::JobEvid
     Ok(test_history::read(plan, |job| {
         Ok((
             format!(
-                "Running unittests src/lib.rs (x)\nrunning 1 test\ntest t{job} ... FAILED\ntest result: FAILED.\n"
+                "Running unittests src/lib.rs (target/debug/deps/gitcraft-0123456789abcdef)\nrunning 1 test\ntest t{job} ... FAILED\ntest result: FAILED. 0 passed; 1 failed; 0 ignored\n"
             ),
             false,
         ))
