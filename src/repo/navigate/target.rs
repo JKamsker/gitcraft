@@ -97,7 +97,7 @@ impl RepoTab {
             Some(row) => {
                 match target {
                     PendingGoto::Restore(_) => self.restore_commit_selection(row, ctx),
-                    PendingGoto::BranchTip(_) => self.select_branch_tip(row, ctx),
+                    PendingGoto::BranchTip(_) => self.select_graph_row(row, ctx),
                     PendingGoto::History(_) => self.select_history(row, ctx),
                 }
                 self.scroll_to = Some(row);
