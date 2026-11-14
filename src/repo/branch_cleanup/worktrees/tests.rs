@@ -223,3 +223,46 @@ fn task_added_after_preview_is_seen_before_removal() -> Result<(), String> {
     assert!(super::jobs::current_use(f.repo.path(), &f.wt("done"))?.is_some());
     Ok(())
 }
+
+#[test]
+fn cleanup_window_opens_with_room_for_preview() {
+    use egui_kittest::{Harness, kittest::Queryable};
+    let ctx = egui::Context::default();
+    let mut tab = RepoTab::new_deferred("/224/window-sizing".into(), &ctx);
+    tab.worktree_cleanup.window = Some(super::Window {
+        rows: vec![],
+        basis: "Merged into main".into(),
+        archive: false,
+        reviewed: false,
+        reading: 0,
+        running: false,
+        results: vec![],
+        archives: Some(Ok((vec![], 0))),
+        restore_into: Default::default(),
+        said: None,
+        armed: None,
+    });
+    let mut styled = false;
+    let mut h = Harness::builder()
+        .with_size([1000.0, 900.0])
+        .build_ui_state(
+            move |ui, tab: &mut RepoTab| {
+                if !styled {
+                    crate::theme::install_fonts(ui.ctx());
+                    egui_extras::install_image_loaders(ui.ctx());
+                    styled = true;
+                    return;
+                }
+                tab.worktree_cleanup_window(ui.ctx());
+            },
+            tab,
+        );
+    h.step();
+    let title = crate::i18n::text("worktree-cleanup-title");
+    assert!(
+        h.get_by_role_and_label(egui::accesskit::Role::Window, title)
+            .rect()
+            .height()
+            >= 360.0
+    );
+}

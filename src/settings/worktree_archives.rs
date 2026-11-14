@@ -207,7 +207,9 @@ fn archive_list(ui: &mut Ui, store: &Store) {
                         match store.delete(listed) {
                             // Gone from the list at once; the usage follows with the next look.
                             Ok(()) => forget(listed.id()),
-                            Err(e) => layout::note(ui, e),
+                            Err(e) => {
+                                layout::note(ui, e);
+                            }
                         }
                         deleted = true;
                         ui.data_mut(|d| d.remove::<String>(armed_id));

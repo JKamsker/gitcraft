@@ -6,8 +6,8 @@ fn location_applies_on_enter_and_focus_loss() {
     for enter in [true, false] {
         let mut h = Harness::builder().build_ui_state(
             |ui, location: &mut String| {
-                super::worktree_archives::location_field(ui, location);
-                ui.button("Elsewhere");
+                super::location_field(ui, location);
+                let _ = ui.button("Elsewhere");
             },
             String::new(),
         );

@@ -14,7 +14,7 @@ pub(crate) use view::cpu_paint;
 
 use std::io::{Read, Write};
 use std::num::NonZeroU16;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::mpsc::{self, Sender};
 use std::sync::{Arc, Mutex, MutexGuard};
@@ -75,7 +75,7 @@ pub struct Terminal {
     selection: Option<((u16, u16), (u16, u16))>,
     pub shell: String,
     /// The folder it was started in (a worktree someone may be working in).
-    pub cwd: PathBuf,
+    pub(crate) cwd: PathBuf,
 }
 
 impl Terminal {
