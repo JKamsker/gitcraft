@@ -107,7 +107,7 @@ pub struct Settings {
     pub show_detail: bool,
     /// A worktree opens in the tab it was opened from, which then shows its branch.
     pub worktrees_in_same_tab: bool,
-    /// Windows and macOS: the tab strip stands in for the system's title bar.
+    /// Windows, macOS and Linux: the tab strip stands in for the system's title bar.
     pub tabs_in_title_bar: bool,
     /// How large the history map beside the graph is, or whether it shows at all.
     pub history_map: HistoryMap,

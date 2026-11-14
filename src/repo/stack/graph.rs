@@ -31,14 +31,14 @@ impl RepoTab {
                                     && let Some(b) =
                                         self.refs.local.iter().find(|b| b.name == layer.parent)
                                 {
-                                    acts.push(Action::SelectHash(b.target.clone()));
+                                    acts.push(Action::SelectBranch(b.target.clone()));
                                 }
                                 ui.label("→");
                                 if ui.link(&layer.branch).clicked()
                                     && let Some(b) =
                                         self.refs.local.iter().find(|b| b.name == layer.branch)
                                 {
-                                    acts.push(Action::SelectHash(b.target.clone()));
+                                    acts.push(Action::SelectBranch(b.target.clone()));
                                 }
                                 if ui
                                     .small_button(crate::i18n::message(
@@ -224,7 +224,7 @@ mod tests {
         output.textures_delta.clear();
         assert!(
             acts.iter()
-                .any(|a| matches!(a, Action::SelectHash(h) if h == "same-tip"))
+                .any(|a| matches!(a, Action::SelectBranch(h) if h == "same-tip"))
         );
         Ok(())
     }
