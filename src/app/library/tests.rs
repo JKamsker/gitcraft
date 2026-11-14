@@ -333,3 +333,31 @@ fn opening_a_deleted_library_row_removes_only_its_auto_entry() {
     assert_eq!(a.recent, [missing]);
     std::fs::remove_dir_all(base).unwrap();
 }
+
+#[test]
+fn practice_handoff_skips_nearby_even_with_permissive_guards() {
+    let base = tree("practice-handoff");
+    let repo = base.join("repository");
+    init(&repo);
+    let mut h = harness();
+    let ctx = h.ctx.clone();
+    let a = app(&mut h);
+    a.recorded_practice_completion(a.windows.current, Ok(repo));
+    a.poll_practice(&ctx);
+    assert!(
+        !a.library.checks.busy(),
+        "practice must not even queue a guard check"
+    );
+    std::fs::remove_dir_all(base).unwrap();
+}
+
+#[test]
+fn save_scan_as_root_uses_the_discovered_depth() {
+    let mut h = harness();
+    let a = app(&mut h);
+    a.save_scan_as_root(PathBuf::from("/review-save-root"), 3);
+    let lib = a.library.get(a.profile()).unwrap();
+    assert_eq!(lib.roots[0].depth, 3);
+    a.save_scan_as_root(PathBuf::from("/review-save-root"), 1);
+    assert_eq!(a.library.get(a.profile()).unwrap().roots[0].depth, 3);
+}
