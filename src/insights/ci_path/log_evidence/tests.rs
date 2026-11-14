@@ -10,13 +10,13 @@ fn complete_log() -> String {
         "##[endgroup]",
         "rustc 1.95.0 (4d91de4e4 2026-10-02)",
         "cargo 1.95.0 (abc123 2026-09-30)",
-        "     \u{1b}[1m\u{1b}[32mRunning\u{1b}[0m unittests src/lib.rs (target/debug/deps/gitcraft-0f3a)",
+        "     \u{1b}[1m\u{1b}[32mRunning\u{1b}[0m unittests src/lib.rs (target/debug/deps/gitcraft-0f3a123456789abc)",
         "running 3 tests",
         "test a::passes ... \u{1b}[32mok\u{1b}[0m",
         "test a::flaky ... FAILED",
         "test a::slow ... ignored, needs a network",
         "test result: FAILED. 1 passed; 1 failed; 1 ignored; 0 measured; 0 filtered out",
-        "     Running tests/cli.rs (target/debug/deps/cli-77aa)",
+        "     Running tests/cli.rs (target/debug/deps/cli-77aa123456789abc)",
         "running 1 test",
         "test a::passes ... ok",
         "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out",
@@ -35,23 +35,35 @@ fn id(suite: &str, name: &str) -> TestId {
 fn a_complete_log_names_each_test_by_target_with_caches_toolchains_and_errors() {
     let evidence = parse(&complete_log(), false);
     assert_eq!(evidence.report(), Report::Complete);
-    let lib = "unittests src/lib.rs";
+    let lib = "gitcraft (unittests src/lib.rs)";
     assert_eq!(
-        evidence.tests.get(&id(lib, "a::passes")),
-        Some(&Some(Outcome::Passed))
+        evidence
+            .tests
+            .get(&id(lib, "a::passes"))
+            .and_then(|seen| seen.outcome()),
+        Some(Outcome::Passed)
     );
     assert_eq!(
-        evidence.tests.get(&id(lib, "a::flaky")),
-        Some(&Some(Outcome::Failed))
+        evidence
+            .tests
+            .get(&id(lib, "a::flaky"))
+            .and_then(|seen| seen.outcome()),
+        Some(Outcome::Failed)
     );
     assert_eq!(
-        evidence.tests.get(&id(lib, "a::slow")),
-        Some(&Some(Outcome::Ignored))
+        evidence
+            .tests
+            .get(&id(lib, "a::slow"))
+            .and_then(|seen| seen.outcome()),
+        Some(Outcome::Ignored)
     );
     // The same path in another target is another test, and the build hash is not identity.
     assert_eq!(
-        evidence.tests.get(&id("tests/cli.rs", "a::passes")),
-        Some(&Some(Outcome::Passed))
+        evidence
+            .tests
+            .get(&id("cli (tests/cli.rs)", "a::passes"))
+            .and_then(|seen| seen.outcome()),
+        Some(Outcome::Passed)
     );
     assert_eq!(evidence.tests.len(), 4);
     assert_eq!(
@@ -102,7 +114,7 @@ fn incomplete_logs_never_claim_a_complete_report() {
 #[test]
 fn conflicting_outcomes_in_one_log_are_ambiguous_and_odd_lines_are_ignored() {
     let log = [
-        "Running unittests src/lib.rs (target/debug/deps/x-1)",
+        "Running unittests src/lib.rs (target/debug/deps/x-0123456789abcdef)",
         "running 2 tests",
         "test retried ... FAILED",
         "test retried ... ok",
@@ -116,8 +128,11 @@ fn conflicting_outcomes_in_one_log_are_ambiguous_and_odd_lines_are_ignored() {
     ]
     .join("\n");
     let evidence = parse(&log, false);
-    let retried = id("unittests src/lib.rs", "retried");
-    assert_eq!(evidence.tests.get(&retried), Some(&None));
+    let retried = id("x (unittests src/lib.rs)", "retried");
+    assert_eq!(
+        evidence.tests.get(&retried).and_then(|seen| seen.outcome()),
+        None
+    );
     assert_eq!(evidence.tests.len(), 1);
     assert_eq!(evidence.report(), Report::Complete);
     assert_eq!(

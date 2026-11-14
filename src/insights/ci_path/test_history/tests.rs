@@ -70,7 +70,7 @@ fn explorer(now: TimedRun, before: Option<TimedRun>, history: Vec<TimedRun>) -> 
 /// A complete libtest log with these outcomes.
 fn log(tests: &[(&str, &str)]) -> String {
     let mut text = format!(
-        "Running unittests src/lib.rs (target/debug/deps/g-1)\nrunning {} tests\n",
+        "Running unittests src/lib.rs (target/debug/deps/g-0123456789abcdef)\nrunning {} tests\n",
         tests.len()
     );
     for (name, result) in tests {
@@ -160,12 +160,14 @@ fn incomplete_or_unread_logs_leave_tests_unknown_rather_than_fixed_or_green()
     let explorer = explorer(current, Some(run(19, 1, "old", 1)), Vec::new());
     let plan = plan(&explorer, 0).ok_or("job")?;
     assert!(!plan.now.finished);
-    let evidence = read(plan, |job| match job {
+    let evidence = read(plan, |job| {
+        match job {
         2010 => Ok((
-            "Running unittests src/lib.rs (x)\nrunning 2 tests\ntest done ... ok\n".into(),
+            "Running unittests src/lib.rs (target/debug/deps/g-0123456789abcdef)\nrunning 2 tests\ntest done ... ok\n".into(),
             false,
         )),
         _ => Ok((log(&[("done", "FAILED"), ("pending", "FAILED")]), false)),
+    }
     });
     assert_eq!(evidence.now.report(), Some(Report::Incomplete));
     let done = row(&evidence, "done").ok_or("done row")?;
@@ -233,5 +235,34 @@ fn ambiguous_matrix_legs_and_other_revisions_are_unaligned_not_guessed() -> Resu
         ]
     );
     assert!(super::plan(&explorer, 9).is_none());
+    Ok(())
+}
+
+#[test]
+fn crate_identity_keeps_failure_visible_and_repeated_conflicts_get_a_row() -> Result<(), String> {
+    let explorer = explorer(run(50, 1, "abc", 2), Some(run(49, 1, "old", 1)), Vec::new());
+    let plan = plan(&explorer, 0).ok_or("job")?;
+    let evidence = read(plan.clone(), |job| {
+        let text = include_str!("../log_evidence/fixtures/cargo.log");
+        Ok((
+            if job == 5010 {
+                text.into()
+            } else {
+                text.replace("FAILED", "ok")
+            },
+            false,
+        ))
+    });
+    assert_eq!(evidence.rows.len(), 1);
+    assert_eq!(evidence.rows[0].test.0, "gitcraft (unittests src/lib.rs)");
+    assert_eq!(evidence.rows[0].transition, Transition::NewlyFailed);
+    assert!(!evidence.rows[0].ambiguous);
+    assert_eq!(evidence.passed_both, 1);
+    let ambiguous = read(plan, |_| {
+        Ok((log(&[("same", "FAILED"), ("same", "ok")]), false))
+    });
+    assert_eq!(ambiguous.rows.len(), 1);
+    assert!(ambiguous.rows[0].ambiguous);
+    assert!(ambiguous.rows[0].label().starts_with("ambiguous:"));
     Ok(())
 }

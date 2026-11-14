@@ -201,7 +201,9 @@ impl Parser {
     }
 
     fn record(&mut self, name: String, outcome: Outcome) {
-        self.pending = None;
+        if self.pending.as_deref() == Some(&name) {
+            self.pending = None;
+        }
         if let Some((_, seen)) = self.open.as_mut() {
             *seen += 1;
         }
@@ -230,3 +232,6 @@ fn notes(evidence: &mut LogEvidence, line: &str) {
 
 #[cfg(test)]
 mod tests;
+
+#[cfg(test)]
+mod review_tests;

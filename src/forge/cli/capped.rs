@@ -39,7 +39,15 @@ fn capped(
     let output = result?;
     let overflowed = output.stopped.is_some()
         && output.stop_kind == Some(crate::processes::StopKind::Failed)
-        && output.stdout.len() == limit;
+        && output.stdout.len() == limit
+        && output.stopped.as_deref()
+            == Some(
+                format!(
+                    "process output exceeded the {} MiB capture limit",
+                    limit >> 20
+                )
+                .as_str(),
+            );
     if overflowed {
         return Ok((String::from_utf8_lossy(&output.stdout).into_owned(), true));
     }
@@ -60,15 +68,29 @@ mod tests {
 
     #[test]
     fn stdout_filling_the_limit_comes_back_cut_not_refused() {
-        let full = output(&[b'x'; 8], Some(StopKind::Failed));
+        let mut full = output(&[b'x'; 8], Some(StopKind::Failed));
+        full.stopped = Some("process output exceeded the 0 MiB capture limit".into());
         assert_eq!(capped("gh", 8, Ok(full)), Ok(("x".repeat(8), true)));
         let whole = output(b"log", None);
         assert_eq!(capped("gh", 8, Ok(whole)), Ok(("log".into(), false)));
     }
 
     #[test]
+    fn logs_above_the_usual_tool_limit_are_read_up_to_the_log_limit() {
+        let bytes = vec![b'x'; OUTPUT_LIMIT + 1];
+        let (text, cut) = capped("gh", 64 * 1024 * 1024, Ok(output(&bytes, None))).unwrap();
+        assert_eq!(text.len(), OUTPUT_LIMIT + 1);
+        assert!(!cut);
+    }
+
+    #[test]
     fn other_stops_stay_errors_even_with_a_full_buffer() {
-        for kind in [StopKind::TimedOut, StopKind::Cancelled, StopKind::Uncertain] {
+        for kind in [
+            StopKind::Failed,
+            StopKind::TimedOut,
+            StopKind::Cancelled,
+            StopKind::Uncertain,
+        ] {
             assert!(capped("gh", 8, Ok(output(&[b'x'; 8], Some(kind)))).is_err());
         }
         // stderr overflowing stops the process with stdout short of the limit.
