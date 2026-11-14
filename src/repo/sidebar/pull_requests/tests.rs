@@ -8,6 +8,7 @@ fn numbered(number: u64) -> PullRequest {
         branch: format!("change-{number}"),
         base: "main".into(),
         base_oid: String::new(),
+        head_repo: None,
         from_fork: false,
         sha: format!("{number:040x}"),
         author: "ann".into(),
@@ -141,6 +142,7 @@ fn pr(branch: &str, sha: &str) -> PullRequest {
         branch: branch.to_owned(),
         base: "main".to_owned(),
         base_oid: String::new(),
+        head_repo: None,
         from_fork: false,
         sha: sha.to_owned(),
         author: String::new(),
@@ -153,12 +155,23 @@ fn pr(branch: &str, sha: &str) -> PullRequest {
 /// selection that could replace the page with a late comparison result.
 #[test]
 fn a_click_selects_the_whole_pr_and_a_double_click_opens_its_details() {
-    for forge in Forge::ALL {
+    for (forge, incoming) in Forge::ALL.into_iter().flat_map(|f| [(f, false), (f, true)]) {
         let ctx = egui::Context::default();
         crate::theme::install_fonts(&ctx);
         let tab = RepoTab::new_deferred("/nonexistent/pr-click-test".into(), &ctx);
         let pr = PullRequest {
             number: 7,
+            from_fork: incoming,
+            head_repo: Some(
+                if incoming {
+                    "contributor/fork"
+                } else {
+                    "owner/repo"
+                }
+                .into(),
+            ),
+            author: if incoming { "contributor" } else { "owner" }.into(),
+            draft: incoming,
             title: "Two commits to review".to_owned(),
             url: "https://example.org/team/app/pull/7".to_owned(),
             ..pr("feature", "head")

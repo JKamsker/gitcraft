@@ -405,6 +405,11 @@ impl RepoTab {
         });
     }
 
+    /// Retire the previous request immediately; reload completion must ask again.
+    pub(in crate::repo) fn retire_pr_list(&mut self) {
+        self.prs_loaded = None;
+    }
+
     pub(in crate::repo) fn load_prs(&mut self, ctx: &egui::Context) {
         let Some(hosting) = self.hosting.clone() else {
             return;

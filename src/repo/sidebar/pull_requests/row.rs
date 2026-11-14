@@ -62,7 +62,7 @@ impl RepoTab {
             } else {
                 ""
             },
-            pr.branch,
+            pr_route(pr, self.hosting.as_ref()),
             pr.author,
             if pr.draft {
                 crate::i18n::text("repo-core-3450")
@@ -93,6 +93,13 @@ impl RepoTab {
         // Not when it changed since: that would take away what changed before it is compared.
         let seen_on_open = (!has_view && !moved).then_some(Action::Versions(
             crate::repo::versions::VersionsAct::PrSeen(pr.number),
+        ));
+        let r = r.on_hover_text(format!(
+            "{} · {} · {}\n{}",
+            pr.author,
+            if pr.draft { "Draft" } else { "Open" },
+            pr_route(pr, self.hosting.as_ref()),
+            pr.url
         ));
         let r = r.on_hover_text(if has_view {
             crate::i18n::message("repo-core-3451", &[("url", pr.url.to_string().into())])
@@ -175,4 +182,14 @@ impl RepoTab {
                 }
             });
     }
+}
+
+/// Repository identity comes from the forge, never from the PR author.
+fn pr_route(pr: &PullRequest, hosting: Option<&Hosting>) -> String {
+    let base = hosting.map_or("unknown", |h| h.path.as_str());
+    let head = pr
+        .head_repo
+        .as_deref()
+        .unwrap_or(if pr.from_fork { "unknown" } else { base });
+    format!("{head}:{} → {base}:{}", pr.branch, pr.base)
 }

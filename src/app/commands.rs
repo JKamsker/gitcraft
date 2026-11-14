@@ -128,7 +128,11 @@ impl App {
         if let Some(Tab::Repo(r)) = self.tabs.get_mut(self.active)
             && (refresh || regained.is_some_and(|initial| !initial || !r.just_read()))
         {
-            r.refresh(ctx);
+            if refresh {
+                r.refresh(ctx);
+            } else {
+                r.refresh_on_focus(ctx);
+            }
         }
         focused
     }
