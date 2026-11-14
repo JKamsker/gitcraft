@@ -237,7 +237,8 @@ impl RepoTab {
                     },
                     acts,
                 );
-                if self.purpose_files(ui, acts, files) {
+                let patterns = crate::settings::Settings::get(ui.ctx()).fold_patterns;
+                if self.purpose_files(ui, acts, files, &patterns) {
                     return;
                 }
                 crate::repo::detail::files_header(ui, &files.files, None);

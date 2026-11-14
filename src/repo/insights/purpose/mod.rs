@@ -67,9 +67,9 @@ pub(crate) enum Act {
     /// By purpose, or the standard order.
     Show(bool),
     /// Read the pull request shown.
-    Load,
+    Load(String),
     /// Propose again (the file folding rules learned more).
-    Refresh,
+    Refresh(String),
     Edit(Edit),
     Select(String, bool),
     /// Bring a stale arrangement to the revisions shown.
@@ -105,8 +105,14 @@ impl RepoTab {
         let state = &mut self.review_purpose;
         match a {
             Act::Show(on) => state.on = on,
-            Act::Load => self.purpose_load(ctx),
-            Act::Refresh => self.purpose_refresh(ctx),
+            Act::Load(patterns) => {
+                state.patterns = patterns;
+                self.purpose_load(ctx);
+            }
+            Act::Refresh(patterns) => {
+                state.patterns = patterns;
+                self.purpose_refresh(ctx);
+            }
             Act::Select(key, on) => {
                 if on {
                     state.selected.insert(key);
@@ -212,15 +218,14 @@ impl RepoTab {
 
     /// Proposes the groups again, and applies the arrangement to them.
     fn purpose_refresh(&mut self, ctx: &egui::Context) {
-        let patterns = crate::settings::Settings::get(ctx).fold_patterns;
         let state = &mut self.review_purpose;
+        let patterns = state.patterns.clone();
         let Some(Ok(units)) = &state.units else {
             return;
         };
         let units = units.clone();
         let saved = state.saved.clone();
         state.arranged = None;
-        state.patterns = patterns.clone();
         state.proposing += 1;
         let (request, proposing) = (state.request, state.proposing);
         self.then(

@@ -25,6 +25,7 @@ impl RepoTab {
         ui: &mut Ui,
         acts: &mut Vec<Action>,
         files: &PrFiles,
+        patterns: &str,
     ) -> bool {
         let state = &self.review_purpose;
         ui.horizontal(|ui| {
@@ -42,7 +43,7 @@ impl RepoTab {
             return false;
         };
         if state.asked.as_ref() != Some(&subject) {
-            acts.push(act(Act::Load));
+            acts.push(act(Act::Load(patterns.to_owned())));
         }
         let t = Tokens::get(ui.ctx());
         let (units, arranged) = match (&state.units, &state.arranged) {
@@ -59,8 +60,8 @@ impl RepoTab {
                 return true;
             }
         };
-        if state.patterns != crate::settings::Settings::get(ui.ctx()).fold_patterns {
-            acts.push(act(Act::Refresh));
+        if state.patterns != patterns {
+            acts.push(act(Act::Refresh(patterns.to_owned())));
         }
         egui::Frame::new()
             .inner_margin(egui::Margin::symmetric(12, 6))
