@@ -17,6 +17,8 @@ mod row;
 mod rows;
 mod scheduler;
 mod status;
+#[cfg(test)]
+pub(in crate::app) mod test_support;
 mod view;
 
 pub(super) use model::Libraries;

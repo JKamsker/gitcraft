@@ -196,6 +196,22 @@ mod tests {
             None
         );
         assert_eq!(near("/tmpfiles/work/app"), Some(p("/tmpfiles/work")));
+        assert_eq!(near("relative/app"), None);
+        // Another machine, a share, WSL.
+        assert_eq!(near("ssh://box/work/projects/app"), None);
+        assert_eq!(near("//server/share/projects/app"), None);
+        assert!(is_far(Path::new(r"\\wsl$\Ubuntu\home\me\app")));
+        assert!(is_far(Path::new(r"\\wsl.localhost\Ubuntu\x")));
+        assert!(is_far(Path::new(r"\\?\UNC\server\share\x")));
+        assert!(!is_far(Path::new("/work/app")));
+        // Unicode and spaces are fine.
+        assert_eq!(near("/my work/Größe/日本"), Some(p("/my work/Größe")));
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn mounted_drive_roots_are_excluded_but_their_subfolders_are_allowed() {
+        let near = |s: &str| nearby_parent(Path::new(s), &[], &[]);
         // Where drives are mounted: their own folders.
         for mounted in [
             "/Volumes/Backup/app",
@@ -214,16 +230,6 @@ mod tests {
             near("/run/media/me/usb/code/app"),
             Some(p("/run/media/me/usb/code"))
         );
-        assert_eq!(near("relative/app"), None);
-        // Another machine, a share, WSL.
-        assert_eq!(near("ssh://box/work/projects/app"), None);
-        assert_eq!(near("//server/share/projects/app"), None);
-        assert!(is_far(Path::new(r"\\wsl$\Ubuntu\home\me\app")));
-        assert!(is_far(Path::new(r"\\wsl.localhost\Ubuntu\x")));
-        assert!(is_far(Path::new(r"\\?\UNC\server\share\x")));
-        assert!(!is_far(Path::new("/work/app")));
-        // Unicode and spaces are fine.
-        assert_eq!(near("/my work/Größe/日本"), Some(p("/my work/Größe")));
     }
 
     #[cfg(windows)]

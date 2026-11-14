@@ -2,6 +2,7 @@
 //! (links, case, Unicode), large trees stopped within bounds, and the window's cost of a
 //! full library.
 
+use crate::app::library::test_support::AssertValue;
 use std::time::{Duration, Instant};
 
 use super::model::{MAX_INDEX, Outcome, ScanResult, Source};
@@ -105,7 +106,7 @@ fn junctions_are_not_followed() {
     let found = crate::app::repo_scan::walk(&base, limits, &stop, &mut |_| {});
     let _ = std::fs::remove_dir_all(&base);
     if made {
-        let found = found.expect("scan succeeds");
+        let found = found.assert_value();
         assert_eq!(found.repos.len(), 1, "{:?}", found.repos);
     }
 }

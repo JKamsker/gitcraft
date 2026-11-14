@@ -2,6 +2,7 @@
 //! siblings of an opened repository, Recent left as it is, opening, hiding, stopping and
 //! retrying, profile switches and restarts.
 
+use crate::app::library::test_support::AssertValue;
 use std::time::{Duration, Instant};
 
 use egui_kittest::Harness;
@@ -297,8 +298,7 @@ fn profile_switches_stops_and_retries() {
 /// the cache; state saved before the library existed reads with an empty one.
 #[test]
 fn the_library_survives_a_restart() {
-    let old: super::super::Saved =
-        ron::from_str("(recent: [\"/r/one\"])").expect("old saved state");
+    let old: super::super::Saved = ron::from_str("(recent: [\"/r/one\"])").assert_value();
     assert!(old.library.is_empty());
     assert_eq!(old.recent, [PathBuf::from("/r/one")]);
     let mut lib = Library::default();
@@ -315,8 +315,8 @@ fn the_library_survives_a_restart() {
         library: Libraries::from([(7, lib.clone())]),
         ..Default::default()
     };
-    let text = ron::to_string(&saved).expect("serialize saved state");
-    let back: super::super::Saved = ron::from_str(&text).expect("deserialize saved state");
+    let text = ron::to_string(&saved).assert_value();
+    let back: super::super::Saved = ron::from_str(&text).assert_value();
     let state = LibraryState::new(back.library);
     let cached = state.get(7).cloned().unwrap_or_default();
     assert_eq!(cached, lib);
@@ -339,9 +339,9 @@ fn opening_a_deleted_library_row_removes_only_its_auto_entry() {
     a.library_click(LibraryClick::Open(missing.clone()), &ctx);
     settle(&mut h);
     let a = app(&mut h);
-    assert!(a.library.get(profile).unwrap().entries.is_empty());
+    assert!(a.library.get(profile).assert_value().entries.is_empty());
     assert_eq!(a.recent, [missing]);
-    std::fs::remove_dir_all(base).unwrap();
+    std::fs::remove_dir_all(base).assert_value();
 }
 
 #[test]
@@ -358,7 +358,7 @@ fn practice_handoff_skips_nearby_even_with_permissive_guards() {
         !a.library.checks.busy(),
         "practice must not even queue a guard check"
     );
-    std::fs::remove_dir_all(base).unwrap();
+    std::fs::remove_dir_all(base).assert_value();
 }
 
 #[test]
@@ -366,8 +366,8 @@ fn save_scan_as_root_uses_the_discovered_depth() {
     let mut h = harness();
     let a = app(&mut h);
     a.save_scan_as_root(PathBuf::from("/review-save-root"), 3);
-    let lib = a.library.get(a.profile()).unwrap();
+    let lib = a.library.get(a.profile()).assert_value();
     assert_eq!(lib.roots[0].depth, 3);
     a.save_scan_as_root(PathBuf::from("/review-save-root"), 1);
-    assert_eq!(a.library.get(a.profile()).unwrap().roots[0].depth, 3);
+    assert_eq!(a.library.get(a.profile()).assert_value().roots[0].depth, 3);
 }

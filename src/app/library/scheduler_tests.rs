@@ -1,3 +1,4 @@
+use crate::app::library::test_support::AssertValue;
 use std::path::Path;
 use std::sync::atomic::AtomicUsize;
 use std::time::{Duration, Instant};
@@ -181,7 +182,12 @@ fn unreadable_subfolders_keep_previous_entries_stale() {
     assert_eq!(lib.entries.len(), 1);
     assert!(lib.entries[0].stale());
     assert_eq!(
-        lib.root(id).unwrap().last.as_ref().unwrap().outcome,
+        lib.root(id)
+            .assert_value()
+            .last
+            .as_ref()
+            .assert_value()
+            .outcome,
         Outcome::Partial(Stopped::Unreadable)
     );
 }
