@@ -54,6 +54,10 @@ fn parallel_completion_does_not_discard_a_pending_serial_result() {
 
 #[test]
 fn cargo_fail_fast_and_crash_before_announcement_are_incomplete() {
+    assert_eq!(
+        parse("build output only", true).report(),
+        Report::Incomplete
+    );
     let full = include_str!("fixtures/cargo.log");
     assert_eq!(
         parse(

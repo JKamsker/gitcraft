@@ -102,6 +102,9 @@ pub struct LogEvidence {
 
 impl LogEvidence {
     pub fn report(&self) -> Report {
+        if self.cut {
+            return Report::Incomplete;
+        }
         if self.started == 0 && self.finished == 0 {
             if self.tests.is_empty() {
                 Report::Missing
