@@ -104,6 +104,12 @@ fn failed_current_baseline_or_history_logs_offer_a_retry_and_recover() -> Result
     use egui_kittest::{Harness, kittest::Queryable};
     for failed in ["now", "baseline", "history"] {
         let mut explorer = tests::explorer();
+        explorer.run.info.workflow_id = Some(5);
+        explorer.run.info.attempt = 1;
+        let baseline = &mut explorer.compared.as_mut().ok_or("baseline")?.run;
+        baseline.info.workflow_id = Some(5);
+        baseline.info.id = 8;
+        baseline.jobs[1].id = 43;
         explorer.diagnostics = analysis::diagnostics::compare(
             &explorer.run,
             &explorer.compared.as_ref().ok_or("baseline")?.run,
@@ -144,7 +150,7 @@ fn failed_current_baseline_or_history_logs_offer_a_retry_and_recover() -> Result
             (state, explorer, Vec::new()),
         );
         h.run();
-        h.get_by_label("Retry job logs (2)").click();
+        h.get_by_label("Retry job logs (3)").click();
         h.run();
         assert!(h.state().2.iter().any(|action| matches!(
             action,
@@ -154,14 +160,14 @@ fn failed_current_baseline_or_history_logs_offer_a_retry_and_recover() -> Result
         let request = state.logs.start();
         h.run();
         assert_eq!(
-            h.get_all_by_label("Retry job logs (2)").count(),
+            h.query_all_by_label("Retry job logs (3)").count(),
             0,
             "no duplicate retry while loading"
         );
         assert!(h.state_mut().0.logs.accept(request, Ok(success)));
         h.run();
         assert_eq!(
-            h.get_all_by_label("Retry job logs (2)").count(),
+            h.query_all_by_label("Retry job logs (3)").count(),
             0,
             "successful evidence needs no retry"
         );
