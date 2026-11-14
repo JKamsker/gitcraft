@@ -40,7 +40,8 @@ impl RepoTab {
         egui::Window::new(crate::i18n::text("worktree-cleanup-title"))
             .id(egui::Id::new(("worktree-cleanup", &self.path)))
             .open(&mut open)
-            .default_width(640.0)
+            .default_size([640.0, 560.0])
+            .min_height(360.0)
             .show(ctx, |ui| {
                 egui::ScrollArea::vertical()
                     .max_height(620.0)

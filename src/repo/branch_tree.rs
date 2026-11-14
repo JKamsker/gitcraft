@@ -225,7 +225,7 @@ impl TreeView {
 /// folder nobody has opened or closed yet is open.
 pub(super) fn files<'a, T>(
     ui: &mut Ui,
-    (id, start_open): (Id, bool),
+    (id, start_open, as_tree): (Id, bool, bool),
     files: &'a [T],
     path: impl Fn(&'a T) -> &'a str,
     selected: &impl Fn(&&'a T) -> bool,
@@ -238,7 +238,7 @@ pub(super) fn files<'a, T>(
         d.remove::<String>(reveal_id);
         path
     });
-    if !Settings::get(ui.ctx()).files_as_tree {
+    if !as_tree {
         if let Some(target) = &reveal
             && let Some(i) = files.iter().position(|file| path(file) == target)
         {

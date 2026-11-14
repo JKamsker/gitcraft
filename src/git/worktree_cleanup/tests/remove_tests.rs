@@ -10,7 +10,7 @@ fn a_clean_merged_worktree_goes_and_its_branch_stays() -> Result<(), String> {
     let wt = f.merged_worktree("done")?;
     let target = f.target(&wt, "done")?;
     let preview = inspect(f.repo.path(), &target)?;
-    let outcome = remove(f.repo.path(), &target, &preview, None);
+    let outcome = remove(f.repo.path(), &target, &preview, None, false);
     assert!(
         matches!(outcome, Outcome::Removed { archive: None, .. }),
         "{outcome:?}"
@@ -33,7 +33,7 @@ fn changed_unmerged_or_untracked_worktrees_stay_whole() -> Result<(), String> {
     for (wt, branch) in [(&dirty, "dirty"), (&open, "open"), (&loose, "loose")] {
         let target = f.target(wt, branch)?;
         let preview = inspect(f.repo.path(), &target)?;
-        let outcome = remove(f.repo.path(), &target, &preview, None);
+        let outcome = remove(f.repo.path(), &target, &preview, None, false);
         assert!(matches!(outcome, Outcome::Kept(_)), "{branch}: {outcome:?}");
         assert!(
             wt.join(format!("{branch}.txt")).exists(),
@@ -51,13 +51,13 @@ fn a_change_after_the_preview_keeps_it_until_looked_at_again() -> Result<(), Str
     let target = f.target(&wt, "done")?;
     let preview = inspect(f.repo.path(), &target)?;
     write(&wt, "new.txt", b"written after the preview\n")?;
-    let outcome = remove(f.repo.path(), &target, &preview, Some(&f.store));
+    let outcome = remove(f.repo.path(), &target, &preview, Some(&f.store), true);
     assert_eq!(outcome, Outcome::Changed);
     assert!(wt.join("new.txt").exists());
     assert!(f.store.list(None).is_empty());
     // Looked at again, with archiving: it goes, the file kept in the archive.
     let preview = inspect(f.repo.path(), &target)?;
-    let outcome = remove(f.repo.path(), &target, &preview, Some(&f.store));
+    let outcome = remove(f.repo.path(), &target, &preview, Some(&f.store), true);
     let Outcome::Removed {
         archive: Some(listed),
         ..
@@ -79,7 +79,7 @@ fn excluded_untracked_files_keep_it_even_when_archiving() -> Result<(), String> 
     write(&wt, "blob.bin", b"\0\0\0")?;
     let target = f.target(&wt, "done")?;
     let preview = inspect(f.repo.path(), &target)?;
-    let outcome = remove(f.repo.path(), &target, &preview, Some(&f.store));
+    let outcome = remove(f.repo.path(), &target, &preview, Some(&f.store), true);
     assert_eq!(outcome, Outcome::Kept(vec![Blocker::NotArchivable(1)]));
     assert!(wt.join("blob.bin").exists() && wt.join("notes.txt").exists());
     assert!(f.store.list(None).is_empty());
@@ -94,7 +94,7 @@ fn a_full_archive_store_keeps_the_worktree_and_a_retry_works() -> Result<(), Str
     let target = f.target(&wt, "done")?;
     let preview = inspect(f.repo.path(), &target)?;
     f.store.quota = 16;
-    let outcome = remove(f.repo.path(), &target, &preview, Some(&f.store));
+    let outcome = remove(f.repo.path(), &target, &preview, Some(&f.store), true);
     assert!(
         matches!(&outcome, Outcome::Failed(e) if e.contains("limit")),
         "{outcome:?}"
@@ -107,7 +107,7 @@ fn a_full_archive_store_keeps_the_worktree_and_a_retry_works() -> Result<(), Str
         "a refused archive leaves nothing behind"
     );
     f.store.quota = 64 << 20;
-    let outcome = remove(f.repo.path(), &target, &preview, Some(&f.store));
+    let outcome = remove(f.repo.path(), &target, &preview, Some(&f.store), true);
     assert!(
         matches!(
             outcome,
@@ -142,7 +142,7 @@ fn files_come_back_when_git_refuses_and_a_retry_works() -> Result<(), String> {
     let target = f.target(&wt, "done")?;
     let preview = inspect(f.repo.path(), &target)?;
     assert_eq!(preview.blockers_with(true), []);
-    let outcome = remove(f.repo.path(), &target, &preview, Some(&f.store));
+    let outcome = remove(f.repo.path(), &target, &preview, Some(&f.store), true);
     assert!(matches!(outcome, Outcome::Failed(_)), "{outcome:?}");
     assert_eq!(
         std::fs::read(wt.join(UNICODE)).ok(),
@@ -159,7 +159,7 @@ fn files_come_back_when_git_refuses_and_a_retry_works() -> Result<(), String> {
     std::fs::remove_dir_all(std::path::Path::new(dir.trim()).join("modules"))
         .map_err(|e| e.to_string())?;
     let preview = inspect(f.repo.path(), &target)?;
-    let outcome = remove(f.repo.path(), &target, &preview, Some(&f.store));
+    let outcome = remove(f.repo.path(), &target, &preview, Some(&f.store), true);
     assert!(
         matches!(
             outcome,
@@ -184,7 +184,7 @@ fn archives_are_never_kept_in_the_worktree_being_removed() -> Result<(), String>
     let target = f.target(&wt, "done")?;
     f.store.root = wt.join("not made yet").join("archives");
     let preview = inspect(f.repo.path(), &target)?;
-    let outcome = remove(f.repo.path(), &target, &preview, Some(&f.store));
+    let outcome = remove(f.repo.path(), &target, &preview, Some(&f.store), true);
     assert!(
         matches!(&outcome, Outcome::Failed(e) if e.contains("inside")),
         "{outcome:?}"

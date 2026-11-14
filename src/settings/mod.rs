@@ -117,6 +117,8 @@ pub struct Settings {
     pub button_layout: crate::app_buttons::ButtonLayout,
     /// Changed files in a tree of their folders rather than a flat list.
     pub files_as_tree: bool,
+    /// Show commit files as a tree, independently of working changes.
+    pub commit_files_as_tree: bool,
     /// Diffs side by side rather than unified.
     pub diff_split: bool,
     pub diff_wrap: bool,
@@ -238,6 +240,7 @@ impl Default for Settings {
             history_map: Default::default(),
             button_layout: Default::default(),
             files_as_tree: true,
+            commit_files_as_tree: true,
             diff_split: false,
             diff_wrap: false,
             diff_whole_file: false,

@@ -30,7 +30,14 @@ impl RepoTab {
             failed,
             move || {
                 let mut done = Vec::new();
-                for (target, preview) in chosen {
+                for (mut target, preview) in chosen {
+                    target.in_use = match current_use(&repo, &target.path) {
+                        Ok(reason) => reason,
+                        Err(e) => {
+                            done.push((target.path.display().to_string(), Outcome::Failed(e)));
+                            continue;
+                        }
+                    };
                     let name = target.path.to_string_lossy().into_owned();
                     done.push((
                         name,
@@ -127,7 +134,9 @@ impl RepoTab {
 
 /// The worktrees (folder, branch, commit) an archive may come back into by itself: never the
 /// main one (archives come from worktrees that were removed), a bare one or one gone.
-pub(super) fn restore_targets(worktrees: &[crate::git::Worktree]) -> Vec<(PathBuf, String, String)> {
+pub(super) fn restore_targets(
+    worktrees: &[crate::git::Worktree],
+) -> Vec<(PathBuf, String, String)> {
     worktrees
         .iter()
         .filter(|w| !w.main && !w.bare && w.prunable.is_none())
@@ -172,4 +181,23 @@ pub(super) fn describe_restore(into: &Path, report: &RestoreReport) -> String {
             ("into", into.to_string_lossy().into_owned().into()),
         ],
     )
+}
+
+/// Recheck app presence and persisted tasks immediately before each removal.
+pub(super) fn current_use(repo: &Path, path: &Path) -> Result<Option<String>, String> {
+    let mut reasons = super::presence::Presence::using(path, None);
+    let same = crate::remote::is_same_dir_as(path);
+    for task in crate::agent::tasks::load(repo)?
+        .iter()
+        .filter(|t| same(Path::new(&t.path)))
+    {
+        reasons.push(crate::i18n::message(
+            "worktree-cleanup-in-use-agent",
+            &[(
+                "agent",
+                crate::agent::tasks::agent_label(&task.agent).into(),
+            )],
+        ));
+    }
+    Ok((!reasons.is_empty()).then(|| reasons.join("; ")))
 }

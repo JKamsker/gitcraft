@@ -30,6 +30,7 @@ pub(super) fn display(raw: &str) -> &str {
         "Branch column width" => {
             crate::i18n::text("interaction-settings-label-branch-column-width")
         }
+        "Commit files" => crate::i18n::text("commit-details-files-setting-label"),
         "Changed files" => crate::i18n::text("interaction-settings-label-changed-files"),
         "Changes by agents" => crate::i18n::text("interaction-settings-label-changes-by-agents"),
         "Channel" => crate::i18n::text("interaction-settings-label-channel"),

@@ -15,7 +15,7 @@ fn files_come_back_into_a_recreated_worktree_once() -> Result<(), String> {
     let Outcome::Removed {
         archive: Some(listed),
         ..
-    } = remove(f.repo.path(), &target, &preview, Some(&f.store))
+    } = remove(f.repo.path(), &target, &preview, Some(&f.store), true)
     else {
         return Err("not removed".to_owned());
     };

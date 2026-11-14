@@ -136,7 +136,7 @@ fn archives_come_back_by_themselves_only_for_the_same_branch_and_commit() -> Res
     let target = tab.merged_worktrees().pop().ok_or("not offered")?;
     let preview = inspect(f.repo.path(), &target)?;
     assert_eq!(preview.blockers_with(false), [Blocker::Untracked(1)]);
-    let outcome = remove(f.repo.path(), &target, &preview, Some(&store));
+    let outcome = remove(f.repo.path(), &target, &preview, Some(&store), true);
     assert!(
         matches!(
             outcome,
@@ -192,4 +192,34 @@ fn outcomes_and_files_read_as_the_preview_says() {
         rows::untracked_line(&file),
         "?? a b/ü.bin (2.0 KB) · not archived: binary"
     );
+}
+
+#[test]
+fn another_open_tab_blocks_a_merged_worktree() -> Result<(), String> {
+    let f = Fixture::new("224 other tab")?;
+    let tab = f.tab();
+    assert!(tab.merged_worktrees()[0].in_use.is_none());
+    let ctx = egui::Context::default();
+    let other = RepoTab::new_deferred(f.wt("done"), &ctx);
+    assert!(tab.merged_worktrees()[0].in_use.is_some());
+    drop(other);
+    assert!(tab.merged_worktrees()[0].in_use.is_none());
+    Ok(())
+}
+
+#[test]
+fn task_added_after_preview_is_seen_before_removal() -> Result<(), String> {
+    let f = Fixture::new("224 late task")?;
+    let tab = f.tab();
+    assert!(tab.merged_worktrees()[0].in_use.is_none());
+    crate::agent::tasks::add(
+        f.repo.path(),
+        crate::agent::tasks::AgentTask {
+            path: f.wt("done").to_string_lossy().into_owned(),
+            agent: "codex".into(),
+            ..Default::default()
+        },
+    )?;
+    assert!(super::jobs::current_use(f.repo.path(), &f.wt("done"))?.is_some());
+    Ok(())
 }

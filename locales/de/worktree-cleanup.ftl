@@ -108,3 +108,7 @@ worktree-cleanup-settings-limit-hint = Alle Archive zusammen; weiteres Archivier
 worktree-cleanup-settings-auto-restore = Archivierte Dateien wiederherstellen, wenn der Branch erneut ausgecheckt wird
 worktree-cleanup-settings-auto-restore-tip = Erscheint ein Arbeitsverzeichnis des Branches auf dem Commit, von dem archiviert wurde, kommen seine Dateien einmal zurück, nie über eine vorhandene Datei.
 worktree-cleanup-settings-none = Noch keine Archive.
+
+worktree-cleanup-in-use-tab = in einem anderen Tab geöffnet
+worktree-cleanup-in-use-terminals = { $count } Terminals darin geöffnet
+worktree-cleanup-in-use-agent = Agent-Aufgabe: { $agent }

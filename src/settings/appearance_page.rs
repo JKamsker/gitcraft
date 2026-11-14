@@ -156,7 +156,7 @@ pub(super) fn render(settings: &mut Settings, ui: &mut Ui, f: &Filter, view: &mu
         card.preview(Preview::FileList);
         card.row_hint(
             "Changed files",
-            crate::i18n::text("commit-details-files-setting-hint"),
+            crate::i18n::text("commit-details-working-files-setting-hint"),
             "tree folders list flat path selected commit",
             |ui| {
                 ui.horizontal_wrapped(|ui| {
@@ -168,6 +168,26 @@ pub(super) fn render(settings: &mut Settings, ui: &mut Ui, f: &Filter, view: &mu
                     );
                     ui.radio_value(
                         &mut settings.files_as_tree,
+                        false,
+                        crate::i18n::text("interaction-settings-one-list"),
+                    );
+                });
+            },
+        );
+        card.row_hint(
+            "Commit files",
+            crate::i18n::text("commit-details-files-setting-hint"),
+            "commit tree folders list flat path",
+            |ui| {
+                ui.horizontal_wrapped(|ui| {
+                    ui.spacing_mut().item_spacing.x = 18.0;
+                    ui.radio_value(
+                        &mut settings.commit_files_as_tree,
+                        true,
+                        crate::i18n::text("interaction-settings-folders"),
+                    );
+                    ui.radio_value(
+                        &mut settings.commit_files_as_tree,
                         false,
                         crate::i18n::text("interaction-settings-one-list"),
                     );

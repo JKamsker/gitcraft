@@ -5,6 +5,7 @@ mod archive_tests;
 mod inspect_tests;
 mod remove_tests;
 mod restore_tests;
+mod review_tests;
 
 use std::path::{Path, PathBuf};
 

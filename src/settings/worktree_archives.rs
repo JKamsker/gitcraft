@@ -116,7 +116,7 @@ fn location_field(ui: &mut Ui, location: &mut String) {
             .hint_text(default)
             .desired_width(layout::fit(ui, FIELD_WIDTH)),
     );
-    if field.lost_focus() {
+    if field.lost_focus() || (field.has_focus() && ui.input(|i| i.key_pressed(egui::Key::Enter))) {
         *location = draft;
         ui.data_mut(|d| d.remove::<String>(id));
     } else if field.has_focus() {
@@ -223,3 +223,7 @@ fn archive_list(ui: &mut Ui, store: &Store) {
         }
     });
 }
+
+#[cfg(test)]
+#[path = "worktree_archives_tests.rs"]
+mod tests;

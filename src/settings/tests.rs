@@ -435,3 +435,14 @@ fn area_d_optional_settings_pages_fit_and_toggle_at_each_scale() -> Result<(), S
     }
     Ok(())
 }
+
+#[test]
+fn commit_tree_preference_defaults_true_and_is_independent() {
+    let mut settings: super::Settings = ron::from_str("(files_as_tree: false)").unwrap();
+    assert!(settings.commit_files_as_tree);
+    settings.commit_files_as_tree = false;
+    settings.files_as_tree = true;
+    let back: super::Settings = ron::from_str(&ron::to_string(&settings).unwrap()).unwrap();
+    assert!(back.files_as_tree);
+    assert!(!back.commit_files_as_tree);
+}

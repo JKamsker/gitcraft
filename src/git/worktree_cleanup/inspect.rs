@@ -61,7 +61,9 @@ pub(crate) fn inspect(repo: &Path, target: &Target) -> Result<Inspection, String
         found.blockers.push(Blocker::Changed(found.changed.len()));
     }
     found.footprint = footprint(&target.path);
-    found.fingerprint = fingerprint(&found, tip.as_deref().unwrap_or(""), &ignored);
+    if found.ignored_size.complete {
+        found.fingerprint = fingerprint(&found, tip.as_deref().unwrap_or(""), &ignored);
+    }
     Ok(found)
 }
 
@@ -184,8 +186,7 @@ fn read_files(path: &Path, found: &mut Inspection) -> Result<String, String> {
             (b'?', b'?') => found.untracked.push(untracked(path, name)),
             (b'!', b'!') => {
                 let rel = String::from_utf8_lossy(name).into_owned();
-                let (size, newest) =
-                    walk(&path.join(rel.trim_end_matches('/')), deadline, 1 << 20);
+                let (size, newest) = walk(&path.join(rel.trim_end_matches('/')), deadline, 1 << 20);
                 let (files, bytes) = (size.files, size.bytes);
                 marks.push_str(&format!("i {rel}\0{files}\0{bytes}\0{newest}\0"));
                 ignored_size.files += size.files;

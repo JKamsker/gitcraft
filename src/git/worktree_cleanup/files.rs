@@ -47,7 +47,8 @@ pub(crate) fn checked_rel(rel: &str) -> Option<Vec<&str>> {
 
 /// `git~1` in any case: the 8.3 short name Windows may give `.git`.
 fn short_git(name: &str) -> bool {
-    name.get(..4).is_some_and(|head| head.eq_ignore_ascii_case("git~"))
+    name.get(..4)
+        .is_some_and(|head| head.eq_ignore_ascii_case("git~"))
         && name.len() > 4
         && name[4..].bytes().all(|b| b.is_ascii_digit())
 }
@@ -89,8 +90,8 @@ pub(crate) fn footprint(path: &Path) -> Footprint {
 
 /// What `path` holds within the time and entries given, and when anything in it last changed
 /// (nanoseconds since 1970).
-pub(crate) fn walk(path: &Path, deadline: Instant, limit: u64) -> (Footprint, u128) {
-    let mut newest = 0u128;
+pub(crate) fn walk(path: &Path, deadline: Instant, limit: u64) -> (Footprint, String) {
+    let mut marks = Sha256::new();
     let mut size = Footprint {
         complete: true,
         ..Footprint::default()
@@ -109,10 +110,28 @@ pub(crate) fn walk(path: &Path, deadline: Instant, limit: u64) -> (Footprint, u1
         };
         let modified = meta.modified().ok();
         let since = modified.and_then(|m| m.duration_since(std::time::UNIX_EPOCH).ok());
-        newest = newest.max(since.map_or(0, |d| d.as_nanos()));
+        marks.update(
+            format!(
+                "{:?}\0{}\0{}",
+                at.strip_prefix(path).unwrap_or(&at),
+                meta.len(),
+                since.map_or(0, |d| d.as_nanos())
+            )
+            .as_bytes(),
+        );
         if meta.is_dir() {
             match std::fs::read_dir(&at) {
-                Ok(entries) => stack.extend(entries.flatten().map(|e| e.path())),
+                Ok(entries) => {
+                    let mut children = Vec::new();
+                    for entry in entries {
+                        match entry {
+                            Ok(entry) => children.push(entry.path()),
+                            Err(_) => size.complete = false,
+                        }
+                    }
+                    children.sort();
+                    stack.extend(children);
+                }
                 Err(_) => size.complete = false,
             }
         } else {
@@ -120,7 +139,7 @@ pub(crate) fn walk(path: &Path, deadline: Instant, limit: u64) -> (Footprint, u1
             size.bytes += meta.len();
         }
     }
-    (size, newest)
+    (size, sha256_hex(&marks.finalize()))
 }
 
 /// A footprint shown as "1.2 MB", or "≥ 1.2 MB" when the count stopped early.

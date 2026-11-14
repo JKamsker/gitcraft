@@ -91,7 +91,7 @@ fn a_long_description_folds_behind_show_more_and_comes_back_whole() {
         // screen readers and on hover).
         let folded = h.get_by_label_contains("First paragraph").rect().height();
         // The files switch is gone from the header; the file list is right there.
-        assert!(h.query_by_label("Tree").is_none() && h.query_by_label("Path").is_none());
+        assert!(h.query_by_label("Tree").is_some());
         assert!(h.query_by_label_contains("file.rs").is_some());
         crate::repo::detail::responsive_tests::evidence(&mut h, &format!("compact-folded-{width}"));
         h.get_by_label("Show more").click();
@@ -168,4 +168,50 @@ fn a_good_or_missing_signature_raises_no_warning() {
     assert!(super::needs_attention(&SignatureVerdict::Expired {
         key: true
     }));
+}
+
+#[test]
+fn signature_check_error_stays_visible_while_folded() {
+    let mut tab = tab("fix: failed check", SignatureVerdict::Unsigned);
+    tab.extras.signature = Some(Err("verification unavailable".into()));
+    let h = harness(420.0, tab);
+    assert_eq!(expanded(&h, "More details"), Some(false));
+    assert!(
+        h.query_by_label_contains("verification unavailable")
+            .is_some()
+    );
+}
+
+#[test]
+fn short_body_cut_by_many_files_has_an_expander() {
+    let mut tab = tab("fix: many files\n\nOne line.", SignatureVerdict::Unsigned);
+    let detail = tab.detail.as_mut().unwrap();
+    detail.files = (0..120)
+        .map(|i| crate::git::ChangedFile {
+            path: format!("src/file{i}.rs"),
+            old_path: None,
+            status: 'M',
+            added: Some(1),
+            removed: None,
+        })
+        .collect();
+    let mut h = harness(420.0, tab);
+    h.get_by_label("Show more").click();
+    h.step();
+    assert!(h.query_by_label_contains("One line.").is_some());
+    assert_eq!(expanded(&h, "Show less"), Some(true));
+}
+
+#[test]
+fn commit_tree_toggle_does_not_change_working_files() {
+    let mut h = harness(
+        420.0,
+        tab("fix: independent tree", SignatureVerdict::Unsigned),
+    );
+    assert!(crate::settings::Settings::get(&h.ctx).commit_files_as_tree);
+    h.get_by_label("Tree").click();
+    h.step();
+    let settings = crate::settings::Settings::get(&h.ctx);
+    assert!(!settings.commit_files_as_tree);
+    assert!(settings.files_as_tree);
 }

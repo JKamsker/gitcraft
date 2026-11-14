@@ -42,7 +42,7 @@ impl RepoTab {
             ui.push_id(("work-list", tree), |ui| {
                 reveal = branch_tree::files(
                     ui,
-                    (id, true),
+                    (id, true, Settings::get(ui.ctx()).files_as_tree),
                     &group.shown,
                     |f| &f.path,
                     &selected,
@@ -53,7 +53,11 @@ impl RepoTab {
                 if group.header(ui, id.with("folded-open"), None, holds_open) {
                     reveal = branch_tree::files(
                         ui,
-                        (id.with("folded"), true),
+                        (
+                            id.with("folded"),
+                            true,
+                            Settings::get(ui.ctx()).files_as_tree,
+                        ),
                         &group.folded,
                         |f| &f.path,
                         &selected,

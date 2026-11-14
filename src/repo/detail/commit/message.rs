@@ -89,7 +89,8 @@ pub(super) fn fitted_message(
         .data(|d| d.get_temp::<bool>(unfolded_id()))
         .unwrap_or(false);
     // Folded, at most the preview; a description that fits it needs no expander.
-    let foldable = body_rows > PREVIEW_ROWS;
+    let foldable = body_rows > PREVIEW_ROWS
+        || title_rows as f32 * title_h + body_rows as f32 * body_h + gap + 2.0 > budget;
     let (show_title, show_body) = if unfolded && foldable {
         (title_rows, body_rows)
     } else {

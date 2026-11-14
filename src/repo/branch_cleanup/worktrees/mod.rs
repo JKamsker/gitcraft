@@ -46,8 +46,8 @@ impl WorktreeCleanup {
     }
 
     /// How many terminals the tab has open, for the other tabs' cleanup.
-    pub fn note_terminals(&mut self, count: usize) {
-        self.presence.terminals(count);
+    pub fn note_terminals(&mut self, paths: Vec<PathBuf>) {
+        self.presence.terminals(paths);
     }
 }
 
@@ -119,7 +119,11 @@ impl RepoTab {
     /// another tab or view open on it, terminals open in it.
     fn in_use(&self, path: &Path) -> Option<String> {
         let same = crate::remote::is_same_dir_as(path);
-        let agents = self.agents.tasks.iter().filter(|t| same(Path::new(&t.path)));
+        let agents = self
+            .agents
+            .tasks
+            .iter()
+            .filter(|t| same(Path::new(&t.path)));
         let mut why: Vec<String> = agents
             .map(|t| {
                 let agent = crate::agent::tasks::agent_label(&t.agent);

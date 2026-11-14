@@ -37,7 +37,7 @@ impl RepoTab {
                         sidebar::stash_menu(ui, acts, stash, idle);
                     });
             }
-            // Files as a tree or a list: Settings → Appearance → Changed files (#213).
+            // Commit file presentation has its own preference in Settings.
         });
         if stash.is_none() && self.detail_hash.is_some() {
             ui.horizontal(|ui| {

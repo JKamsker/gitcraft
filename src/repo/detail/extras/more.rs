@@ -23,6 +23,16 @@ pub(super) fn show(
     {
         signature_warning(ui, sig, &t);
     }
+    if let Some(Err(error)) = &extras.signature {
+        ui.colored_label(
+            t.danger,
+            format!(
+                "{}: {}",
+                crate::i18n::text("repo-core-1136"),
+                crate::git::display_error(error)
+            ),
+        );
+    }
     let summary = match glance(extras) {
         Some(text) => Summary::Text(text, t.text_dim),
         None => Summary::Loading,

@@ -9,6 +9,7 @@ use crate::git::{ChangedFile, CommitDetail};
 use crate::repo::file_view::FileTab;
 use crate::repo::widgets::{self, RowExtra};
 use crate::repo::{Action, RepoTab, branch_tree};
+use crate::settings::Settings;
 use crate::theme::Tokens;
 
 #[derive(Default)]
@@ -114,7 +115,7 @@ impl RepoTab {
             ui.push_id(("all-files", &detail.hash), |ui| {
                 reveal = branch_tree::files(
                     ui,
-                    (id, false),
+                    (id, false, Settings::get(ui.ctx()).commit_files_as_tree),
                     files,
                     |p| p.as_str(),
                     &|p: &&String| shown(p),
