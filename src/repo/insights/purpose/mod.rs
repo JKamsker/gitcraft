@@ -228,8 +228,10 @@ impl RepoTab {
         state.arranged = None;
         state.proposing += 1;
         let (request, proposing) = (state.request, state.proposing);
-        self.then(
+        self.then_or(
             ctx,
+            false,
+            Err,
             move || {
                 let rules = crate::repo::folding::Rules::new(true, &patterns);
                 let proposal = propose::propose(&units, &|path| {
@@ -242,13 +244,18 @@ impl RepoTab {
                 });
                 let arranged = arrange::arrange(&proposal, &units, saved.as_ref());
                 let checked = arrange::check(&arranged, &units).map(|()| arranged);
-                (proposal, checked)
+                Ok((proposal, checked))
             },
-            move |tab, (proposal, arranged), _| {
+            move |tab, result: Result<_, String>, _| {
                 let state = &mut tab.review_purpose;
                 if state.request == request && state.proposing == proposing {
-                    state.proposal = Some(proposal);
-                    state.arranged = Some(arranged);
+                    match result {
+                        Ok((proposal, arranged)) => {
+                            state.proposal = Some(proposal);
+                            state.arranged = Some(arranged);
+                        }
+                        Err(error) => state.arranged = Some(Err(error)),
+                    }
                 }
             },
         );

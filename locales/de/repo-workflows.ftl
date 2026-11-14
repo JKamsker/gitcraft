@@ -7788,3 +7788,6 @@ purpose-made-by-you = von Ihnen erstellt
 purpose-split-title = { $title } (Teilung { $count })
 
 purpose-open-insight = In { $insight } öffnen
+
+purpose-rename-confirm = Umbenennen
+purpose-rename-cancel = Abbrechen

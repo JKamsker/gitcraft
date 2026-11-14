@@ -110,13 +110,20 @@ pub(super) fn group(ui: &mut Ui, ctx: &Ctx, g: usize, shown: &Shown, acts: &mut 
                 ui.horizontal(|ui| {
                     let r = ui.text_edit_singleline(&mut text);
                     let enter = r.lost_focus() && ui.input(|i| i.key_pressed(egui::Key::Enter));
-                    if enter || ui.button("Rename").clicked() {
+                    if enter
+                        || ui
+                            .button(crate::i18n::text("purpose-rename-confirm"))
+                            .clicked()
+                    {
                         acts.push(act(Act::Edit(Edit::Rename {
                             group: id.clone(),
                             title: text.clone(),
                         })));
                         ui.data_mut(|d| d.remove::<String>(rename));
-                    } else if ui.button("Cancel").clicked() {
+                    } else if ui
+                        .button(crate::i18n::text("purpose-rename-cancel"))
+                        .clicked()
+                    {
                         ui.data_mut(|d| d.remove::<String>(rename));
                     } else {
                         ui.data_mut(|d| d.insert_temp(rename, text));

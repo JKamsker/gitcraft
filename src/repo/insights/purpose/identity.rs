@@ -4,7 +4,15 @@ use super::units::{Body, Units};
 use std::{collections::HashMap, path::Path};
 
 pub(super) fn add_context(repo: &Path, base: &str, units: &mut Units) -> Result<(), String> {
-    let mut files: HashMap<String, Vec<String>> = HashMap::new();
+    add_context_with(base, units, |args| crate::git::run(Some(repo), args))
+}
+
+fn add_context_with(
+    base: &str,
+    units: &mut Units,
+    mut run: impl FnMut(&[&str]) -> Result<String, String>,
+) -> Result<(), String> {
+    let mut files: HashMap<String, Option<Vec<String>>> = HashMap::new();
     for unit in &mut units.units {
         let Body::Hunk {
             old_start, old_len, ..
@@ -18,16 +26,22 @@ pub(super) fn add_context(repo: &Path, base: &str, units: &mut Units) -> Result<
         }
         if !files.contains_key(path) {
             let spec = format!("{base}:{path}");
-            let size = crate::git::run(Some(repo), &["cat-file", "-s", &spec])?;
+            let size = run(&["cat-file", "-s", &spec])?;
             // For very large blobs, invalidate conservatively when the base moves.
             if size.trim().parse::<u64>().unwrap_or(u64::MAX) > 1024 * 1024 {
-                unit.key.push_str(&format!(":base:{base}"));
-                continue;
+                files.insert(path.clone(), None);
+            } else {
+                let text = run(&["cat-file", "blob", &spec])?;
+                files.insert(
+                    path.clone(),
+                    Some(text.lines().map(str::to_owned).collect()),
+                );
             }
-            let text = crate::git::run(Some(repo), &["cat-file", "blob", &spec])?;
-            files.insert(path.clone(), text.lines().map(str::to_owned).collect());
         }
-        let lines = &files[path];
+        let Some(lines) = &files[path] else {
+            unit.key.push_str(&format!(":base:{base}"));
+            continue;
+        };
         let start = if old_len == 0 {
             old_start as usize
         } else {
@@ -42,4 +56,34 @@ pub(super) fn add_context(repo: &Path, base: &str, units: &mut Units) -> Result<
         ));
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn oversized_blobs_have_one_size_lookup_per_path() -> Result<(), String> {
+        use super::super::tests::{unit, units};
+        let mut units = units(
+            vec![
+                unit("large.txt", 1),
+                unit("large.txt", 20),
+                unit("other.txt", 1),
+            ],
+            "head",
+        );
+        let mut calls = Vec::new();
+        super::add_context_with("base", &mut units, |args| {
+            calls.push(args.iter().map(|s| (*s).to_owned()).collect::<Vec<_>>());
+            Ok("1048577".into())
+        })?;
+        assert_eq!(
+            calls,
+            vec![
+                vec!["cat-file", "-s", "base:large.txt"],
+                vec!["cat-file", "-s", "base:other.txt"]
+            ]
+        );
+        assert!(units.units.iter().all(|u| u.key.ends_with(":base:base")));
+        Ok(())
+    }
 }

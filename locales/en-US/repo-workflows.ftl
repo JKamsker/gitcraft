@@ -7790,3 +7790,6 @@ purpose-made-by-you = made by you
 purpose-split-title = { $title } (split { $count })
 
 purpose-open-insight = Open in { $insight }
+
+purpose-rename-confirm = Rename
+purpose-rename-cancel = Cancel

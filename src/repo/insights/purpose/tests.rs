@@ -2,6 +2,7 @@
 //! folders, the repository's own rules), the reviewer's edits and their revisions, and where a
 //! change opens. Real repositories are in `tests/real.rs`.
 
+mod followup;
 mod real;
 mod regressions;
 
@@ -11,7 +12,7 @@ use super::rows;
 use super::rules::{self, Purpose};
 use super::units::{Body, Markers, Unit, Units, Whole};
 
-fn unit(path: &str, line: u32) -> Unit {
+pub(super) fn unit(path: &str, line: u32) -> Unit {
     Unit {
         key: format!("h:{path}:{line}"),
         path: path.to_owned(),
@@ -39,7 +40,7 @@ fn whole(path: &str, why: Whole) -> Unit {
     }
 }
 
-fn units(list: Vec<Unit>, head: &str) -> Units {
+pub(super) fn units(list: Vec<Unit>, head: &str) -> Units {
     Units {
         base: "base".into(),
         head: head.into(),
