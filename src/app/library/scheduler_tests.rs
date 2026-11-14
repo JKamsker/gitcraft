@@ -163,3 +163,25 @@ fn a_real_scan_applies_incrementally() {
     assert_eq!(lib.count(&source), 2);
     assert!(lib.entries.iter().all(|e| e.stale()));
 }
+
+#[test]
+fn unreadable_subfolders_keep_previous_entries_stale() {
+    let mut lib = Library::default();
+    let id = lib.add_root(PathBuf::from("/review-unreadable"), 1);
+    let source = Source::Root(id);
+    lib.add_found(&source, &[PathBuf::from("/review-unreadable/locked/repo")]);
+    let mut s = Scheduler::with_runner(Arc::new(|_, _, _| {
+        Ok(Found {
+            unreadable: true,
+            ..Found::default()
+        })
+    }));
+    s.queue(1, job(source, "/review-unreadable"));
+    until(&mut s, 1, &mut lib, |s| !s.busy() && s.threads() == 0);
+    assert_eq!(lib.entries.len(), 1);
+    assert!(lib.entries[0].stale());
+    assert_eq!(
+        lib.root(id).unwrap().last.as_ref().unwrap().outcome,
+        Outcome::Partial(Stopped::Unreadable)
+    );
+}

@@ -1,4 +1,5 @@
 //! Regressions from the repository-library review (#225).
+#[cfg(unix)]
 use super::checks::{Checks, Guards};
 use super::model::{Outcome, ScanRecord};
 use super::*;
