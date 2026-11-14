@@ -123,7 +123,12 @@ fn configured_roots_list_open_and_hide() {
     h.get_by_label(&crate::remote::display(&alpha)).click();
     h.step();
     let a = app(&mut h);
-    assert_eq!(a.recent, std::slice::from_ref(&alpha));
+    assert_eq!(
+        a.recent,
+        std::slice::from_ref(&alpha),
+        "open error: {:?}",
+        a.error
+    );
     assert!(matches!(&a.tabs[a.active], Tab::Repo(r) if r.path == alpha));
     assert_eq!(a.tabs.len(), 1, "one tab, for the one opened");
 
@@ -174,7 +179,7 @@ fn an_opened_repository_lists_its_siblings() {
     app(&mut h).open_repo(&projects.join("app"), &ctx);
     settle(&mut h);
     let a = app(&mut h);
-    assert_eq!(listed(a), ["app", "tool"]);
+    assert_eq!(listed(a), ["app", "tool"], "open error: {:?}", a.error);
     let lib = a.library.get(a.profile()).cloned().unwrap_or_default();
     assert_eq!(lib.nearby.len(), 1);
     assert_eq!(lib.nearby[0].parent, projects);
@@ -237,7 +242,12 @@ fn thirty_repositories_leave_recent_alone() {
     h.key_press(egui::Key::Enter);
     h.run_steps(2);
     let a = app(&mut h);
-    assert_eq!(a.recent[0], base.join("repo31"));
+    assert_eq!(
+        a.recent[0],
+        base.join("repo31"),
+        "open error: {:?}",
+        a.error
+    );
     assert_eq!(a.recent[1..], recent[..]);
     let _ = std::fs::remove_dir_all(&base);
 }
