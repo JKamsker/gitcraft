@@ -170,10 +170,10 @@ fn the_repositorys_rules_come_first_and_lines_not_understood_are_said() {
         ],
         "head",
     );
-    u.config = Some(
+    u.set_config(Some(
         "# ours\ngroup Billing: src/billing/ web/billing/**\ntests: e2e/**\nbogus: x\nno colon\n"
             .into(),
-    );
+    ));
     let p = propose(&u, &|_| None);
     let got = titles(&p, &u);
     assert_eq!(
@@ -196,14 +196,14 @@ fn the_repositorys_rules_come_first_and_lines_not_understood_are_said() {
 
 #[test]
 fn patterns_match_names_paths_and_folders() {
-    assert!(rules::matches("*.proto", "a/b/c.proto"));
-    assert!(rules::matches("src/*.rs", "src/a.rs"));
-    assert!(!rules::matches("src/*.rs", "src/a/b.rs"));
-    assert!(rules::matches("src/**/*.rs", "src/a/b.rs"));
-    assert!(rules::matches("src/**/*.rs", "src/b.rs"));
-    assert!(rules::matches("vendor/", "vendor/x/y.c"));
-    assert!(rules::matches("/docs/?.md", "docs/a.md"));
-    assert!(!rules::matches("docs/?.md", "docs/ab.md"));
+    assert!(super::glob::matches("*.proto", "a/b/c.proto"));
+    assert!(super::glob::matches("src/*.rs", "src/a.rs"));
+    assert!(!super::glob::matches("src/*.rs", "src/a/b.rs"));
+    assert!(super::glob::matches("src/**/*.rs", "src/a/b.rs"));
+    assert!(super::glob::matches("src/**/*.rs", "src/b.rs"));
+    assert!(super::glob::matches("vendor/", "vendor/x/y.c"));
+    assert!(super::glob::matches("/docs/?.md", "docs/a.md"));
+    assert!(!super::glob::matches("docs/?.md", "docs/ab.md"));
     assert_eq!(Purpose::Api.title(), "API and contracts");
 }
 

@@ -26,9 +26,12 @@ pub(in crate::repo::insights) fn load(repo: &Path, url: &str) -> Result<Option<S
         return Ok(None);
     }
     let text = git::run(Some(repo), &["cat-file", "blob", &oid])?;
-    serde_json::from_str(&text)
-        .map(Some)
-        .map_err(|e| format!("the saved grouping can't be read: {e}"))
+    serde_json::from_str(&text).map(Some).map_err(|e| {
+        crate::i18n::message(
+            "purpose-diagnostic-11",
+            &[("error", (e).to_string().into())],
+        )
+    })
 }
 
 /// Saves `saved` (`None`: forgets the arrangement).

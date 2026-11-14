@@ -1,4 +1,5 @@
 //! Regression coverage for the adversarial review findings in #225.
+use super::super::units;
 use super::*;
 use crate::git::{self, fixture::Repo};
 

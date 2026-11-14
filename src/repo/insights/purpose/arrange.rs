@@ -171,11 +171,17 @@ pub(in crate::repo::insights) fn check(arranged: &Arranged, units: &Units) -> Re
         for &u in &g.group.units {
             *count
                 .get_mut(u)
-                .ok_or("a group holds a change that isn't there")? += 1;
+                .ok_or(crate::i18n::text("purpose-diagnostic-15"))? += 1;
         }
     }
     match count.iter().position(|&n| n != 1) {
-        Some(u) => Err(format!("{} is in {} groups", units.units[u].path, count[u])),
+        Some(u) => Err(crate::i18n::message(
+            "purpose-diagnostic-9",
+            &[
+                ("path", (units.units[u].path).to_string().into()),
+                ("count", (count[u]).to_string().into()),
+            ],
+        )),
         None => Ok(()),
     }
 }
@@ -322,8 +328,9 @@ fn place(saved: &mut Saved, keys: &[String], g: usize, units: &Units) -> Result<
         .iter()
         .find(|k| !units.units.iter().any(|u| &u.key == *k))
     {
-        return Err(format!(
-            "A change is gone ({k}): the pull request changed since"
+        return Err(crate::i18n::message(
+            "purpose-diagnostic-10",
+            &[("key", (k).to_string().into())],
         ));
     }
     for sg in &mut saved.groups {

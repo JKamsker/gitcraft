@@ -110,21 +110,33 @@ pub(in crate::repo::insights) fn parse(text: &str) -> (Vec<Rule>, Vec<String>) {
         if line.is_empty() {
             continue;
         }
-        let Some((head, patterns)) = line.split_once(':') else {
-            errors.push(format!("line {}: no `:` in “{line}”", i + 1));
+        let Some((head, raw_patterns)) = line.split_once(':') else {
+            errors.push(crate::i18n::message(
+                "purpose-diagnostic-1",
+                &[
+                    ("number", (i + 1).to_string().into()),
+                    ("line", (line).to_string().into()),
+                ],
+            ));
             continue;
         };
         let mut patterns: Vec<String> = Vec::new();
-        for p in patterns.split_whitespace() {
+        for p in raw_patterns.split_whitespace() {
             if p.len() > MAX_PATTERN {
-                errors.push(format!(
-                    "line {}: a pattern longer than {MAX_PATTERN} bytes is not used",
-                    i + 1
+                errors.push(crate::i18n::message(
+                    "purpose-diagnostic-2",
+                    &[
+                        ("number", (i + 1).to_string().into()),
+                        ("limit", (MAX_PATTERN).to_string().into()),
+                    ],
                 ));
             } else if total + p.len() > MAX_PATTERNS {
-                errors.push(format!(
-                    "line {}: past {MAX_PATTERNS} bytes of patterns, the rest are not used",
-                    i + 1
+                errors.push(crate::i18n::message(
+                    "purpose-diagnostic-3",
+                    &[
+                        ("number", (i + 1).to_string().into()),
+                        ("limit", (MAX_PATTERNS).to_string().into()),
+                    ],
                 ));
                 break;
             } else {
@@ -138,13 +150,22 @@ pub(in crate::repo::insights) fn parse(text: &str) -> (Vec<Rule>, Vec<String>) {
             _ => match Purpose::NAMED.iter().find(|p| p.word() == head) {
                 Some(&p) => Target::Purpose(p),
                 None => {
-                    errors.push(format!("line {}: unknown purpose “{head}”", i + 1));
+                    errors.push(crate::i18n::message(
+                        "purpose-diagnostic-4",
+                        &[
+                            ("number", (i + 1).to_string().into()),
+                            ("head", (head).to_string().into()),
+                        ],
+                    ));
                     continue;
                 }
             },
         };
         if patterns.is_empty() {
-            errors.push(format!("line {}: no patterns", i + 1));
+            errors.push(crate::i18n::message(
+                "purpose-diagnostic-5",
+                &[("number", (i + 1).to_string().into())],
+            ));
             continue;
         }
         rules.push(Rule {
@@ -273,9 +294,9 @@ pub(in crate::repo::insights) fn rule<'a>(
         hits.push(hit);
     }
     if out_of_work {
-        errors.push(format!(
-            "{}: too much to match against these paths; the built-in rules place the rest",
-            super::units::CONFIG
+        errors.push(crate::i18n::message(
+            "purpose-diagnostic-6",
+            &[("file", (super::units::CONFIG).to_string().into())],
         ));
     }
     Ruled {
@@ -297,12 +318,25 @@ pub(in crate::repo::insights) fn place(
     if let Some((rule, p)) = hit {
         return Placement {
             target: rule.target.clone(),
-            why: format!("`{p}` (line {} of {})", rule.line, super::units::CONFIG),
+            why: crate::i18n::message(
+                "purpose-diagnostic-7",
+                &[
+                    ("pattern", (p).to_string().into()),
+                    ("line", (rule.line).to_string().into()),
+                    ("file", (super::units::CONFIG).to_string().into()),
+                ],
+            ),
         };
     }
     let name = path.rsplit('/').next().unwrap_or(path);
     if let Some(reason) = generated {
-        return put(Purpose::Generated, format!("{reason} (file folding rules)"));
+        return put(
+            Purpose::Generated,
+            crate::i18n::message(
+                "purpose-diagnostic-8",
+                &[("reason", (reason).to_string().into())],
+            ),
+        );
     }
     if let Some(why) = in_dir(path, &GENERATED_DIRS) {
         return put(Purpose::Generated, why);

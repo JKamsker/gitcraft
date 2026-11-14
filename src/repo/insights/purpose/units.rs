@@ -146,8 +146,9 @@ pub(in crate::repo::insights) fn read(
     units.attrs = match crate::git::fold_attributes(repo, Some(&source), &paths, &|| true) {
         (found, None) => Some(found),
         (_, Some(error)) => {
-            units.notes.push(format!(
-                "Base attributes unavailable; grouping uses file names and custom patterns: {error}"
+            units.notes.push(crate::i18n::message(
+                "purpose-diagnostic-12",
+                &[("error", (error).to_string().into())],
             ));
             None
         }
@@ -168,9 +169,12 @@ fn config_at(repo: &Path, base: &str) -> (Option<String>, Option<String>) {
         ),
         _ => (
             None,
-            Some(format!(
-                "{CONFIG} is larger than {} KiB: its rules are not used",
-                rules::MAX_FILE / 1024
+            Some(crate::i18n::message(
+                "purpose-diagnostic-13",
+                &[
+                    ("file", (CONFIG).to_string().into()),
+                    ("limit", (rules::MAX_FILE / 1024).to_string().into()),
+                ],
             )),
         ),
     }
@@ -197,7 +201,7 @@ pub(in crate::repo::insights) fn build(
         cut_file = Some(path);
     }
     if read.hunks_cut || read.beyond > 0 {
-        notes.push("some files are past the limits of what is split into hunks".to_owned());
+        notes.push(crate::i18n::text("purpose-diagnostic-16").to_owned());
     }
     let (repeated, by_hunk, layout) = repeated_of(patterns);
     let of_file: HashMap<&str, &ChangedFile> = files.iter().map(|f| (f.path.as_str(), f)).collect();
@@ -245,9 +249,9 @@ pub(in crate::repo::insights) fn build(
         match file {
             Some(f) => by_path.entry(f.path.as_str()).or_default().push(unit),
             None => {
-                return Err(format!(
-                    "the diff read has a change to {}, which the pull request doesn't list",
-                    unit.path
+                return Err(crate::i18n::message(
+                    "purpose-diagnostic-14",
+                    &[("path", (unit.path).to_string().into())],
                 ));
             }
         }
