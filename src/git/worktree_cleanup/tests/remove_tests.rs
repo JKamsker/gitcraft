@@ -122,10 +122,9 @@ fn a_full_archive_store_keeps_the_worktree_and_a_retry_works() -> Result<(), Str
     Ok(())
 }
 
-/// Git refuses to remove a worktree with a submodule checked out in it: the untracked files
-/// archived and taken out just before are put back, and the archive goes.
+/// Submodule files and their private Git metadata are retained along with the full tree.
 #[test]
-fn files_come_back_when_git_refuses_and_a_retry_works() -> Result<(), String> {
+fn submodule_content_is_retained_without_git_removal() -> Result<(), String> {
     let f = Fixture::new("remove refused")?;
     let sub = crate::git::stack::test_repo::TestRepo::new("wt cleanup submodule")?;
     let url = sub.path().to_string_lossy().into_owned();
@@ -143,32 +142,18 @@ fn files_come_back_when_git_refuses_and_a_retry_works() -> Result<(), String> {
     let preview = inspect(f.repo.path(), &target)?;
     assert_eq!(preview.blockers_with(true), []);
     let outcome = remove(f.repo.path(), &target, &preview, Some(&f.store), true);
-    assert!(matches!(outcome, Outcome::Failed(_)), "{outcome:?}");
+    let Outcome::Removed { recovery, .. } = outcome else {
+        return Err(format!("{outcome:?}"));
+    };
     assert_eq!(
-        std::fs::read(wt.join(UNICODE)).ok(),
-        Some(b"keep me\n".to_vec())
+        std::fs::read(recovery.join(UNICODE)).map_err(|e| e.to_string())?,
+        b"keep me\n"
     );
+    assert!(recovery.join("sub/.git").exists());
     assert!(
-        f.store.list(None).is_empty(),
-        "the archive is only a second copy now"
-    );
-    // Retried once the submodule is gone (git keeps refusing while the worktree's own
-    // `modules` folder is there).
-    f.git(&wt, &["submodule", "--quiet", "deinit", "-f", "sub"])?;
-    let dir = f.git(&wt, &["rev-parse", "--absolute-git-dir"])?;
-    std::fs::remove_dir_all(std::path::Path::new(dir.trim()).join("modules"))
-        .map_err(|e| e.to_string())?;
-    let preview = inspect(f.repo.path(), &target)?;
-    let outcome = remove(f.repo.path(), &target, &preview, Some(&f.store), true);
-    assert!(
-        matches!(
-            outcome,
-            Outcome::Removed {
-                archive: Some(_),
-                ..
-            }
-        ),
-        "{outcome:?}"
+        recovery
+            .parent()
+            .is_some_and(|p| p.join("git-state/modules").is_dir())
     );
     assert_eq!(f.store.list(None).len(), 1);
     Ok(())

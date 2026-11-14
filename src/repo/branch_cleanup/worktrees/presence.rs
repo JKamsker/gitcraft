@@ -5,13 +5,15 @@
 
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
-use std::sync::{Mutex, MutexGuard, PoisonError};
+use std::sync::{Arc, Mutex, MutexGuard, PoisonError};
+
+type Probe = Arc<dyn Fn() -> Option<PathBuf> + Send + Sync>;
 
 /// A view: its folder as the tab has it, and its terminals.
 struct Open {
     id: u64,
     path: PathBuf,
-    terminals: Vec<PathBuf>,
+    terminals: Vec<Probe>,
 }
 
 static OPEN: Mutex<Vec<Open>> = Mutex::new(Vec::new());
@@ -24,7 +26,7 @@ fn open() -> MutexGuard<'static, Vec<Open>> {
 /// A view's place on the list, taken off when the view goes.
 pub(in crate::repo) struct Presence {
     id: u64,
-    terminals: Vec<PathBuf>,
+    terminals: Vec<Probe>,
 }
 
 impl Presence {
@@ -42,8 +44,13 @@ impl Presence {
     }
 
     /// How many terminals the view has open now; the list is only touched when that changed.
-    pub fn terminals(&mut self, paths: Vec<PathBuf>) {
-        if paths == self.terminals {
+    pub fn terminals(&mut self, paths: Vec<Probe>) {
+        if paths.len() == self.terminals.len()
+            && paths
+                .iter()
+                .zip(&self.terminals)
+                .all(|(a, b)| Arc::ptr_eq(a, b))
+        {
             return;
         }
         self.terminals = paths.clone();
@@ -60,14 +67,26 @@ impl Presence {
 
     pub(super) fn using(path: &Path, except: Option<u64>) -> Vec<String> {
         let same = |other: &Path| crate::remote::same_dir(path, other);
-        let (mut views, mut terminals) = (0, 0);
+        let root = path.canonicalize().unwrap_or_else(|_| path.to_owned());
+        let (mut views, mut terminals, mut unknown) = (0, 0, false);
         for entry in open().iter().filter(|e| Some(e.id) != except) {
             views += usize::from(same(&entry.path));
-            terminals += entry.terminals.iter().filter(|p| same(p)).count();
+            for probe in &entry.terminals {
+                match probe() {
+                    Some(cwd) => {
+                        let cwd = cwd.canonicalize().unwrap_or(cwd);
+                        terminals += usize::from(cwd.starts_with(&root));
+                    }
+                    None => unknown = true,
+                }
+            }
         }
         let mut why = Vec::new();
         if views > 0 {
             why.push(crate::i18n::text("worktree-cleanup-in-use-tab").to_owned());
+        }
+        if unknown {
+            why.push(crate::i18n::text("worktree-cleanup-terminal-unknown").to_owned());
         }
         if terminals > 0 {
             why.push(crate::i18n::message(

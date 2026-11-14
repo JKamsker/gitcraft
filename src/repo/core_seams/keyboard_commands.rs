@@ -107,10 +107,9 @@ impl RepoTab {
         let selected = if delta != 0 || enter {
             let mut ordered: Vec<&T> = if folder.is_some() && {
                 let settings = Settings::get(ui.ctx());
-                if files
-                    .first()
-                    .is_some_and(|f| matches!(key(f), DiffKey::Commit { .. }))
-                {
+                if files.first().is_some_and(|f| {
+                    matches!(key(f), DiffKey::Commit { .. } | DiffKey::Remerge { .. })
+                }) {
                     settings.commit_files_as_tree
                 } else {
                     settings.files_as_tree

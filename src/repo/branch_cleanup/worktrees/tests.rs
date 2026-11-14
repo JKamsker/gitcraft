@@ -231,6 +231,7 @@ fn cleanup_window_opens_with_room_for_preview() {
     let mut tab = RepoTab::new_deferred("/224/window-sizing".into(), &ctx);
     tab.worktree_cleanup.window = Some(super::Window {
         rows: vec![],
+        retained: Default::default(),
         basis: "Merged into main".into(),
         archive: false,
         reviewed: false,
@@ -257,7 +258,9 @@ fn cleanup_window_opens_with_room_for_preview() {
             },
             tab,
         );
-    h.step();
+    for _ in 0..5 {
+        h.step();
+    }
     let title = crate::i18n::text("worktree-cleanup-title");
     assert!(
         h.get_by_role_and_label(egui::accesskit::Role::Window, title)

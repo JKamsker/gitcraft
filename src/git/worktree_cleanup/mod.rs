@@ -8,6 +8,7 @@ pub(crate) mod archive;
 mod execute;
 mod files;
 mod inspect;
+mod recovery;
 
 use std::path::PathBuf;
 

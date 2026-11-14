@@ -3,6 +3,7 @@
 
 pub(crate) mod display;
 mod keys;
+mod location;
 mod palette;
 mod shells;
 #[cfg(test)]
@@ -74,8 +75,8 @@ pub struct Terminal {
     /// Selected cells, (row, col) on screen, from where the drag started to where it is.
     selection: Option<((u16, u16), (u16, u16))>,
     pub shell: String,
-    /// The folder it was started in (a worktree someone may be working in).
-    pub(crate) cwd: PathBuf,
+    /// Live, observational cwd probe for cleanup; an unknown location blocks conservatively.
+    pub(crate) location: Arc<dyn Fn() -> Option<PathBuf> + Send + Sync>,
 }
 
 impl Terminal {
@@ -189,6 +190,7 @@ impl Terminal {
         }
 
         let shell = shell.label.clone();
+        let location = location::probe(child.process_id());
         Ok(Self {
             parser,
             writer,
@@ -202,7 +204,7 @@ impl Terminal {
             scroll_rest: 0.0,
             selection: None,
             shell,
-            cwd: cwd.to_owned(),
+            location,
         })
     }
 

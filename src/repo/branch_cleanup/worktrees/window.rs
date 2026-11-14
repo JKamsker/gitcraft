@@ -19,6 +19,7 @@ pub(super) struct Asks {
     pub look_again: bool,
     pub restore: Option<(Listed, PathBuf)>,
     pub delete: Option<Listed>,
+    pub retained: Option<(PathBuf, bool)>,
 }
 
 impl RepoTab {
@@ -48,6 +49,9 @@ impl RepoTab {
                     .show(ui, |ui| {
                         body(ui, window, checking, idle, &mut asks);
                         let store = settings.store();
+                        ui.add_enabled_ui(!window.running, |ui| {
+                            super::retained::show(ui, &mut window.retained, &mut asks);
+                        });
                         archives::show(ui, window, &worktrees, store.as_ref(), &mut asks);
                     });
             });
@@ -55,6 +59,9 @@ impl RepoTab {
         if !open && !running {
             self.worktree_cleanup.window = None;
             return;
+        }
+        if let Some((directory, purge)) = asks.retained {
+            self.retained_action(directory, purge, ctx);
         }
         if asks.run {
             self.run_cleanup(ctx);
@@ -181,7 +188,11 @@ fn results(ui: &mut Ui, results: &[(String, Outcome)], t: &Tokens) {
 /// What became of a worktree, and whether that is a failure to look at.
 pub(super) fn describe(outcome: &Outcome) -> (String, bool) {
     match outcome {
-        Outcome::Removed { archive, freed } => {
+        Outcome::Removed {
+            archive,
+            freed,
+            recovery,
+        } => {
             let freed = freed.describe();
             let text = match archive {
                 Some(listed) => crate::i18n::message(
@@ -195,7 +206,16 @@ pub(super) fn describe(outcome: &Outcome) -> (String, bool) {
                     crate::i18n::message("worktree-cleanup-removed", &[("freed", freed.into())])
                 }
             };
-            (text, false)
+            (
+                format!(
+                    "{text}\n{}",
+                    crate::i18n::message(
+                        "worktree-cleanup-recovered-at",
+                        &[("path", recovery.display().to_string().into())]
+                    )
+                ),
+                false,
+            )
         }
         Outcome::Kept(blockers) => {
             let why: Vec<String> = blockers.iter().map(|b| b.describe()).collect();

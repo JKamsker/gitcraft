@@ -23,7 +23,7 @@ impl RepoTab {
             self.terminals
                 .shells()
                 .iter()
-                .map(|t| t.cwd.clone())
+                .map(|t| t.location.clone())
                 .collect(),
         );
         self.shown = shown;

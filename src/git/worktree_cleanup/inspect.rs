@@ -22,6 +22,15 @@ const OPERATIONS: [&str; 7] = [
 /// What `target` holds and what keeps it, `repo` being any worktree of the repository (the
 /// tab's). An error only when git can't list the worktrees at all.
 pub(crate) fn inspect(repo: &Path, target: &Target) -> Result<Inspection, String> {
+    at(repo, target, &target.path, false)
+}
+
+pub(super) fn at(
+    repo: &Path,
+    target: &Target,
+    path: &Path,
+    captured: bool,
+) -> Result<Inspection, String> {
     let mut found = Inspection {
         path: target.path.clone(),
         branch: target.branch.clone(),
@@ -39,14 +48,18 @@ pub(crate) fn inspect(repo: &Path, target: &Target) -> Result<Inspection, String
         return Ok(found);
     }
     let listed = git::worktree_list(repo, None)?;
-    let same = crate::remote::is_same_dir_as(&target.path);
+    let same = |p: &Path| crate::remote::same_dir(&target.path, p);
     let Some(wt) = listed.iter().find(|w| same(&w.path)) else {
         found.blockers.push(Blocker::Missing);
         return Ok(found);
     };
     found.head = wt.head.clone();
-    listed_blockers(wt, target, &mut found.blockers);
-    if wt.prunable.is_some() || wt.bare || !target.path.is_dir() {
+    let mut wt = wt.clone();
+    if captured {
+        wt.prunable = None;
+    }
+    listed_blockers(&wt, target, &mut found.blockers);
+    if wt.prunable.is_some() || wt.bare || !path.is_dir() {
         return Ok(found);
     }
     let tip = branch_tip(repo, &target.branch);
@@ -55,12 +68,12 @@ pub(crate) fn inspect(repo: &Path, target: &Target) -> Result<Inspection, String
     } else {
         merge_blockers(repo, target, &mut found.blockers);
     }
-    operation_blockers(&target.path, &mut found.blockers);
-    let ignored = read_files(&target.path, &mut found)?;
+    operation_blockers(path, &mut found.blockers);
+    let ignored = read_files(path, &mut found)?;
     if !found.changed.is_empty() {
         found.blockers.push(Blocker::Changed(found.changed.len()));
     }
-    found.footprint = footprint(&target.path);
+    found.footprint = footprint(path);
     if found.ignored_size.complete {
         found.fingerprint = fingerprint(&found, tip.as_deref().unwrap_or(""), &ignored);
     }

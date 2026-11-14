@@ -3,7 +3,8 @@ use super::{Fixture, write};
 use crate::git::worktree_cleanup::{Outcome, inspect, remove};
 
 #[test]
-fn archive_store_inside_ignored_folder_blocks_even_without_untracked_files() -> Result<(), String> {
+fn archive_store_inside_ignored_folder_blocks_even_without_untracked_files()
+-> Result<(), Box<dyn std::error::Error>> {
     let f = Fixture::new("224 archive inside")?;
     let wt = f.merged_worktree("done")?;
     f.repo.git(&[
@@ -25,16 +26,13 @@ fn archive_store_inside_ignored_folder_blocks_even_without_untracked_files() -> 
             remove(f.repo.path(), &target, &preview, Some(&store), archive),
             Outcome::Failed(_)
         ));
-        assert_eq!(
-            std::fs::read(store.root.join("archive.zip")).unwrap(),
-            b"precious"
-        );
+        assert_eq!(std::fs::read(store.root.join("archive.zip"))?, b"precious");
     }
     Ok(())
 }
 
 #[test]
-fn ignored_file_created_after_preview_is_preserved() -> Result<(), String> {
+fn ignored_file_created_after_preview_is_preserved() -> Result<(), Box<dyn std::error::Error>> {
     let f = Fixture::new("224 ignored changed")?;
     let wt = f.merged_worktree("done")?;
     f.repo.git(&[
@@ -51,12 +49,12 @@ fn ignored_file_created_after_preview_is_preserved() -> Result<(), String> {
         remove(f.repo.path(), &target, &preview, Some(&f.store), false),
         Outcome::Changed
     );
-    assert_eq!(std::fs::read(wt.join(".env")).unwrap(), b"secret");
+    assert_eq!(std::fs::read(wt.join(".env"))?, b"secret");
     Ok(())
 }
 
 #[test]
-fn quota_counts_only_archive_files_in_store_folders() -> Result<(), String> {
+fn quota_counts_only_archive_files_in_store_folders() -> Result<(), Box<dyn std::error::Error>> {
     let f = Fixture::new("224 quota")?;
     for (name, bytes) in [
         ("abcd/one.zip", b"zip".as_slice()),

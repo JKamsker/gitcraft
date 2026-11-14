@@ -55,7 +55,7 @@ impl RepoTab {
         key: impl Fn(&str) -> DiffKey,
     ) {
         let settings = Settings::get(ui.ctx());
-        let as_tree = if matches!(key(""), DiffKey::Commit { .. }) {
+        let as_tree = if matches!(key(""), DiffKey::Commit { .. } | DiffKey::Remerge { .. }) {
             settings.commit_files_as_tree
         } else {
             settings.files_as_tree
@@ -248,3 +248,6 @@ fn horizontal_files(
 
 #[cfg(test)]
 pub(in crate::repo) mod responsive_tests;
+
+#[cfg(test)]
+mod commit_tree_tests;

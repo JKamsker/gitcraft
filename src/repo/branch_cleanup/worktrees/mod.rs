@@ -7,6 +7,7 @@
 mod archives;
 mod jobs;
 mod presence;
+mod retained;
 mod rows;
 mod window;
 
@@ -46,7 +47,10 @@ impl WorktreeCleanup {
     }
 
     /// How many terminals the tab has open, for the other tabs' cleanup.
-    pub fn note_terminals(&mut self, paths: Vec<PathBuf>) {
+    pub fn note_terminals(
+        &mut self,
+        paths: Vec<std::sync::Arc<dyn Fn() -> Option<PathBuf> + Send + Sync>>,
+    ) {
         self.presence.terminals(paths);
     }
 }
@@ -62,6 +66,7 @@ struct Row {
 /// The window: the worktrees, the choices, what was done, and this repository's archives.
 struct Window {
     rows: Vec<Row>,
+    retained: retained::Retained,
     /// Which branch merged means merged into, as the preview says.
     basis: String,
     /// Archive untracked text files first (opt-in).
@@ -154,6 +159,7 @@ impl RepoTab {
         );
         self.worktree_cleanup.window = Some(Window {
             rows: Vec::new(),
+            retained: Default::default(),
             basis,
             archive: false,
             reviewed: false,
@@ -223,6 +229,7 @@ impl RepoTab {
 
     /// This repository's archives, read in the background.
     fn read_archives(&mut self, ctx: &egui::Context) {
+        self.read_retained(ctx);
         let Some(store) = Settings::get(ctx).worktree_archives.store() else {
             return;
         };

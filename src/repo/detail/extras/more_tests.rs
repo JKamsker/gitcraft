@@ -183,9 +183,9 @@ fn signature_check_error_stays_visible_while_folded() {
 }
 
 #[test]
-fn short_body_cut_by_many_files_has_an_expander() {
+fn short_body_cut_by_many_files_has_an_expander() -> Result<(), Box<dyn std::error::Error>> {
     let mut tab = tab("fix: many files\n\nOne line.", SignatureVerdict::Unsigned);
-    let detail = tab.detail.as_mut().unwrap();
+    let detail = tab.detail.as_mut().ok_or("missing fixture detail")?;
     detail.files = (0..120)
         .map(|i| crate::git::ChangedFile {
             path: format!("src/file{i}.rs"),
@@ -201,4 +201,5 @@ fn short_body_cut_by_many_files_has_an_expander() {
     h.step();
     assert!(h.query_by_label_contains("One line.").is_some());
     assert_eq!(expanded(&h, "Show less"), Some(true));
+    Ok(())
 }
