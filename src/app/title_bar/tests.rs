@@ -112,7 +112,7 @@ fn each_corner_and_edge_resizes_its_way() {
 
 #[test]
 fn supported_platforms_replace_the_title_bar_by_default() {
-    let supported = cfg!(any(windows, target_os = "macos"));
+    let supported = cfg!(any(windows, target_os = "macos", target_os = "linux"));
     assert_eq!(wanted(&Settings::default()), supported);
     let off = Settings {
         tabs_in_title_bar: false,
@@ -150,7 +150,7 @@ fn the_setting_is_read_from_what_eframe_saved() {
 
 #[test]
 fn a_window_with_nothing_saved_follows_the_default() {
-    let decorated = !cfg!(any(windows, target_os = "macos"));
+    let decorated = !cfg!(any(windows, target_os = "macos", target_os = "linux"));
     assert_eq!(decorated_by(None), decorated);
     assert_eq!(
         decorated_by(Some(Path::new("/nonexistent/gitcraft/app.ron"))),
@@ -170,7 +170,10 @@ fn the_title_bar_is_switched_once_per_change() {
     assert!(decorated);
     settings.tabs_in_title_bar = true;
     apply(&ctx, &settings, &mut decorated);
-    assert_eq!(decorated, !cfg!(any(windows, target_os = "macos")));
+    assert_eq!(
+        decorated,
+        !cfg!(any(windows, target_os = "macos", target_os = "linux"))
+    );
     settings.tabs_in_title_bar = false;
     apply(&ctx, &settings, &mut decorated);
     assert!(decorated);

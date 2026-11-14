@@ -1,4 +1,4 @@
-//! Tabs in the title bar (Windows and macOS): the window is made without the system's title bar.
+//! Tabs in the title bar (Windows, macOS and Linux): the window is made without the system's title bar.
 //! The tab strip takes its place, as in a browser. The strip's empty space moves the window and a
 //! double click on it maximizes it, the caption buttons (minimize, maximize, close) sit at the
 //! strip's end, and the window's edges resize it. On macOS the maximize button enters
@@ -43,7 +43,7 @@ static DECORATED_AT_START: AtomicBool = AtomicBool::new(true);
 
 /// Whether the tab strip stands in for the system's title bar.
 pub(super) fn wanted(settings: &Settings) -> bool {
-    cfg!(any(windows, target_os = "macos")) && settings.tabs_in_title_bar
+    cfg!(any(windows, target_os = "macos", target_os = "linux")) && settings.tabs_in_title_bar
 }
 
 /// Whether to make the window with the system's title bar, from the settings eframe saved in
