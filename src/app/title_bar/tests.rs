@@ -166,15 +166,27 @@ fn the_title_bar_is_switched_once_per_change() {
         ..Settings::default()
     };
     let mut decorated = true;
-    apply(&ctx, &settings, &mut decorated);
+    apply(&ctx, &settings, true, &mut decorated);
     assert!(decorated);
     settings.tabs_in_title_bar = true;
-    apply(&ctx, &settings, &mut decorated);
+    apply(&ctx, &settings, true, &mut decorated);
     assert_eq!(
         decorated,
         !cfg!(any(windows, target_os = "macos", target_os = "linux"))
     );
     settings.tabs_in_title_bar = false;
-    apply(&ctx, &settings, &mut decorated);
+    apply(&ctx, &settings, true, &mut decorated);
     assert!(decorated);
+}
+
+#[test]
+fn missing_git_restores_native_controls_and_recheck_restores_the_preference() {
+    let ctx = egui::Context::default();
+    let settings = Settings::default();
+    let mut decorated = !wanted(&settings);
+    apply(&ctx, &settings, false, &mut decorated);
+    assert!(decorated, "the Git-missing screen has no custom controls");
+    apply(&ctx, &settings, true, &mut decorated);
+    assert_eq!(decorated, !wanted(&settings));
+    assert!(settings.tabs_in_title_bar, "keep the saved preference");
 }

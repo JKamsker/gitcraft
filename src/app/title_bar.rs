@@ -99,9 +99,14 @@ pub(super) fn viewport(decorated: bool) -> egui::ViewportBuilder {
 }
 
 /// Gives the window the system's title bar back or takes it away, when that changes.
-/// `decorated` is what the window has now.
-pub(super) fn apply(ctx: &egui::Context, settings: &Settings, decorated: &mut bool) {
-    let want = !wanted(settings);
+/// `decorated` is what the window has now. Screens without a tab strip need native controls.
+pub(super) fn apply(
+    ctx: &egui::Context,
+    settings: &Settings,
+    has_tab_strip: bool,
+    decorated: &mut bool,
+) {
+    let want = !has_tab_strip || !wanted(settings);
     if *decorated != want {
         *decorated = want;
         // macOS keeps the native frame; sync_border updates its title bar in place.
@@ -118,10 +123,10 @@ pub(super) fn apply(ctx: &egui::Context, settings: &Settings, decorated: &mut bo
 /// On macOS this synchronizes the transparent native title bar instead.
 pub(super) fn sync_border(
     window: &impl raw_window_handle::HasWindowHandle,
-    settings: &Settings,
+    decorated: bool,
     shown: &mut Option<bool>,
 ) {
-    let want = !wanted(settings);
+    let want = decorated;
     if *shown != Some(want) {
         *shown = Some(want);
         set_window_border(window, want);
