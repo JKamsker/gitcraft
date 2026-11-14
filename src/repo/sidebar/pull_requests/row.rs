@@ -35,6 +35,12 @@ impl RepoTab {
             13.0,
             if pr.draft { t.text_faint } else { t.success },
         );
+        let moved = self.pr_moved_since_seen(pr);
+        if moved {
+            // Keep the changed-since-seen cue visible without consuming subtitle space.
+            ui.painter()
+                .circle_filled(pos2(rect.left() + 41.0, y - 8.0), 2.5, t.warning);
+        }
         let ci = self.ci_status(&pr.sha);
         // The build status on the right, and the texts up to it.
         let text_right = if ci.is_some() {
@@ -46,44 +52,7 @@ impl RepoTab {
             rect.min,
             pos2(text_right, rect.bottom()),
         ));
-        p.text(
-            pos2(rect.left() + 48.0, y - 7.0),
-            Align2::LEFT_CENTER,
-            format!("#{} {}", pr.number, pr.title),
-            egui::FontId::proportional(12.5),
-            t.text,
-        );
-        let moved = self.pr_moved_since_seen(pr);
-        // First, where a long branch name can't cut it off.
-        let sub = format!(
-            "{}{} · {}{}",
-            if moved {
-                crate::i18n::text("repo-core-3449")
-            } else {
-                ""
-            },
-            pr_route(pr, self.hosting.as_ref()),
-            pr.author,
-            if pr.draft {
-                crate::i18n::text("repo-core-3450")
-            } else {
-                ""
-            }
-        );
-        let sub = p.text(
-            pos2(rect.left() + 48.0, y + 8.0),
-            Align2::LEFT_CENTER,
-            sub,
-            egui::FontId::proportional(11.0),
-            t.text_faint,
-        );
-        let badges = crate::repo::forks::paint_badges(
-            self,
-            &p,
-            pos2(sub.right() + 8.0, y + 8.0),
-            pr.number,
-            &pr.sha,
-        );
+        let badges = super::row_text::paint(self, &p, rect, text_right, pr);
         if let Some(status) = ci {
             let center = pos2(rect.right() - 14.0, y);
             acts.extend(ci_status::dot(ui, r.id.with("ci"), center, &pr.sha, status));
@@ -94,13 +63,7 @@ impl RepoTab {
         let seen_on_open = (!has_view && !moved).then_some(Action::Versions(
             crate::repo::versions::VersionsAct::PrSeen(pr.number),
         ));
-        let r = r.on_hover_text(format!(
-            "{} · {} · {}\n{}",
-            pr.author,
-            if pr.draft { "Draft" } else { "Open" },
-            pr_route(pr, self.hosting.as_ref()),
-            pr.url
-        ));
+        let r = r.on_hover_text(super::row_text::tooltip(pr, self.hosting.as_ref(), moved));
         let r = r.on_hover_text(if has_view {
             crate::i18n::message("repo-core-3451", &[("url", pr.url.to_string().into())])
         } else {
@@ -182,14 +145,4 @@ impl RepoTab {
                 }
             });
     }
-}
-
-/// Repository identity comes from the forge, never from the PR author.
-fn pr_route(pr: &PullRequest, hosting: Option<&Hosting>) -> String {
-    let base = hosting.map_or("unknown", |h| h.path.as_str());
-    let head = pr
-        .head_repo
-        .as_deref()
-        .unwrap_or(if pr.from_fork { "unknown" } else { base });
-    format!("{head}:{} → {base}:{}", pr.branch, pr.base)
 }

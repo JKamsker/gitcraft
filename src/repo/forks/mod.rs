@@ -86,6 +86,15 @@ impl Forks {
         Some((staged, asked, plan))
     }
 
+    /// A recorded fork catalog for rendering tests, without starting network work.
+    #[cfg(test)]
+    pub(in crate::repo) fn fixture(info: ForkInfo) -> Self {
+        Self {
+            info: [(info.number, info)].into(),
+            ..Self::default()
+        }
+    }
+
     /// What the forge said of pull request `number`.
     pub(crate) fn of(&self, number: u64) -> Option<&ForkInfo> {
         self.info.get(&number)

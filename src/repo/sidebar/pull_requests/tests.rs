@@ -158,7 +158,13 @@ fn a_click_selects_the_whole_pr_and_a_double_click_opens_its_details() {
     for (forge, incoming) in Forge::ALL.into_iter().flat_map(|f| [(f, false), (f, true)]) {
         let ctx = egui::Context::default();
         crate::theme::install_fonts(&ctx);
-        let tab = RepoTab::new_deferred("/nonexistent/pr-click-test".into(), &ctx);
+        let mut tab = RepoTab::new_deferred("/nonexistent/pr-click-test".into(), &ctx);
+        tab.hosting = Some(Hosting {
+            forge,
+            host: "example.org".into(),
+            path: "owner/repo".into(),
+            web: "https://example.org".into(),
+        });
         let pr = PullRequest {
             number: 7,
             from_fork: incoming,

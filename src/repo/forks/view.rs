@@ -1,7 +1,7 @@
 //! What the forks show: badges in the list of pull requests, and the items and buttons that act
 //! on a pull request from a fork.
 
-use egui::{Align2, Painter, Pos2, Ui};
+use egui::{Painter, Pos2, Ui};
 
 use super::ForkAct;
 use super::plan::{BranchSetup, fork_remote};
@@ -53,35 +53,44 @@ pub(crate) fn badges(tab: &RepoTab, number: u64, sha: &str) -> Vec<(&'static str
     out
 }
 
-/// Paints the badges of pull request `number` from `at` (left, centre); the text that says why,
-/// for the row's tooltip.
+/// Paints badges ending at `at` (right, centre), returning their left edge and tooltip.
+/// Callers reserve this measured space before laying out neighboring text.
 pub(crate) fn paint_badges(
     tab: &RepoTab,
     painter: &Painter,
     at: Pos2,
     number: u64,
     sha: &str,
-) -> Option<String> {
+) -> (f32, Option<String>) {
     let t = Tokens::get(painter.ctx());
     let badges = badges(tab, number, sha);
-    let mut x = at.x;
-    for (text, _, warn) in &badges {
-        let r = painter.text(
-            egui::pos2(x, at.y),
-            Align2::LEFT_CENTER,
-            *text,
-            egui::FontId::proportional(10.5),
-            if *warn { t.warning } else { t.accent },
-        );
-        x = r.right() + 8.0;
+    let galleys: Vec<_> = badges
+        .iter()
+        .map(|(text, _, warn)| {
+            painter.layout_no_wrap(
+                (*text).into(),
+                egui::FontId::proportional(10.5),
+                if *warn { t.warning } else { t.accent },
+            )
+        })
+        .collect();
+    let width = galleys.iter().map(|g| g.size().x).sum::<f32>()
+        + badges.len().saturating_sub(1) as f32 * 8.0;
+    let left = at.x - width;
+    let mut x = left;
+    for galley in galleys {
+        let size = galley.size();
+        painter.galley(egui::pos2(x, at.y - size.y / 2.0), galley, t.accent);
+        x += size.x + 8.0;
     }
-    (!badges.is_empty()).then(|| {
+    let tooltip = (!badges.is_empty()).then(|| {
         badges
             .iter()
             .map(|(_, why, _)| why.as_str())
             .collect::<Vec<_>>()
             .join("\n")
-    })
+    });
+    (left, tooltip)
 }
 
 /// What the forge calls letting maintainers push to a pull request's branch.

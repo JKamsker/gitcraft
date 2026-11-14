@@ -272,4 +272,5 @@ enum PrWorktree {
 mod tests;
 
 mod row;
+mod row_text;
 mod worktrees;
