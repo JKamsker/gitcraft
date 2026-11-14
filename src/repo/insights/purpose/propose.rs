@@ -96,7 +96,10 @@ pub(in crate::repo::insights) fn propose(
                 ),
                 format!("named:{name}"),
                 name.clone(),
-                format!("named by the rules in {}", super::units::CONFIG),
+                crate::i18n::message(
+                    "purpose-detail-2",
+                    &[("file", (super::units::CONFIG).to_string().into())],
+                ),
                 None,
             ),
             Target::Purpose(Purpose::Logic) => {
@@ -105,14 +108,32 @@ pub(in crate::repo::insights) fn propose(
                     Some(dirs) => {
                         let list: Vec<&str> = dirs
                             .iter()
-                            .map(|d| if d.is_empty() { "the top folder" } else { d })
+                            .map(|d| {
+                                if d.is_empty() {
+                                    crate::i18n::text("purpose-detail-1")
+                                } else {
+                                    d
+                                }
+                            })
                             .collect();
-                        reasons[i] = format!("named `{name}` like files in other folders");
+                        reasons[i] = crate::i18n::message(
+                            "purpose-detail-3",
+                            &[("name", (name).to_string().into())],
+                        );
                         (
                             (1 + Purpose::Logic as usize, 0),
                             format!("feature:{name}"),
-                            format!("Feature: {name}"),
-                            format!("runtime files named `{name}` in {}", list.join(", ")),
+                            crate::i18n::message(
+                                "purpose-detail-4",
+                                &[("name", (name).to_string().into())],
+                            ),
+                            crate::i18n::message(
+                                "purpose-detail-5",
+                                &[
+                                    ("name", (name).to_string().into()),
+                                    ("folders", (list.join(", ")).to_string().into()),
+                                ],
+                            ),
                             Some(Purpose::Logic),
                         )
                     }
@@ -125,13 +146,18 @@ pub(in crate::repo::insights) fn propose(
                 (
                     (1 + Purpose::Repeated as usize, r),
                     format!("repeated:{}", made.map_or("", |m| m.label.as_str())),
-                    format!(
-                        "Repeated edit: {}",
-                        shorten(made.map_or("", |m| m.label.as_str()), 60)
+                    crate::i18n::message(
+                        "purpose-detail-6",
+                        &[(
+                            "edit",
+                            (shorten(made.map_or("", |m| m.label.as_str()), 60))
+                                .to_string()
+                                .into(),
+                        )],
                     ),
-                    format!(
-                        "the same edit made in {} files, found by Repeated edits",
-                        made.map_or(0, |m| m.files)
+                    crate::i18n::message(
+                        "purpose-detail-7",
+                        &[("count", (made.map_or(0, |m| m.files)).to_string().into())],
                     ),
                     Some(Purpose::Repeated),
                 )
@@ -167,9 +193,9 @@ fn plain(p: Purpose, within: usize) -> ((usize, usize), String, String, String, 
         (1 + p as usize, within),
         format!("purpose:{p:?}"),
         p.title().to_owned(),
-        format!(
-            "proposed by the built-in rules for {}",
-            p.title().to_lowercase()
+        crate::i18n::message(
+            "purpose-detail-8",
+            &[("purpose", (p.title().to_lowercase()).to_string().into())],
         ),
         Some(p),
     )

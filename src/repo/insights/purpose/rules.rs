@@ -25,18 +25,18 @@ pub(in crate::repo::insights) enum Purpose {
 impl Purpose {
     pub(in crate::repo::insights) fn title(self) -> &'static str {
         match self {
-            Purpose::Api => "API and contracts",
-            Purpose::Migrations => "Migrations and schema",
-            Purpose::Logic => "Runtime logic",
-            Purpose::Repeated => "Repeated edit",
-            Purpose::Tests => "Tests",
-            Purpose::Config => "Build and configuration",
-            Purpose::Docs => "Documentation",
-            Purpose::Formatting => "Formatting only",
-            Purpose::Moves => "Moves and renames",
-            Purpose::Assets => "Images and other binaries",
-            Purpose::Generated => "Generated, vendored and lockfiles",
-            Purpose::Other => "Other changes",
+            Purpose::Api => crate::i18n::text("purpose-26"),
+            Purpose::Migrations => crate::i18n::text("purpose-27"),
+            Purpose::Logic => crate::i18n::text("purpose-28"),
+            Purpose::Repeated => crate::i18n::text("purpose-29"),
+            Purpose::Tests => crate::i18n::text("purpose-30"),
+            Purpose::Config => crate::i18n::text("purpose-31"),
+            Purpose::Docs => crate::i18n::text("purpose-32"),
+            Purpose::Formatting => crate::i18n::text("purpose-33"),
+            Purpose::Moves => crate::i18n::text("purpose-34"),
+            Purpose::Assets => crate::i18n::text("purpose-35"),
+            Purpose::Generated => crate::i18n::text("purpose-36"),
+            Purpose::Other => crate::i18n::text("purpose-37"),
         }
     }
 
@@ -222,7 +222,7 @@ const GENERATED_NAMES: [&str; 4] = [".generated.", ".pb.go", "_pb2.py", ".g.dart
 fn in_dir(path: &str, dirs: &[&str]) -> Option<String> {
     dirs.iter()
         .find(|d| path.starts_with(*d) || path.contains(&format!("/{d}")))
-        .map(|d| format!("in a `{d}` folder"))
+        .map(|d| crate::i18n::message("purpose-detail-19", &[("d", (d).to_string().into())]))
 }
 
 /// The repository's rules and what they match: worked out with the units, off the UI thread.
@@ -278,7 +278,11 @@ pub(in crate::repo::insights) fn rule<'a>(
             super::units::CONFIG
         ));
     }
-    Ruled { rules, errors, hits }
+    Ruled {
+        rules,
+        errors,
+        hits,
+    }
 }
 
 /// Where the rules put `unit`; `hit`: the repository's rule that matched it, and the pattern.
@@ -304,27 +308,30 @@ pub(in crate::repo::insights) fn place(
         return put(Purpose::Generated, why);
     }
     if let Some(n) = GENERATED_NAMES.iter().find(|n| name.contains(*n)) {
-        return put(Purpose::Generated, format!("named `*{n}*`"));
+        return put(
+            Purpose::Generated,
+            crate::i18n::message("purpose-detail-20", &[("n", (n).to_string().into())]),
+        );
     }
     if let Body::File(Whole::NoLines) = unit.body {
         return match &unit.old_path {
-            Some(old) => put(Purpose::Moves, format!("from {old}, no lines changed")),
-            None => put(Purpose::Other, "no lines changed (its mode, say)"),
+            Some(old) => put(
+                Purpose::Moves,
+                crate::i18n::message("purpose-detail-21", &[("old", (old).to_string().into())]),
+            ),
+            None => put(Purpose::Other, crate::i18n::text("purpose-detail-9")),
         };
     }
     if unit.markers.layout {
-        return put(
-            Purpose::Formatting,
-            "only whitespace or line breaks change (Repeated edits)",
-        );
+        return put(Purpose::Formatting, crate::i18n::text("purpose-detail-10"));
     }
     if let Some((_, deviates)) = unit.repeated {
         return put(
             Purpose::Repeated,
             if deviates {
-                "resembles the repeated edit but is made otherwise: check it (Repeated edits)"
+                crate::i18n::text("purpose-detail-11")
             } else {
-                "the same edit is made in other files (Repeated edits)"
+                crate::i18n::text("purpose-detail-12")
             },
         );
     }
@@ -336,46 +343,67 @@ fn by_path(unit: &Unit, path: &str, name: &str) -> Placement {
         return put(Purpose::Tests, why);
     }
     if let Some(n) = TEST_NAMES.iter().find(|n| name.contains(*n)) {
-        return put(Purpose::Tests, format!("named `*{n}*`"));
+        return put(
+            Purpose::Tests,
+            crate::i18n::message("purpose-detail-20", &[("n", (n).to_string().into())]),
+        );
     }
     if name.starts_with("test_") || name == "tests.rs" {
-        return put(Purpose::Tests, "a test file by its name");
+        return put(Purpose::Tests, crate::i18n::text("purpose-detail-13"));
     }
     if let Some(why) = in_dir(path, &["migrations/", "migrate/"]) {
         return put(Purpose::Migrations, why);
     }
     if name.ends_with(".sql") {
-        return put(Purpose::Migrations, "an SQL file");
+        return put(Purpose::Migrations, crate::i18n::text("purpose-detail-14"));
     }
     if let Some(e) = API_EXT.iter().find(|e| name.ends_with(*e)) {
-        return put(Purpose::Api, format!("a `{e}` file"));
+        return put(
+            Purpose::Api,
+            crate::i18n::message("purpose-detail-22", &[("e", (e).to_string().into())]),
+        );
     }
     if let Some(why) = in_dir(path, &API_PATHS) {
         return put(Purpose::Api, why);
     }
     if DOC_NAMES.iter().any(|n| name.starts_with(n)) || in_dir(path, &["docs/", "doc/"]).is_some() {
-        return put(Purpose::Docs, "documentation by its name or folder");
+        return put(Purpose::Docs, crate::i18n::text("purpose-detail-15"));
     }
     if let Some(e) = DOC_EXT.iter().find(|e| name.ends_with(*e)) {
-        return put(Purpose::Docs, format!("a `{e}` file"));
+        return put(
+            Purpose::Docs,
+            crate::i18n::message("purpose-detail-22", &[("e", (e).to_string().into())]),
+        );
     }
     if CONFIG_NAMES.contains(&name) || path.starts_with(".github/") || path.starts_with("ci/") {
-        return put(Purpose::Config, "a build or CI file by its name or folder");
+        return put(Purpose::Config, crate::i18n::text("purpose-detail-16"));
     }
     if let Some(e) = CONFIG_EXT.iter().find(|e| name.ends_with(*e)) {
-        return put(Purpose::Config, format!("a `{e}` file"));
+        return put(
+            Purpose::Config,
+            crate::i18n::message("purpose-detail-22", &[("e", (e).to_string().into())]),
+        );
     }
     if let Some(ext) = SOURCE_EXT.iter().find(|e| name.ends_with(*e)) {
         if let Some(t) = &unit.markers.test {
-            return put(Purpose::Tests, format!("its lines add or remove `{t}`"));
+            return put(
+                Purpose::Tests,
+                crate::i18n::message("purpose-detail-23", &[("t", (t).to_string().into())]),
+            );
         }
         if let Some(a) = &unit.markers.api {
-            return put(Purpose::Api, format!("changes a public declaration: `{a}`"));
+            return put(
+                Purpose::Api,
+                crate::i18n::message("purpose-detail-24", &[("a", (a).to_string().into())]),
+            );
         }
-        return put(Purpose::Logic, format!("a `{ext}` source file"));
+        return put(
+            Purpose::Logic,
+            crate::i18n::message("purpose-detail-25", &[("ext", (ext).to_string().into())]),
+        );
     }
     if let Body::File(Whole::Binary) = unit.body {
-        return put(Purpose::Assets, "a binary file");
+        return put(Purpose::Assets, crate::i18n::text("purpose-detail-17"));
     }
-    put(Purpose::Other, "no rule matched")
+    put(Purpose::Other, crate::i18n::text("purpose-detail-18"))
 }

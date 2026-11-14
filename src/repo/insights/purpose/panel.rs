@@ -10,8 +10,12 @@ use crate::pull_request::PrFiles;
 use crate::repo::{Action, RepoTab, insights::InsightsAct, short, widgets};
 use crate::theme::Tokens;
 
-const STANDARD: &str = "Standard order";
-const BY_PURPOSE: &str = "By purpose";
+fn standard() -> &'static str {
+    crate::i18n::text("purpose-1")
+}
+fn by_purpose() -> &'static str {
+    crate::i18n::text("purpose-2")
+}
 
 impl RepoTab {
     /// The switch between the standard order and the groups, then the groups when they are
@@ -25,7 +29,8 @@ impl RepoTab {
         let state = &self.review_purpose;
         ui.horizontal(|ui| {
             ui.add_space(8.0);
-            if let Some(i) = widgets::switch(ui, &[STANDARD, BY_PURPOSE], usize::from(state.on)) {
+            if let Some(i) = widgets::switch(ui, &[standard(), by_purpose()], usize::from(state.on))
+            {
                 acts.push(act(Act::Show(i == 1)));
             }
         });
@@ -33,17 +38,11 @@ impl RepoTab {
             return false;
         }
         let Some((subject, _)) = self.purpose_files_read() else {
-            ui.weak("  The groups come once the files are read at the pull request's head.");
+            ui.weak(crate::i18n::text("purpose-3"));
             return false;
         };
         if state.asked.as_ref() != Some(&subject) {
             acts.push(act(Act::Load));
-        }
-        let unknown = self
-            .folding
-            .unknown(files.files.iter().map(|f| f.path.as_str()));
-        if !unknown.is_empty() {
-            acts.push(Action::FoldAttributes(unknown));
         }
         let t = Tokens::get(ui.ctx());
         let (units, arranged) = match (&state.units, &state.arranged) {
@@ -60,7 +59,7 @@ impl RepoTab {
                 return true;
             }
         };
-        if state.generation != self.folding.generation {
+        if state.patterns != crate::settings::Settings::get(ui.ctx()).fold_patterns {
             acts.push(act(Act::Refresh));
         }
         egui::Frame::new()
@@ -103,9 +102,9 @@ fn unsupported(ui: &mut Ui, t: &Tokens, e: &str) {
         .show(ui, |ui| {
             ui.colored_label(
                 t.warning,
-                format!("Review by purpose isn't available for this pull request: {e}"),
+                crate::i18n::message("purpose-38", &[("error", (e).to_string().into())]),
             );
-            ui.label(RichText::new("Showing the standard order.").color(t.text_faint));
+            ui.label(RichText::new(crate::i18n::text("purpose-4")).color(t.text_faint));
         });
 }
 
@@ -122,23 +121,23 @@ fn header(
     let files: std::collections::BTreeSet<&str> =
         units.units.iter().map(|u| u.path.as_str()).collect();
     ui.label(
-        RichText::new(format!(
-            "{} changes in {} files, each in exactly one of {} groups · {}..{}",
-            units.units.len(),
-            files.len(),
-            arranged.groups.len(),
-            short(&units.base),
-            short(&units.head),
+        RichText::new(crate::i18n::message(
+            "purpose-44",
+            &[
+                ("changes", units.units.len().into()),
+                ("files", files.len().into()),
+                ("groups", arranged.groups.len().into()),
+                ("base", short(&units.base).into()),
+                ("head", short(&units.head).into()),
+            ],
         ))
         .small()
         .color(t.text_dim),
     );
     let mine = if arranged.edited {
-        "Groups proposed by the rules, arranged by you (✓ marks what you placed). \
-         Right-click a group or a change to rename, reorder, split, merge or move it."
+        crate::i18n::text("purpose-42")
     } else {
-        "Groups proposed by the rules: hover a change for the rule that placed it. \
-         Right-click a group or a change to rename, reorder, split, merge or move it."
+        crate::i18n::text("purpose-43")
     };
     ui.label(RichText::new(mine).small().color(t.text_faint));
     for note in units.notes.iter().chain(
@@ -153,22 +152,20 @@ fn header(
     if let Some((base, head)) = &arranged.stale {
         ui.colored_label(
             t.warning,
-            format!(
-                "Your grouping was made at {}..{}; the pull request changed since (new commits \
-                 or a force push), so it isn't applied. These are the rules' groups.",
-                short(base),
-                short(head)
+            crate::i18n::message(
+                "purpose-45",
+                &[("base", short(base).into()), ("head", short(head).into())],
             ),
         );
         ui.horizontal_wrapped(|ui| {
             if ui
-                .button("Carry over what still matches")
-                .on_hover_text("Changes whose content is the same go back where you put them")
+                .button(crate::i18n::text("purpose-5"))
+                .on_hover_text(crate::i18n::text("purpose-6"))
                 .clicked()
             {
                 acts.push(act(Act::CarryOver));
             }
-            if ui.button("Discard it").clicked() {
+            if ui.button(crate::i18n::text("purpose-7")).clicked() {
                 acts.push(act(Act::Reset));
             }
         });
@@ -178,7 +175,11 @@ fn header(
         ui.colored_label(color, RichText::new(text).small());
     }
     ui.horizontal_wrapped(|ui| {
-        ui.label(RichText::new("Insights:").small().color(t.text_faint));
+        ui.label(
+            RichText::new(crate::i18n::text("purpose-8"))
+                .small()
+                .color(t.text_faint),
+        );
         for kind in [Kind::Impact, Kind::ReviewHeat, Kind::Transform] {
             if ui
                 .small_button(kind.title())
@@ -190,8 +191,8 @@ fn header(
         }
         if arranged.edited
             && ui
-                .small_button("Reset to the rules' groups")
-                .on_hover_text("Forget your renames, moves, splits and merges")
+                .small_button(crate::i18n::text("purpose-9"))
+                .on_hover_text(crate::i18n::text("purpose-10"))
                 .clicked()
         {
             acts.push(act(Act::Reset));

@@ -3,6 +3,7 @@
 //! change opens. Real repositories are in `tests/real.rs`.
 
 mod real;
+mod regressions;
 
 use super::arrange::{self, Edit, Placed, Saved};
 use super::propose::{Proposal, propose};
@@ -390,6 +391,16 @@ fn a_change_opens_in_the_pull_requests_own_diff_with_its_threads() {
         thread(7, Left, true),
     ];
     assert_eq!(rows::threads_on(&threads, &gone), 1);
+    assert_eq!(rows::threads_on(&[thread(6, Right, false)], &gone), 0);
+    assert_eq!(rows::threads_on(&[thread(9, Left, false)], &gone), 0);
+    let mut file_thread = thread(7, Left, false);
+    file_thread.line = None;
+    assert_eq!(rows::threads_on(&[file_thread.clone()], &gone), 0);
+    assert_eq!(
+        rows::threads_on(&[file_thread], &whole("src/a.rs", Whole::Binary)),
+        1
+    );
+
     // A hunk replacing line 8 has both sides' line 8.
     assert_eq!(rows::threads_on(&threads, &unit("src/a.rs", 8)), 2);
     assert_eq!(

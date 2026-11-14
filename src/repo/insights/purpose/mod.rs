@@ -8,6 +8,8 @@
 //! (a force push, new commits) it is stale, said so, and only carried over when asked.
 
 mod arrange;
+mod glob;
+mod identity;
 mod panel;
 mod propose;
 mod rows;
@@ -17,7 +19,7 @@ mod store;
 mod tests;
 mod units;
 
-use std::collections::{BTreeSet, HashMap};
+use std::collections::BTreeSet;
 use std::sync::{Arc, Mutex};
 
 use arrange::{Arranged, Edit, Saved};
@@ -48,7 +50,8 @@ pub(crate) struct State {
     proposal: Option<Proposal>,
     arranged: Option<Result<Arranged, String>>,
     /// What the file folding rules knew when the proposal was made.
-    generation: u64,
+    patterns: String,
+    proposing: u64,
     /// Units selected (by key), to split off together.
     selected: BTreeSet<String>,
     /// What the last change made by hand said, if anything.
@@ -103,7 +106,7 @@ impl RepoTab {
         match a {
             Act::Show(on) => state.on = on,
             Act::Load => self.purpose_load(ctx),
-            Act::Refresh => self.purpose_refresh(),
+            Act::Refresh => self.purpose_refresh(ctx),
             Act::Select(key, on) => {
                 if on {
                     state.selected.insert(key);
@@ -116,11 +119,8 @@ impl RepoTab {
                     return;
                 };
                 if arranged.stale.is_some() {
-                    state.notice = Some((
-                        "Carry over or discard your earlier grouping before changing this one"
-                            .to_owned(),
-                        true,
-                    ));
+                    state.notice =
+                        Some((crate::i18n::text("purpose-notice-stale").to_owned(), true));
                     return;
                 }
                 match arrange::edit(arranged, units, edit) {
@@ -139,13 +139,8 @@ impl RepoTab {
                 let (saved, dropped) = arrange::carry_over(saved, units);
                 state.notice = Some((
                     match dropped {
-                        0 => {
-                            "Your grouping is carried over: every change you placed is still there"
-                                .to_owned()
-                        }
-                        n => format!(
-                            "Your grouping is carried over; {n} changes you placed changed since and are where the rules put them"
-                        ),
+                        0 => crate::i18n::text("purpose-notice-carried").to_owned(),
+                        n => crate::i18n::message("purpose-notice-dropped", &[("count", n.into())]),
                     },
                     false,
                 ));
@@ -192,7 +187,7 @@ impl RepoTab {
                 let saved = store::load(&repo, &subject.url);
                 Ok((units, saved))
             },
-            move |tab, result: Result<(Units, Result<Option<Saved>, String>), String>, _| {
+            move |tab, result: Result<(Units, Result<Option<Saved>, String>), String>, ctx| {
                 let state = &mut tab.review_purpose;
                 if state.request != request {
                     return;
@@ -210,34 +205,48 @@ impl RepoTab {
                     }
                     Err(e) => state.units = Some(Err(e)),
                 }
-                tab.purpose_refresh();
+                tab.purpose_refresh(ctx);
             },
         );
     }
 
     /// Proposes the groups again, and applies the arrangement to them.
-    fn purpose_refresh(&mut self) {
-        // The attributes and the built-in names (lockfiles, minified files), folding on or off.
-        let rules = crate::repo::folding::Rules::new(true, "");
-        let generation = self.folding.generation;
-        let Some(Ok(units)) = &self.review_purpose.units else {
+    fn purpose_refresh(&mut self, ctx: &egui::Context) {
+        let patterns = crate::settings::Settings::get(ctx).fold_patterns;
+        let state = &mut self.review_purpose;
+        let Some(Ok(units)) = &state.units else {
             return;
         };
-        let generated: HashMap<&str, String> = units
-            .units
-            .iter()
-            .filter_map(|u| {
-                let reason = self.folding.reason(&rules, &u.path)?;
-                Some((u.path.as_str(), reason.label().to_owned()))
-            })
-            .collect();
-        let proposal = propose::propose(units, &|p| generated.get(p).cloned());
-        let arranged = arrange::arrange(&proposal, units, self.review_purpose.saved.as_ref());
-        let checked = arrange::check(&arranged, units).map(|()| arranged);
-        let state = &mut self.review_purpose;
-        state.generation = generation;
-        state.proposal = Some(proposal);
-        state.arranged = Some(checked);
+        let units = units.clone();
+        let saved = state.saved.clone();
+        state.arranged = None;
+        state.patterns = patterns.clone();
+        state.proposing += 1;
+        let (request, proposing) = (state.request, state.proposing);
+        self.then(
+            ctx,
+            move || {
+                let rules = crate::repo::folding::Rules::new(true, &patterns);
+                let proposal = propose::propose(&units, &|path| {
+                    rules
+                        .reason(
+                            path,
+                            units.attrs.as_ref().and_then(|a| a.get(path)).copied(),
+                        )
+                        .map(|r| r.label().to_owned())
+                });
+                let arranged = arrange::arrange(&proposal, &units, saved.as_ref());
+                let checked = arrange::check(&arranged, &units).map(|()| arranged);
+                (proposal, checked)
+            },
+            move |tab, (proposal, arranged), _| {
+                let state = &mut tab.review_purpose;
+                if state.request == request && state.proposing == proposing {
+                    state.proposal = Some(proposal);
+                    state.arranged = Some(arranged);
+                }
+            },
+        );
     }
 
     /// Takes `saved` as the arrangement, shows it and writes it down.
@@ -246,7 +255,7 @@ impl RepoTab {
             return;
         };
         self.review_purpose.saved = saved.clone();
-        self.purpose_refresh();
+        self.purpose_refresh(ctx);
         let state = &mut self.review_purpose;
         state.sent += 1;
         let (seq, written, repo) = (state.sent, state.written.clone(), self.path.clone());
@@ -265,8 +274,10 @@ impl RepoTab {
             },
             |tab, result: Result<(), String>, _| {
                 if let Err(e) = result {
-                    tab.review_purpose.notice =
-                        Some((format!("Your grouping couldn't be saved: {e}"), true));
+                    tab.review_purpose.notice = Some((
+                        crate::i18n::message("purpose-notice-save", &[("error", e.into())]),
+                        true,
+                    ));
                 }
             },
         );

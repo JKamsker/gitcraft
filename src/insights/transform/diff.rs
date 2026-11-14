@@ -215,7 +215,12 @@ pub fn read(repo: &Path, base: &str, head: &str, limits: &Limits) -> Result<Read
             continue;
         }
         taken += 1;
-        entries.push([Some(file.path.as_str()), file.old_path.as_deref()].into_iter().flatten().collect());
+        entries.push(
+            [Some(file.path.as_str()), file.old_path.as_deref()]
+                .into_iter()
+                .flatten()
+                .collect(),
+        );
     }
     // A few files at a time, so that the command line stays short.
     for chunk in chunks(&entries, 80) {

@@ -41,10 +41,10 @@ pub(in crate::repo::insights) enum Whole {
 impl Whole {
     pub(in crate::repo::insights) fn label(self) -> &'static str {
         match self {
-            Whole::NoLines => "no lines changed",
-            Whole::Binary => "binary file",
-            Whole::TooLarge => "too many lines changed to split into hunks",
-            Whole::NotRead => "beyond the hunks read: shown whole",
+            Whole::NoLines => crate::i18n::text("purpose-22"),
+            Whole::Binary => crate::i18n::text("purpose-23"),
+            Whole::TooLarge => crate::i18n::text("purpose-24"),
+            Whole::NotRead => crate::i18n::text("purpose-25"),
         }
     }
 }
@@ -108,7 +108,10 @@ pub(in crate::repo::insights) struct Units {
 impl Units {
     /// Takes `config` as the repository's rules, and matches them against every unit.
     pub(in crate::repo::insights) fn set_config(&mut self, config: Option<String>) {
-        self.ruled = rules::rule(config.as_deref(), self.units.iter().map(|u| u.path.as_str()));
+        self.ruled = rules::rule(
+            config.as_deref(),
+            self.units.iter().map(|u| u.path.as_str()),
+        );
         self.config = config;
     }
 }
@@ -137,11 +140,17 @@ pub(in crate::repo::insights) fn read(
     let (config, note) = config_at(repo, base);
     units.notes.extend(note);
     units.set_config(config);
+    super::identity::add_context(repo, base, &mut units)?;
     let paths: Vec<String> = files.iter().map(|f| f.path.clone()).collect();
     let source = format!("--source={base}");
     units.attrs = match crate::git::fold_attributes(repo, Some(&source), &paths, &|| true) {
         (found, None) => Some(found),
-        (_, Some(_)) => None,
+        (_, Some(error)) => {
+            units.notes.push(format!(
+                "Base attributes unavailable; grouping uses file names and custom patterns: {error}"
+            ));
+            None
+        }
     };
     Ok(units)
 }
@@ -153,9 +162,10 @@ fn config_at(repo: &Path, base: &str) -> (Option<String>, Option<String>) {
         return (None, None);
     };
     match size.trim().parse::<u64>() {
-        Ok(n) if n <= rules::MAX_FILE => {
-            (crate::git::run(Some(repo), &["cat-file", "blob", &spec]).ok(), None)
-        }
+        Ok(n) if n <= rules::MAX_FILE => (
+            crate::git::run(Some(repo), &["cat-file", "blob", &spec]).ok(),
+            None,
+        ),
         _ => (
             None,
             Some(format!(

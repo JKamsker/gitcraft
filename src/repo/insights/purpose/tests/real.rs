@@ -182,11 +182,18 @@ fn an_arrangement_is_saved_locally_and_a_force_push_leaves_it_stale() -> Result<
         None
     );
 
+    let remote = repo.path().join("force-push-fixture.git");
+    let remote = remote.to_str().ok_or("non UTF-8 fixture path")?;
+    repo.git(&["init", "--bare", remote])?;
+    repo.git(&["push", remote, "HEAD:refs/heads/review"])?;
     // The author rewrites the head: the README changes again, the rest stays as it was.
     std::fs::write(repo.path().join("README.md"), "hello, again\n").map_err(|e| e.to_string())?;
     repo.git(&["commit", "-q", "-a", "--amend", "-m", "head, rewritten"])?;
     let pushed = repo.rev("HEAD")?;
     assert_ne!(pushed, head);
+    repo.git(&["push", "--force", remote, "HEAD:refs/heads/review"])?;
+    repo.git(&["fetch", remote, "refs/heads/review"])?;
+    assert_eq!(repo.rev("FETCH_HEAD")?, pushed);
     let files = git::diff_files(repo.path(), &base, Some(&pushed))?;
     let u2 = units::read(repo.path(), &base, &pushed, &files)?;
     let p2 = propose::propose(&u2, &lockfiles);

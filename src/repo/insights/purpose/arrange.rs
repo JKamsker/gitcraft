@@ -245,7 +245,7 @@ pub(in crate::repo::insights) fn edit(
             .groups
             .iter()
             .position(|g| g.id == id)
-            .ok_or_else(|| "That group is gone: the grouping changed since".to_owned())
+            .ok_or_else(|| crate::i18n::text("purpose-detail-26").to_owned())
     };
     let keys_of = |id: &str| -> Vec<String> {
         arranged
@@ -266,7 +266,7 @@ pub(in crate::repo::insights) fn edit(
             let g = find(&saved, &group)?;
             let title = title.trim();
             if title.is_empty() {
-                return Err("A group needs a name".to_owned());
+                return Err(crate::i18n::text("purpose-detail-27").to_owned());
             }
             saved.groups[g].title = title.to_owned();
             saved.groups[g].renamed = true;
@@ -316,7 +316,7 @@ pub(in crate::repo::insights) fn edit(
 /// Puts the units `keys` into group `g` by hand, out of wherever else they were.
 fn place(saved: &mut Saved, keys: &[String], g: usize, units: &Units) -> Result<(), String> {
     if keys.is_empty() {
-        return Err("Nothing is selected".to_owned());
+        return Err(crate::i18n::text("purpose-detail-28").to_owned());
     }
     if let Some(k) = keys
         .iter()

@@ -65,7 +65,8 @@ pub(super) fn threads_on(threads: &[Thread], unit: &Unit) -> usize {
         .filter(|t| !t.resolved && !t.outdated)
         .filter(|t| t.path == unit.path || unit.old_path.as_deref() == Some(t.path.as_str()))
         .filter(|t| match (unit.body.clone(), t.line) {
-            (Body::File(_), _) | (_, None) => true,
+            (Body::File(_), _) => true,
+            (_, None) => false,
             (
                 Body::Hunk {
                     old_start,
@@ -80,8 +81,8 @@ pub(super) fn threads_on(threads: &[Thread], unit: &Unit) -> usize {
                 } else {
                     (new_start, new_len)
                 };
-                let from = u64::from(start.max(1));
-                line >= from && line < from + u64::from(len.max(1))
+                let from = u64::from(start);
+                len > 0 && line >= from && line < from + u64::from(len)
             }
         })
         .count()
@@ -135,11 +136,14 @@ pub(super) fn group(ui: &mut Ui, ctx: &Ctx, g: usize, shown: &Shown, acts: &mut 
             }
         });
     header.header_response.context_menu(|ui| {
-        if ui.button("Rename…").clicked() {
+        if ui.button(crate::i18n::text("purpose-11")).clicked() {
             ui.data_mut(|d| d.insert_temp(rename, shown.group.title.clone()));
             ui.close();
         }
-        for (label, up) in [("Move up", true), ("Move down", false)] {
+        for (label, up) in [
+            (crate::i18n::text("purpose-12"), true),
+            (crate::i18n::text("purpose-13"), false),
+        ] {
             if ui.button(label).clicked() {
                 acts.push(act(Act::Edit(Edit::Shift {
                     group: id.clone(),
@@ -148,7 +152,7 @@ pub(super) fn group(ui: &mut Ui, ctx: &Ctx, g: usize, shown: &Shown, acts: &mut 
                 ui.close();
             }
         }
-        if ui.button("Confirm these changes belong here").clicked() {
+        if ui.button(crate::i18n::text("purpose-14")).clicked() {
             acts.push(act(Act::Edit(Edit::Confirm { group: id.clone() })));
             ui.close();
         }
@@ -159,7 +163,10 @@ pub(super) fn group(ui: &mut Ui, ctx: &Ctx, g: usize, shown: &Shown, acts: &mut 
             .map(|&u| ctx.units.units[u].key.clone())
             .filter(|k| ctx.selected.contains(k))
             .collect();
-        let split = format!("Split the {} selected into a new group", picked.len());
+        let split = crate::i18n::message(
+            "purpose-39",
+            &[("count", (picked.len()).to_string().into())],
+        );
         if ui
             .add_enabled(!picked.is_empty(), egui::Button::new(split))
             .clicked()
@@ -170,7 +177,7 @@ pub(super) fn group(ui: &mut Ui, ctx: &Ctx, g: usize, shown: &Shown, acts: &mut 
             })));
             ui.close();
         }
-        ui.menu_button("Merge into", |ui| {
+        ui.menu_button(crate::i18n::text("purpose-15"), |ui| {
             for other in ctx.arranged.groups.iter().filter(|o| &o.group.id != id) {
                 if ui.button(&other.group.title).clicked() {
                     acts.push(act(Act::Edit(Edit::Merge {
@@ -202,7 +209,7 @@ fn unit_row(ui: &mut Ui, ctx: &Ctx, u: usize, g: usize, acts: &mut Vec<Action>) 
         let mut on = ctx.selected.contains(&unit.key);
         if ui
             .checkbox(&mut on, "")
-            .on_hover_text("Select, to split off with others")
+            .on_hover_text(crate::i18n::text("purpose-16"))
             .changed()
         {
             acts.push(act(Act::Select(unit.key.clone(), on)));
@@ -212,10 +219,17 @@ fn unit_row(ui: &mut Ui, ctx: &Ctx, u: usize, g: usize, acts: &mut Vec<Action>) 
             _ => unit.path.clone(),
         };
         let place = match (&unit.body, line_of(unit)) {
-            (Body::File(why), _) => format!("whole file, {}", why.label()),
+            (Body::File(why), _) => crate::i18n::message(
+                "purpose-40",
+                &[("reason", (why.label()).to_string().into())],
+            ),
             (_, Some((old, n))) => format!(
-                "{}{n}  {}",
-                if old { "old line " } else { "line " },
+                "{} {n}  {}",
+                if old {
+                    crate::i18n::text("purpose-17")
+                } else {
+                    crate::i18n::text("purpose-18")
+                },
                 unit.preview
             ),
             _ => String::new(),
@@ -223,9 +237,9 @@ fn unit_row(ui: &mut Ui, ctx: &Ctx, u: usize, g: usize, acts: &mut Vec<Action>) 
         let mut text = format!("{name}  +{} −{}", unit.added, unit.removed);
         let threads = threads_on(ctx.threads, unit);
         if threads > 0 {
-            text.push_str(&format!(
-                "  · {threads} open thread{}",
-                if threads == 1 { "" } else { "s" }
+            text.push_str(&crate::i18n::message(
+                "purpose-46",
+                &[("count", threads.into())],
             ));
         }
         if *placed == Placed::Yours {
@@ -233,8 +247,10 @@ fn unit_row(ui: &mut Ui, ctx: &Ctx, u: usize, g: usize, acts: &mut Vec<Action>) 
         }
         let selected = ctx.open == Some(&key_of(ctx.files, unit));
         let why = match placed {
-            Placed::Rule(why) => format!("Placed by the rules: {why}"),
-            Placed::Yours => "Placed here by you".to_owned(),
+            Placed::Rule(why) => {
+                crate::i18n::message("purpose-41", &[("reason", (why).to_string().into())])
+            }
+            Placed::Yours => crate::i18n::text("purpose-19").to_owned(),
         };
         let r = ui
             .vertical(|ui| {
@@ -248,7 +264,7 @@ fn unit_row(ui: &mut Ui, ctx: &Ctx, u: usize, g: usize, acts: &mut Vec<Action>) 
             acts.extend(open(ctx.files, unit));
         }
         r.context_menu(|ui| {
-            ui.menu_button("Move to", |ui| {
+            ui.menu_button(crate::i18n::text("purpose-20"), |ui| {
                 for (o, other) in ctx
                     .arranged
                     .groups
@@ -265,7 +281,7 @@ fn unit_row(ui: &mut Ui, ctx: &Ctx, u: usize, g: usize, acts: &mut Vec<Action>) 
                     }
                 }
             });
-            if ui.button("Move to a new group").clicked() {
+            if ui.button(crate::i18n::text("purpose-21")).clicked() {
                 acts.push(act(Act::Edit(Edit::Split {
                     units: vec![unit.key.clone()],
                     from: ctx.arranged.groups[g].group.id.clone(),
