@@ -48,8 +48,8 @@ pub(super) fn binary(line: &str) -> Option<String> {
     }
     if let Some(running) = line.strip_prefix("Running ") {
         let (source, path) = running.trim().strip_suffix(')')?.split_once(" (")?;
-        let (stem, _) = stem(path);
-        return (!stem.is_empty()).then(|| format!("{stem} ({})", source.trim()));
+        let (stem, hashed) = stem(path);
+        return (hashed && !stem.is_empty()).then(|| format!("{stem} ({})", source.trim()));
     }
     let (file, rest) = line.split_once(": ")?;
     let (_, count) = rest.rsplit_once(": ")?;
