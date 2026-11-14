@@ -84,6 +84,7 @@ impl LibraryState {
     }
 
     pub fn forget_profile(&mut self, profile: u64) {
+        self.checks.retire_all();
         self.saved.remove(&profile);
         self.rev += 1;
     }

@@ -130,3 +130,17 @@ fn profile_switch_discards_pending_checks_even_after_switching_back() {
     settle(&mut state, 1);
     assert_eq!(state.get(1).unwrap().entries.len(), 1);
 }
+
+#[test]
+fn disabling_nearby_retires_checks_before_it_is_enabled_again() {
+    let base = tempfile::tempdir().unwrap();
+    let parent = base.path().join("projects");
+    std::fs::create_dir(&parent).unwrap();
+    let mut state = LibraryState::default();
+    state.checks.set_guards(checks::Guards::default());
+    state.noticed_open(1, &parent.join("repo"));
+    state.set_nearby(1, false);
+    state.set_nearby(1, true);
+    settle(&mut state, 1);
+    assert!(state.get(1).unwrap().nearby.is_empty());
+}

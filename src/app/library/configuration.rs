@@ -68,6 +68,9 @@ impl LibraryState {
     }
 
     pub fn set_nearby(&mut self, profile: u64, on: bool) {
+        if !on {
+            self.checks.retire_all();
+        }
         if !on && let Some(lib) = self.get(profile) {
             for n in lib.nearby.clone() {
                 self.scheduler.retire(&Source::Nearby(n.parent));
@@ -77,6 +80,7 @@ impl LibraryState {
     }
 
     pub fn forget_nearby(&mut self, profile: u64, parent: &Path) {
+        self.checks.retire_all();
         let source = Source::Nearby(parent.to_owned());
         self.scheduler.retire(&source);
         let lib = self.lib(profile);
