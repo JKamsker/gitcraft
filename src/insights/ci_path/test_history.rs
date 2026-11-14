@@ -3,7 +3,10 @@
 //! changes and same-SHA test history are kept apart from durations; a test a log doesn't
 //! report stays unknown. Nothing here says why anything changed.
 
-use std::collections::{BTreeSet, HashMap};
+use std::collections::HashMap;
+use std::sync::Arc;
+
+mod assemble;
 
 use super::Explorer;
 use super::compare::Difference;
@@ -15,6 +18,7 @@ use crate::ci::timing::history::RunKey;
 
 /// So many tests with a signal are listed; the rest are counted.
 pub(in crate::insights) const MAX_ROWS: usize = 200;
+const MAX_EVIDENCE_TESTS: usize = 4 * log_evidence::MAX_TESTS;
 
 /// One exact job log to read.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -65,7 +69,12 @@ pub fn plan(explorer: &Explorer, job: usize) -> Option<Plan> {
             .map(|found| Target::of(RunKey::of(&compared.run.info), found))
     });
     let (mut history, mut unaligned) = (Vec::new(), Vec::new());
-    for run in &explorer.history.runs {
+    for run in explorer
+        .history
+        .runs
+        .iter()
+        .take(crate::ci::timing::history::LIMIT)
+    {
         let key = RunKey::of(&run.info);
         if key == current {
             continue;
@@ -89,12 +98,12 @@ pub fn plan(explorer: &Explorer, job: usize) -> Option<Plan> {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Read {
     pub target: Target,
-    pub log: Result<LogEvidence, String>,
+    pub log: Result<Arc<LogEvidence>, String>,
 }
 
 impl Read {
     pub fn report(&self) -> Option<Report> {
-        self.log.as_ref().ok().map(LogEvidence::report)
+        self.log.as_ref().ok().map(|log| log.report())
     }
 
     /// The test's outcome when every report of it in this log agrees.
@@ -153,17 +162,29 @@ pub struct JobEvidence {
 }
 
 /// Reads every log of `plan` with `fetch` (each exact job once) and compares them.
-pub fn read(
+pub fn read(plan: Plan, fetch: impl FnMut(u64) -> Result<(String, bool), String>) -> JobEvidence {
+    read_bounded(plan, fetch, MAX_EVIDENCE_TESTS)
+}
+
+fn read_bounded(
     plan: Plan,
     mut fetch: impl FnMut(u64) -> Result<(String, bool), String>,
+    mut remaining: usize,
 ) -> JobEvidence {
-    let mut cache: HashMap<u64, Result<LogEvidence, String>> = HashMap::new();
+    let mut cache: HashMap<u64, Result<Arc<LogEvidence>, String>> = HashMap::new();
     let mut read = |target: &Target| {
         let log = cache
             .entry(target.job)
             .or_insert_with(|| {
-                fetch(target.job)
-                    .map(|(text, cut)| log_evidence::parse(&text, cut || !target.finished))
+                if remaining == 0 {
+                    return Ok(Arc::new(log_evidence::parse_bounded("", true, 0)));
+                }
+                fetch(target.job).map(|(text, cut)| {
+                    let log =
+                        log_evidence::parse_bounded(&text, cut || !target.finished, remaining);
+                    remaining -= log.tests.len();
+                    Arc::new(log)
+                })
             })
             .clone();
         Read {
@@ -174,121 +195,11 @@ pub fn read(
     let now = read(&plan.now);
     let before = plan.before.as_ref().map(&mut read);
     let history = plan.history.iter().map(&mut read).collect();
-    assemble(plan, now, before, history)
-}
-
-fn state(outcome: Option<Outcome>) -> Option<CheckState> {
-    match outcome? {
-        Outcome::Passed => Some(CheckState::Passed),
-        Outcome::Failed => Some(CheckState::Failed),
-        Outcome::Ignored => Some(CheckState::Skipped),
-    }
-}
-
-fn assemble(plan: Plan, now: Read, before: Option<Read>, history: Vec<Read>) -> JobEvidence {
-    let mut timeline: Vec<&Read> = history.iter().chain([&now]).collect();
-    timeline.sort_by_key(|read| (read.target.key.run, read.target.key.attempt));
-    let tests: BTreeSet<&TestId> = timeline
-        .iter()
-        .copied()
-        .chain(before.as_ref())
-        .filter_map(|read| read.log.as_ref().ok())
-        .flat_map(|log| log.tests.keys())
-        .collect();
-    let (mut rows, mut passed_both, mut unknown) = (Vec::new(), 0, 0);
-    for test in tests {
-        let transition = diagnostics::transition(
-            state(now.outcome(test)),
-            before.as_ref().and_then(|read| state(read.outcome(test))),
-        );
-        let observed: Vec<Observation> = timeline
-            .iter()
-            .map(|read| Observation {
-                key: read.target.key,
-                state: state(read.outcome(test)),
-                url: read.target.url.clone(),
-            })
-            .collect();
-        let intermittent = diagnostics::intermittent(&observed);
-        // Any failure in this run's log is listed, even one another report of the same test
-        // contradicts: it never only adds to the unknown count.
-        let failed_now = now.failed(test);
-        let ambiguous = failed_now && now.outcome(test).is_none();
-        let signal = intermittent
-            || failed_now
-            || matches!(transition, Transition::NewlyFailed | Transition::Fixed);
-        match transition {
-            _ if signal => rows.push(TestRow {
-                test: test.clone(),
-                transition,
-                intermittent,
-                ambiguous,
-                history: observed,
-            }),
-            Transition::Passed => passed_both += 1,
-            _ => unknown += 1,
-        }
-    }
-    rows.sort_by_key(|row| (rank(row), row.test.clone()));
-    let more = rows.len().saturating_sub(MAX_ROWS);
-    rows.truncate(MAX_ROWS);
-    let (differences, new_errors) = match before.as_ref().map(|read| &read.log) {
-        Some(Ok(earlier)) => now
-            .log
-            .as_ref()
-            .map(|log| (differences(log, earlier), new_errors(log, earlier)))
-            .unwrap_or_default(),
-        _ => Default::default(),
-    };
-    JobEvidence {
-        plan,
-        now,
-        before,
-        history,
-        rows,
-        more,
-        passed_both,
-        unknown,
-        differences,
-        new_errors,
-    }
-}
-
-fn rank(row: &TestRow) -> u8 {
-    match (row.transition, row.intermittent) {
-        (Transition::NewlyFailed, _) => 0,
-        (_, true) => 1,
-        (Transition::ConsistentlyFailed, _) => 2,
-        _ if row.ambiguous => 2,
-        (Transition::Fixed, _) => 3,
-        _ => 4,
-    }
-}
-
-fn differences(now: &LogEvidence, before: &LogEvidence) -> Vec<Difference> {
-    let report = |log: &LogEvidence| log.report().label().to_owned();
-    [
-        ("cache", now.caches(), before.caches()),
-        ("toolchain", now.toolchains(), before.toolchains()),
-        ("test report", report(now), report(before)),
-    ]
-    .into_iter()
-    .filter(|(_, now, before)| now != before)
-    .map(|(what, now, before)| Difference {
-        what: what.to_owned(),
-        before,
-        now,
-    })
-    .collect()
-}
-
-fn new_errors(now: &LogEvidence, before: &LogEvidence) -> Vec<String> {
-    now.errors
-        .iter()
-        .filter(|error| !before.errors.contains(error))
-        .cloned()
-        .collect()
+    assemble::assemble(plan, now, before, history)
 }
 
 #[cfg(test)]
 mod tests;
+
+#[cfg(test)]
+mod budget_tests;

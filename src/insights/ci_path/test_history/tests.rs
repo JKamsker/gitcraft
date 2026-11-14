@@ -6,7 +6,7 @@ use crate::insights::ci_path::{Compared, compare, critical_path, timing_deps};
 const MATRIX: [&str; 2] = ["test (linux)", "test (windows)"];
 
 /// A run of workflow 5 on `main` whose matrix jobs have ids `run * 100 + attempt * 10 + n`.
-fn run(id: u64, attempt: u64, sha: &str, number: u64) -> TimedRun {
+pub(super) fn run(id: u64, attempt: u64, sha: &str, number: u64) -> TimedRun {
     TimedRun {
         info: RunInfo {
             id,
@@ -33,7 +33,11 @@ fn run(id: u64, attempt: u64, sha: &str, number: u64) -> TimedRun {
     }
 }
 
-fn explorer(now: TimedRun, before: Option<TimedRun>, history: Vec<TimedRun>) -> Explorer {
+pub(super) fn explorer(
+    now: TimedRun,
+    before: Option<TimedRun>,
+    history: Vec<TimedRun>,
+) -> Explorer {
     let compared = before.map(|before| Compared {
         critical: critical_path(&before.jobs, &timing_deps(&before.jobs)),
         comparison: compare::compare(&now, &before),
@@ -68,7 +72,7 @@ fn explorer(now: TimedRun, before: Option<TimedRun>, history: Vec<TimedRun>) -> 
 }
 
 /// A complete libtest log with these outcomes.
-fn log(tests: &[(&str, &str)]) -> String {
+pub(super) fn log(tests: &[(&str, &str)]) -> String {
     let mut text = format!(
         "Running unittests src/lib.rs (target/debug/deps/g-0123456789abcdef)\nrunning {} tests\n",
         tests.len()

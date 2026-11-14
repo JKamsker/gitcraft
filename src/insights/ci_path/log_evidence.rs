@@ -161,6 +161,7 @@ fn listed(items: Vec<String>) -> String {
 }
 
 /// `text` is the log; `cut` says it was read only in part.
+#[cfg(test)]
 pub(in crate::insights) fn parse(text: &str, cut: bool) -> LogEvidence {
     parse_bounded(text, cut, MAX_TESTS)
 }
