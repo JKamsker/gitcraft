@@ -76,11 +76,12 @@ mod tests {
     }
 
     #[test]
-    fn logs_above_the_usual_tool_limit_are_read_up_to_the_log_limit() {
+    fn logs_above_the_usual_tool_limit_are_read_up_to_the_log_limit() -> Result<(), String> {
         let bytes = vec![b'x'; OUTPUT_LIMIT + 1];
-        let (text, cut) = capped("gh", 64 * 1024 * 1024, Ok(output(&bytes, None))).unwrap();
+        let (text, cut) = capped("gh", 64 * 1024 * 1024, Ok(output(&bytes, None)))?;
         assert_eq!(text.len(), OUTPUT_LIMIT + 1);
         assert!(!cut);
+        Ok(())
     }
 
     #[test]
