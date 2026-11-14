@@ -1,0 +1,49 @@
+# Build the release source, including the default native Git and syntax backends.
+pkgname=gitcraft
+pkgver=0.3.5
+pkgrel=1
+pkgdesc='A small, personal visual git client'
+arch=('x86_64' 'aarch64')
+url='https://github.com/JKamsker/gitcraft'
+license=('MIT OR Apache-2.0')
+depends=('git' 'gcc-libs' 'glibc' 'alsa-lib' 'libxkbcommon' 'libx11'
+         'libxcursor' 'libxi' 'libxrandr' 'wayland')
+makedepends=('cargo' 'pkgconf')
+conflicts=('gitcraft-bin')
+# Cargo enables thin LTO itself; GCC LTO objects from bundled C cannot link with rust-lld.
+options=('!lto')
+optdepends=('vulkan-driver: Vulkan graphics backend'
+            'mesa: OpenGL graphics backend'
+            'org.freedesktop.secrets: save connection credentials'
+            'xdg-desktop-portal: native file dialogs'
+            'xdg-utils: open links in the default browser'
+            'git-lfs: Git LFS support')
+# Pin the release commit rather than a movable branch or tag.
+source=("git+$url.git#commit=3df3711bdf7059ca456f68138a859d31daedd1ca")
+sha256sums=('SKIP')
+
+prepare() {
+    cd "$srcdir/$pkgname"
+    export CARGO_HOME="$srcdir/cargo-home"
+    nice -n 19 cargo fetch --locked
+}
+
+build() {
+    cd "$srcdir/$pkgname"
+    export CARGO_HOME="$srcdir/cargo-home"
+    export CARGO_TARGET_DIR="$srcdir/target"
+    nice -n 19 cargo build --release --frozen --bin gitcraft
+}
+
+package() {
+    cd "$srcdir/$pkgname"
+    install -Dm755 "$srcdir/target/release/gitcraft" "$pkgdir/usr/bin/gitcraft"
+    install -Dm644 packaging/gitcraft.desktop "$pkgdir/usr/share/applications/gitcraft.desktop"
+    install -Dm644 packaging/linux/gitcraft-link.desktop "$pkgdir/usr/share/applications/gitcraft-link.desktop"
+    install -Dm755 packaging/linux/gitcraft-servicemenu.desktop "$pkgdir/usr/share/kio/servicemenus/gitcraft.desktop"
+    install -Dm644 assets/app-icon/gitcraft-256.png "$pkgdir/usr/share/icons/hicolor/256x256/apps/gitcraft.png"
+    install -Dm644 ATTRIBUTION.md "$pkgdir/usr/share/doc/gitcraft/ATTRIBUTION.md"
+    install -Dm644 README.md "$pkgdir/usr/share/doc/gitcraft/README.md"
+    install -Dm644 LICENSE-MIT "$pkgdir/usr/share/licenses/gitcraft/LICENSE-MIT"
+    install -Dm644 LICENSE-APACHE "$pkgdir/usr/share/licenses/gitcraft/LICENSE-APACHE"
+}

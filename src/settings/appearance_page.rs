@@ -39,7 +39,7 @@ pub(super) fn render(settings: &mut Settings, ui: &mut Ui, f: &Filter, view: &mu
                 }
             }
         });
-        if cfg!(any(windows, target_os = "macos")) {
+        if cfg!(any(windows, target_os = "macos", target_os = "linux")) {
             card.row("Title bar", "window frame caption native tabs", |ui| {
                 ui.checkbox(
                     &mut settings.tabs_in_title_bar,

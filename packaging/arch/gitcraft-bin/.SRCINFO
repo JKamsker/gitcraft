@@ -1,0 +1,30 @@
+pkgbase = gitcraft-bin
+	pkgdesc = A small, personal visual git client
+	pkgver = 0.3.5
+	pkgrel = 1
+	url = https://github.com/JKamsker/gitcraft
+	arch = x86_64
+	license = MIT OR Apache-2.0
+	depends = git
+	depends = gcc-libs
+	depends = glibc
+	depends = alsa-lib
+	depends = libxkbcommon
+	depends = libx11
+	depends = libxcursor
+	depends = libxi
+	depends = libxrandr
+	depends = wayland
+	optdepends = vulkan-driver: Vulkan graphics backend
+	optdepends = mesa: OpenGL graphics backend
+	optdepends = org.freedesktop.secrets: save connection credentials
+	optdepends = xdg-desktop-portal: native file dialogs
+	optdepends = xdg-utils: open links in the default browser
+	optdepends = git-lfs: Git LFS support
+	provides = gitcraft=0.3.5
+	conflicts = gitcraft
+	options = !strip
+	source = https://github.com/JKamsker/gitcraft/releases/download/v0.3.5/gitcraft-v0.3.5-linux-x86_64.tar.gz
+	sha256sums = 2e4f3d224640efe9092cbedc1308d359ad192d6a43c106e2e8ed1084ba17f837
+
+pkgname = gitcraft-bin

@@ -217,7 +217,7 @@ impl RepoTab {
         if r.double_clicked() && idle {
             acts.push(Action::CheckoutRemote(b.name.clone()));
         } else if r.clicked() {
-            acts.push(Action::SelectHash(b.target.clone()));
+            acts.push(Action::SelectBranch(b.target.clone()));
         }
         crate::menu_item::context(&r)
             .style(crate::theme::menu_style)
