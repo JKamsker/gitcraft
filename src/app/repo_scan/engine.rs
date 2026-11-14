@@ -130,16 +130,27 @@ pub(in crate::app) fn is_repo(dir: &Path) -> bool {
 /// [`is_repo`], or `None` when `dir` couldn't be looked at (not allowed, an I/O error): it
 /// may be one.
 fn probe(dir: &Path) -> Option<bool> {
-    let git = dir.join(".git");
-    match std::fs::metadata(&git) {
-        Ok(m) if m.is_dir() => Some(git.join("HEAD").is_file()),
-        Ok(m) if m.is_file() => {
-            Some(gitfile_target(dir, &git).is_some_and(|t| t.join("HEAD").is_file()))
-        }
-        Ok(_) => Some(false),
+    match probe_result(dir) {
+        Ok(is_repo) => Some(is_repo),
         Err(e) if gone(&e) => Some(false),
         Err(_) => None,
     }
+}
+
+fn probe_result(dir: &Path) -> std::io::Result<bool> {
+    let git = dir.join(".git");
+    let metadata = std::fs::metadata(&git)?;
+    let target = if metadata.is_dir() {
+        git
+    } else if metadata.is_file() {
+        let Some(target) = gitfile_target(dir, &git)? else {
+            return Ok(false);
+        };
+        target
+    } else {
+        return Ok(false);
+    };
+    Ok(std::fs::metadata(target.join("HEAD"))?.is_file())
 }
 
 /// The error says there is nothing there (rather than that it couldn't be looked at).
@@ -152,23 +163,35 @@ fn gone(e: &std::io::Error) -> bool {
 
 /// The folder a `.git` file names (`gitdir: <path>`), relative ones from `dir`. Reads at
 /// most 4 KiB of it.
-pub(in crate::app) fn gitfile_target(dir: &Path, file: &Path) -> Option<PathBuf> {
+pub(in crate::app) fn gitfile_target(dir: &Path, file: &Path) -> std::io::Result<Option<PathBuf>> {
     let mut text = String::new();
-    std::fs::File::open(file)
-        .ok()?
+    if let Err(error) = std::fs::File::open(file)?
         .take(4096)
         .read_to_string(&mut text)
-        .ok()?;
-    let target = text.lines().next()?.strip_prefix("gitdir:")?.trim();
+    {
+        return if error.kind() == std::io::ErrorKind::InvalidData {
+            Ok(None)
+        } else {
+            Err(error)
+        };
+    }
+    let Some(target) = text
+        .lines()
+        .next()
+        .and_then(|line| line.strip_prefix("gitdir:"))
+        .map(str::trim)
+    else {
+        return Ok(None);
+    };
     if target.is_empty() {
-        return None;
+        return Ok(None);
     }
     let target = dir.join(target);
     // A gitfile must name a separate git directory, never the checkout itself.
-    if std::fs::canonicalize(&target).ok()? == std::fs::canonicalize(dir).ok()? {
-        return None;
+    if std::fs::canonicalize(&target)? == std::fs::canonicalize(dir)? {
+        return Ok(None);
     }
-    Some(target)
+    Ok(Some(target))
 }
 
 /// Why `dir` couldn't be looked in, in words.

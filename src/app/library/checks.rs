@@ -3,6 +3,7 @@
 //! the canonical home and temporary folders, and not where a drive is mounted), and whether a
 //! row that didn't open is gone from the disk.
 
+use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 use std::sync::mpsc::{Receiver, Sender, channel};
 use std::sync::{Arc, OnceLock};
@@ -78,6 +79,8 @@ pub(in crate::app) enum Answer {
     Nearby {
         profile: u64,
         parent: Option<PathBuf>,
+        key: (u64, identity::PathKey),
+        token: u64,
     },
     /// `path`, a row of `profile`'s that didn't open, is gone from the disk.
     Gone { profile: u64, path: PathBuf },
@@ -90,6 +93,8 @@ pub(in crate::app) struct Checks {
     rx: Receiver<(u64, Answer)>,
     worker: Option<Sender<Box<dyn FnOnce() + Send>>>,
     epoch: u64,
+    next_token: u64,
+    nearby: BTreeMap<(u64, identity::PathKey), u64>,
     guards: Arc<OnceLock<Guards>>,
     /// Checks asked for and not answered yet.
     pending: usize,
@@ -105,6 +110,8 @@ impl Default for Checks {
             guards: Arc::default(),
             worker: None,
             epoch: 0,
+            next_token: 0,
+            nearby: BTreeMap::new(),
             pending: 0,
             repaint: None,
         }
@@ -131,10 +138,22 @@ impl Checks {
 
     /// Finds the folder to look in near `root`, opened in `profile`.
     pub fn nearby(&mut self, profile: u64, root: PathBuf) {
+        let Some(parent) = root.parent() else {
+            return;
+        };
+        let key = (profile, identity::PathKey::of(parent));
+        self.next_token += 1;
+        let token = self.next_token;
+        self.nearby.insert(key.clone(), token);
         let guards = self.guards.clone();
         self.spawn(move || {
             let parent = vet(&root, guards.get_or_init(Guards::current));
-            Answer::Nearby { profile, parent }
+            Answer::Nearby {
+                profile,
+                parent,
+                key,
+                token,
+            }
         });
     }
 
@@ -178,6 +197,13 @@ impl Checks {
     /// Discards checks requested before a profile change, even after switching back.
     pub fn retire_all(&mut self) {
         self.epoch = self.epoch.wrapping_add(1);
+        self.nearby.clear();
+    }
+
+    /// A forgotten folder's queued checks can never recreate its source.
+    pub fn retire_nearby(&mut self, profile: u64, parent: &Path) {
+        self.nearby
+            .remove(&(profile, identity::PathKey::of(parent)));
     }
 
     /// The answers in so far.
@@ -186,7 +212,18 @@ impl Checks {
         self.pending = self.pending.saturating_sub(answers.len());
         answers
             .into_iter()
-            .filter_map(|(epoch, answer)| (epoch == self.epoch).then_some(answer))
+            .filter_map(|(epoch, answer)| {
+                if epoch != self.epoch {
+                    return None;
+                }
+                if let Answer::Nearby { key, token, .. } = &answer {
+                    if self.nearby.get(key) != Some(token) {
+                        return None;
+                    }
+                    self.nearby.remove(key);
+                }
+                Some(answer)
+            })
             .collect()
     }
 }

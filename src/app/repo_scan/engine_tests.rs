@@ -98,7 +98,11 @@ fn git_files_and_malformed_git_entries() {
     let _ = std::fs::create_dir_all(root.join("plain/src"));
     let found = at_depth(&root, 1);
     assert_eq!(rel(&root, &found), ["linked", "main"]);
-    assert!(gitfile_target(&linked, &linked.join(".git")).is_some());
+    assert!(
+        gitfile_target(&linked, &linked.join(".git"))
+            .unwrap()
+            .is_some()
+    );
     let _ = std::fs::remove_dir_all(&root);
 }
 

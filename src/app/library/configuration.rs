@@ -80,7 +80,7 @@ impl LibraryState {
     }
 
     pub fn forget_nearby(&mut self, profile: u64, parent: &Path) {
-        self.checks.retire_all();
+        self.checks.retire_nearby(profile, parent);
         let source = Source::Nearby(parent.to_owned());
         self.scheduler.retire(&source);
         let lib = self.lib(profile);

@@ -144,3 +144,23 @@ fn disabling_nearby_retires_checks_before_it_is_enabled_again() {
     settle(&mut state, 1);
     assert!(state.get(1).unwrap().nearby.is_empty());
 }
+
+#[test]
+fn delayed_check_cannot_undo_forget_or_cancel_another_folder() {
+    let base = tempfile::tempdir().unwrap();
+    let forgotten = base.path().join("forgotten");
+    let kept = base.path().join("kept");
+    for parent in [&forgotten, &kept] {
+        std::fs::create_dir(parent).unwrap();
+    }
+    let mut state = LibraryState::default();
+    state.checks.set_guards(checks::Guards::default());
+    state.lib(1).note_nearby(forgotten.clone());
+    state.noticed_open(1, &forgotten.join("repo"));
+    state.noticed_open(1, &kept.join("repo"));
+    state.forget_nearby(1, &forgotten);
+    // Apply both answers only after Forget, regardless of worker scheduling.
+    settle(&mut state, 1);
+    assert_eq!(state.get(1).unwrap().nearby.len(), 1);
+    assert_eq!(state.get(1).unwrap().nearby[0].parent, kept);
+}

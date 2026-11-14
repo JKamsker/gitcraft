@@ -7,6 +7,8 @@ mod actions;
 mod checks;
 mod configuration;
 mod identity;
+#[cfg(all(test, unix))]
+mod metadata_tests;
 mod model;
 #[cfg(test)]
 mod review_tests;
@@ -170,6 +172,7 @@ impl LibraryState {
                 checks::Answer::Nearby {
                     profile: p,
                     parent: Some(parent),
+                    ..
                 } if p == profile => self.look_nearby(profile, parent),
                 checks::Answer::Gone { profile: p, path } if p == profile => {
                     if let Some(lib) = self.saved.get_mut(&profile)
