@@ -123,6 +123,7 @@ pub(in crate::app) fn walked(name: &str) -> bool {
 /// Whether `dir` is a repository's top folder, checked cheaply: a `.git` folder with a `HEAD`,
 /// or the `.git` file of a linked worktree or submodule naming a git folder (with a `HEAD`)
 /// that is there. A malformed or unreadable one is not (opening it is what checks it with git).
+#[cfg(test)]
 pub(in crate::app) fn is_repo(dir: &Path) -> bool {
     probe(dir) == Some(true)
 }
