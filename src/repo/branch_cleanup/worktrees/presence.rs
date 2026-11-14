@@ -69,8 +69,8 @@ impl Presence {
         let same = |other: &Path| crate::remote::same_dir(path, other);
         let root = path.canonicalize().unwrap_or_else(|_| path.to_owned());
         let (mut views, mut terminals, mut unknown) = (0, 0, false);
-        for entry in open().iter().filter(|e| Some(e.id) != except) {
-            views += usize::from(same(&entry.path));
+        for entry in open().iter() {
+            views += usize::from(Some(entry.id) != except && same(&entry.path));
             for probe in &entry.terminals {
                 match probe() {
                     Some(cwd) => {

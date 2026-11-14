@@ -250,6 +250,7 @@ fn cleanup_window_opens_with_room_for_preview() {
             move |ui, tab: &mut RepoTab| {
                 if !styled {
                     crate::theme::install_fonts(ui.ctx());
+                    ui.ctx().all_styles_mut(|style| style.animation_time = 0.0);
                     egui_extras::install_image_loaders(ui.ctx());
                     styled = true;
                     return;

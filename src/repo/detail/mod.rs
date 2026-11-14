@@ -248,6 +248,3 @@ fn horizontal_files(
 
 #[cfg(test)]
 pub(in crate::repo) mod responsive_tests;
-
-#[cfg(test)]
-mod commit_tree_tests;

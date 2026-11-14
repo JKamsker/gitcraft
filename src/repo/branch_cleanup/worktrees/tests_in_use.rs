@@ -11,7 +11,11 @@ fn open_views_and_terminals_block_until_the_last_view_drops() {
     let reasons = other.others(&path);
     assert!(reasons.iter().any(|s| s.contains("tab")));
     assert!(reasons.iter().any(|s| s.contains('2')));
-    assert!(view.others(&path).is_empty());
+    assert!(
+        view.others(&path)
+            .iter()
+            .all(|reason| !reason.contains("tab"))
+    );
     drop(view);
     assert!(other.others(&path).is_empty());
 }
@@ -32,6 +36,7 @@ fn terminal_uses_its_own_worktree_even_when_its_tab_is_elsewhere() {
     let cwd = root.join("terminal");
     view.terminals(vec![probe(cwd.clone())]);
     assert!(!Presence::using(&cwd, None).is_empty());
+    assert!(!view.others(&cwd).is_empty());
     drop(view);
     assert!(Presence::using(&cwd, None).is_empty());
 }
