@@ -105,7 +105,7 @@ fn junctions_are_not_followed() {
     let found = crate::app::repo_scan::walk(&base, limits, &stop, &mut |_| {});
     let _ = std::fs::remove_dir_all(&base);
     if made {
-        let found = found.unwrap_or_default();
+        let found = found.expect("scan succeeds");
         assert_eq!(found.repos.len(), 1, "{:?}", found.repos);
     }
 }

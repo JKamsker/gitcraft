@@ -36,7 +36,7 @@ fn at_depth(root: &Path, depth: usize) -> Found {
         depth,
         ..ROOT_LIMITS
     };
-    walk(root, limits, &stop, &mut |_| {}).unwrap_or_default()
+    walk(root, limits, &stop, &mut |_| {}).expect("scan succeeds")
 }
 
 /// The issue's example: two repositories as children, one at depth 2, the root itself one.
@@ -125,11 +125,11 @@ fn huge_fan_out_stops_within_its_bounds() {
             most = most.max(p.folders);
         }
     });
-    let found = found.unwrap_or_default();
+    let found = found.expect("scan succeeds");
     assert_eq!(found.stopped, Some(Stopped::Entries));
     assert!(most <= NEARBY_LIMITS.max_dirs, "{most}");
     // Without the entry budget, the folder budget cuts in and what is kept is in name order.
-    let found = walk(&root, NEARBY_LIMITS, &stop, &mut |_| {}).unwrap_or_default();
+    let found = walk(&root, NEARBY_LIMITS, &stop, &mut |_| {}).expect("scan succeeds");
     assert_eq!(found.stopped, Some(Stopped::Folders));
     assert_eq!(rel(&root, &found), ["d0000"]);
     let _ = std::fs::remove_dir_all(&root);
@@ -147,7 +147,7 @@ fn budget_cancellation_and_events() {
         budget: Some(Duration::ZERO),
         ..ROOT_LIMITS
     };
-    let found = walk(&root, none, &stop, &mut |_| {}).unwrap_or_default();
+    let found = walk(&root, none, &stop, &mut |_| {}).expect("scan succeeds");
     assert_eq!(found.stopped, Some(Stopped::Time));
     let mut told = Vec::new();
     let found = walk(&root, ROOT_LIMITS, &stop, &mut |e| {
@@ -155,12 +155,12 @@ fn budget_cancellation_and_events() {
             told.push(p.to_owned());
         }
     })
-    .unwrap_or_default();
+    .expect("scan succeeds");
     assert_eq!(found.stopped, None);
     told.sort();
     assert_eq!(told, found.repos);
     stop.store(true, Ordering::Relaxed);
-    let found = walk(&root, ROOT_LIMITS, &stop, &mut |_| {}).unwrap_or_default();
+    let found = walk(&root, ROOT_LIMITS, &stop, &mut |_| {}).expect("scan succeeds");
     assert_eq!(found.stopped, Some(Stopped::Asked));
     let _ = std::fs::remove_dir_all(&root);
 }
@@ -183,6 +183,70 @@ fn unreadable_folders_are_passed_over() {
     // Root (uid 0) reads anything: only an ordinary user sees the refusal.
     if let Err(e) = direct {
         assert!(e.contains("isn't allowed"), "{e}");
+        assert!(found.unreadable, "unreadable children must prevent pruning");
     }
     let _ = std::fs::remove_dir_all(&root);
+}
+
+#[test]
+fn exact_limits_are_complete_and_manual_scan_does_not_cap_files() {
+    let root = tree("exact-limits");
+    init(&root.join("repo"));
+    let stop = AtomicBool::new(false);
+    let limits = ScanLimits {
+        max_dirs: 2,
+        max_repos: 1,
+        depth: 1,
+        ..ROOT_LIMITS
+    };
+    assert_eq!(
+        walk(&root, limits, &stop, &mut |_| {}).unwrap().stopped,
+        None
+    );
+    // Files don't spend the manual scan's folder budget.
+    for i in 0..100 {
+        std::fs::write(root.join(format!("f{i}")), "").unwrap();
+    }
+    assert_eq!(LIMITS.max_entries, usize::MAX);
+    assert_eq!(
+        walk(
+            &root,
+            ScanLimits {
+                max_dirs: 2,
+                ..LIMITS
+            },
+            &stop,
+            &mut |_| {}
+        )
+        .unwrap()
+        .stopped,
+        None
+    );
+    std::fs::remove_dir_all(root).unwrap();
+}
+
+#[test]
+fn gitfiles_cannot_point_at_the_checkout_itself() {
+    let root = tree("self-gitfile");
+    std::fs::write(root.join("HEAD"), "ref: refs/heads/main\n").unwrap();
+    for target in [".", "./", "sub/.."] {
+        std::fs::create_dir_all(root.join("sub")).unwrap();
+        std::fs::write(root.join(".git"), format!("gitdir: {target}\n")).unwrap();
+        assert!(!is_repo(&root), "{target}");
+    }
+    std::fs::remove_dir_all(root).unwrap();
+}
+
+#[cfg(unix)]
+#[test]
+fn non_utf8_discoveries_do_not_poison_saved_state() {
+    use std::os::unix::ffi::OsStringExt;
+    let root = tree("nonutf8");
+    let bad = root.join(std::ffi::OsString::from_vec(vec![0xff]));
+    init(&bad);
+    init(&root.join("valid"));
+    let found = at_depth(&root, 1);
+    assert_eq!(rel(&root, &found), ["valid"]);
+    assert!(ron::to_string(&found.repos).is_ok());
+    std::fs::remove_dir_all(root).unwrap();
 }

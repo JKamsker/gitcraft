@@ -29,7 +29,7 @@ fn names(root: &Path, found: &Found) -> Vec<String> {
 
 fn run(root: &Path, limits: ScanLimits) -> Found {
     let stop = AtomicBool::new(false);
-    scan(root, limits, &stop, &mut |_| {}).unwrap_or_default()
+    scan(root, limits, &stop, &mut |_| {}).expect("scan succeeds")
 }
 
 #[test]
@@ -104,7 +104,7 @@ fn the_folders_kept_stay_within_the_limit() {
     };
     let found = scan(&root, limits, &stop, &mut |p| most = most.max(p.folders));
     let _ = std::fs::remove_dir_all(&root);
-    let found = found.unwrap_or_default();
+    let found = found.expect("scan succeeds");
     assert_eq!(found.stopped, Some(Stopped::Folders));
     assert!(most <= 10, "{most}");
     assert_eq!(names(&root, &found), vec!["d00"]);

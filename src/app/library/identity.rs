@@ -102,7 +102,10 @@ fn is_mount_root(dir: &Path) -> bool {
     let names: Vec<&str> = names.iter().map(String::as_str).collect();
     matches!(
         names.as_slice(),
-        ["volumes" | "mnt" | "media", _] | ["media", _, _] | ["run", "media", _] | ["run", "media", _, _]
+        ["volumes" | "mnt" | "media", _]
+            | ["media", _, _]
+            | ["run", "media", _]
+            | ["run", "media", _, _]
     )
 }
 
@@ -188,7 +191,10 @@ mod tests {
         // In a temporary folder, however deep (a practice repository), but not one only
         // named like it.
         assert_eq!(near("/tmp/gitcraft-practice-1/repository"), None);
-        assert_eq!(near("/private/var/folders/x/T/gitcraft-practice-2/repository"), None);
+        assert_eq!(
+            near("/private/var/folders/x/T/gitcraft-practice-2/repository"),
+            None
+        );
         assert_eq!(near("/tmpfiles/work/app"), Some(p("/tmpfiles/work")));
         // Where drives are mounted: their own folders.
         for mounted in [
@@ -200,8 +206,14 @@ mod tests {
         ] {
             assert_eq!(near(mounted), None, "{mounted}");
         }
-        assert_eq!(near("/Volumes/Backup/code/app"), Some(p("/Volumes/Backup/code")));
-        assert_eq!(near("/run/media/me/usb/code/app"), Some(p("/run/media/me/usb/code")));
+        assert_eq!(
+            near("/Volumes/Backup/code/app"),
+            Some(p("/Volumes/Backup/code"))
+        );
+        assert_eq!(
+            near("/run/media/me/usb/code/app"),
+            Some(p("/run/media/me/usb/code"))
+        );
         assert_eq!(near("relative/app"), None);
         // Another machine, a share, WSL.
         assert_eq!(near("ssh://box/work/projects/app"), None);

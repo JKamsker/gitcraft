@@ -38,6 +38,8 @@ fn harness() -> Harness<'static, Option<App>> {
                     let mut app = App::launched_using(&cc, None, || {
                         Ok("git version 2.43.0 (recorded)".into())
                     });
+                    // Nearby acceptance tests deliberately use a synthetic temp/home policy.
+                    app.library.checks.set_guards(checks::Guards::default());
                     app.settings.check_updates = false;
                     app.settings.notifications = false;
                     app.settings.set(ui.ctx());
@@ -71,7 +73,7 @@ fn settle(h: &mut Harness<'static, Option<App>>) {
         let busy = h
             .state()
             .as_ref()
-            .is_some_and(|a| a.library.scheduler.busy());
+            .is_some_and(|a| a.library.scheduler.busy() || a.library.checks.busy());
         if !busy || Instant::now() > end {
             break;
         }
@@ -285,7 +287,8 @@ fn profile_switches_stops_and_retries() {
 /// the cache; state saved before the library existed reads with an empty one.
 #[test]
 fn the_library_survives_a_restart() {
-    let old: super::super::Saved = ron::from_str("(recent: [\"/r/one\"])").unwrap_or_default();
+    let old: super::super::Saved =
+        ron::from_str("(recent: [\"/r/one\"])").expect("old saved state");
     assert!(old.library.is_empty());
     assert_eq!(old.recent, [PathBuf::from("/r/one")]);
     let mut lib = Library::default();
@@ -302,10 +305,31 @@ fn the_library_survives_a_restart() {
         library: Libraries::from([(7, lib.clone())]),
         ..Default::default()
     };
-    let text = ron::to_string(&saved).unwrap_or_default();
-    let back: super::super::Saved = ron::from_str(&text).unwrap_or_default();
+    let text = ron::to_string(&saved).expect("serialize saved state");
+    let back: super::super::Saved = ron::from_str(&text).expect("deserialize saved state");
     let state = LibraryState::new(back.library);
     let cached = state.get(7).cloned().unwrap_or_default();
     assert_eq!(cached, lib);
     assert_eq!(rows::all(&cached, &[]).len(), 1);
+}
+
+#[test]
+fn opening_a_deleted_library_row_removes_only_its_auto_entry() {
+    let base = tree("deleted-row");
+    let missing = base.join("removed-worktree");
+    let mut h = harness();
+    let ctx = h.ctx.clone();
+    let a = app(&mut h);
+    let profile = a.profile();
+    let id = a.library.lib(profile).add_root(base.clone(), 1);
+    a.library
+        .lib(profile)
+        .add_found(&Source::Root(id), std::slice::from_ref(&missing));
+    a.recent.push(missing.clone());
+    a.library_click(LibraryClick::Open(missing.clone()), &ctx);
+    settle(&mut h);
+    let a = app(&mut h);
+    assert!(a.library.get(profile).unwrap().entries.is_empty());
+    assert_eq!(a.recent, [missing]);
+    std::fs::remove_dir_all(base).unwrap();
 }

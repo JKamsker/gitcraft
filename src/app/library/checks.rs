@@ -86,8 +86,10 @@ pub(in crate::app) enum Answer {
 }
 
 pub(in crate::app) struct Checks {
-    tx: Sender<Answer>,
-    rx: Receiver<Answer>,
+    tx: Sender<(u64, Answer)>,
+    rx: Receiver<(u64, Answer)>,
+    worker: Option<Sender<Box<dyn FnOnce() + Send>>>,
+    epoch: u64,
     guards: Arc<OnceLock<Guards>>,
     /// Checks asked for and not answered yet.
     pending: usize,
@@ -101,6 +103,8 @@ impl Default for Checks {
             tx,
             rx,
             guards: Arc::default(),
+            worker: None,
+            epoch: 0,
             pending: 0,
             repaint: None,
         }
@@ -143,24 +147,46 @@ impl Checks {
     }
 
     fn spawn(&mut self, check: impl FnOnce() -> Answer + Send + 'static) {
-        let (tx, ctx) = (self.tx.clone(), self.repaint.clone());
-        let spawned = std::thread::Builder::new()
-            .name("library-check".into())
-            .spawn(move || {
-                let _ = tx.send(check());
-                if let Some(ctx) = ctx {
-                    ctx.request_repaint();
-                }
-            });
-        if spawned.is_ok() {
+        // One worker per window: a slow filesystem never causes replacement threads.
+        if self.worker.is_none() {
+            let (tx, rx) = channel::<Box<dyn FnOnce() + Send>>();
+            if std::thread::Builder::new()
+                .name("library-check".into())
+                .spawn(move || {
+                    for check in rx {
+                        check();
+                    }
+                })
+                .is_err()
+            {
+                return;
+            }
+            self.worker = Some(tx);
+        }
+        let (tx, ctx, epoch) = (self.tx.clone(), self.repaint.clone(), self.epoch);
+        let job = Box::new(move || {
+            let _ = tx.send((epoch, check()));
+            if let Some(ctx) = ctx {
+                ctx.request_repaint();
+            }
+        });
+        if self.worker.as_ref().is_some_and(|w| w.send(job).is_ok()) {
             self.pending += 1;
         }
     }
 
+    /// Discards checks requested before a profile change, even after switching back.
+    pub fn retire_all(&mut self) {
+        self.epoch = self.epoch.wrapping_add(1);
+    }
+
     /// The answers in so far.
     pub fn poll(&mut self) -> Vec<Answer> {
-        let answers: Vec<Answer> = self.rx.try_iter().collect();
+        let answers: Vec<_> = self.rx.try_iter().collect();
         self.pending = self.pending.saturating_sub(answers.len());
         answers
+            .into_iter()
+            .filter_map(|(epoch, answer)| (epoch == self.epoch).then_some(answer))
+            .collect()
     }
 }

@@ -160,7 +160,15 @@ pub(in crate::app) fn gitfile_target(dir: &Path, file: &Path) -> Option<PathBuf>
         .read_to_string(&mut text)
         .ok()?;
     let target = text.lines().next()?.strip_prefix("gitdir:")?.trim();
-    (!target.is_empty()).then(|| dir.join(target))
+    if target.is_empty() {
+        return None;
+    }
+    let target = dir.join(target);
+    // A gitfile must name a separate git directory, never the checkout itself.
+    if std::fs::canonicalize(&target).ok()? == std::fs::canonicalize(dir).ok()? {
+        return None;
+    }
+    Some(target)
 }
 
 /// Why `dir` couldn't be looked in, in words.

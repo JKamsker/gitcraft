@@ -216,6 +216,15 @@ mod tests {
             std::thread::sleep(Duration::from_millis(10));
         }
         assert!(!harness.state().practice_open);
+        assert!(
+            harness
+                .state()
+                .library
+                .saved()
+                .values()
+                .all(|l| l.nearby.is_empty()),
+            "practice completion must never trigger Nearby"
+        );
         let path = match harness.state().tabs.get(harness.state().active) {
             Some(super::super::Tab::Repo(tab)) => tab.path.clone(),
             _ => return Err("Practice did not open its repository tab".to_owned()),
