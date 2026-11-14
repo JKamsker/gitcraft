@@ -22,7 +22,7 @@ for a do
             n=$((n + 1))
             continue
             ;;
-        -C | -c | --git-dir | --work-tree | --namespace | --config-env) take=1 ;;
+        -C | -c | --git-dir | --work-tree | --namespace | --config-env | --attr-source) take=1 ;;
         -*) ;;
         *) break ;;
         esac
