@@ -18,8 +18,7 @@ use crate::repo::graph_view;
 use crate::repo::pinned_sections::{Button, Header, Sections};
 use crate::repo::reflog::{ReflogAct, Source};
 use crate::repo::{
-    Action, Dialog, RepoTab, ci_status, fast_forward_action, merge_action, ops, rebase_action,
-    widgets,
+    Action, Dialog, RepoTab, ci_status, fast_forward_action, merge_action, rebase_action, widgets,
 };
 use crate::settings::Settings;
 use crate::theme::{self, Tokens};
@@ -159,23 +158,28 @@ impl RepoTab {
         for reason in reasons.iter().filter(|r| **r != Reason::UpstreamGone) {
             tip.push_str(&format!("\n{}", capitalise(&reason.describe())));
         }
-        let r = match elsewhere {
-            Some(wt) => r.on_hover_text(crate::i18n::message(
+        let tip = match elsewhere {
+            Some(wt) => crate::i18n::message(
                 "repo-core-3384",
                 &[
                     ("name", b.name.to_string().into()),
                     ("tip", tip.to_string().into()),
                     ("wt", format!("{}", wt.path.display()).into()),
                 ],
-            )),
-            None => r.on_hover_text(crate::i18n::message(
+            ),
+            None => crate::i18n::message(
                 "repo-core-3385",
                 &[
                     ("name", b.name.to_string().into()),
                     ("tip", tip.to_string().into()),
                 ],
-            )),
+            ),
         };
+        let r = r.on_hover_ui(|ui| {
+            ui.set_max_width(ui.spacing().tooltip_width);
+            ui.label(tip);
+            self.tracking_items(ui, acts, b, idle);
+        });
         if r.double_clicked() && elsewhere.is_some() {
             if let Some(wt) = elsewhere {
                 acts.push(Action::OpenWorktree(wt.path.clone()));
@@ -357,3 +361,7 @@ struct Marks<'a> {
     /// Left out of the graph: the name is dimmed.
     hidden: bool,
 }
+
+#[cfg(test)]
+#[path = "branches/tooltip_tests.rs"]
+mod tooltip_tests;

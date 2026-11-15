@@ -25,7 +25,6 @@ mod rehearse;
 mod remote;
 mod stash;
 mod test_commits;
-mod upstream;
 mod window;
 mod worktree;
 
@@ -156,14 +155,7 @@ pub enum Dialog {
         url: String,
         focus: bool,
     },
-    /// The remote branch `branch` tracks: `remote`/`name`. `undo` brings back the one before.
-    SetUpstream {
-        branch: String,
-        remote: String,
-        name: String,
-        undo: Vec<Vec<String>>,
-        focus: bool,
-    },
+    Tracking(Box<super::tracking::Form>),
     /// Username and password / token for an HTTPS remote that asked for them.
     Credentials {
         url: String,
@@ -237,7 +229,7 @@ pub(crate) struct Instead {
     pub(super) described: Vec<String>,
 }
 
-pub(super) enum Outcome {
+pub(in crate::repo) enum Outcome {
     Open,
     Cancel,
     Done(Box<Action>),

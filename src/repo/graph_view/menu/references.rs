@@ -54,6 +54,9 @@ impl RepoTab {
             name: branch,
             remote: !local,
         };
+        if local && let Some(b) = self.refs.local.iter().find(|b| b.name == branch) {
+            self.tracking_items(ui, acts, b, idle);
+        }
         if crate::menu_item::MenuItem::new(crate::i18n::message(
             "repo-core-2632",
             &[("branch", branch.to_string().into())],

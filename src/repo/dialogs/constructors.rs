@@ -165,16 +165,6 @@ impl Dialog {
         }
     }
 
-    pub fn set_upstream(branch: &str, remote: String, name: &str, undo: Vec<Vec<String>>) -> Self {
-        Dialog::SetUpstream {
-            branch: branch.to_owned(),
-            remote,
-            name: name.to_owned(),
-            undo,
-            focus: true,
-        }
-    }
-
     pub fn create_pr(noun: &str, branch: &str, base: &str, title: &str, body: &str) -> Self {
         Dialog::CreatePr {
             noun: noun.to_owned(),

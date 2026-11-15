@@ -24,6 +24,7 @@ impl RepoTab {
         idle: bool,
     ) {
         self.checkout_items(ui, acts, b, idle);
+        self.tracking_items(ui, acts, b, idle);
         if b.is_head
             && b.name.starts_with(&self.hotfix_prefix())
             && crate::menu_item::MenuItem::new(crate::i18n::text("repo-core-0137"))
