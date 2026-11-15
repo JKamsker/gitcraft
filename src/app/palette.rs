@@ -37,6 +37,12 @@ pub(super) struct Palette {
     shown: Option<(RankedFor, Vec<Shown>)>,
     /// How far the list is scrolled.
     scroll: f32,
+    #[cfg(test)]
+    entry_builds: usize,
+    #[cfg(test)]
+    rank_passes: usize,
+    #[cfg(test)]
+    ranked_entries: usize,
 }
 
 /// The second step: what to do it with.
@@ -77,6 +83,12 @@ impl App {
             step: None,
             shown: None,
             scroll: 0.0,
+            #[cfg(test)]
+            entry_builds: 0,
+            #[cfg(test)]
+            rank_passes: 0,
+            #[cfg(test)]
+            ranked_entries: 0,
         });
     }
 
@@ -114,6 +126,10 @@ impl App {
                 .map(|item| item.label.clone())
         });
         if let Some(palette) = &mut self.palette {
+            #[cfg(test)]
+            {
+                palette.entry_builds += 1;
+            }
             palette.entries = Some((key.clone(), entries));
             if let (Some(step), Some(choices)) = (&mut palette.step, choices) {
                 step.choices = choices;
@@ -232,6 +248,11 @@ impl Palette {
         let wanted = (self.query.clone(), self.step.is_some(), key.clone());
         if self.shown.as_ref().is_some_and(|(made, _)| *made == wanted) {
             return;
+        }
+        #[cfg(test)]
+        {
+            self.rank_passes += 1;
+            self.ranked_entries += self.list().len();
         }
         let shown = rank(self.list(), &self.query, recent);
         self.shown = Some((wanted, shown));

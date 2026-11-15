@@ -10,6 +10,12 @@ pub(in crate::repo) struct Catalog {
     pub entries_visited: usize,
 }
 
+impl Catalog {
+    pub(super) fn description<'a>(&'a self, full: &'a str) -> &'a str {
+        self.details.get(full).map(String::as_str).unwrap_or(full)
+    }
+}
+
 use super::RepoTab;
 use crate::ref_labels::{Entry, Kind, Label};
 
@@ -56,7 +62,7 @@ impl RepoTab {
             .take();
     }
 
-    fn presentation(&self) -> Arc<Catalog> {
+    pub(super) fn presentation(&self) -> Arc<Catalog> {
         if let Some(catalog) = self.graph_badge_index.presentation_cache.borrow().as_ref() {
             return catalog.clone();
         }
@@ -134,11 +140,7 @@ impl RepoTab {
     }
 
     pub(super) fn ref_description(&self, full: &str) -> String {
-        self.presentation()
-            .details
-            .get(full)
-            .cloned()
-            .unwrap_or_else(|| full.to_owned())
+        self.presentation().description(full).to_owned()
     }
 }
 
