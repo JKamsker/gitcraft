@@ -185,11 +185,11 @@ fn snapshot_inner(repo: &Path, expected: Option<&[u8]>) -> Result<(Scratch, Stri
 fn index_tree(repo: &Path, index: &str, root: &Path) -> Result<String, String> {
     let git_dir = git::run(Some(repo), &["rev-parse", "--absolute-git-dir"])?;
     let empty = tempfile::tempdir_in(root).map_err(|e| e.to_string())?;
-    let worktree = empty.path().to_string_lossy();
+    let worktree = git::bundle_git_path(empty.path())?;
     let env = [
         ("GIT_INDEX_FILE", index),
         ("GIT_DIR", git_dir.trim()),
-        ("GIT_WORK_TREE", worktree.as_ref()),
+        ("GIT_WORK_TREE", worktree.as_str()),
     ];
     let unresolved = git::run_env(Some(empty.path()), &["ls-files", "--unmerged"], &env)?;
     if !unresolved.is_empty() {

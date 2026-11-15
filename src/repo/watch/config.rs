@@ -47,11 +47,17 @@ fn key(path: &Path) -> String {
         .unwrap_or_else(|| path.into());
     let text = absolute.to_string_lossy();
     if cfg!(windows) {
-        text.trim_start_matches(r"\\?\")
-            .replace('\\', "/")
-            .to_lowercase()
+        windows_key(&text)
     } else {
         text.into()
+    }
+}
+fn windows_key(text: &str) -> String {
+    let text = text.replace('\\', "/").to_lowercase();
+    if let Some(network) = text.strip_prefix("//?/unc/") {
+        format!("//{network}")
+    } else {
+        text.strip_prefix("//?/").unwrap_or(&text).into()
     }
 }
 pub(super) fn contains(files: &[PathBuf], path: &Path) -> bool {
@@ -71,6 +77,17 @@ pub(super) fn covers(path: &Path, root: &Path) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn windows_verbatim_drive_and_unc_forms_have_the_same_identity() {
+        assert_eq!(
+            windows_key(r"\\?\C:\Repo\config"),
+            windows_key(r"c:\repo\config")
+        );
+        assert_eq!(
+            windows_key(r"\\?\UNC\Server\Share\config"),
+            windows_key(r"\\server\share\config")
+        );
+    }
     #[test]
     fn absent_config_replacement_matches_its_parent_without_matching_other_files()
     -> Result<(), String> {
