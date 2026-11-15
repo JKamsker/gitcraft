@@ -1,0 +1,20 @@
+Application/test candidate: 15badf7feeffaf102a577c125e32ebdfc6ec61d8
+
+size-review.log
+warning: 'tests/mcp_stdio.rs': 359 physical lines (warning at 300; hard limit 500); decompose into cohesive owners/helpers
+Rust file size: 2793 tracked files checked; 776 warnings; 0 errors (warning at 300; hard limit 500).
+
+complexity-review.log
+Clippy complexity policy: 0 errors; compiler threshold 25.
+
+baseline-review.log
+Architecture baseline growth: declared or absent (base 4189435a20d21f5f334332d71d7230fe184571c5).
+Architecture baseline growth: declared or absent (base f4eca6354f3f646d3fb91e3fa4675e20ec3c9246).
+
+tooling-review.log
+----------------------------------------------------------------------
+Ran 132 tests in 16.192s
+
+OK
+
+cargo +stable fmt --check: passed

@@ -1,0 +1,574 @@
+..Architecture baseline: undeclared baseline growth:
+budget/a/exported=2
+Architecture baseline: undeclared baseline growth:
+budget/a/exported=2
+Architecture baseline: undeclared baseline growth:
+budget/a/exported=2
+fatal: Not a valid object name missing-revision
+Architecture baseline: Command '['git', 'merge-base', 'missing-revision', 'HEAD']' returned non-zero exit status 128.
+......................Architecture baseline growth: declared or absent (base 0c267e0afec51c5c4697c6b33f395c69bb1e95f8).
+Architecture baseline growth: declared or absent (base 0c267e0afec51c5c4697c6b33f395c69bb1e95f8).
+formatting: cargo fmt --check
+tooling tests: python3 -m unittest discover -s ci -p 'test_*.py'
+Rust file size: python3 ci/rust_file_size.py --revision HEAD
+complexity policy: python3 ci/complexity_policy.py --revision HEAD
+clippy and complexity gate: python3 ci/clippy_packages.py
+tests: x: cargo test --locked x
+forge=true: cannot diff against 0000000000000000000000000000000000000000; running the lane
+[10s] waiting: GitHub API error, retrying: rate limited
+[20s] waiting: no push/merge_group CI run for aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa yet
+[30s] passed: run 1 attempt 1 (push) : 'CI result' succeeded
+[10s] waiting: no push/merge_group CI run for aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa yet
+[20s] waiting: no push/merge_group CI run for aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa yet
+[30s] waiting: no push/merge_group CI run for aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa yet
+[40s] waiting: no push/merge_group CI run for aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa yet
+[50s] waiting: no push/merge_group CI run for aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa yet
+..............
+
+
+    Checking default v0.0.0 (/tmp/tmp7xxjj6tz/default)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.08s
+
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.00s
+
+    Checking independent v0.0.0 (/tmp/tmp7xxjj6tz/independent)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.03s
+
+    Checking nondefault v0.0.0 (/tmp/tmp7xxjj6tz/nondefault)
+error: this looks like an `else if` but the `else` is missing
+ --> nondefault/src/lib.rs:1:85
+  |
+1 | pub fn score(value: usize) -> usize { let mut score=0; if value == 0 { score += 1; } if value == 1 { score += 1; } if value == 2 { sc...
+  |                                                                                     ^
+  |
+  = note: to remove this lint, add the missing `else` or add a new line before the second `if`
+  = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.100.0/index.html#possible_missing_else
+  = note: `-D clippy::possible-missing-else` implied by `-D warnings`
+  = help: to override `-D warnings` add `#[allow(clippy::possible_missing_else)]`
+
+error: this looks like an `else if` but the `else` is missing
+ --> nondefault/src/lib.rs:1:115
+  |
+1 | pub fn score(value: usize) -> usize { let mut score=0; if value == 0 { score += 1; } if value == 1 { score += 1; } if value == 2 { sc...
+  |                                                                                                                   ^
+  |
+  = note: to remove this lint, add the missing `else` or add a new line before the second `if`
+  = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.100.0/index.html#possible_missing_else
+
+error: this looks like an `else if` but the `else` is missing
+ --> nondefault/src/lib.rs:1:145
+  |
+1 | ...1; } if value == 1 { score += 1; } if value == 2 { score += 1; } if value == 3 { score += 1; } if value == 4 { score += 1; } if va...
+  |                                                                    ^
+  |
+  = note: to remove this lint, add the missing `else` or add a new line before the second `if`
+  = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.100.0/index.html#possible_missing_else
+
+error: this looks like an `else if` but the `else` is missing
+ --> nondefault/src/lib.rs:1:175
+  |
+1 | ...1; } if value == 2 { score += 1; } if value == 3 { score += 1; } if value == 4 { score += 1; } if value == 5 { score += 1; } if va...
+  |                                                                    ^
+  |
+  = note: to remove this lint, add the missing `else` or add a new line before the second `if`
+  = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.100.0/index.html#possible_missing_else
+
+error: this looks like an `else if` but the `else` is missing
+ --> nondefault/src/lib.rs:1:205
+  |
+1 | ...1; } if value == 3 { score += 1; } if value == 4 { score += 1; } if value == 5 { score += 1; } if value == 6 { score += 1; } if va...
+  |                                                                    ^
+  |
+  = note: to remove this lint, add the missing `else` or add a new line before the second `if`
+  = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.100.0/index.html#possible_missing_else
+
+error: this looks like an `else if` but the `else` is missing
+ --> nondefault/src/lib.rs:1:235
+  |
+1 | ...1; } if value == 4 { score += 1; } if value == 5 { score += 1; } if value == 6 { score += 1; } if value == 7 { score += 1; } if va...
+  |                                                                    ^
+  |
+  = note: to remove this lint, add the missing `else` or add a new line before the second `if`
+  = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.100.0/index.html#possible_missing_else
+
+error: this looks like an `else if` but the `else` is missing
+ --> nondefault/src/lib.rs:1:265
+  |
+1 | ...1; } if value == 5 { score += 1; } if value == 6 { score += 1; } if value == 7 { score += 1; } if value == 8 { score += 1; } if va...
+  |                                                                    ^
+  |
+  = note: to remove this lint, add the missing `else` or add a new line before the second `if`
+  = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.100.0/index.html#possible_missing_else
+
+error: this looks like an `else if` but the `else` is missing
+ --> nondefault/src/lib.rs:1:295
+  |
+1 | ...1; } if value == 6 { score += 1; } if value == 7 { score += 1; } if value == 8 { score += 1; } if value == 9 { score += 1; } if va...
+  |                                                                    ^
+  |
+  = note: to remove this lint, add the missing `else` or add a new line before the second `if`
+  = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.100.0/index.html#possible_missing_else
+
+error: this looks like an `else if` but the `else` is missing
+ --> nondefault/src/lib.rs:1:325
+  |
+1 | ...1; } if value == 7 { score += 1; } if value == 8 { score += 1; } if value == 9 { score += 1; } if value == 10 { score += 1; } if v...
+  |                                                                    ^
+  |
+  = note: to remove this lint, add the missing `else` or add a new line before the second `if`
+  = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.100.0/index.html#possible_missing_else
+
+error: this looks like an `else if` but the `else` is missing
+ --> nondefault/src/lib.rs:1:355
+  |
+1 | ...1; } if value == 8 { score += 1; } if value == 9 { score += 1; } if value == 10 { score += 1; } if value == 11 { score += 1; } if ...
+  |                                                                    ^
+  |
+  = note: to remove this lint, add the missing `else` or add a new line before the second `if`
+  = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.100.0/index.html#possible_missing_else
+
+error: this looks like an `else if` but the `else` is missing
+ --> nondefault/src/lib.rs:1:386
+  |
+1 | ...; } if value == 9 { score += 1; } if value == 10 { score += 1; } if value == 11 { score += 1; } if value == 12 { score += 1; } if ...
+  |                                                                    ^
+  |
+  = note: to remove this lint, add the missing `else` or add a new line before the second `if`
+  = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.100.0/index.html#possible_missing_else
+
+error: this looks like an `else if` but the `else` is missing
+ --> nondefault/src/lib.rs:1:417
+  |
+1 | ... } if value == 10 { score += 1; } if value == 11 { score += 1; } if value == 12 { score += 1; } if value == 13 { score += 1; } if ...
+  |                                                                    ^
+  |
+  = note: to remove this lint, add the missing `else` or add a new line before the second `if`
+  = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.100.0/index.html#possible_missing_else
+
+error: this looks like an `else if` but the `else` is missing
+ --> nondefault/src/lib.rs:1:448
+  |
+1 | ... } if value == 11 { score += 1; } if value == 12 { score += 1; } if value == 13 { score += 1; } if value == 14 { score += 1; } if ...
+  |                                                                    ^
+  |
+  = note: to remove this lint, add the missing `else` or add a new line before the second `if`
+  = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.100.0/index.html#possible_missing_else
+
+error: this looks like an `else if` but the `else` is missing
+ --> nondefault/src/lib.rs:1:479
+  |
+1 | ... } if value == 12 { score += 1; } if value == 13 { score += 1; } if value == 14 { score += 1; } if value == 15 { score += 1; } if ...
+  |                                                                    ^
+  |
+  = note: to remove this lint, add the missing `else` or add a new line before the second `if`
+  = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.100.0/index.html#possible_missing_else
+
+error: this looks like an `else if` but the `else` is missing
+ --> nondefault/src/lib.rs:1:510
+  |
+1 | ... } if value == 13 { score += 1; } if value == 14 { score += 1; } if value == 15 { score += 1; } if value == 16 { score += 1; } if ...
+  |                                                                    ^
+  |
+  = note: to remove this lint, add the missing `else` or add a new line before the second `if`
+  = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.100.0/index.html#possible_missing_else
+
+error: this looks like an `else if` but the `else` is missing
+ --> nondefault/src/lib.rs:1:541
+  |
+1 | ... } if value == 14 { score += 1; } if value == 15 { score += 1; } if value == 16 { score += 1; } if value == 17 { score += 1; } if ...
+  |                                                                    ^
+  |
+  = note: to remove this lint, add the missing `else` or add a new line before the second `if`
+  = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.100.0/index.html#possible_missing_else
+
+error: this looks like an `else if` but the `else` is missing
+ --> nondefault/src/lib.rs:1:572
+  |
+1 | ... } if value == 15 { score += 1; } if value == 16 { score += 1; } if value == 17 { score += 1; } if value == 18 { score += 1; } if ...
+  |                                                                    ^
+  |
+  = note: to remove this lint, add the missing `else` or add a new line before the second `if`
+  = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.100.0/index.html#possible_missing_else
+
+error: this looks like an `else if` but the `else` is missing
+ --> nondefault/src/lib.rs:1:603
+  |
+1 | ... } if value == 16 { score += 1; } if value == 17 { score += 1; } if value == 18 { score += 1; } if value == 19 { score += 1; } if ...
+  |                                                                    ^
+  |
+  = note: to remove this lint, add the missing `else` or add a new line before the second `if`
+  = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.100.0/index.html#possible_missing_else
+
+error: this looks like an `else if` but the `else` is missing
+ --> nondefault/src/lib.rs:1:634
+  |
+1 | ... } if value == 17 { score += 1; } if value == 18 { score += 1; } if value == 19 { score += 1; } if value == 20 { score += 1; } if ...
+  |                                                                    ^
+  |
+  = note: to remove this lint, add the missing `else` or add a new line before the second `if`
+  = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.100.0/index.html#possible_missing_else
+
+error: this looks like an `else if` but the `else` is missing
+ --> nondefault/src/lib.rs:1:665
+  |
+1 | ... } if value == 18 { score += 1; } if value == 19 { score += 1; } if value == 20 { score += 1; } if value == 21 { score += 1; } if ...
+  |                                                                    ^
+  |
+  = note: to remove this lint, add the missing `else` or add a new line before the second `if`
+  = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.100.0/index.html#possible_missing_else
+
+error: this looks like an `else if` but the `else` is missing
+ --> nondefault/src/lib.rs:1:696
+  |
+1 | ... } if value == 19 { score += 1; } if value == 20 { score += 1; } if value == 21 { score += 1; } if value == 22 { score += 1; } if ...
+  |                                                                    ^
+  |
+  = note: to remove this lint, add the missing `else` or add a new line before the second `if`
+  = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.100.0/index.html#possible_missing_else
+
+error: this looks like an `else if` but the `else` is missing
+ --> nondefault/src/lib.rs:1:727
+  |
+1 | ... } if value == 20 { score += 1; } if value == 21 { score += 1; } if value == 22 { score += 1; } if value == 23 { score += 1; } if ...
+  |                                                                    ^
+  |
+  = note: to remove this lint, add the missing `else` or add a new line before the second `if`
+  = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.100.0/index.html#possible_missing_else
+
+error: this looks like an `else if` but the `else` is missing
+ --> nondefault/src/lib.rs:1:758
+  |
+1 | ... } if value == 21 { score += 1; } if value == 22 { score += 1; } if value == 23 { score += 1; } if value == 24 { score += 1; } sco...
+  |                                                                    ^
+  |
+  = note: to remove this lint, add the missing `else` or add a new line before the second `if`
+  = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.100.0/index.html#possible_missing_else
+
+error: this looks like an `else if` but the `else` is missing
+ --> nondefault/src/lib.rs:1:789
+  |
+1 | ... } if value == 22 { score += 1; } if value == 23 { score += 1; } if value == 24 { score += 1; } score }
+  |                                                                    ^
+  |
+  = note: to remove this lint, add the missing `else` or add a new line before the second `if`
+  = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.100.0/index.html#possible_missing_else
+
+error: the function has a cognitive complexity of (26/25)
+ --> nondefault/src/lib.rs:1:8
+  |
+1 | pub fn score(value: usize) -> usize { let mut score=0; if value == 0 { score += 1; } if value == 1 { score += 1; } if value == 2 { sc...
+  |        ^^^^^
+  |
+  = help: you could split it up into multiple smaller functions
+  = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.100.0/index.html#cognitive_complexity
+  = note: requested on the command line with `-F clippy::cognitive-complexity`
+
+error: could not compile `nondefault` (lib) due to 25 previous errors
+warning: build failed, waiting for other jobs to finish...
+error: could not compile `nondefault` (lib test) due to 25 previous errors
+
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.00s
+
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.00s
+
+    Checking nondefault v0.0.0 (/tmp/tmp7xxjj6tz/nondefault)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.03s
+
+    Checking recording v0.0.0 (/tmp/tmp7xxjj6tz/src/resolver/park/checks)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.03s
+
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.00s
+
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.00s
+
+    Checking independent v0.0.0 (/tmp/tmp7xxjj6tz/independent)
+error: this looks like an `else if` but the `else` is missing
+ --> src/lib.rs:1:85
+  |
+1 | pub fn score(value: usize) -> usize { let mut score=0; if value == 0 { score += 1; } if value == 1 { score += 1; } if value == 2 { sc...
+  |                                                                                     ^
+  |
+  = note: to remove this lint, add the missing `else` or add a new line before the second `if`
+  = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.100.0/index.html#possible_missing_else
+  = note: `-D clippy::possible-missing-else` implied by `-D warnings`
+  = help: to override `-D warnings` add `#[allow(clippy::possible_missing_else)]`
+
+error: this looks like an `else if` but the `else` is missing
+ --> src/lib.rs:1:115
+  |
+1 | pub fn score(value: usize) -> usize { let mut score=0; if value == 0 { score += 1; } if value == 1 { score += 1; } if value == 2 { sc...
+  |                                                                                                                   ^
+  |
+  = note: to remove this lint, add the missing `else` or add a new line before the second `if`
+  = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.100.0/index.html#possible_missing_else
+
+error: this looks like an `else if` but the `else` is missing
+ --> src/lib.rs:1:145
+  |
+1 | ...1; } if value == 1 { score += 1; } if value == 2 { score += 1; } if value == 3 { score += 1; } if value == 4 { score += 1; } if va...
+  |                                                                    ^
+  |
+  = note: to remove this lint, add the missing `else` or add a new line before the second `if`
+  = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.100.0/index.html#possible_missing_else
+
+error: this looks like an `else if` but the `else` is missing
+ --> src/lib.rs:1:175
+  |
+1 | ...1; } if value == 2 { score += 1; } if value == 3 { score += 1; } if value == 4 { score += 1; } if value == 5 { score += 1; } if va...
+  |                                                                    ^
+  |
+  = note: to remove this lint, add the missing `else` or add a new line before the second `if`
+  = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.100.0/index.html#possible_missing_else
+
+error: this looks like an `else if` but the `else` is missing
+ --> src/lib.rs:1:205
+  |
+1 | ...1; } if value == 3 { score += 1; } if value == 4 { score += 1; } if value == 5 { score += 1; } if value == 6 { score += 1; } if va...
+  |                                                                    ^
+  |
+  = note: to remove this lint, add the missing `else` or add a new line before the second `if`
+  = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.100.0/index.html#possible_missing_else
+
+error: this looks like an `else if` but the `else` is missing
+ --> src/lib.rs:1:235
+  |
+1 | ...1; } if value == 4 { score += 1; } if value == 5 { score += 1; } if value == 6 { score += 1; } if value == 7 { score += 1; } if va...
+  |                                                                    ^
+  |
+  = note: to remove this lint, add the missing `else` or add a new line before the second `if`
+  = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.100.0/index.html#possible_missing_else
+
+error: this looks like an `else if` but the `else` is missing
+ --> src/lib.rs:1:265
+  |
+1 | ...1; } if value == 5 { score += 1; } if value == 6 { score += 1; } if value == 7 { score += 1; } if value == 8 { score += 1; } if va...
+  |                                                                    ^
+  |
+  = note: to remove this lint, add the missing `else` or add a new line before the second `if`
+  = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.100.0/index.html#possible_missing_else
+
+error: this looks like an `else if` but the `else` is missing
+ --> src/lib.rs:1:295
+  |
+1 | ...1; } if value == 6 { score += 1; } if value == 7 { score += 1; } if value == 8 { score += 1; } if value == 9 { score += 1; } if va...
+  |                                                                    ^
+  |
+  = note: to remove this lint, add the missing `else` or add a new line before the second `if`
+  = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.100.0/index.html#possible_missing_else
+
+error: this looks like an `else if` but the `else` is missing
+ --> src/lib.rs:1:325
+  |
+1 | ...1; } if value == 7 { score += 1; } if value == 8 { score += 1; } if value == 9 { score += 1; } if value == 10 { score += 1; } if v...
+  |                                                                    ^
+  |
+  = note: to remove this lint, add the missing `else` or add a new line before the second `if`
+  = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.100.0/index.html#possible_missing_else
+
+error: this looks like an `else if` but the `else` is missing
+ --> src/lib.rs:1:355
+  |
+1 | ...1; } if value == 8 { score += 1; } if value == 9 { score += 1; } if value == 10 { score += 1; } if value == 11 { score += 1; } if ...
+  |                                                                    ^
+  |
+  = note: to remove this lint, add the missing `else` or add a new line before the second `if`
+  = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.100.0/index.html#possible_missing_else
+
+error: this looks like an `else if` but the `else` is missing
+ --> src/lib.rs:1:386
+  |
+1 | ...; } if value == 9 { score += 1; } if value == 10 { score += 1; } if value == 11 { score += 1; } if value == 12 { score += 1; } if ...
+  |                                                                    ^
+  |
+  = note: to remove this lint, add the missing `else` or add a new line before the second `if`
+  = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.100.0/index.html#possible_missing_else
+
+error: this looks like an `else if` but the `else` is missing
+ --> src/lib.rs:1:417
+  |
+1 | ... } if value == 10 { score += 1; } if value == 11 { score += 1; } if value == 12 { score += 1; } if value == 13 { score += 1; } if ...
+  |                                                                    ^
+  |
+  = note: to remove this lint, add the missing `else` or add a new line before the second `if`
+  = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.100.0/index.html#possible_missing_else
+
+error: this looks like an `else if` but the `else` is missing
+ --> src/lib.rs:1:448
+  |
+1 | ... } if value == 11 { score += 1; } if value == 12 { score += 1; } if value == 13 { score += 1; } if value == 14 { score += 1; } if ...
+  |                                                                    ^
+  |
+  = note: to remove this lint, add the missing `else` or add a new line before the second `if`
+  = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.100.0/index.html#possible_missing_else
+
+error: this looks like an `else if` but the `else` is missing
+ --> src/lib.rs:1:479
+  |
+1 | ... } if value == 12 { score += 1; } if value == 13 { score += 1; } if value == 14 { score += 1; } if value == 15 { score += 1; } if ...
+  |                                                                    ^
+  |
+  = note: to remove this lint, add the missing `else` or add a new line before the second `if`
+  = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.100.0/index.html#possible_missing_else
+
+error: this looks like an `else if` but the `else` is missing
+ --> src/lib.rs:1:510
+  |
+1 | ... } if value == 13 { score += 1; } if value == 14 { score += 1; } if value == 15 { score += 1; } if value == 16 { score += 1; } if ...
+  |                                                                    ^
+  |
+  = note: to remove this lint, add the missing `else` or add a new line before the second `if`
+  = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.100.0/index.html#possible_missing_else
+
+error: this looks like an `else if` but the `else` is missing
+ --> src/lib.rs:1:541
+  |
+1 | ... } if value == 14 { score += 1; } if value == 15 { score += 1; } if value == 16 { score += 1; } if value == 17 { score += 1; } if ...
+  |                                                                    ^
+  |
+  = note: to remove this lint, add the missing `else` or add a new line before the second `if`
+  = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.100.0/index.html#possible_missing_else
+
+error: this looks like an `else if` but the `else` is missing
+ --> src/lib.rs:1:572
+  |
+1 | ... } if value == 15 { score += 1; } if value == 16 { score += 1; } if value == 17 { score += 1; } if value == 18 { score += 1; } if ...
+  |                                                                    ^
+  |
+  = note: to remove this lint, add the missing `else` or add a new line before the second `if`
+  = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.100.0/index.html#possible_missing_else
+
+error: this looks like an `else if` but the `else` is missing
+ --> src/lib.rs:1:603
+  |
+1 | ... } if value == 16 { score += 1; } if value == 17 { score += 1; } if value == 18 { score += 1; } if value == 19 { score += 1; } if ...
+  |                                                                    ^
+  |
+  = note: to remove this lint, add the missing `else` or add a new line before the second `if`
+  = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.100.0/index.html#possible_missing_else
+
+error: this looks like an `else if` but the `else` is missing
+ --> src/lib.rs:1:634
+  |
+1 | ... } if value == 17 { score += 1; } if value == 18 { score += 1; } if value == 19 { score += 1; } if value == 20 { score += 1; } if ...
+  |                                                                    ^
+  |
+  = note: to remove this lint, add the missing `else` or add a new line before the second `if`
+  = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.100.0/index.html#possible_missing_else
+
+error: this looks like an `else if` but the `else` is missing
+ --> src/lib.rs:1:665
+  |
+1 | ... } if value == 18 { score += 1; } if value == 19 { score += 1; } if value == 20 { score += 1; } if value == 21 { score += 1; } if ...
+  |                                                                    ^
+  |
+  = note: to remove this lint, add the missing `else` or add a new line before the second `if`
+  = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.100.0/index.html#possible_missing_else
+
+error: this looks like an `else if` but the `else` is missing
+ --> src/lib.rs:1:696
+  |
+1 | ... } if value == 19 { score += 1; } if value == 20 { score += 1; } if value == 21 { score += 1; } if value == 22 { score += 1; } if ...
+  |                                                                    ^
+  |
+  = note: to remove this lint, add the missing `else` or add a new line before the second `if`
+  = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.100.0/index.html#possible_missing_else
+
+error: this looks like an `else if` but the `else` is missing
+ --> src/lib.rs:1:727
+  |
+1 | ... } if value == 20 { score += 1; } if value == 21 { score += 1; } if value == 22 { score += 1; } if value == 23 { score += 1; } if ...
+  |                                                                    ^
+  |
+  = note: to remove this lint, add the missing `else` or add a new line before the second `if`
+  = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.100.0/index.html#possible_missing_else
+
+error: this looks like an `else if` but the `else` is missing
+ --> src/lib.rs:1:758
+  |
+1 | ... } if value == 21 { score += 1; } if value == 22 { score += 1; } if value == 23 { score += 1; } if value == 24 { score += 1; } sco...
+  |                                                                    ^
+  |
+  = note: to remove this lint, add the missing `else` or add a new line before the second `if`
+  = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.100.0/index.html#possible_missing_else
+
+error: this looks like an `else if` but the `else` is missing
+ --> src/lib.rs:1:789
+  |
+1 | ... } if value == 22 { score += 1; } if value == 23 { score += 1; } if value == 24 { score += 1; } score }
+  |                                                                    ^
+  |
+  = note: to remove this lint, add the missing `else` or add a new line before the second `if`
+  = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.100.0/index.html#possible_missing_else
+
+error: the function has a cognitive complexity of (26/25)
+ --> src/lib.rs:1:8
+  |
+1 | pub fn score(value: usize) -> usize { let mut score=0; if value == 0 { score += 1; } if value == 1 { score += 1; } if value == 2 { sc...
+  |        ^^^^^
+  |
+  = help: you could split it up into multiple smaller functions
+  = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.100.0/index.html#cognitive_complexity
+  = note: requested on the command line with `-F clippy::cognitive-complexity`
+
+error: could not compile `independent` (lib) due to 25 previous errors
+warning: build failed, waiting for other jobs to finish...
+error: could not compile `independent` (lib test) due to 25 previous errors
+
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.00s
+
+    Checking independent v0.0.0 (/tmp/tmp7xxjj6tz/independent)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.03s
+
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.00s
+
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.00s
+...................
+[watchdog 2026-11-15T09:06:30Z +1s/4s] fake hang: 1/3 finished, last progress 1s ago; running: a::two
+[watchdog 2026-11-15T09:06:31Z +1s/4s] fake hang: 1/3 finished, last progress 1s ago; running: a::two
+[watchdog 2026-11-15T09:06:31Z +2s/4s] fake hang: 1/3 finished, last progress 2s ago; running: a::two
+[watchdog 2026-11-15T09:06:32Z +2s/4s] fake hang: 1/3 finished, last progress 2s ago; running: a::two
+[watchdog 2026-11-15T09:06:32Z +3s/4s] fake hang: 1/3 finished, last progress 3s ago; running: a::two
+[watchdog 2026-11-15T09:06:33Z +3s/4s] fake hang: 1/3 finished, last progress 3s ago; running: a::two
+[watchdog 2026-11-15T09:06:33Z +4s/4s] fake hang: 1/3 finished, last progress 4s ago; running: a::two
+[watchdog 2026-11-15T09:06:34Z +4s/4s] fake hang: 1/3 finished, last progress 4s ago; running: a::two
+::error title=not-finished: a::three::fake hang: timeout
+::error title=timeout: a::two::fake hang: timeout
+::error title=watchdog: timeout::fake hang after 4s; exit -9; running: a::two; SIGKILL to owned process group 1043446
+.::error title=failed: a::three::fake fail: it broke
+...[watchdog 2026-11-15T09:06:35Z +1s/60s] fake leak: 3/3 finished, last progress 1s ago; running: unknown (parallel)
+[watchdog 2026-11-15T09:06:35Z +1s/60s] fake leak: 3/3 finished, last progress 1s ago; running: unknown (parallel)
+::warning title=watchdog::fake leak: the test process exited but descendants held its output open; they were stopped
+.[watchdog 2026-11-15T09:06:36Z +1s/60s] fake stall: 1/3 finished, last progress 1s ago; running: unknown (parallel)
+[watchdog 2026-11-15T09:06:37Z +1s/60s] fake stall: 1/3 finished, last progress 1s ago; running: unknown (parallel)
+[watchdog 2026-11-15T09:06:37Z +2s/60s] fake stall: 1/3 finished, last progress 2s ago; running: unknown (parallel)
+[watchdog 2026-11-15T09:06:38Z +2s/60s] fake stall: 1/3 finished, last progress 2s ago; running: unknown (parallel)
+::error title=not-finished: a::three::fake stall: stalled
+::error title=not-finished: a::two::fake stall: stalled
+::error title=watchdog: stalled::fake stall after 2s; exit -9; running: none reported; SIGKILL to owned process group 1043972
+...Running precompiled Windows test shard repo-s (budget 60s, no-progress limit 30s)
+fake-libtest: repo-s: 2 tests
+running 2 tests
+test repo::stack::tests::passes ... ok
+test repo::sync::tests::passes ... ok
+fake-libtest: isolated repo::stack::tests::hangs: 1 tests
+running 1 tests
+test repo::stack::tests::hangs ... ok
+Passed 3 tests in repo-s
+Running precompiled Windows test shard repo-s (budget 60s, no-progress limit 2s)
+fake-libtest: repo-s: 2 tests
+running 2 tests
+test repo::stack::tests::passes ... ok
+test repo::sync::tests::passes ... ok
+fake-libtest: isolated repo::stack::tests::hangs: 1 tests
+running 1 tests
+::error title=timeout: repo::stack::tests::hangs::fake-libtest: isolated repo::stack::tests::hangs: stalled
+::error title=watchdog: stalled::fake-libtest: isolated repo::stack::tests::hangs after 2s; exit -9; running: none reported; SIGKILL to owned process group 1044339
+.........release_version: not a release version: 'not-a-version'
+.................0.3.4~dev.6
+Verified 1 documented test migrations
+Verified 1 documented test migrations
+.........................................
+----------------------------------------------------------------------
+Ran 132 tests in 15.573s
+
+OK

@@ -336,11 +336,10 @@ fn a_huge_range_is_refused() -> Result<(), String> {
     Ok(())
 }
 
-/// A scratch worktree left by a gitcraft of this machine that is gone is removed when the
-/// next is made; a worktree of the user's in a folder that happens to have the same name, or
-/// one named otherwise in the scratch folder, never is.
+/// Names identify scratch paths for presentation, but do not prove cleanup ownership.
+/// Even a matching dead-PID legacy path must survive without matching ownership records.
 #[test]
-fn worktrees_left_by_a_crash_are_swept_and_nothing_else() -> Result<(), String> {
+fn legacy_unmarked_worktrees_are_never_adopted_by_crash_recovery() -> Result<(), String> {
     let (repo, _) = branch_with_a_break("sweep", 1, 9)?;
     let root = scratch_root(repo.path())?;
     let me = super::scratch::tests_machine();
@@ -368,17 +367,18 @@ fn worktrees_left_by_a_crash_are_swept_and_nothing_else() -> Result<(), String> 
     // gitcraft's own are hidden from the worktrees the window lists; the user's aren't.
     assert_eq!(git::worktree_list(repo.path(), None)?.len(), 3);
     let scratch = Scratch::add_empty(repo.path(), "test", "main")?;
-    // The left-over one went; the new one is out of the user's checkout.
-    assert_eq!(repo.worktree_count()?, 5);
+    // A matching name without ownership evidence stays untouched.
+    assert_eq!(repo.worktree_count()?, 6);
+    assert!(left.exists());
     assert!(!scratch.path.starts_with(repo.path()));
     assert!(users.join("precious.txt").exists());
     scratch.remove()?;
-    assert_eq!(repo.worktree_count()?, 4);
+    assert_eq!(repo.worktree_count()?, 5);
     // Dropped without being removed, it goes too.
     drop(Scratch::add_empty(repo.path(), "test", "main")?);
-    assert_eq!(repo.worktree_count()?, 4);
+    assert_eq!(repo.worktree_count()?, 5);
     let _ = std::fs::remove_dir_all(repo.path().with_extension("mine"));
-    for path in [&other_machine, &odd] {
+    for path in [&left, &other_machine, &odd] {
         repo.git(&["worktree", "remove", "--force", &path.to_string_lossy()])?;
     }
     Ok(())

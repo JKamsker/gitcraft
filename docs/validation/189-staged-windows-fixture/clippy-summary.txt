@@ -1,0 +1,5 @@
+Clippy 0.1.100 (0ef1bc3860 2026-11-09)
+Command: nice -n 19 cargo +stable clippy --locked --package gitcraft --all-targets -- -D warnings
+Exit: 0
+    Checking egui_kittest v0.36.2
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 3m 03s

@@ -38,12 +38,26 @@ impl RepoTab {
         }
         // Changes on disk, debounced. Taken in before the finished work, so that a reload
         // that work starts covers what it wrote itself (see `reload`).
+        let mut snapshot_changed = false;
+        let mut rewatch = false;
         if let Some(rx) = &self.fs_rx {
             while let Ok(change) = rx.try_recv() {
+                snapshot_changed = true;
+                rewatch |= change == super::super::watch::FsChange::Git;
                 self.working_drafts.observe();
                 let was = self.fs_pending.map(|(c, _)| c);
                 self.fs_pending = Some((was.max(Some(change)).unwrap_or(change), Instant::now()));
             }
+        }
+
+        if rewatch && !self.sleeping() {
+            // Includes and includeIf activation depend on both config and HEAD.
+            // Rebuild off-thread; the verdict stays unverified until registration
+            // finishes and a subsequent fingerprint covers the setup interval.
+            self.watch(ctx);
+        }
+        if snapshot_changed {
+            self.invalidate_staged(ctx);
         }
 
         while let Ok(msg) = self.rx.try_recv() {
@@ -199,6 +213,7 @@ impl RepoTab {
             Msg::Watcher(watch, watcher) => {
                 if watch == self.watches && !self.sleeping() {
                     self.watcher = watcher.map(|w| *w);
+                    self.staged_watching(false, ctx);
                     self.watcher_arrived(ctx);
                 }
             }

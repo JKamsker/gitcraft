@@ -13,6 +13,12 @@ const DRAIN: Duration = Duration::from_millis(300);
 #[derive(Clone, Default)]
 pub struct Stopper(crate::tasks::Cancellation);
 impl Stopper {
+    pub(in crate::git) fn scoped() -> Self {
+        Self(crate::tasks::cancellation().child())
+    }
+    pub(in crate::git) fn with_scope<T>(&self, work: impl FnOnce() -> T) -> T {
+        crate::tasks::with_cancellation(self.0.clone(), work)
+    }
     pub fn stop(&self) {
         self.0.cancel();
     }
@@ -34,6 +40,16 @@ pub fn stream(
     dir: &Path,
     args: &[&str],
     stopper: &Stopper,
+    line: impl FnMut(String),
+) -> Result<Ended, String> {
+    stream_timed(dir, args, stopper, None, line)
+}
+
+pub(in crate::git) fn stream_timed(
+    dir: &Path,
+    args: &[&str],
+    stopper: &Stopper,
+    timeout: Option<Duration>,
     mut line: impl FnMut(String),
 ) -> Result<Ended, String> {
     if stopper.stopped() {
@@ -42,12 +58,19 @@ pub fn stream(
             stopped: true,
         });
     }
-    let _timer = super::backend::CliTimer::new(args);
+    // Timed test commands may embed credentials; retain only the operation label.
+    let log_args = if timeout.is_some() {
+        &["gitcraft-test"][..]
+    } else {
+        args
+    };
+    let _timer = super::backend::CliTimer::new(log_args);
     let (sent, received) = queue::queue(queue::LIMIT);
     let stopping = stopper.clone();
     let full = sent.clone();
     let mut options = crate::processes::Options {
         background: true,
+        timeout,
         drain_for: DRAIN,
         cancelled: Some(Box::new(move || stopping.stopped() || full.full())),
         ..Default::default()
