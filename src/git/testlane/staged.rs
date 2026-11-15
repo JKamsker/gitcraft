@@ -31,16 +31,18 @@ fn local(repo: &Path) -> Result<(), String> {
     Ok(())
 }
 
-/// Cheap freshness evidence: canonical index entries, command, process environment,
+/// Freshness evidence: captured index bytes/flags, command, process environment,
 /// effective Git configuration and profile. Values are hashed, never displayed.
 pub(crate) fn staged_fingerprint(repo: &Path, command: &str) -> Result<String, String> {
     local(repo)?;
-    let entries = git::run_bytes(Some(repo), &["ls-files", "--stage", "-z"])?;
+    fingerprint_for(repo, command, index_bytes(repo)?.as_deref())
+}
+
+fn fingerprint_for(repo: &Path, command: &str, index: Option<&[u8]>) -> Result<String, String> {
     let mut hash = Sha256::new();
-    hash.update(entries);
     // Raw flags matter too: intent-to-add and an actually staged empty file have
     // identical ls-files --stage rows but different write-tree results.
-    hash.update(index_bytes(repo)?.unwrap_or_default());
+    hash.update(index.unwrap_or_default());
     hash.update(command.as_bytes());
     hash.update(git::run_bytes(Some(repo), &["config", "--null", "--list"])?);
     let mut env: Vec<_> = std::env::vars_os().collect();
@@ -174,7 +176,7 @@ fn verify(repo: &Path, command: &str, stop: &RunStop) -> Result<StagedResult, St
     }
     local(repo)?;
     let expected = index_bytes(repo)?;
-    let fingerprint = staged_fingerprint(repo, command)?;
+    let fingerprint = fingerprint_for(repo, command, expected.as_deref())?;
     let (scratch, tree) = snapshot(repo, expected.as_deref())?;
     // A concurrent staging operation must never label a mixed/new snapshot as this run.
     if staged_fingerprint(repo, command)? != fingerprint {
