@@ -123,3 +123,27 @@ fn fetched_ref_can_be_selected_with_the_keyboard() -> Result<(), String> {
     );
     Ok(())
 }
+
+#[test]
+fn overlapping_fetch_mappings_explain_why_a_fetched_ref_is_unavailable() -> Result<(), String> {
+    let (repo, mut form) = fixture("tracking-ui-overlap")?;
+    repo.git(&[
+        "config",
+        "remote.origin.fetch",
+        "+refs/heads/*:refs/remotes/alice/*",
+    ])?;
+    loaded(&mut form, tracking::read(repo.path(), "main")?);
+    let mut h = harness(form);
+    h.run();
+    assert!(
+        h.query_by_label(crate::i18n::text("tracking-ambiguous"))
+            .is_some()
+    );
+    assert!(h.state().selected.is_none());
+    assert!(!h.state().view.as_ref().is_some_and(|v| {
+        v.choices
+            .iter()
+            .any(|c| c.full == "refs/remotes/alice/topic")
+    }));
+    Ok(())
+}

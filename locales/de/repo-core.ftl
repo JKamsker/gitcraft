@@ -3316,3 +3316,5 @@ tracking-cancel = Abbrechen
 tracking-stale = Tracking, Referenzen oder Remote-Konfiguration wurden geändert. Aktualisieren und einen Upstream erneut wählen.
 tracking-unresolved = Nicht verfügbar (Upstream-Konfiguration nicht auflösbar)
 tracking-inherited = { $key } enthält geerbte, eingebundene, Profil- oder Worktree-Werte. Diese Auswahl kann nur direkt gespeicherte Repository-Upstreams bearbeiten. Die Quellkonfiguration vor dem Ändern oder Entfernen hier bearbeiten.
+tracking-reserved-head = Der Upstream eines Branches mit dem wörtlichen Namen HEAD kann hier nicht geändert werden. Diesen Branch zuerst umbenennen.
+tracking-ambiguous = Einige abgerufene Referenzen passen zu mehreren Remotes und sind nicht auswählbar. Jedem Remote ein eigenes Abrufziel zuweisen und dann aktualisieren.

@@ -23,6 +23,7 @@ pub(crate) struct View {
     pub current_full: String,
     pub choices: Vec<Choice>,
     pub has_tracking: bool,
+    pub ambiguous_mappings: bool,
     pub saving_blocked: Option<String>,
     oid: String,
     prior: Values,
@@ -63,14 +64,6 @@ fn values(repo: &Path, branch: &str) -> Result<Values, String> {
 fn config(repo: &Path) -> Result<String, String> {
     text(repo, &["config", "--null", "--list", "--includes"])
 }
-fn source(spec: &str, full: &str) -> Option<String> {
-    let (from, to) = spec.trim_start_matches('+').split_once(':')?;
-    if let Some((prefix, suffix)) = to.split_once('*') {
-        Some(from.replace('*', full.strip_prefix(prefix)?.strip_suffix(suffix)?))
-    } else {
-        (to == full).then(|| from.to_owned())
-    }
-}
 fn catalog_snapshot(repo: &Path) -> Result<String, String> {
     text(
         repo,
@@ -95,26 +88,7 @@ pub(crate) fn read(repo: &Path, branch: &str) -> Result<View, String> {
         .iter()
         .find(|b| b.name == branch)
         .ok_or_else(|| crate::i18n::text("tracking-stale").to_owned())?;
-    let remotes = crate::git::remotes(repo)?;
-    let mut choices = Vec::new();
-    for (alias, branches) in refs.remotes {
-        let Some(remote) = remotes.iter().find(|r| r.name == alias) else {
-            continue;
-        };
-        let specs = super::remote_config::values(repo, &format!("remote.{alias}.fetch"))?;
-        for b in branches {
-            let full = format!("refs/remotes/{}", b.name);
-            if let Some(source) = specs.iter().find_map(|s| source(s, &full)) {
-                choices.push(Choice {
-                    path: b.name,
-                    full,
-                    remote: alias.clone(),
-                    url: remote.url.clone(),
-                    source,
-                });
-            }
-        }
-    }
+    let (choices, ambiguous_mappings) = catalog::choices(repo, &refs)?;
     let current_full = text(
         repo,
         &[
@@ -145,6 +119,7 @@ pub(crate) fn read(repo: &Path, branch: &str) -> Result<View, String> {
     Ok(View {
         branch: branch.into(),
         has_tracking,
+        ambiguous_mappings,
         saving_blocked,
         current: local.upstream.clone(),
         current_full,
@@ -219,6 +194,7 @@ impl View {
     }
 }
 mod apply;
+mod catalog;
 pub(crate) use apply::execute;
 
 #[cfg(test)]

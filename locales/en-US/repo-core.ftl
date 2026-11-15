@@ -3313,3 +3313,5 @@ tracking-cancel = Cancel
 tracking-stale = Tracking, refs, or remote configuration changed. Refresh and reselect an upstream.
 tracking-unresolved = Unavailable (unresolvable tracking configuration)
 tracking-inherited = { $key } contains inherited, included, profile, or worktree values. This picker can only edit directly stored repository tracking. Edit the source configuration before changing or unsetting it here.
+tracking-reserved-head = Tracking for a branch literally named HEAD cannot be changed here. Rename that branch first.
+tracking-ambiguous = Some fetched refs match multiple remotes and cannot be selected. Give each remote a separate fetch destination, then refresh.

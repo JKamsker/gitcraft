@@ -140,6 +140,9 @@ impl Form {
             if let Some(why) = &view.saving_blocked {
                 ui.label(why);
             }
+            if view.ambiguous_mappings {
+                ui.label(crate::i18n::text("tracking-ambiguous"));
+            }
             ui.add(
                 egui::TextEdit::singleline(&mut self.query)
                     .hint_text(crate::i18n::text("tracking-search")),

@@ -9,6 +9,9 @@ pub(crate) fn execute(
     control: Option<&Arc<crate::git::OpControl>>,
 ) -> Result<String, String> {
     let r: Request = serde_json::from_str(json).map_err(|e| e.to_string())?;
+    if r.branch == "HEAD" {
+        return Err(crate::i18n::text("tracking-reserved-head").into());
+    }
     crate::git::run(
         Some(repo),
         &["check-ref-format", &format!("refs/heads/{}", r.branch)],
@@ -53,6 +56,8 @@ pub(crate) fn execute(
                 remote_config::set_values(&runner, &format!("branch.{}.merge", r.branch), &[])?;
             }
             runner.run(&[
+                "-c",
+                "branch.autoSetupRebase=never",
                 "branch",
                 &format!("--set-upstream-to={full}"),
                 "--",
