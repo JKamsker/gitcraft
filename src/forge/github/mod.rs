@@ -3,7 +3,7 @@
 //! user ([`issues`]).
 
 mod details;
-pub(crate) mod discovery;
+pub(super) mod discovery;
 mod issues;
 mod list;
 mod post;
