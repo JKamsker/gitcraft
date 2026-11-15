@@ -5,9 +5,10 @@ use std::collections::HashMap;
 
 use egui::{Color32, RichText, Ui, vec2};
 
+use super::resources::DiskObservation as Disk;
 use super::{Act, Built, COLUMNS, act};
 use crate::insights::Evidence;
-use crate::insights::constellation::read::{self, Disk};
+use crate::insights::constellation::read;
 use crate::insights::constellation::{self as model, Flag, Kind, Link, Model};
 use crate::repo::Action;
 use crate::repo::actions::{BranchRef, compare_branches_action};
@@ -51,19 +52,26 @@ pub(super) fn disk_line(
         return Some("disk: not measured on another machine".to_owned());
     }
     Some(match disk.and_then(|d| d.get(&node.key)) {
-        Some(Ok(d)) if d.partial => format!(
-            "disk: at least {} in {} files (the walk stopped at {} entries)",
-            read::human_bytes(d.bytes),
-            d.files,
-            read::DISK_ENTRIES
+        Some(Ok(d)) if d.size.partial => format!(
+            "disk: at least {} in {} files (partial observation) · observed {} · HEAD {} · {}",
+            read::human_bytes(d.size.bytes),
+            d.size.files,
+            crate::git::relative_time(d.observed, crate::git::now()),
+            d.head,
+            d.fingerprint
         ),
         Some(Ok(d)) => format!(
-            "disk: {} in {} files (its .git aside)",
-            read::human_bytes(d.bytes),
-            d.files
+            "disk: {} in {} files · observed {} · HEAD {} · {}",
+            read::human_bytes(d.size.bytes),
+            d.size.files,
+            crate::git::relative_time(d.observed, crate::git::now()),
+            d.head,
+            d.fingerprint
         ),
         Some(Err(e)) => format!("disk: not measured ({e})"),
-        None if disk.is_some() => "disk: not measured (folder missing)".to_owned(),
+        None if node.flags.iter().any(|(f, _)| *f == model::Flag::Missing) => {
+            "disk: not measured (Git reports missing)".to_owned()
+        }
         None => "disk: not measured; select Measure / Refresh".to_owned(),
     })
 }

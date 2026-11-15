@@ -302,6 +302,7 @@ pub struct Disk {
 }
 
 /// Most entries one worktree's walk looks at.
+#[cfg(test)]
 pub const DISK_ENTRIES: usize = 200_000;
 
 /// What the folder at `dir` takes, its `.git` aside, looking at no more than `budget` entries.

@@ -17,11 +17,12 @@ use super::InsightsAct;
 use super::common::{self, Slot, SlotState};
 use super::graph::{self, Arrange, Graph, Pick};
 use crate::insights::Provenance;
-use crate::insights::constellation::read::{self, Disk};
+use crate::insights::constellation::read;
 use crate::insights::constellation::{self as model, Forge, Kind, Model, Snapshot};
 use crate::repo::{Action, RepoTab};
 use crate::theme::Tokens;
 use picture::{details, legend, to_graph};
+use resources::DiskObservation as Disk;
 
 /// The columns, left to right.
 const COLUMNS: [Kind; 5] = [
@@ -51,6 +52,8 @@ pub(crate) struct State {
 impl State {
     pub(super) fn stop_resources(&mut self) {
         self.resources.stop();
+        self.disk = Default::default();
+        self.forge_read = None;
     }
 
     pub(super) fn invalidate_forge(&mut self) {
@@ -79,6 +82,7 @@ pub(crate) enum Act {
     CompareWith(usize),
     Deselect,
     Measure(String),
+    Preview(String),
     StopResources,
 }
 
@@ -92,7 +96,7 @@ impl RepoTab {
         let Some(view) = self.insights.as_mut() else {
             return;
         };
-        view.constellation.resources.stop();
+        view.constellation.stop_resources();
         let request = view.constellation.read.start();
         let repo = self.path.clone();
         self.insight_then(
@@ -234,7 +238,11 @@ impl RepoTab {
 
     pub(super) fn constellation_act(&mut self, act: Act, ctx: &egui::Context) {
         if let Act::Measure(path) = &act {
-            self.constellation_resources(ctx, path.clone());
+            self.constellation_resources(ctx, path.clone(), false);
+            return;
+        }
+        if let Act::Preview(path) = &act {
+            self.constellation_resources(ctx, path.clone(), true);
             return;
         }
         let Some(view) = self.insights.as_mut() else {
@@ -267,8 +275,8 @@ impl RepoTab {
                     state.other = Some(node);
                 }
             }
-            Act::Measure(_) => {}
-            Act::StopResources => state.resources.stop(),
+            Act::Measure(_) | Act::Preview(_) => {}
+            Act::StopResources => state.stop_resources(),
             Act::Deselect => {
                 state.selected = None;
                 state.other = None;

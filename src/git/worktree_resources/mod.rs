@@ -16,7 +16,7 @@ pub(crate) enum Completeness {
     Complete,
     Partial(String),
     Unavailable(String),
-    #[cfg(not(target_os = "linux"))]
+    #[cfg(any(not(target_os = "linux"), test))]
     Unsupported,
 }
 
@@ -66,12 +66,24 @@ pub(crate) struct Inventory {
     pub untracked: usize,
     pub measurements: [Measurement; 5],
     pub candidates: Vec<PathBuf>,
+    pub uncertain: Vec<PathBuf>,
+    pub uncertain_truncated: bool,
     pub blockers: Vec<String>,
     pub presence: Option<String>,
     pub fingerprint: String,
     pub publication: String,
 }
 impl Inventory {
+    fn mark_stale(&mut self) {
+        for m in &mut self.measurements {
+            if matches!(m.status, Completeness::Complete | Completeness::Partial(_)) {
+                m.status = Completeness::Partial("resources-stale".into());
+            }
+        }
+        self.fingerprint.clear();
+        self.candidates.clear();
+        self.blockers.push("resources-stale".into());
+    }
     pub fn complete(&self) -> bool {
         self.measurements
             .iter()

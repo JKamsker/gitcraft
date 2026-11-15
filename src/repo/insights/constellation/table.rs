@@ -1,8 +1,8 @@
 //! Constellation table, including on-demand resource totals.
 use super::picture::{disk_line, flag_words};
+use super::resources::DiskObservation as Disk;
 use super::{Act, act};
 use crate::insights::constellation::Model;
-use crate::insights::constellation::read::Disk;
 use crate::repo::{Action, insights::common};
 use egui::Ui;
 use std::collections::HashMap;

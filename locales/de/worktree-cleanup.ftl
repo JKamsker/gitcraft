@@ -163,3 +163,4 @@ resources-ambiguous-build = Blockiert: Kandidat enthält nicht als entbehrlich e
 resources-remote = SSH/WSL: nur Git-Metadaten; Größen, Prozesszuordnung und Bereinigungsvorschauen nicht unterstützt.
 resources-busy = Kapazität belegt; nach Ende laufender Messungen erneut versuchen.
 resources-protected-data = Blockiert: sonstige ignorierte oder unklassifizierte Dateien können Benutzerdaten enthalten.
+resources-detail-truncated = Unbekannte Pfade nach 32 Einträgen gekürzt; das gesamte Stammverzeichnis bleibt unsicher.

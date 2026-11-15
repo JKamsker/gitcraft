@@ -78,18 +78,34 @@ pub(in crate::repo::insights::constellation) fn show(
                     )
                 }
                 Completeness::Unavailable(why) => {
-                    format!("{}: {why}", text("resources-unavailable"))
+                    format!(
+                        "{}: {}",
+                        text("resources-unavailable"),
+                        crate::i18n::message(why, &[])
+                    )
                 }
-                #[cfg(not(target_os = "linux"))]
+                #[cfg(any(not(target_os = "linux"), test))]
                 Completeness::Unsupported => text("resources-platform").into(),
             });
             ui.end_row();
         }
     });
     if ui.button(text("resources-preview")).clicked() {
-        state.preview = !state.preview;
+        acts.push(act(Act::Preview(path.into())));
+    }
+    if state.validation.loading {
+        ui.add(crate::spinner::Spinner::new());
     }
     if state.preview {
-        super::preview::show(ui, found);
+        if state
+            .checked
+            .is_some_and(|at| at.elapsed() < std::time::Duration::from_secs(1))
+        {
+            super::preview::show(ui, found);
+            ui.ctx()
+                .request_repaint_after(std::time::Duration::from_secs(1));
+        } else {
+            acts.push(act(Act::Preview(path.into())));
+        }
     }
 }

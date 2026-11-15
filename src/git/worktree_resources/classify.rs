@@ -20,7 +20,7 @@ impl Membership {
         } else if self.untracked.contains(path) {
             Category::Untracked
         } else if self.ignored.contains(path) {
-            if cargo && path.starts_with("target") {
+            if cargo && artifact(path) {
                 Category::Build
             } else {
                 Category::Ignored
@@ -50,10 +50,62 @@ impl Membership {
 /// Deliberately small artifact allow-list. A tooling marker never blesses secrets/data.
 #[cfg(any(target_os = "linux", test))]
 pub(super) fn artifact(path: &Path) -> bool {
-    let name = path.file_name().and_then(|n| n.to_str()).unwrap_or("");
-    matches!(name, "CACHEDIR.TAG" | ".rustc_info.json" | ".cargo-lock")
-        || matches!(
+    let Some(parts) = path.iter().map(|p| p.to_str()).collect::<Option<Vec<_>>>() else {
+        return false;
+    };
+    if parts.len() < 2 || parts[0] != "target" {
+        return false;
+    }
+    if parts.len() == 2 {
+        return parts[1] == "CACHEDIR.TAG";
+    }
+    if parts
+        .iter()
+        .skip(1)
+        .any(|p| p.starts_with('.') && *p != ".fingerprint")
+    {
+        return false;
+    }
+    if parts[1] == "doc" {
+        return parts.len() >= 3
+            && matches!(
+                path.extension().and_then(|e| e.to_str()),
+                Some("html" | "css" | "js" | "svg" | "png" | "woff" | "woff2" | "ttf")
+            );
+    }
+    if !matches!(parts[1], "debug" | "release") || parts.len() < 4 {
+        return false;
+    }
+    let layout = matches!(
+        parts[2],
+        "deps" | "build" | "incremental" | ".fingerprint" | "examples"
+    );
+    let name = parts.last().copied().unwrap_or("");
+    layout
+        && (matches!(
             path.extension().and_then(|e| e.to_str()),
-            Some("rlib" | "rmeta" | "o" | "d" | "so" | "dll" | "a" | "lib" | "exe")
-        )
+            Some(
+                "rlib"
+                    | "rmeta"
+                    | "o"
+                    | "d"
+                    | "so"
+                    | "dll"
+                    | "a"
+                    | "lib"
+                    | "exe"
+                    | "bin"
+                    | "json"
+                    | "timestamp"
+            )
+        ) || (parts[2] == ".fingerprint"
+            && ["lib-", "dep-lib-", "test-", "dep-test-", "build-script-"]
+                .iter()
+                .any(|prefix| name.starts_with(prefix))))
+}
+
+/// A Cargo-generated observation marker is protected, not an artifact itself.
+#[cfg(any(target_os = "linux", test))]
+pub(super) fn marker(path: &Path) -> bool {
+    path == Path::new("target/.rustc_info.json")
 }

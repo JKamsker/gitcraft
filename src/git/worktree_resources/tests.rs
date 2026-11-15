@@ -15,10 +15,10 @@ fn linked_worktree_inventory_is_read_only_and_preserves_ignored_secrets() -> Res
     repo.git(&["branch", "topic"])?;
     let linked = repo.path().join("linked");
     repo.git(&["worktree", "add", linked.to_str().ok_or("path")?, "topic"])?;
-    std::fs::create_dir(linked.join("target")).map_err(|e| e.to_string())?;
+    std::fs::create_dir_all(linked.join("target/debug/deps")).map_err(|e| e.to_string())?;
     for (path, bytes) in [
         ("target/.rustc_info.json", "{}"),
-        ("target/output.rlib", "artifact"),
+        ("target/debug/deps/output.rlib", "artifact"),
         (".env", "secret"),
         ("note", "keep"),
     ] {
@@ -29,8 +29,8 @@ fn linked_worktree_inventory_is_read_only_and_preserves_ignored_secrets() -> Res
     assert_eq!(inventory.untracked, 1);
     #[cfg(target_os = "linux")]
     {
-        assert_eq!(inventory.measurements[Category::Ignored.index()].bytes, 6);
-        assert_eq!(inventory.measurements[Category::Build.index()].bytes, 10);
+        assert_eq!(inventory.measurements[Category::Ignored.index()].bytes, 8);
+        assert_eq!(inventory.measurements[Category::Build.index()].bytes, 8);
         assert_eq!(inventory.candidates, vec![linked.join("target")]);
     }
     let plans = previews(&inventory);
@@ -195,6 +195,55 @@ fn missing_linked_worktree_keeps_registration_but_not_zero_measurements() -> Res
             .iter()
             .all(|m| matches!(m.status, Completeness::Unavailable(_)))
     );
+    assert_eq!(previews(&found)[1].potential_purge, None);
+    Ok(())
+}
+
+#[cfg(target_os = "linux")]
+#[test]
+fn cargo_layout_does_not_bless_secrets_or_user_supplied_libraries() -> Result<(), String> {
+    let repo = Repo::new("resources-cargo-layout")?;
+    repo.commit(
+        "base",
+        &[
+            ("Cargo.toml", Some("[package]\n")),
+            (".gitignore", Some("target/\n")),
+        ],
+    )?;
+    std::fs::create_dir_all(repo.path().join("target/release/deps")).map_err(|e| e.to_string())?;
+    for (name, content) in [
+        ("target/.rustc_info.json", "{}"),
+        ("target/.env", "secret"),
+        ("target/release/libuser.a", "user"),
+        ("target/release/deps/generated.rlib", "artifact"),
+    ] {
+        std::fs::write(repo.path().join(name), content).map_err(|e| e.to_string())?;
+    }
+    let found = collect(repo.path(), repo.path(), 1, None, None)?;
+    assert_eq!(found.measurements[Category::Build.index()].bytes, 8);
+    assert_eq!(found.measurements[Category::Ignored.index()].bytes, 12);
+    assert!(found.candidates.is_empty());
+    assert!(found.uncertain.contains(&"target/.env".into()));
+    assert!(found.uncertain.contains(&"target/release/libuser.a".into()));
+    assert!(found.blockers.contains(&"resources-ambiguous-build".into()));
+    Ok(())
+}
+
+#[test]
+fn stale_non_linux_capability_stays_unknown_instead_of_zero_partial() -> Result<(), String> {
+    let repo = Repo::new("resources-stale-capability")?;
+    repo.commit("base", &[("a", Some("a"))])?;
+    let mut found = collect(repo.path(), repo.path(), 1, None, None)?;
+    found.measurements[0].status = Completeness::Unsupported;
+    found.measurements[1].status = Completeness::Unavailable("permission denied".into());
+    found.mark_stale();
+    assert_eq!(found.measurements[0].status, Completeness::Unsupported);
+    assert_eq!(
+        found.measurements[1].status,
+        Completeness::Unavailable("permission denied".into())
+    );
+    assert!(found.fingerprint.is_empty());
+    assert!(!found.complete());
     assert_eq!(previews(&found)[1].potential_purge, None);
     Ok(())
 }

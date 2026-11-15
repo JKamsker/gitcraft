@@ -1,6 +1,6 @@
 //! Linux descriptor-relative measurement. Iteration, stack and retained evidence are bounded.
-use super::classify::{Membership, artifact};
-use super::{Category, Completeness, Inventory};
+use super::classify::{Membership, artifact, marker};
+use super::{Completeness, Inventory};
 use crate::git::worktree_inspection::unix::{child, open_root};
 use rustix::fd::OwnedFd;
 use rustix::fs::{self, AtFlags, Dir, FileType};
@@ -137,6 +137,8 @@ impl Walk<'_> {
                 stat.st_size,
                 stat.st_mtime,
                 stat.st_mtime_nsec,
+                stat.st_ctime,
+                stat.st_ctime_nsec,
             )
                 .hash(&mut self.hash);
             match FileType::from_raw_mode(stat.st_mode) {
@@ -160,15 +162,24 @@ impl Walk<'_> {
                         return Err("resources-stale".into());
                     }
                     let category = self.membership.category(&path, self.cargo);
-                    if category == Category::Build
+                    if self.cargo
+                        && path.starts_with("target")
                         && !artifact(&path)
-                        && !self
+                        && !marker(&path)
+                    {
+                        if !self
                             .found
                             .blockers
                             .iter()
                             .any(|b| b == "resources-ambiguous-build")
-                    {
-                        self.found.blockers.push("resources-ambiguous-build".into());
+                        {
+                            self.found.blockers.push("resources-ambiguous-build".into());
+                        }
+                        if self.found.uncertain.len() < 32 {
+                            self.found.uncertain.push(path.clone());
+                        } else {
+                            self.found.uncertain_truncated = true;
+                        }
                     }
                     let m = &mut self.found.measurements[category.index()];
                     m.bytes = m

@@ -9,6 +9,16 @@ pub(super) fn show(ui: &mut egui::Ui, found: &Inventory) {
     }
     ui.ctx()
         .request_repaint_after(std::time::Duration::from_secs(1));
+    for unknown in &found.uncertain {
+        ui.label(format!(
+            "{}: {}",
+            text("resources-protected-data"),
+            found.root.join(unknown).display()
+        ));
+    }
+    if found.uncertain_truncated {
+        ui.label(text("resources-detail-truncated"));
+    }
     for preview in previews(found) {
         ui.strong(text(match preview.operation {
             Operation::BuildOutputs => "resources-build",

@@ -36,6 +36,8 @@ pub(crate) fn collect(
         untracked: 0,
         measurements: std::array::from_fn(|_| Measurement::default()),
         candidates: Vec::new(),
+        uncertain: Vec::new(),
+        uncertain_truncated: false,
         blockers: Vec::new(),
         presence,
         fingerprint: String::new(),
@@ -161,9 +163,7 @@ pub(crate) fn collect(
         ],
     )?;
     if after != status || current_refs != refs || git::resolve(path, "HEAD")? != found.head {
-        for m in &mut found.measurements {
-            m.status = Completeness::Partial("resources-stale".into());
-        }
+        found.mark_stale();
     }
     Ok(found)
 }

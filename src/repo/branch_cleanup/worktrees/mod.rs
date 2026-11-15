@@ -47,8 +47,8 @@ impl WorktreeCleanup {
     }
 
     /// Read-only presence snapshot for resource observations.
-    pub fn resource_presence(&self, repo: &Path, path: &Path) -> Result<Option<String>, String> {
-        jobs::current_use(repo, path)
+    pub fn resource_presence(&self) -> fn(&Path, &Path) -> Result<Option<String>, String> {
+        jobs::current_use
     }
 
     /// How many terminals the tab has open, for the other tabs' cleanup.

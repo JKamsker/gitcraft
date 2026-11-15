@@ -30,20 +30,40 @@ impl RepoTab {
         &mut self,
         ctx: &egui::Context,
         path: String,
+        preview: bool,
     ) {
+        // Capability rejection performs no Git, task-file, canonicalization or probe I/O.
+        if crate::remote::is_remote(&self.path)
+            || crate::remote::is_remote(std::path::Path::new(&path))
+        {
+            if let Some(view) = self.insights.as_mut() {
+                view.constellation.stop_resources();
+                let state = &mut view.constellation.resources;
+                state.path = path;
+                let id = state.result.start();
+                state
+                    .result
+                    .accept(id, Err(crate::i18n::text("resources-remote").into()));
+            }
+            return;
+        }
         let repo = self.path.clone();
-        let presence = self
-            .worktree_cleanup
-            .resource_presence(&repo, std::path::Path::new(&path));
+        let presence = self.worktree_cleanup.resource_presence(); // Callback only; invoked by worker.
         let Some(view) = self.insights.as_mut() else {
             return;
         };
+        if view.kind != crate::repo::insights::Kind::Constellation {
+            return;
+        }
+        if preview && view.constellation.resources.result.ready().is_none() {
+            return;
+        }
         let lease = view
             .constellation
             .read
             .ready()
             .and_then(|s| s.common_dir.clone())
-            .ok_or_else(|| crate::i18n::text("resources-remote").to_owned())
+            .ok_or_else(|| crate::i18n::text("resources-unavailable").to_owned())
             .and_then(Lease::acquire);
         let merged = view.constellation.read.ready().and_then(|s| {
             let wt = s.worktrees.iter().find(|w| w.path == path)?;
@@ -58,43 +78,73 @@ impl RepoTab {
                 describe: String::new(),
             })
         });
+        if !preview {
+            if let Some(sizes) = view.constellation.disk.ready_mut() {
+                sizes.remove(&path);
+            }
+            view.constellation.forge_read = None;
+        }
         let state = &mut view.constellation.resources;
-        state.stop();
+        state.scope.0.cancel();
+        if !preview {
+            state.stop();
+        }
         state.path = path.clone();
+        state.preview = false;
         state.scope = crate::tasks::Scope(crate::tasks::cancellation().child());
         let cancel = state.scope.0.clone();
-        let request = state.result.restart();
+        let request = if preview {
+            state.validation.restart()
+        } else {
+            state.result.restart()
+        };
         self.insight_then(
             ctx,
             move || {
                 let _lease = lease?;
                 crate::tasks::with_cancellation(cancel, || {
-                    worktree_resources::collect(
-                        &repo,
-                        std::path::Path::new(&path),
-                        request,
-                        presence?,
-                        merged,
-                    )
+                    let path = std::path::Path::new(&path);
+                    let before = presence(&repo, path)?;
+                    let found =
+                        worktree_resources::collect(&repo, path, request, before.clone(), merged)?;
+                    if crate::tasks::cancellation().is_cancelled() {
+                        return Err("resources-cancelled".into());
+                    }
+                    if presence(&repo, path)? != before {
+                        return Err(crate::i18n::text("resources-stale").into());
+                    }
+                    Ok(found)
                 })
             },
             move |tab, result, _| {
                 if let Some(view) = tab.insights.as_mut() {
-                    let disk = result.as_ref().ok().map(|f| {
-                        (
-                            f.root.to_string_lossy().into_owned(),
-                            measured_disk(&f.measurements),
-                        )
-                    });
-                    if view.constellation.resources.result.accept(request, result) {
-                        if let Some((path, size)) = disk {
-                            let state = &mut view.constellation.disk;
-                            let mut sizes = state.ready().cloned().unwrap_or_default();
-                            sizes.insert(path, size);
-                            let id = state.start();
-                            state.accept(id, Ok(sizes));
+                    if preview {
+                        if view.constellation.resources.verified(request, result) == Some(false) {
+                            view.constellation.disk = Default::default();
+                            view.constellation.forge_read = None;
                         }
-                        tab.constellation_build();
+                    } else {
+                        let disk = result.as_ref().ok().map(|f| {
+                            (
+                                f.root.to_string_lossy().into_owned(),
+                                measured_disk(&f.measurements).map(|size| super::DiskObservation {
+                                    size,
+                                    head: f.head.clone(),
+                                    fingerprint: f.fingerprint.clone(),
+                                    observed: f.collected,
+                                }),
+                            )
+                        });
+                        if view.constellation.resources.result.accept(request, result) {
+                            if let Some((path, size)) = disk {
+                                let state = &mut view.constellation.disk;
+                                let mut sizes = state.ready().cloned().unwrap_or_default();
+                                sizes.insert(path, size);
+                                let id = state.start();
+                                state.accept(id, Ok(sizes));
+                            }
+                            tab.constellation_build();
+                        }
                     }
                 }
             },
