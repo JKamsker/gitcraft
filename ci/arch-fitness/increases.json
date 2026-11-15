@@ -226,5 +226,13 @@
     "reason": "Existing worktrees definitions exposed through named/glob re-exports and module aliases were omitted by the declaration-only visibility calculation. Corrected measurement 52 -> 74; application source unchanged.",
     "owner": "@JKamsker",
     "remediation": "Narrow or remove existing re-export bindings at the domain boundary, then ratchet the budget."
+  },
+  "231-discovery-effective-visibility": {
+    "changes": [
+      "budget/forge/exported=222"
+    ],
+    "reason": "After #236 merged alongside the #238 effective-visibility checker, forge measured 223 against 218. Narrowing the GitHub adapter to forge and replacing the discovery model glob with explicit UI exports confines RateLimit to forge and reduces the measurement to 222. The remaining query, repository/owner/visibility, page/error, session and discovery capability definitions form the app repository browser contract and must cross the forge boundary. This declares only the remaining four-item measured increase.",
+    "owner": "@JKamsker",
+    "remediation": "Keep transport, rate-limit parsing and provider adapters forge-scoped; use explicit discovery exports. Narrow unused browser contract types as consumers change, then ratchet this budget."
   }
 }

@@ -5,7 +5,7 @@ mod response;
 mod tests;
 use crate::forge::discovery::*;
 
-pub(crate) fn repositories(
+pub(in crate::forge) fn repositories(
     session: &DiscoverySession,
     query: &Query,
     next: Option<&str>,
