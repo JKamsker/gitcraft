@@ -83,18 +83,14 @@ impl RepoTab {
                     let disk = result.as_ref().ok().map(|f| {
                         (
                             f.root.to_string_lossy().into_owned(),
-                            crate::insights::constellation::read::Disk {
-                                bytes: f.logical_bytes(),
-                                files: f.measurements.iter().map(|m| m.files).sum(),
-                                partial: !f.complete(),
-                            },
+                            measured_disk(&f.measurements),
                         )
                     });
                     if view.constellation.resources.result.accept(request, result) {
                         if let Some((path, size)) = disk {
                             let state = &mut view.constellation.disk;
                             let mut sizes = state.ready().cloned().unwrap_or_default();
-                            sizes.insert(path, Ok(size));
+                            sizes.insert(path, size);
                             let id = state.start();
                             state.accept(id, Ok(sizes));
                         }
@@ -104,6 +100,26 @@ impl RepoTab {
             },
         );
     }
+}
+
+/// Unknown measurements never become a zero-byte disk total in the graph/table.
+fn measured_disk(
+    measurements: &[worktree_resources::Measurement; 5],
+) -> Result<crate::insights::constellation::read::Disk, String> {
+    use worktree_resources::Completeness;
+    if measurements
+        .iter()
+        .any(|m| !matches!(m.status, Completeness::Complete | Completeness::Partial(_)))
+    {
+        return Err(crate::i18n::text("resources-unavailable").into());
+    }
+    Ok(crate::insights::constellation::read::Disk {
+        bytes: measurements.iter().map(|m| m.bytes).sum(),
+        files: measurements.iter().map(|m| m.files).sum(),
+        partial: measurements
+            .iter()
+            .any(|m| m.status != Completeness::Complete),
+    })
 }
 
 #[cfg(test)]
@@ -118,6 +134,14 @@ mod tests {
         drop(lease);
         assert!(super::Lease::acquire(repo).is_ok());
         Ok(())
+    }
+    #[test]
+    fn unknown_sizes_are_not_zero_byte_totals() {
+        use crate::git::worktree_resources::{Completeness, Measurement};
+        let mut measurements = std::array::from_fn(|_| Measurement::default());
+        assert!(super::measured_disk(&measurements).is_ok_and(|m| m.bytes == 0));
+        measurements[0].status = Completeness::Unavailable("missing".into());
+        assert!(super::measured_disk(&measurements).is_err());
     }
     use std::path::PathBuf;
 }
