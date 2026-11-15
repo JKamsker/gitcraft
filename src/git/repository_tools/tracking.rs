@@ -1,7 +1,7 @@
 //! Fetched-ref tracking plans. Reads and writes use the repository's Git transport.
-use super::guard::{Runner, text};
+use super::guard::text;
 use serde::{Deserialize, Serialize};
-use std::{path::Path, sync::Arc};
+use std::path::Path;
 
 pub(crate) const APPLY: &str = "\0tracking";
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -22,6 +22,8 @@ pub(crate) struct View {
     pub current: String,
     pub current_full: String,
     pub choices: Vec<Choice>,
+    pub has_tracking: bool,
+    pub saving_blocked: Option<String>,
     oid: String,
     prior: Values,
     config: String,
@@ -40,7 +42,14 @@ struct Request {
 fn local_values(repo: &Path, key: &str) -> Result<Vec<String>, String> {
     let out = crate::git::run_ok_codes(
         Some(repo),
-        &["config", "--local", "--null", "--get-all", key],
+        &[
+            "config",
+            "--local",
+            "--no-includes",
+            "--null",
+            "--get-all",
+            key,
+        ],
         &[0, 1],
     )?;
     Ok(out.split_terminator('\0').map(str::to_owned).collect())
@@ -117,11 +126,26 @@ pub(crate) fn read(repo: &Path, branch: &str) -> Result<View, String> {
     .trim()
     .to_owned();
     let prior = values(repo, branch)?;
+    let mut saving_blocked = None;
+    let mut has_tracking = false;
+    for (field, own) in [("remote", &prior.remote), ("merge", &prior.merge)] {
+        let key = format!("branch.{branch}.{field}");
+        let effective = super::remote_config::values(repo, &key)?;
+        has_tracking |= !effective.is_empty() || !own.is_empty();
+        if effective != *own {
+            saving_blocked = Some(crate::i18n::message(
+                "tracking-inherited",
+                &[("key", key.into())],
+            ));
+        }
+    }
     if before != config(repo)? || catalog != catalog_snapshot(repo)? {
         return Err(crate::i18n::text("tracking-stale").into());
     }
     Ok(View {
         branch: branch.into(),
+        has_tracking,
+        saving_blocked,
         current: local.upstream.clone(),
         current_full,
         oid: local.target.clone(),
@@ -145,6 +169,9 @@ pub(crate) struct Plan {
 }
 impl View {
     pub fn plan(&self, selected: Option<&str>) -> Result<Plan, String> {
+        if let Some(why) = &self.saving_blocked {
+            return Err(why.clone());
+        }
         let desired = match selected {
             Some(full) => {
                 let c = self
@@ -191,106 +218,8 @@ impl View {
         })
     }
 }
-pub(crate) fn execute(
-    repo: &Path,
-    json: &str,
-    control: Option<&Arc<crate::git::OpControl>>,
-) -> Result<String, String> {
-    let r: Request = serde_json::from_str(json).map_err(|e| e.to_string())?;
-    crate::git::run(
-        Some(repo),
-        &["check-ref-format", &format!("refs/heads/{}", r.branch)],
-    )?;
-    let now = read(repo, &r.branch)?;
-    if now.oid != r.oid
-        || now.prior != r.expected
-        || r.config.as_ref().is_some_and(|c| c != &now.config)
-        || r.catalog.as_ref().is_some_and(|c| c != &now.catalog)
-    {
-        return Err(crate::i18n::text("tracking-stale").into());
-    }
-    if let Some(full) = &r.target {
-        let c = now
-            .choices
-            .iter()
-            .find(|c| &c.full == full)
-            .ok_or_else(|| crate::i18n::text("tracking-stale").to_owned())?;
-        if r.desired
-            != (Values {
-                remote: vec![c.remote.clone()],
-                merge: vec![c.source.clone()],
-            })
-        {
-            return Err(crate::i18n::text("tracking-stale").into());
-        }
-    }
-    let owned = crate::git::OpControl::new(|| {});
-    let runner = Runner {
-        repo,
-        control: control.unwrap_or(&owned),
-        credentials: None,
-    };
-    let result = (|| -> Result<(), String> {
-        if let Some(full) = &r.target {
-            // Git appends rather than replaces ambiguous multi-value tracking keys.
-            if r.expected.remote.len() > 1 || r.expected.merge.len() > 1 {
-                super::remote_config::set_values(
-                    &runner,
-                    &format!("branch.{}.remote", r.branch),
-                    &[],
-                )?;
-                super::remote_config::set_values(
-                    &runner,
-                    &format!("branch.{}.merge", r.branch),
-                    &[],
-                )?;
-            }
-            runner.run(&[
-                "branch",
-                &format!("--set-upstream-to={full}"),
-                "--",
-                &r.branch,
-            ])?;
-        } else {
-            if r.desired.remote.is_empty() && r.desired.merge.is_empty() && !now.current.is_empty()
-            {
-                runner.run(&["branch", "--unset-upstream", "--", &r.branch])?;
-            }
-            super::remote_config::set_values(
-                &runner,
-                &format!("branch.{}.remote", r.branch),
-                &r.desired.remote,
-            )?;
-            super::remote_config::set_values(
-                &runner,
-                &format!("branch.{}.merge", r.branch),
-                &r.desired.merge,
-            )?;
-        }
-        Ok(())
-    })();
-    if let Err(error) = result {
-        let rollback = Runner {
-            repo,
-            control: &owned,
-            credentials: None,
-        };
-        let restore_remote = super::remote_config::set_values(
-            &rollback,
-            &format!("branch.{}.remote", r.branch),
-            &r.expected.remote,
-        );
-        let restore_merge = super::remote_config::set_values(
-            &rollback,
-            &format!("branch.{}.merge", r.branch),
-            &r.expected.merge,
-        );
-        restore_remote?;
-        restore_merge?;
-        return Err(error);
-    }
-    Ok(String::new())
-}
+mod apply;
+pub(crate) use apply::execute;
 
 #[cfg(test)]
 mod tests;

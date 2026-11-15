@@ -25,6 +25,7 @@ fn fixture(name: &str) -> Result<(Repo, Form), String> {
         labels: Arc::default(),
         hidden: ["origin".into()].into_iter().collect(),
         pending: None,
+        catalog: Catalog::new(&view, &BTreeMap::new()),
         view: Some(view),
         selected: Some("refs/remotes/alice/topic".into()),
         query: String::new(),
@@ -185,3 +186,5 @@ fn selection_cannot_change_while_apply_is_being_revalidated() -> Result<(), Stri
     );
     Ok(())
 }
+
+mod regressions;

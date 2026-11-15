@@ -3311,3 +3311,5 @@ tracking-unset = Unset upstream
 tracking-refresh = Refresh
 tracking-cancel = Cancel
 tracking-stale = Tracking, refs, or remote configuration changed. Refresh and reselect an upstream.
+tracking-unresolved = Unavailable (unresolvable tracking configuration)
+tracking-inherited = { $key } contains inherited, included, profile, or worktree values. This picker can only edit directly stored repository tracking. Edit the source configuration before changing or unsetting it here.

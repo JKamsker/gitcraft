@@ -11,6 +11,9 @@ use std::{
     },
 };
 
+mod catalog;
+use catalog::Catalog;
+
 pub struct Form {
     repo: PathBuf,
     branch: String,
@@ -18,6 +21,7 @@ pub struct Form {
     hidden: BTreeSet<String>,
     pending: Option<Receiver<Result<View, String>>>,
     view: Option<View>,
+    catalog: Catalog,
     selected: Option<String>,
     query: String,
     include_hidden: bool,
@@ -39,6 +43,7 @@ impl Form {
             hidden,
             pending: None,
             view: None,
+            catalog: Catalog::default(),
             selected: None,
             query: String::new(),
             include_hidden: false,
@@ -95,6 +100,7 @@ impl Form {
                         .find(|c| c.full == view.current_full)
                         .map(|c| c.full.clone());
                 }
+                self.catalog = Catalog::new(&view, &self.labels);
                 self.view = Some(view);
             }
         }
@@ -116,7 +122,11 @@ impl Form {
         }
         if let Some(view) = &self.view {
             let current = if view.current.is_empty() {
-                crate::i18n::text("tracking-none")
+                crate::i18n::text(if view.has_tracking {
+                    "tracking-unresolved"
+                } else {
+                    "tracking-none"
+                })
             } else {
                 &view.current
             };
@@ -124,9 +134,11 @@ impl Form {
                 "{}: {current}",
                 crate::i18n::text("tracking-current")
             ));
-            if !view.current.is_empty() && !view.choices.iter().any(|c| c.full == view.current_full)
-            {
+            if view.has_tracking && !self.catalog.upstream_available {
                 ui.label(crate::i18n::text("tracking-unavailable"));
+            }
+            if let Some(why) = &view.saving_blocked {
+                ui.label(why);
             }
             ui.add(
                 egui::TextEdit::singleline(&mut self.query)
@@ -136,25 +148,9 @@ impl Form {
                 &mut self.include_hidden,
                 crate::i18n::text("tracking-hidden"),
             );
-            let query = self.query.to_lowercase();
-            let choices: Vec<_> = view
-                .choices
-                .iter()
-                .filter_map(|c| {
-                    if !self.include_hidden && self.hidden.contains(&c.remote) {
-                        return None;
-                    }
-                    let caption = self
-                        .labels
-                        .get(&c.full)
-                        .map_or(c.path.as_str(), |l| &l.caption);
-                    format!("{} {} {caption}", c.path, c.remote)
-                        .to_lowercase()
-                        .contains(&query)
-                        .then_some((c, caption))
-                })
-                .collect();
-            let count = choices.len();
+            self.catalog
+                .filter(view, &self.query, self.include_hidden, &self.hidden);
+            let count = self.catalog.filtered.len();
             let height = ui.text_style_height(&egui::TextStyle::Body) * 3.0
                 + ui.spacing().item_spacing.y * 2.0;
             egui::ScrollArea::vertical().max_height(280.0).show_rows(
@@ -164,7 +160,9 @@ impl Form {
                 |ui, rows| {
                     let mut group = String::new();
                     for index in rows {
-                        let (c, caption) = choices[index];
+                        let index = self.catalog.filtered[index];
+                        let c = &view.choices[index];
+                        let caption = &self.catalog.captions[index];
                         ui.push_id(&c.full, |ui| {
                             ui.allocate_ui(egui::vec2(ui.available_width(), height), |ui| {
                                 if self.applying {
@@ -197,7 +195,12 @@ impl Form {
         }
         let mut outcome = Outcome::Open;
         ui.horizontal_wrapped(|ui| {
-            let ready = idle && self.pending.is_none() && self.view.is_some();
+            let ready = idle
+                && self.pending.is_none()
+                && self
+                    .view
+                    .as_ref()
+                    .is_some_and(|v| v.saving_blocked.is_none());
             if ui
                 .add_enabled(
                     ready && self.selected.is_some(),
@@ -211,7 +214,7 @@ impl Form {
             }
             if ui
                 .add_enabled(
-                    ready && self.view.as_ref().is_some_and(|v| !v.current.is_empty()),
+                    ready && self.view.as_ref().is_some_and(|v| v.has_tracking),
                     egui::Button::new(crate::i18n::text("tracking-unset")),
                 )
                 .clicked()
