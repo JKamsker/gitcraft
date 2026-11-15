@@ -1,4 +1,4 @@
-//! Hold the ancestry without FILE_SHARE_DELETE so path replacement cannot redirect
+//! Hold the ancestry without write/delete sharing so path replacement cannot redirect
 //! traversal. Reparse points (including junctions and volume mounts) are refused.
 use std::fs::{File, OpenOptions};
 use std::os::windows::fs::{MetadataExt, OpenOptionsExt};
@@ -13,7 +13,9 @@ pub(in super::super) struct Purge {
 fn open_dir(path: &Path) -> Result<File, String> {
     let file = OpenOptions::new()
         .read(true)
-        .share_mode(0x1 | 0x2)
+        // Deny write sharing too: a concurrent handle cannot set a reparse point
+        // in place on an empty held directory. Existing write handles cause refusal.
+        .share_mode(0x1)
         .custom_flags(0x0200_0000 | 0x0020_0000)
         .open(path)
         .map_err(|e| e.to_string())?;
