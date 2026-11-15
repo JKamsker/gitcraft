@@ -63,6 +63,11 @@ fn additions_deletions_renames_modes_and_ignored_assets() -> Result<(), String> 
     std::fs::write(repo.path().join("asset"), "ignored").map_err(|e| e.to_string())?;
     let (scratch, tree) = snapshot(repo.path(), None)?;
     assert_eq!(
+        git::run(Some(&scratch.path), &["rev-parse", "HEAD^{tree}"])?.trim(),
+        tree
+    );
+    assert!(git::run(Some(&scratch.path), &["status", "--porcelain"])?.is_empty());
+    assert_eq!(
         std::fs::read(scratch.path.join("renamed")).map_err(|e| e.to_string())?,
         b"old"
     );

@@ -57,11 +57,17 @@ fn initial_revision(repo: &Path) -> Result<String, String> {
     if empty.code != Some(0) {
         return Err(empty.stderr);
     }
+    synthetic_revision(repo, empty.stdout.trim())
+}
+
+fn synthetic_revision(repo: &Path, tree: &str) -> Result<String, String> {
     git::run_env(
         Some(repo),
         &[
+            "-c",
+            "commit.gpgSign=false",
             "commit-tree",
-            empty.stdout.trim(),
+            tree,
             "-m",
             "staged verification",
         ],
@@ -117,8 +123,9 @@ fn snapshot(repo: &Path, expected: Option<&[u8]>) -> Result<(Scratch, String), S
     }
     // Replace the copied split index with a standalone scratch index before checkout.
     std::fs::remove_file(target).map_err(|e| e.to_string())?;
-    git::run(Some(&scratch.path), &["read-tree", &tree])?;
-    git::run(Some(&scratch.path), &["checkout-index", "--all", "--force"])?;
+    // HEAD must describe the snapshot too: tools that inspect HEAD or reset their
+    // disposable checkout must not silently switch back to the source commit.
+    scratch.checkout(&synthetic_revision(repo, &tree)?)?;
     Ok((scratch, tree))
 }
 
