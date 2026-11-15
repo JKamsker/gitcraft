@@ -38,12 +38,13 @@ fn presentation_search_and_visibility_preserve_refs_without_submitting_jobs() {
         assert!(tab.visibility.shows("refs/remotes/alice/topic"));
         assert!(tab.visibility.sidebar_remotes.contains("alice"));
         tab.branch_filter = "topic".into();
-        let _ = ctx.run_ui(egui::RawInput::default(), |ui| {
+        let mut output = ctx.run_ui(egui::RawInput::default(), |ui| {
             let mut acts: Vec<Action> = Vec::new();
             tab.sidebar(ui, &mut acts);
             tab.graph_view(ui, &mut acts);
             assert!(acts.is_empty());
         });
+        output.textures_delta.clear();
     });
     assert!(
         jobs.is_empty(),
