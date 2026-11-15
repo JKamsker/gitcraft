@@ -38,6 +38,13 @@ impl RepoTab {
         let Some(view) = self.insights.as_mut() else {
             return;
         };
+        let lease = view
+            .constellation
+            .read
+            .ready()
+            .and_then(|s| s.common_dir.clone())
+            .ok_or_else(|| crate::i18n::text("resources-remote").to_owned())
+            .and_then(Lease::acquire);
         let merged = view.constellation.read.ready().and_then(|s| {
             let wt = s.worktrees.iter().find(|w| w.path == path)?;
             let branch = wt.branch.as_ref()?;
@@ -60,14 +67,7 @@ impl RepoTab {
         self.insight_then(
             ctx,
             move || {
-                let common = PathBuf::from(
-                    crate::git::run(
-                        Some(&repo),
-                        &["rev-parse", "--path-format=absolute", "--git-common-dir"],
-                    )?
-                    .trim(),
-                );
-                let _lease = Lease::acquire(common)?;
+                let _lease = lease?;
                 crate::tasks::with_cancellation(cancel, || {
                     worktree_resources::collect(
                         &repo,

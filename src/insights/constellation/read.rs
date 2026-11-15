@@ -254,7 +254,18 @@ pub fn snapshot(repo: &Path, now: i64) -> Result<Snapshot, String> {
     if !partial.is_empty() {
         provenance = provenance.partial(partial.join("; "));
     }
+    let common_dir = if crate::remote::is_remote(repo) {
+        None
+    } else {
+        git::run(
+            Some(repo),
+            &["rev-parse", "--path-format=absolute", "--git-common-dir"],
+        )
+        .ok()
+        .and_then(|p| std::fs::canonicalize(p.trim()).ok())
+    };
     Ok(Snapshot {
+        common_dir,
         branches,
         worktrees,
         tasks,
