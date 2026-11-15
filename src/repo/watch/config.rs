@@ -31,7 +31,13 @@ pub(super) fn paths(repo: &Path) -> Vec<PathBuf> {
     if let Some(profile) = crate::git::profile_config() {
         paths.push(profile);
     }
-    paths.into_iter().filter(|p| p.is_absolute()).collect()
+    paths
+        .into_iter()
+        .filter(|p| p.is_absolute())
+        .map(|p| (key(&p), p))
+        .collect::<std::collections::BTreeMap<_, _>>()
+        .into_values()
+        .collect()
 }
 fn key(path: &Path) -> String {
     let absolute = path
@@ -53,10 +59,13 @@ pub(super) fn contains(files: &[PathBuf], path: &Path) -> bool {
     files.iter().any(|file| key(file) == wanted)
 }
 
-pub(super) fn under(path: &Path, root: &Path) -> bool {
-    key(path).strip_prefix(&key(root)).is_some_and(|rest| {
-        rest.starts_with(std::path::MAIN_SEPARATOR) || (cfg!(windows) && rest.starts_with('/'))
-    })
+pub(super) fn covers(path: &Path, root: &Path) -> bool {
+    let path = key(path);
+    let root = key(root);
+    path == root
+        || path.strip_prefix(&root).is_some_and(|rest| {
+            rest.starts_with(std::path::MAIN_SEPARATOR) || (cfg!(windows) && rest.starts_with('/'))
+        })
 }
 
 #[cfg(test)]
@@ -68,6 +77,9 @@ mod tests {
         let dir = tempfile::tempdir().map_err(|e| e.to_string())?;
         let config = dir.path().join("config");
         assert!(contains(std::slice::from_ref(&config), &config));
+        assert!(covers(dir.path(), dir.path()));
+        assert!(covers(&config, dir.path()));
+        assert!(!covers(&dir.path().with_extension("sibling"), dir.path()));
         assert!(!contains(&[config], &dir.path().join("other")));
         Ok(())
     }

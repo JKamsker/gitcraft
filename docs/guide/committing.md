@@ -44,7 +44,8 @@ including Git LFS and effective negative filter declarations in tree/info attrib
 refused before they execute: use a checkout without those filters
 or prepare the required assets explicitly in the command. Global attributes are disabled
 for preparation so a relative attributes path cannot resolve to live source content.
-Repository info attributes are included in the result fingerprint. Source hooks and
+Repository info attributes are included in the result fingerprint. The copied index is
+written from an empty working directory so Git cannot rehash live source files. Source hooks and
 filesystem-monitor extensions are disabled throughout preparation. Symlinks must resolve
 entirely inside the snapshot; escaping links and cycles are refused. The portable path preflight
 rejects case/Unicode collisions, Windows reserved names, invalid components and absolute

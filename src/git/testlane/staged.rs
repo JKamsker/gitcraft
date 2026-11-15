@@ -150,15 +150,7 @@ fn snapshot_inner(repo: &Path, expected: Option<&[u8]>) -> Result<(Scratch, Stri
             return Err(crate::i18n::text("staged-stale").into());
         }
     }
-    let env = [("GIT_INDEX_FILE", target)];
-    // Run in the source repository so split-index shared files resolve there.
-    let unresolved = git::run_env(Some(repo), &["ls-files", "--unmerged"], &env)?;
-    if !unresolved.is_empty() {
-        return Err(crate::i18n::text("staged-unmerged").into());
-    }
-    let tree = git::run_env(Some(repo), &["write-tree"], &env)?
-        .trim()
-        .to_owned();
+    let tree = index_tree(repo, target, &scratch.path)?;
     let entries = preflight::manifest(repo, &tree, &scratch.path)?;
     // Replace the copied split index with a standalone scratch index before checkout.
     std::fs::remove_file(target).map_err(|e| e.to_string())?;
@@ -185,6 +177,27 @@ fn snapshot_inner(repo: &Path, expected: Option<&[u8]>) -> Result<(Scratch, Stri
     )?;
     preflight::faithful(&scratch.path, &entries)?;
     Ok((scratch, tree))
+}
+
+/// Git may rehash racy entries while writing an index. Keep its actual cwd empty,
+/// not merely GIT_WORK_TREE: write-tree does not set up/chdir into a worktree.
+/// The source Git dir still resolves split-index shared files; only the copy is written.
+fn index_tree(repo: &Path, index: &str, root: &Path) -> Result<String, String> {
+    let git_dir = git::run(Some(repo), &["rev-parse", "--absolute-git-dir"])?;
+    let empty = tempfile::tempdir_in(root).map_err(|e| e.to_string())?;
+    let worktree = empty.path().to_string_lossy();
+    let env = [
+        ("GIT_INDEX_FILE", index),
+        ("GIT_DIR", git_dir.trim()),
+        ("GIT_WORK_TREE", worktree.as_ref()),
+    ];
+    let unresolved = git::run_env(Some(empty.path()), &["ls-files", "--unmerged"], &env)?;
+    if !unresolved.is_empty() {
+        return Err(crate::i18n::text("staged-unmerged").into());
+    }
+    let tree = git::run_env(Some(empty.path()), &["write-tree"], &env)?;
+    empty.close().map_err(|e| e.to_string())?;
+    Ok(tree.trim().into())
 }
 
 pub(crate) fn test_staged(

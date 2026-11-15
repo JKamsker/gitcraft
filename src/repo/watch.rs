@@ -101,7 +101,8 @@ fn start_watcher(
         for path in &event.paths {
             let change = if config::contains(&configurations, path) {
                 Some(FsChange::Git)
-            } else if config::under(path, &root) || git_dirs.iter().any(|d| config::under(path, d))
+            } else if config::covers(path, &root)
+                || git_dirs.iter().any(|d| config::covers(path, d))
             {
                 fs_change(path, &git_dirs)
             } else {
@@ -123,10 +124,13 @@ fn start_watcher(
     let config = notify::Config::default().with_follow_symlinks(false);
     let mut watcher = notify::RecommendedWatcher::new(handler, config).ok()?;
     watcher.watch(path, notify::RecursiveMode::Recursive).ok()?;
+    let mut recursive = vec![path.to_owned()];
     if let Some((own, common)) = &linked {
+        recursive.push(own.clone());
         use notify::RecursiveMode::{NonRecursive, Recursive};
         let _ = watcher.watch(own, Recursive);
         if common != own {
+            recursive.extend([common.join("refs"), common.join("reftable")]);
             // Not all of it: objects are written all the time.
             let _ = watcher.watch(common, NonRecursive);
             let _ = watcher.watch(&common.join("refs"), Recursive);
@@ -136,7 +140,11 @@ fn start_watcher(
         }
     }
     for file in watched_configurations {
-        if let Some(parent) = file.parent() {
+        if let Some(parent) = file.parent()
+            && !recursive.iter().any(|root| config::covers(parent, root))
+        {
+            // Re-registering an existing recursive root as nonrecursive can downgrade
+            // its coverage. Only add config parents outside those roots.
             let _ = watcher.watch(parent, notify::RecursiveMode::NonRecursive);
         }
     }
