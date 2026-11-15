@@ -11,6 +11,11 @@ fn fixture(name: &str) -> Result<(Repo, Repo), String> {
         repo.git(&["remote", "add", remote, &host.path().to_string_lossy()])?;
         repo.git(&["fetch", remote])?;
     }
+    repo.git(&[
+        "symbolic-ref",
+        "refs/remotes/origin/HEAD",
+        "refs/remotes/origin/main",
+    ])?;
     repo.git(&["branch", "origin/topic"])?;
     Ok((repo, host))
 }
@@ -79,7 +84,15 @@ fn stale_branch_remote_target_or_prior_tracking_refuses_before_mutation() -> Res
                 ])?;
             }
             "target" => {
-                repo.git(&["update-ref", "-d", "refs/remotes/origin/topic"])?;
+                let moved = repo.git(&[
+                    "commit-tree",
+                    "HEAD^{tree}",
+                    "-p",
+                    "HEAD",
+                    "-m",
+                    "remote moved",
+                ])?;
+                repo.git(&["update-ref", "refs/remotes/origin/topic", moved.trim()])?;
             }
             "prior" => {
                 repo.git(&["config", "branch.main.remote", "."])?;
