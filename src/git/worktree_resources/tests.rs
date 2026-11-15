@@ -187,8 +187,12 @@ fn missing_linked_worktree_keeps_registration_but_not_zero_measurements() -> Res
     let linked = repo.path().join("linked");
     repo.git(&["worktree", "add", linked.to_str().ok_or("path")?, "topic"])?;
     std::fs::remove_dir_all(&linked).map_err(|e| e.to_string())?;
+    let registered = crate::git::worktree_list(repo.path(), None)?
+        .into_iter()
+        .find(|w| w.branch.as_deref() == Some("topic"))
+        .ok_or("missing fixture registration")?;
     let found = collect(repo.path(), &linked, 1, None, None)?;
-    assert_eq!(found.root, linked);
+    assert_eq!(found.root, registered.path);
     assert!(
         found
             .measurements

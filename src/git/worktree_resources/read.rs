@@ -22,8 +22,10 @@ pub(crate) fn collect(
     let listed = git::worktree_list(repo, None)?;
     let wt = listed
         .iter()
-        .find(|w| w.path == path)
+        .find(|w| super::super::worktree_inspection::same_registered_path(&w.path, path))
         .ok_or("Worktree no longer registered")?;
+    // Preserve Git's spelling for every subsequent operation and returned observation.
+    let path = wt.path.as_path();
     let mut found = Inventory {
         root: wt.path.clone(),
         head: wt.head.clone(),
