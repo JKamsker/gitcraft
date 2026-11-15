@@ -44,7 +44,7 @@ def main():
 
     print("Compiling all Windows test targets once", flush=True)
     proc = subprocess.Popen(
-        ["cargo", "test", "--locked", "--no-run", "--message-format=json"],
+        ["cargo", "test", "--locked", "--no-run", "--timings", "--message-format=json"],
         stdout=subprocess.PIPE,
         text=True,
         encoding="utf-8",
