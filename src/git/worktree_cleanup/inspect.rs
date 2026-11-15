@@ -66,7 +66,7 @@ pub(super) fn at(
     if tip.as_deref() != Some(target.evidence.tip.as_str()) || wt.head != target.evidence.tip {
         found.blockers.push(Blocker::Moved);
     } else {
-        merge_blockers(repo, target, &mut found.blockers);
+        merge_blockers(repo, &target.branch, &target.evidence, &mut found.blockers);
     }
     operation_blockers(path, &mut found.blockers);
     let ignored = read_files(path, &mut found)?;
@@ -116,9 +116,8 @@ fn branch_tip(repo: &Path, branch: &str) -> Option<String> {
 }
 
 /// Whether the evidence still holds for the tip found merged.
-fn merge_blockers(repo: &Path, target: &Target, out: &mut Vec<Blocker>) {
-    let evidence = &target.evidence;
-    let branch = format!("refs/heads/{}", target.branch);
+fn merge_blockers(repo: &Path, branch: &str, evidence: &super::Evidence, out: &mut Vec<Blocker>) {
+    let branch = format!("refs/heads/{branch}");
     let holds = match evidence.proof {
         Proof::Ancestor => git::is_ancestor(repo, &evidence.tip, &evidence.base_ref),
         Proof::PatchEquivalent => {
@@ -256,4 +255,25 @@ fn fingerprint(found: &Inspection, tip: &str, ignored: &str) -> String {
     }
     text.push_str(ignored);
     sha256_hex(text.as_bytes())
+}
+
+/// Generic resource observations reuse eligibility checks without manufacturing a Target.
+pub(crate) fn resource_blockers(
+    repo: &Path,
+    path: &Path,
+    branch: Option<&str>,
+    head: &str,
+    evidence: Option<&super::Evidence>,
+) -> Vec<Blocker> {
+    let mut out = Vec::new();
+    operation_blockers(path, &mut out);
+    match (branch, evidence) {
+        (Some(branch), Some(evidence))
+            if evidence.tip == head && branch_tip(repo, branch).as_deref() == Some(head) =>
+        {
+            merge_blockers(repo, branch, evidence, &mut out);
+        }
+        _ => out.push(Blocker::NotMerged),
+    }
+    out
 }

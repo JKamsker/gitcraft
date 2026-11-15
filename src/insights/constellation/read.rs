@@ -254,7 +254,18 @@ pub fn snapshot(repo: &Path, now: i64) -> Result<Snapshot, String> {
     if !partial.is_empty() {
         provenance = provenance.partial(partial.join("; "));
     }
+    let common_dir = if crate::remote::is_remote(repo) {
+        None
+    } else {
+        git::run(
+            Some(repo),
+            &["rev-parse", "--path-format=absolute", "--git-common-dir"],
+        )
+        .ok()
+        .and_then(|p| std::fs::canonicalize(p.trim()).ok())
+    };
     Ok(Snapshot {
+        common_dir,
         branches,
         worktrees,
         tasks,
@@ -291,12 +302,14 @@ pub struct Disk {
 }
 
 /// Most entries one worktree's walk looks at.
+#[cfg(test)]
 pub const DISK_ENTRIES: usize = 200_000;
 
 /// What the folder at `dir` takes, its `.git` aside, looking at no more than `budget` entries.
 /// Symbolic links are counted as themselves, not followed; a folder with a `.git` of its own
 /// inside it (another worktree kept there, a submodule, a nested repository) is counted on its
 /// own, not again here.
+#[cfg(test)]
 pub fn disk_usage(dir: &Path, budget: usize) -> Result<Disk, String> {
     let mut disk = Disk::default();
     let mut seen = 0usize;

@@ -77,6 +77,8 @@ pub struct Target {
 /// What Git and the agent task list said, read in the background.
 #[derive(Clone, Debug, Default)]
 pub struct Snapshot {
+    /// Local Git common directory, used only to coordinate resource job ownership.
+    pub common_dir: Option<std::path::PathBuf>,
     pub branches: Vec<BranchIn>,
     pub worktrees: Vec<WorktreeIn>,
     pub tasks: Vec<TaskIn>,

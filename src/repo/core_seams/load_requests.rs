@@ -4,6 +4,7 @@ impl RepoTab {
     /// Re-reads refs, history, working tree, worktrees, stashes, remotes and submodules in the
     /// background.
     pub fn reload(&mut self, ctx: &egui::Context) {
+        self.invalidate_resource_observations();
         self.work_epoch = self.work_epoch.wrapping_add(1);
 
         self.saved_views.cancel();
@@ -152,6 +153,7 @@ impl RepoTab {
     }
 
     pub(in crate::repo) fn reload_status(&mut self, ctx: &egui::Context) {
+        self.invalidate_resource_observations();
         self.work_epoch = self.work_epoch.wrapping_add(1);
         let read = self.next_read();
         self.work_pending = read;

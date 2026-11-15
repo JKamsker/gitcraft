@@ -5,7 +5,19 @@
 use std::fs::File;
 use std::path::Path;
 
-pub(super) fn acquire(root: &Path, directory: &Path) -> Result<File, String> {
+/// Owns the operation, independently of transiently inherited/duplicated descriptors.
+#[derive(Debug)]
+pub(super) struct Operation(File);
+impl Drop for Operation {
+    fn drop(&mut self) {
+        // flock is attached to the open-file description. Closing only our descriptor
+        // can leave it held by a child forked before CLOEXEC took effect. The operation
+        // has ended, so release it explicitly before File closes its descriptor.
+        let _ = self.0.unlock();
+    }
+}
+
+pub(super) fn acquire(root: &Path, directory: &Path) -> Result<Operation, String> {
     let name = directory.file_name().ok_or("Missing recovery name")?;
     if directory.parent() != Some(root) || !name.to_string_lossy().starts_with("tree-") {
         return Err("Invalid recovery item".into());
@@ -51,5 +63,22 @@ pub(super) fn acquire(root: &Path, directory: &Path) -> Result<File, String> {
     }
     file.try_lock()
         .map_err(|e| format!("Recovery operation already running or lock unavailable: {e:?}"))?;
-    Ok(file)
+    Ok(Operation(file))
+}
+
+#[cfg(all(test, unix))]
+mod tests {
+    /// Model an inherited open-file description without spawning or signalling a process.
+    #[test]
+    fn owner_drop_releases_operation_even_with_a_duplicated_descriptor()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let temp = tempfile::tempdir()?;
+        let item = temp.path().join("tree-duplicate");
+        let held = super::acquire(temp.path(), &item)?;
+        let inherited = held.0.try_clone()?;
+        drop(held);
+        assert!(super::acquire(temp.path(), &item).is_ok());
+        drop(inherited);
+        Ok(())
+    }
 }

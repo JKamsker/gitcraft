@@ -21,7 +21,7 @@ pub(super) struct Capture {
     pub directory: PathBuf,
     pub registered: PathBuf,
     record: Record,
-    _operation: std::fs::File,
+    _operation: lock::Operation,
 }
 
 fn root(repo: &Path) -> Result<PathBuf, String> {
