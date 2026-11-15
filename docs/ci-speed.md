@@ -1,6 +1,7 @@
 # CI speed measurement (2026-11-15)
 
-Baseline: [PR #248 run 43730650718, attempt 2](https://github.com/JKamsker/gitcraft/actions/runs/43730650718/attempts/2)
+Baseline: [PR #248 run 43730650718](https://github.com/JKamsker/gitcraft/actions/runs/43730650718)
+(first attempt failed; successful core retry is attempt 2)
 (head `8b8a76b4e49e913f039133a06efba95eeb25701f`, merge checkout
 `c7fba584cef707444506738316342ab38063c871`). Comparison:
 [dev run 43728729496](https://github.com/JKamsker/gitcraft/actions/runs/43728729496)
@@ -8,20 +9,20 @@ Baseline: [PR #248 run 43730650718, attempt 2](https://github.com/JKamsker/gitcr
 
 GitHub job-step timestamps (seconds; excludes queue time):
 
-| Windows build step | PR baseline | dev baseline |
-| --- | ---: | ---: |
-| Run actions/checkout@v4 | 8 | 7 |
-| Run actions/setup-python@v5 | 1 | 0 |
-| Run dtolnay/rust-toolchain@stable | 26 | 21 |
-| Run Swatinem/rust-cache@v2 | 25 | 22 |
-| Verify compiler diagnostics and build inventory | 2 | 3 |
-| Verify the test watchdog's Job Object containment on native Windows | 17 | 16 |
-| Verify owned-child thread stack capture on native Windows | 1 | 1 |
-| Clippy and complexity gate | 398 | 527 |
-| Build test binaries | 1110 | 1388 |
-| Verify complete and disjoint Windows test shards | 4 | 4 |
-| Windows doctests (not included in compiled test executables) | 19 | 16 |
-| Upload Windows test binaries | 18 | 21 |
+| Windows build step | PR baseline | dev baseline | candidate 45ba60ed |
+| --- | ---: | ---: | ---: |
+| Run actions/checkout@v4 | 8 | 7 | 8 |
+| Run actions/setup-python@v5 | 1 | 0 | 0 |
+| Run dtolnay/rust-toolchain@stable | 26 | 21 | 24 |
+| Run Swatinem/rust-cache@v2 | 25 | 22 | 2 |
+| Verify compiler diagnostics and build inventory | 2 | 3 | 3 |
+| Verify the test watchdog's Job Object containment on native Windows | 17 | 16 | 15 |
+| Verify owned-child thread stack capture on native Windows | 1 | 1 | 1 |
+| Clippy and complexity gate | 398 | 527 | parallel (542s job) |
+| Build test binaries | 1110 | 1388 | 902 |
+| Verify complete and disjoint Windows test shards | 4 | 4 | 4 |
+| Windows doctests (not included in compiled test executables) | 19 | 16 | 17 |
+| Upload Windows test binaries | 18 | 21 | 10 |
 
 Both restored the exact same 684,605,283-byte (653 MiB) cache, then reported
 `Cache up-to-date` without saving. Both nevertheless compiled dependencies again.
@@ -34,6 +35,24 @@ overlapping wall intervals, **not** separate measured lib/test compiler times:
 the old log has no per-target completion timestamps. The dev counterpart took
 778s before the root crate started and 608s from its start to Cargo completion.
 The candidate adds Cargo timing artifacts to measure individual targets.
+
+## First attempt, retry, and eventual green
+
+The first attempt's Windows build completed at 16:03:14; core started at
+16:03:17, a **3s handoff**, and failed at 16:13:38 after **621s (10m21s)**.
+The failing test was
+`standalone::model::tests::existing_result_is_kept_and_computed_conflicts_require_a_choice`:
+`process timed out and was stopped`. `CI result` failed at 16:13:56, making
+first-attempt time-to-result **39m19s** from run creation at 15:34:37.
+
+Core's retry started at 16:15:05 (87s after the failed shard ended), with job
+setup at 16:15:06; the retry's whole-job duration is 546s. The run became green
+at 16:24:39, **50m02s after creation**. The apparent 11m54s gap obtained by
+comparing the build with the retry includes the failed test execution and retry
+delay. It is **not runner queueing**. The timeout remains unresolved reliability
+evidence; the passing retry and this speed change do not prove it harmless.
+The successful core timings below describe retry execution, not first-attempt
+success. Build and non-core job timings are retained from the successful jobs.
 
 Core's report records 363.328s in the main library harness, 69.593s in serial
 standalone tests, and 1.688s / 41.954s / 21.422s in its three isolated tests.
@@ -83,8 +102,64 @@ existing `changes` job only selects the forge lane; docs-only changes still run
 all mandatory checks. Any future docs-only optimization must conservatively
 require the full suite for src/**, Cargo.*, ci/** and .github/**.
 
-Before measurement, expected Windows path is build + about 7m shard tail +
-preflight/queue/aggregate overhead: the parallel Clippy and rebalancing alone
-remove about 9m from the baseline's serial work. Line tables and a fresh usable
-cache target a further reduction. The <=30m goal remains unproven until real CI
-finishes; ~20m is a target, not a measured claim.
+## Candidate measurements
+
+[Run 43741657210](https://github.com/JKamsker/gitcraft/actions/runs/43741657210)
+verified `45ba60edf771549190492182c3462a8ed47408aa` (merge checkout recorded
+in its logs). Windows cache was cold. Every Windows shard passed on attempt 1.
+
+| Metric | Baseline | Candidate |
+| --- | ---: | ---: |
+| Windows build job | 27m15s | 16m35s |
+| Longest successful Windows shard | 9m06s core retry | 7m49s core, first attempt |
+| Build + longest shard service time | 36m21s | 24m24s |
+| Run creation to Windows aggregate success | baseline first core failed | 25m38s |
+| First aggregate result | failed, 39m19s | failed, 25m50s |
+| Time-to-eventual-green including retries | 50m02s | 43m33s |
+
+The candidate's first attempt failed the unrelated, unchanged Ubuntu-latest test
+`a11y::tests::repo_view::the_graph_is_reached_with_tab_and_read_aloud`.
+The failure log reports `could not run process: Text file busy (os error 26)`.
+Ubuntu latest reran from 17:58:25 to 18:15:36 and passed with no source changes;
+`CI result` passed at 18:15:50. This retry is unresolved reliability evidence,
+not proof the failure is harmless. Full wall-clock is therefore **43m33s**,
+not a claimed sub-30-minute green run. The measured complete-verification path
+before that retry is 25m50s; the final documentation head must pass fresh CI.
+No checks are deferred to nightly to hide this test failure.
+
+Cargo timing artifact: normal library 127.40s (62.6s frontend, 64.8s codegen),
+library test target 211.14s, test-build total 902s including dependencies and other
+targets. Target times can overlap and must not be summed as a critical path.
+The native Windows Clippy job took 542s, independently of the test build.
+
+
+## Runtime symbolization probe
+
+An isolated Linux fixture was compiled and intentionally failed under stable Rust
+1.100.0 with `CARGO_PROFILE_DEV_DEBUG=line-tables-only`, `CARGO_INCREMENTAL=0`,
+and `RUST_BACKTRACE=1`, using `nice -n 19 cargo +stable test --offline`.
+The native backtrace retained the named test and source location:
+
+```text
+2: ci_speed_backtrace::tests::intentional_failure
+         at ./src/lib.rs:5:9
+3: ci_speed_backtrace::tests::intentional_failure::{closure#0}
+         at ./src/lib.rs:4:29
+```
+
+The fixture's expected failure is diagnostic evidence, not an application-test
+failure. Windows reasoning: the unchanged build manifest/upload logic explicitly
+includes each reported executable's adjacent PDB; native Windows CI runs its
+owned-child stack capture regression test before building the binaries. Line
+tables retain names and source lines, while full local-variable/type information
+is intentionally omitted. The actual candidate artifact contains six PDBs, one beside each of the six
+reported test executables, including both gitcraft harnesses. Native stack-capture
+checks and all Windows shards passed. Linux runtime evidence plus those PDBs is
+not a claim that a Windows failing-test backtrace was executed.
+
+The measurement/symbolization documentation follow-up changes no application,
+Cargo, CI tooling or workflow files relative to reviewed commit `45ba60ed`.
+Application gates bind to green run 43741657210 for that commit, preserving the
+failed first-attempt evidence above. Independent read-only review passed on
+45ba60ed; its P2 baseline-attribution finding is corrected here. A documentation
+update does not constitute new execution of those application gates.
