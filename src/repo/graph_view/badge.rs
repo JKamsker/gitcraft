@@ -133,6 +133,7 @@ pub(in crate::repo) struct BadgeIndex {
     heads: HashSet<String>,
     current: Option<String>,
     symbolic: std::collections::BTreeSet<String>,
+    tags: HashSet<String>,
     names: Vec<String>,
     remote_branches: HashMap<String, String>,
     pub(in crate::repo) captions: std::collections::BTreeMap<String, crate::ref_labels::Label>,
@@ -159,6 +160,7 @@ impl BadgeIndex {
         Self {
             heads,
             symbolic: refs.symbolic.clone(),
+            tags: refs.tags.iter().map(|b| b.name.clone()).collect(),
             current: refs.current.clone(),
             local,
             names,
@@ -238,7 +240,10 @@ impl BadgeIndex {
             if let Some(name) = d.strip_prefix("HEAD -> ") {
                 let name = name
                     .strip_prefix("refs/heads/")
-                    .or_else(|| name.strip_prefix("heads/"))
+                    .or_else(|| {
+                        name.strip_prefix("heads/")
+                            .filter(|_| !local.contains(name))
+                    })
                     .unwrap_or(name);
                 let i = branch(&mut out, &mut indices, name, None);
                 if let Some(b) = out.get_mut(i) {
@@ -258,7 +263,10 @@ impl BadgeIndex {
             } else if let Some(tag) = d.strip_prefix("tag: ") {
                 let tag = tag
                     .strip_prefix("refs/tags/")
-                    .or_else(|| tag.strip_prefix("tags/"))
+                    .or_else(|| {
+                        tag.strip_prefix("tags/")
+                            .filter(|_| !self.tags.contains(tag))
+                    })
                     .unwrap_or(tag);
                 out.push(Badge {
                     label: tag.to_owned(),
@@ -271,19 +279,21 @@ impl BadgeIndex {
                 });
             } else if let Some(name) = d
                 .strip_prefix("refs/heads/")
-                .or_else(|| d.strip_prefix("heads/"))
+                .or_else(|| d.strip_prefix("heads/").filter(|_| !local.contains(d)))
             {
                 let i = branch(&mut out, &mut indices, name, None);
                 if let Some(b) = out.get_mut(i) {
                     b.local = true;
                 }
-            } else if let Some((name, remote)) = match d
-                .strip_prefix("refs/remotes/")
-                .or_else(|| d.strip_prefix("remotes/"))
+            } else if let Some((name, remote)) =
+                match d.strip_prefix("refs/remotes/").or_else(|| {
+                    d.strip_prefix("remotes/")
+                        .filter(|_| !local.contains(d) && !remote_branches.contains_key(d))
+                }) {
+                    Some(rest) => remote_of(rest, true),
+                    None => remote_of(d, false),
+                }
             {
-                Some(rest) => remote_of(rest, true),
-                None => remote_of(d, false),
-            } {
                 // Symbolic defaults can have arbitrary names. A real branch ending in
                 // HEAD remains selectable when present in the fetched catalog.
                 if self

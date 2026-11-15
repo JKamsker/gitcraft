@@ -68,3 +68,31 @@ fn symbolic_decorations_are_excluded_without_hiding_real_head_paths() {
     assert_eq!(got.len(), 1);
     assert_eq!(got[0].full_ref, "refs/remotes/origin/nested/HEAD");
 }
+
+#[test]
+fn literal_namespace_paths_are_not_mistaken_for_short_ref_qualifiers() {
+    let refs = Refs {
+        local: ["heads/topic", "remotes/origin/topic"]
+            .map(super::tests::branch)
+            .to_vec(),
+        tags: vec![super::tests::branch("tags/topic")],
+        ..Default::default()
+    };
+    let got = BadgeIndex::new(&refs).badges(&[
+        "heads/topic".into(),
+        "remotes/origin/topic".into(),
+        "tag: tags/topic".into(),
+    ]);
+    let full: std::collections::BTreeSet<_> = got.iter().map(|b| b.git_ref()).collect();
+    assert_eq!(
+        full,
+        [
+            "refs/heads/heads/topic",
+            "refs/heads/remotes/origin/topic",
+            "refs/tags/tags/topic"
+        ]
+        .map(str::to_owned)
+        .into_iter()
+        .collect()
+    );
+}
