@@ -16,6 +16,8 @@ jobs:
     steps:
       # On pull_request this is the candidate merge commit, not just the PR head.
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
@@ -24,6 +26,13 @@ jobs:
           components: clippy
       - name: All tooling regression tests
         run: python3 -m unittest discover -s ci -p 'test_*.py' -v
+      - name: Require declarations for architecture baseline growth
+        # Pushes compare the entire event range; PR merge refs compare their target parent.
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          BEFORE_SHA: ${{ github.event.before }}
+          REF_TYPE: ${{ github.ref_type }}
+        run: python3 ci/arch_baseline.py --event-range --revision HEAD
       - name: Enforce the full candidate tree
         run: python3 ci/rust_file_size.py --revision HEAD
       - name: Prevent complexity policy overrides in the candidate tree

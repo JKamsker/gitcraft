@@ -8,8 +8,8 @@ fn retained_home_errors_paint_en_de_en_from_original_source_without_io() {
     let detail = "native 日本語\n: $(opaque) git init failed: literal";
     let errors = vec![
         AppError::init(detail.into()),
-        super::super::dropped::retained_folder_error(path, "FATAL: NOT A GIT REPOSITORY"),
-        super::super::dropped::retained_folder_error(path, detail),
+        crate::app::dropped::retained_folder_error(path, "FATAL: NOT A GIT REPOSITORY"),
+        crate::app::dropped::retained_folder_error(path, detail),
         AppError::unsupported("日本語.patch.txt".into()),
         AppError::patch_target(false, "日本語.patch"),
         AppError::patch_target(true, "literal.patch"),

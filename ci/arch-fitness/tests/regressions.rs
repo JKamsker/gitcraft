@@ -145,3 +145,94 @@ fn cycle_exempt_edges_do_not_deepen_a_known_cycle() {
     let found = rules(&outcome(&deeper, &adopted(&known)));
     assert!(!found.iter().any(|r| r == "cycle-edge"), "{found:?}");
 }
+
+#[test]
+fn shared_receiver_names_cannot_outvote_a_crate_mutator() {
+    let source = format!(
+        "{} impl State {{ fn stop(&mut self) {{}} }} struct A; impl A {{ fn stop(&self) {{}} }} struct B; impl B {{ fn stop(&self) {{}} }}",
+        tab_act("self.alpha.stop();")
+    );
+    // beta owns alpha here, so this is a cross-feature mutation.
+    let mut p = policy();
+    p.repo_tab
+        .owners
+        .insert("beta".into(), vec!["alpha".into()]);
+    let a = analyze(&tree(&[("src/alpha.rs", &source)]), &p, Default::default());
+    assert!(
+        a.repo_tab
+            .cross_mutations
+            .iter()
+            .any(|m| m.field == "alpha")
+    );
+}
+
+#[test]
+fn visible_globs_are_cross_domain_reexports_but_private_globs_are_not() {
+    for vis in ["pub", "pub(crate)", "pub(super)", "", "pub(self)"] {
+        let source = format!("pub struct State; {vis} use crate::beta::*;");
+        let a = analysis(&tree(&[("src/alpha.rs", &source)]));
+        let expected = !matches!(vis, "" | "pub(self)");
+        assert_eq!(
+            a.reexports
+                .iter()
+                .any(|r| r.module == "fx::alpha" && r.target_domain == "beta"),
+            expected,
+            "{vis}"
+        );
+    }
+}
+
+#[test]
+fn inherited_trait_mutators_are_mutation_evidence() {
+    for method in ["fn inherited(&mut self) {}", "fn inherited(&mut self);"] {
+        let source = format!(
+            "{} trait Mutator {{ {method} }} impl Mutator for State {{}}",
+            tab_act("self.status.inherited();")
+        );
+        let a = analysis(&tree(&[("src/alpha.rs", &source)]));
+        assert!(
+            a.repo_tab
+                .cross_mutations
+                .iter()
+                .any(|m| m.field == "status")
+        );
+    }
+}
+
+#[test]
+fn reexport_visibility_increases_budget_once_per_definition() {
+    for (export, expected) in [
+        ("pub(crate) use hidden::*;", 2),
+        (
+            "pub(crate) use hidden::A; pub(crate) use hidden::A as Again;",
+            1,
+        ),
+        (
+            "mod bridge { pub(super) use super::hidden::*; } pub(crate) use bridge::*;",
+            0,
+        ),
+        (
+            "mod bridge { pub(super) use super::hidden::A as Alias; } pub(crate) use bridge::*;",
+            0,
+        ),
+        (
+            "mod bridge { pub(crate) use super::hidden::*; } pub(crate) use bridge::*;",
+            2,
+        ),
+        ("pub(crate) use hidden::nested as exposed;", 1),
+    ] {
+        let hidden =
+            "pub struct State; mod hidden { pub struct A; pub mod nested { pub struct B; } }";
+        let original = tree(&[("src/alpha.rs", hidden)]);
+        let source = format!("{hidden} {export}");
+        let changed = tree(&[("src/alpha.rs", &source)]);
+        let before = analysis(&original).domains["alpha"].exported;
+        let after = analysis(&changed).domains["alpha"].exported;
+        assert_eq!(after, before + expected, "{export}");
+        assert_eq!(
+            rules(&outcome(&changed, &adopted(&original))).contains(&"visibility-budget".into()),
+            expected > 0,
+            "{export}"
+        );
+    }
+}

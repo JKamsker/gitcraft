@@ -232,3 +232,84 @@ The report is an index for targeted refactors, not a to-do list:
 - *Cross-feature mutations* show which coordinator fields features write directly
   (`status`, `busy_op`, `dialog`): candidates for narrow coordinator methods or effects.
 - *Exported but unused* items per domain are visibility that can be narrowed for free.
+
+## Declaring an intentional baseline increase
+
+CI compares `baseline.json` in the immutable candidate against its target merge base
+(`HEAD^1` for GitHub's PR merge checkout; the event's `before` SHA for branch
+pushes, covering every commit in the push). It checks
+individual numeric budgets, exception identities and cycle members/edges. Reductions
+cannot offset growth elsewhere. A fresh entry in `ci/arch-fitness/increases.json`
+acknowledges only its listed changes; old declarations cannot authorize later growth.
+Each entry needs a unique key, `changes` (the exact strings printed by the failing gate),
+and nonempty `reason`, `owner`, and `remediation` strings. This is a review declaration,
+not external approval: reviewers approve it with the rest of the PR, without labels.
+
+Run `python3 ci/arch_baseline.py --base origin/dev --revision HEAD` after committing.
+If an increase is intentional, copy each reported identity into a new declaration,
+explain why it is needed and how to reduce it later, then commit and rerun. Keep older
+entries unchanged. Existing PRs (#224, #236, #237) can declare their legitimate budget
+increases this way; there is no retroactive requirement for already merged PRs.
+On concurrent baseline conflicts, merge `origin/dev` normally, combine increments
+(and preserve both published declarations unchanged), then add a fresh declaration
+with a unique key for the combined budget value and rerun the gate. The push-event
+check compares with the previous pushed commit, which may contain declarations absent
+from `origin/dev`; also check with `--base <previous-pushed-SHA>` when resolving conflicts.
+Never rebase published history.
+
+Receiver mutation detection is conservative: any analyzed `&mut self` definition of
+a method name counts, regardless of unrelated shared receivers with that name. Without
+type inference this can flag shared `get`/`join` calls as mutations. The #215 correction
+records eleven such collisions explicitly, plus the existing diff layout `stop` and
+push hook-choice mutations; each exception explains the limitation or intended cleanup.
+
+
+The CI command `python3 ci/arch_baseline.py --event-range --revision HEAD` reads
+`EVENT_NAME`, `BEFORE_SHA`, and `REF_TYPE` from pinned workflow environment values.
+Branch pushes use the exact prior commit, including available force-push history.
+New branches (all-zero before), missing before commits, and shallow/root histories
+fail closed: fetch the required history or establish a reviewed base before publishing.
+Tag releases and non-push events validate against the candidate's first parent.
+Local `--base` comparisons still use a merge base.
+
+The #215 review correction also propagates effective visibility through re-export
+bindings, including aliases of modules, and counts each underlying definition once.
+Existing named re-exports as well as globs were omitted from export budgets. Examples
+include `a11y::focus::keyboard_on`, `agent::files::read_json` and the types exported
+from `ai::prompt::diff`. The following budgets record existing API visibility only;
+no application files changed. Each increase has a separate scoped declaration and
+remediation in `increases.json`.
+
+| Domain | Previous exports | Corrected exports | Increase |
+| --- | ---: | ---: | ---: |
+| agents | 200 | 258 | +58 |
+| app | 58 | 107 | +49 |
+| bisect | 46 | 62 | +16 |
+| changes | 88 | 116 | +28 |
+| conflicts | 88 | 113 | +25 |
+| diff | 90 | 132 | +42 |
+| doctor | 34 | 40 | +6 |
+| forge | 166 | 218 | +52 |
+| git | 375 | 1019 | +644 |
+| graph | 52 | 59 | +7 |
+| guidance | 44 | 48 | +4 |
+| insights | 304 | 339 | +35 |
+| os | 32 | 73 | +41 |
+| release | 55 | 83 | +28 |
+| remote | 69 | 127 | +58 |
+| repo-core | 91 | 188 | +97 |
+| review | 71 | 117 | +46 |
+| rewrite | 89 | 130 | +41 |
+| runtime | 101 | 116 | +15 |
+| settings | 34 | 67 | +33 |
+| sidebar | 31 | 36 | +5 |
+| sync | 27 | 57 | +30 |
+| terminal | 23 | 37 | +14 |
+| ui-kit | 98 | 168 | +70 |
+| update | 10 | 20 | +10 |
+| worktrees | 52 | 74 | +22 |
+
+Integration with #237 preserves both independent export increments: graph is now 61
+(59 from corrected visibility plus #237's +2) and ui-kit is 172 (168 plus #237's +4).
+The declarations cover this PR's resulting visibility correction relative to updated
+`dev`; #237's already merged increases require no retroactive declaration.

@@ -33,6 +33,7 @@ mod recent_status;
 mod remote_open;
 mod resident;
 pub(crate) use resident::notification_body as resident_notification_body;
+mod repo_browser;
 mod repo_scan;
 mod setup;
 mod startup_display;
@@ -141,6 +142,7 @@ pub struct App {
     /// [`crate::error_card`]).
     error_card: Option<crate::error_card::ErrorCard>,
     focus: focus::State,
+    repo_browser: Option<repo_browser::Browser>,
     clone_form: Option<CloneForm>,
     practice_open: bool,
     setup: setup::SetupWindow,

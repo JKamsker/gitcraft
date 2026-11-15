@@ -49,6 +49,11 @@ pub(in crate::app) fn cloning_line(ui: &mut Ui, cloning: &Cloning) {
 
 /// URL, folder and name, where that puts the clone, and the credentials once asked for.
 pub(super) fn form_fields(ui: &mut Ui, form: &mut CloneForm, t: &Tokens) -> bool {
+    source::controls(ui, form);
+    ui.checkbox(
+        &mut form.open_after,
+        crate::i18n::text("github-browser-open-after"),
+    );
     let mut enter = false;
     ui.label(
         RichText::new(crate::i18n::text("interaction-forms-url"))
@@ -65,6 +70,9 @@ pub(super) fn form_fields(ui: &mut Ui, form: &mut CloneForm, t: &Tokens) -> bool
     if form.focus {
         url.request_focus();
         form.focus = false;
+    }
+    if url.changed() {
+        form.source = None;
     }
     if url.changed() && !form.name_edited {
         form.name = git::clone_dir_name(&form.url);
