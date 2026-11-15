@@ -1,5 +1,6 @@
 //! Deterministic presentation-state tests; no repaint waits or remote connections.
 use super::*;
+#[cfg(target_os = "linux")]
 use crate::git::{fixture::Repo, worktree_resources::collect};
 use crate::repo::insights::{
     Kind,
