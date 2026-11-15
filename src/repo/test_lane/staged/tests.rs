@@ -156,3 +156,61 @@ fn watch_dependency_rebuild_keeps_verdict_unverified_until_registration() -> Res
     assert!(tab.test_lane.staged.stale);
     Ok(())
 }
+
+#[test]
+fn checkout_variants_invalidate_before_any_work_is_dispatched() {
+    let ctx = egui::Context::default();
+    let mut tab = RepoTab::new_deferred("/nonexistent/staged-checkout".into(), &ctx);
+    let actions = [
+        Action::Checkout("main".into()),
+        Action::CheckoutPull("main".into()),
+        Action::CheckoutRemote("origin/main".into()),
+        Action::CarryCheckout(Box::new(crate::repo::checkout_blocked::BlockedCheckout {
+            label: "carry".into(),
+            ops: Vec::new(),
+            undo: crate::repo::Undo::None,
+        })),
+    ];
+    for action in actions {
+        tab.test_lane.staged.stale = false;
+        let before = tab.test_lane.staged.freshness;
+        tab.staged_before_action(&action, &ctx);
+        assert!(tab.test_lane.staged.stale);
+        assert!(tab.test_lane.staged.freshness > before);
+        assert!(tab.busy_op.is_none());
+    }
+}
+
+#[test]
+fn timeout_panel_shows_failure_and_retained_output_without_cancel_label() -> Result<(), String> {
+    use egui_kittest::{Harness, kittest::Queryable};
+    let repo = Repo::new("staged-timeout-panel")?;
+    repo.commit("base", &[])?;
+    let ctx = egui::Context::default();
+    let mut tab = RepoTab::new_deferred(repo.path().into(), &ctx);
+    let mut result = git::test_staged(repo.path(), "exit 0", &RunStop::default())?;
+    result.ended = git::Ended {
+        code: None,
+        stopped: true,
+    };
+    result.error = Some("diagnostic timeout".into());
+    result.lines = vec!["compiler diagnostic retained".into()];
+    tab.test_lane.staged.result = Some(Ok(result));
+    tab.test_lane.staged.initialized = true;
+    let mut h = Harness::new_ui_state(
+        |ui, tab: &mut RepoTab| tab.staged_box(ui, &mut Vec::new()),
+        tab,
+    );
+    h.step();
+    assert!(h.query_by_label("diagnostic timeout").is_some());
+    assert!(
+        h.query_by_label(crate::i18n::text("staged-cancelled"))
+            .is_none()
+    );
+    h.get_by_label(crate::i18n::text("staged-output")).click();
+    for _ in 0..3 {
+        h.step();
+    }
+    assert!(h.query_by_label("compiler diagnostic retained").is_some());
+    Ok(())
+}

@@ -7,7 +7,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
-pub(super) fn reserve(repo: &Path, root: &Path, label: &str) -> Result<PathBuf, String> {
+pub(super) fn reserve(root: &Path, label: &str) -> Result<PathBuf, String> {
     if !super::LABELS.contains(&label) {
         return Err("unsupported scratch purpose".into());
     }
@@ -25,7 +25,6 @@ pub(super) fn reserve(repo: &Path, root: &Path, label: &str) -> Result<PathBuf, 
             return Ok(path);
         }
     }
-    let _ = repo;
     Err("could not reserve a unique scratch destination".into())
 }
 fn directory_command(path: &Path, command: &str) -> Result<i32, String> {

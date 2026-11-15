@@ -45,14 +45,16 @@ the environment variables and Git configuration require another run.
 Only local repositories are supported in this first version. Resolve index conflicts first;
 submodules, sparse checkouts and skip-worktree entries are refused. Checkout filters,
 including Git LFS and effective negative filter declarations in tree/info attributes, are
-refused before they execute: stage ordinary contents without filter attributes
-or prepare the required assets explicitly in the command. Preparation writes raw Git objects
+refused before the command starts. First remove the effective filter declaration from
+staged .gitattributes or repository info/attributes and stage ordinary contents. Then
+prepare any required assets explicitly in the command. Preparation writes raw Git objects
 directly, so even a concurrent attribute/config change cannot activate a filter or conversion.
 Global attributes are disabled for the preflight query.
 Repository info attributes are included in the result fingerprint. The copied index is
 written from an empty working directory so Git cannot rehash live source files. Source hooks and
 filesystem-monitor extensions are disabled throughout preparation. Symlinks must resolve
-entirely inside the snapshot; escaping links and cycles are refused. The portable path preflight
+entirely inside the snapshot; escaping links and cycles are refused. Resolution is
+limited to 1,000,000 traversal/queue steps across all links, with cancellation checks. The portable path preflight
 rejects case/Unicode collisions, Windows reserved names, Git-protected NTFS/HFS aliases
 (including GIT~1 and ignorable Unicode), invalid components and absolute
 checkout paths longer than 240 UTF-16 units. The materialized files, modes and symlink

@@ -33,6 +33,11 @@ pub(super) fn paths(repo: &Path) -> Vec<PathBuf> {
         if !file.is_absolute() || !seen.insert(key(&file)) {
             continue;
         }
+        // Keep the link spelling for replacement events and the actual file for
+        // edits in its target directory. Relative includes still use Git's spelling.
+        if let Ok(target) = file.canonicalize() {
+            paths.push(target);
+        }
         let Ok(raw) = crate::git::run(
             Some(repo),
             &[
@@ -67,7 +72,7 @@ pub(super) fn paths(repo: &Path) -> Vec<PathBuf> {
 fn key(path: &Path) -> String {
     let absolute = path
         .parent()
-        .and_then(|p| p.canonicalize().ok())
+        .map(closest_canonical)
         .and_then(|p| path.file_name().map(|name| p.join(name)))
         .unwrap_or_else(|| path.into());
     let text = absolute.to_string_lossy();
@@ -75,6 +80,25 @@ fn key(path: &Path) -> String {
         windows_key(&text)
     } else {
         text.into()
+    }
+}
+fn closest_canonical(path: &Path) -> PathBuf {
+    let mut missing = Vec::new();
+    let mut current = path;
+    loop {
+        if let Ok(real) = current.canonicalize() {
+            return missing
+                .iter()
+                .rev()
+                .fold(real, |path, part| path.join(part));
+        }
+        match (current.parent(), current.file_name()) {
+            (Some(parent), Some(name)) => {
+                missing.push(name);
+                current = parent;
+            }
+            _ => return path.into(),
+        }
     }
 }
 fn windows_key(text: &str) -> String {

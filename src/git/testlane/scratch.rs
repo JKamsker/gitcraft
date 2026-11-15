@@ -37,7 +37,7 @@ impl Scratch {
     pub fn add_empty(repo: &Path, label: &str, rev: &str) -> Result<Scratch, String> {
         let root = scratch_root(repo)?;
         sweep_left_over(repo, &root);
-        let path = allocation::reserve(repo, &root, label)?;
+        let path = allocation::reserve(&root, label)?;
         let there = remote::git_path(&path);
         let args = [
             "worktree",

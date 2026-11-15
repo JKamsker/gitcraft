@@ -56,8 +56,8 @@ fn failed_add_cannot_delete_a_retained_worktree_from_a_reused_pid() -> Result<()
 #[test]
 fn reservations_are_distinct_and_failed_empty_attempts_are_cleaned() -> Result<(), String> {
     let root = tempfile::tempdir().map_err(|e| e.to_string())?;
-    let first = reserve(root.path(), root.path(), "test")?;
-    let second = reserve(root.path(), root.path(), "test")?;
+    let first = reserve(root.path(), "test")?;
+    let second = reserve(root.path(), "test")?;
     assert_ne!(first, second);
     discard_empty(&first);
     discard_empty(&second);

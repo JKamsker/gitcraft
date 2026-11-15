@@ -52,6 +52,10 @@ impl RepoTab {
                 | Action::UndoableOps { .. }
                 | Action::PickLines { .. }
                 | Action::Commit
+                | Action::Checkout(_)
+                | Action::CheckoutPull(_)
+                | Action::CheckoutRemote(_)
+                | Action::CarryCheckout(_)
         ) {
             self.invalidate_staged(ctx);
         }
