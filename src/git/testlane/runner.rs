@@ -119,7 +119,7 @@ impl RunStop {
 
     /// A stopper for one command of the run: stopped already when the run is.
     pub fn command_stopper(&self) -> Stopper {
-        let stopper = Stopper::default();
+        let stopper = Stopper::scoped();
         match self.0.lock() {
             Ok(mut s) if !s.stopped => {
                 s.going.retain(|st| !st.stopped());

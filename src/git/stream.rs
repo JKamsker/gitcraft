@@ -13,6 +13,12 @@ const DRAIN: Duration = Duration::from_millis(300);
 #[derive(Clone, Default)]
 pub struct Stopper(crate::tasks::Cancellation);
 impl Stopper {
+    pub(in crate::git) fn scoped() -> Self {
+        Self(crate::tasks::cancellation().child())
+    }
+    pub(in crate::git) fn with_scope<T>(&self, work: impl FnOnce() -> T) -> T {
+        crate::tasks::with_cancellation(self.0.clone(), work)
+    }
     pub fn stop(&self) {
         self.0.cancel();
     }

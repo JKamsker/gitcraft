@@ -54,6 +54,8 @@ impl Scratch {
             rev,
         ];
         run(Some(repo), &args).map_err(|e| {
+            // Cancellation may arrive after Git registered the new worktree.
+            let _ = remove_worktree(repo, &path);
             crate::i18n::message(
                 "backend-could-not-make-a-scratch-worktree-e-76b327",
                 &[("detail", (e).to_string().into())],
@@ -135,6 +137,13 @@ impl Drop for Scratch {
 /// Removes the worktree at `path` of `repo`, and git's record of it even when its folder is
 /// gone already.
 fn remove_worktree(repo: &Path, path: &Path) -> Result<(), String> {
+    // Cleanup must survive both the run's Cancel button and tab lifetime cancellation.
+    crate::tasks::with_cancellation(crate::tasks::Cancellation::default(), || {
+        remove_uncancelled(repo, path)
+    })
+}
+
+fn remove_uncancelled(repo: &Path, path: &Path) -> Result<(), String> {
     let there = remote::git_path(path);
     let removed = run(
         Some(repo),

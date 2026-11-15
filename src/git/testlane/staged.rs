@@ -134,7 +134,10 @@ pub(crate) fn test_staged(
     command: &str,
     stop: &RunStop,
 ) -> Result<StagedResult, String> {
-    verify(repo, command, stop).map_err(|error| scrub(&error))
+    let lifetime = stop.command_stopper();
+    lifetime
+        .with_scope(|| verify(repo, command, stop))
+        .map_err(|error| scrub(&error))
 }
 
 fn verify(repo: &Path, command: &str, stop: &RunStop) -> Result<StagedResult, String> {
