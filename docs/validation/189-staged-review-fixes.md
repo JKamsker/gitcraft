@@ -1,4 +1,6 @@
-# Issue 189: review fixes and final local evidence
+# Issue 189: round-1 review fixes and historical evidence
+
+Superseded by the [round-2 fix evidence](189-staged-round2.md).
 
 Application/test candidate: `15badf7feeffaf102a577c125e32ebdfc6ec61d8`. Base `origin/dev` at
 `4189435a20d21f5f334332d71d7230fe184571c5` was merged normally; it includes `d3a759bd`.

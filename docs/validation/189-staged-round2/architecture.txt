@@ -1,0 +1,32 @@
+   Compiling proc-macro2 v1.0.107
+   Compiling unicode-ident v1.0.27
+   Compiling quote v1.0.47
+   Compiling serde_core v1.0.229
+   Compiling zmij v1.0.23
+   Compiling serde v1.0.229
+   Compiling serde_json v1.0.154
+   Compiling memchr v2.8.3
+   Compiling itoa v1.0.18
+   Compiling syn v3.0.9
+   Compiling syn v2.0.119
+   Compiling serde_derive v1.0.229
+   Compiling gitcraft-arch-fitness v0.0.0 (/home/jonas/.t3/worktrees/gitcraft/t3-bf6dbd6d/ci/arch-fitness)
+    Finished `release` profile [optimized] target(s) in 12.75s
+     Running `/home/jonas/work/gitcraft-targets/189/release/gitcraft-arch-fitness check --revision HEAD`
+ratchet available: agents: fan-out 18/18, exported 244/258
+ratchet available: app: fan-out 17/17, exported 89/107
+ratchet available: changes: fan-out 14/14, exported 100/116
+ratchet available: conflicts: fan-out 11/11, exported 108/113
+ratchet available: git: fan-out 12/12, exported 981/1025
+ratchet available: guidance: fan-out 8/8, exported 47/48
+ratchet available: release: fan-out 9/9, exported 71/83
+ratchet available: remote: fan-out 6/6, exported 115/127
+ratchet available: repo-core: fan-out 24/24, exported 178/188
+ratchet available: review: fan-out 15/15, exported 112/117
+ratchet available: rewrite: fan-out 14/14, exported 119/130
+ratchet available: runtime: fan-out 5/5, exported 113/116
+ratchet available: settings: fan-out 15/15, exported 62/67
+ratchet available: sync: fan-out 13/13, exported 52/57
+ratchet available: ui-kit: fan-out 4/4, exported 154/172
+ratchet available: worktrees: fan-out 5/5, exported 69/74
+architecture: 28 domains, 291 edges (119 forbidden, baselined or not), 1 cycles, 252 cross-feature RepoTab mutations; 0 violations
