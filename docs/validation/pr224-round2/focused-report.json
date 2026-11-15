@@ -1,0 +1,40 @@
+{
+  "source": "ade2bff9f6e3542cb0455c300747ae41a68c7543",
+  "tests": [
+    {
+      "filter": "git::worktree_cleanup",
+      "passed": 37,
+      "ok": true
+    },
+    {
+      "filter": "terminal::location",
+      "passed": 3,
+      "ok": true
+    },
+    {
+      "filter": "repo::branch_cleanup::worktrees",
+      "passed": 14,
+      "ok": true
+    },
+    {
+      "filter": "repo::keyboard::tests::commit_tree",
+      "passed": 1,
+      "ok": true
+    },
+    {
+      "filter": "repo::detail::extras::more::tests",
+      "passed": 6,
+      "ok": true
+    },
+    {
+      "filter": "settings::worktree_archives::tests",
+      "passed": 1,
+      "ok": true
+    },
+    {
+      "filter": "commit_tree_preference_defaults",
+      "passed": 1,
+      "ok": true
+    }
+  ]
+}
