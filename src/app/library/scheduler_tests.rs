@@ -1,4 +1,4 @@
-use crate::app::library::test_support::AssertValue;
+use crate::app::library::test_support::{AssertValue, tree};
 use std::path::Path;
 use std::sync::atomic::AtomicUsize;
 use std::time::{Duration, Instant};
@@ -114,8 +114,8 @@ fn late_results_are_never_applied() {
 /// The real engine on a real tree: found as it goes, then settled; a stop keeps what it had.
 #[test]
 fn a_real_scan_applies_incrementally() {
-    let root = std::env::temp_dir().join(format!("gitcraft-lib-sched-{}", std::process::id()));
-    let _ = std::fs::remove_dir_all(&root);
+    let fixture = tree("scheduler");
+    let root = fixture.0.clone();
     for name in ["a", "b"] {
         let _ = std::fs::create_dir_all(root.join(name));
         let _ = crate::git::run(Some(&root.join(name)), &["init", "-q"]);
@@ -134,7 +134,7 @@ fn a_real_scan_applies_incrementally() {
     );
     assert_eq!(s.activity(7, &source), Some(Activity::Queued));
     until(&mut s, 7, &mut lib, |s| s.threads() == 0 && !s.busy());
-    let _ = std::fs::remove_dir_all(&root);
+    drop(fixture);
     assert_eq!(lib.count(&source), 2);
     let names: Vec<_> = lib
         .entries

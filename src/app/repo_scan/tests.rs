@@ -1,14 +1,8 @@
 use super::*;
 use crate::app::library::test_support::AssertValue;
+use crate::app::library::test_support::tree;
 use crate::git;
 use std::path::Path;
-
-fn tree(name: &str) -> PathBuf {
-    let dir = std::env::temp_dir().join(format!("gitcraft-scan-{name}-{}", std::process::id()));
-    let _ = std::fs::remove_dir_all(&dir);
-    let _ = std::fs::create_dir_all(&dir);
-    dir
-}
 
 fn init(dir: &Path) {
     let _ = std::fs::create_dir_all(dir);
@@ -35,7 +29,8 @@ fn run(root: &Path, limits: ScanLimits) -> Found {
 
 #[test]
 fn repositories_are_found_where_they_are_looked_for() {
-    let root = tree("found");
+    let fixture = tree("found");
+    let root = fixture.0.clone();
     init(&root.join("app"));
     init(&root.join("app/plugins/inner"));
     init(&root.join("my projects/Größe 日本"));
@@ -69,20 +64,21 @@ fn repositories_are_found_where_they_are_looked_for() {
     // The folder picked is itself one.
     let inner = run(&root.join("app"), LIMITS);
     assert_eq!(names(&root, &inner), vec!["app", "app/plugins/inner"]);
-    let _ = std::fs::remove_dir_all(&root);
+    drop(fixture);
 }
 
 /// A repository named like a folder that isn't looked in (`build`, `.dotfiles`) is still
 /// found; what is inside it isn't looked at.
 #[test]
 fn repositories_named_like_skipped_folders_are_found() {
-    let root = tree("skipped-names");
+    let fixture = tree("skipped-names");
+    let root = fixture.0.clone();
     init(&root.join("build"));
     init(&root.join("tools/target"));
     init(&root.join(".dotfiles"));
     init(&root.join("vendor/inside/repo"));
     let found = run(&root, LIMITS);
-    let _ = std::fs::remove_dir_all(&root);
+    drop(fixture);
     assert_eq!(
         names(&root, &found),
         vec![".dotfiles", "build", "tools/target"]
@@ -92,7 +88,8 @@ fn repositories_named_like_skipped_folders_are_found() {
 /// No more folders are kept to look in than the limit, however many a folder holds.
 #[test]
 fn the_folders_kept_stay_within_the_limit() {
-    let root = tree("many");
+    let fixture = tree("many");
+    let root = fixture.0.clone();
     for i in 0..40 {
         let _ = std::fs::create_dir_all(root.join(format!("d{i:02}/x")));
     }
@@ -104,7 +101,7 @@ fn the_folders_kept_stay_within_the_limit() {
         ..LIMITS
     };
     let found = scan(&root, limits, &stop, &mut |p| most = most.max(p.folders));
-    let _ = std::fs::remove_dir_all(&root);
+    drop(fixture);
     let found = found.assert_value();
     assert_eq!(found.stopped, Some(Stopped::Folders));
     assert!(most <= 10, "{most}");
@@ -113,7 +110,8 @@ fn the_folders_kept_stay_within_the_limit() {
 
 #[test]
 fn a_missing_folder_is_an_error_and_an_empty_one_finds_nothing() {
-    let root = tree("empty");
+    let fixture = tree("empty");
+    let root = fixture.0.clone();
     let stop = AtomicBool::new(false);
     assert_eq!(
         scan(&root, LIMITS, &stop, &mut |_| {}),
@@ -132,13 +130,14 @@ fn a_missing_folder_is_an_error_and_an_empty_one_finds_nothing() {
             ..Default::default()
         })
     );
-    let _ = std::fs::remove_dir_all(&root);
+    drop(fixture);
 }
 
 #[cfg(unix)]
 #[test]
 fn links_are_not_followed() {
-    let root = tree("loop");
+    let fixture = tree("loop");
+    let root = fixture.0.clone();
     init(&root.join("real"));
     let _ = std::fs::create_dir_all(root.join("dir"));
     // A loop, and a second way to the repository.
@@ -146,7 +145,7 @@ fn links_are_not_followed() {
     let _ = std::os::unix::fs::symlink(root.join("real"), root.join("again"));
     let found = run(&root, LIMITS);
     assert_eq!(names(&root, &found), vec!["real"]);
-    let _ = std::fs::remove_dir_all(&root);
+    drop(fixture);
 }
 
 #[test]

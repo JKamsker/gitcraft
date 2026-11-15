@@ -2,7 +2,8 @@
 //! siblings of an opened repository, Recent left as it is, opening, hiding, stopping and
 //! retrying, profile switches and restarts.
 
-use crate::app::library::test_support::AssertValue;
+use crate::app::library::test_support::{AssertValue, LiveHarness, tree};
+use crate::repo::hang_diagnostics as diag;
 use std::time::{Duration, Instant};
 
 use egui_kittest::Harness;
@@ -14,52 +15,47 @@ use super::roots_dialog::RootsClick;
 use super::*;
 use crate::app::App;
 
-/// A folder of its own for a test, under the temporary folder (whose own children are never
-/// a nearby folder: see `identity::nearby_parent`).
-fn tree(name: &str) -> PathBuf {
-    let dir = std::env::temp_dir().join(format!("gitcraft-library-{name}-{}", std::process::id()));
-    let _ = std::fs::remove_dir_all(&dir);
-    let _ = std::fs::create_dir_all(&dir);
-    super::super::strip_verbatim(std::fs::canonicalize(&dir).unwrap_or(dir))
-}
-
 fn init(dir: &Path) {
+    let _stage = diag::stage(format_args!("initialize repository {}", dir.display()));
     let _ = std::fs::create_dir_all(dir);
     assert!(crate::git::run(Some(dir), &["init", "-q"]).is_ok());
 }
 
 /// The start page and the roots dialog of an app made as the window makes it.
-fn harness() -> Harness<'static, Option<App>> {
-    Harness::builder()
-        .with_size([900.0, 1600.0])
-        .build_ui_state(
-            |ui, state: &mut Option<App>| {
-                if state.is_none() {
-                    let cc = eframe::CreationContext::_new_kittest(ui.ctx().clone());
-                    let mut app = App::launched_using(&cc, None, || {
-                        Ok("git version 2.43.0 (recorded)".into())
-                    });
-                    // Nearby acceptance tests deliberately use a synthetic temp/home policy.
-                    app.library.checks.set_guards(checks::Guards::default());
-                    app.settings.check_updates = false;
-                    app.settings.notifications = false;
-                    app.settings.set(ui.ctx());
-                    *state = Some(app);
-                    // Its fonts are in from the next frame.
-                    return;
-                }
-                if let Some(app) = state {
-                    let ctx = ui.ctx().clone();
-                    app.poll_library(&ctx);
-                    app.library_dialog(&ctx);
-                    app.home(ui);
-                }
-            },
-            None,
-        )
+fn harness() -> LiveHarness {
+    let _stage = diag::stage(format_args!("open library harness"));
+    LiveHarness(
+        Harness::builder()
+            .with_size([900.0, 1600.0])
+            .build_ui_state(
+                |ui, state: &mut Option<App>| {
+                    if state.is_none() {
+                        let cc = eframe::CreationContext::_new_kittest(ui.ctx().clone());
+                        let mut app = App::launched_using(&cc, None, || {
+                            Ok("git version 2.43.0 (recorded)".into())
+                        });
+                        // Nearby acceptance tests deliberately use a synthetic temp/home policy.
+                        app.library.checks.set_guards(checks::Guards::default());
+                        app.settings.check_updates = false;
+                        app.settings.notifications = false;
+                        app.settings.put_for_test(ui.ctx());
+                        *state = Some(app);
+                        // Its fonts are in from the next frame.
+                        return;
+                    }
+                    if let Some(app) = state {
+                        let ctx = ui.ctx().clone();
+                        app.poll_library(&ctx);
+                        app.library_dialog(&ctx);
+                        app.home(ui);
+                    }
+                },
+                None,
+            ),
+    )
 }
 
-fn app<'h>(h: &'h mut Harness<'static, Option<App>>) -> &'h mut App {
+fn app(h: &mut LiveHarness) -> &mut App {
     h.step();
     let app = h.state_mut().as_mut();
     assert!(app.is_some());
@@ -67,7 +63,8 @@ fn app<'h>(h: &'h mut Harness<'static, Option<App>>) -> &'h mut App {
 }
 
 /// Steps until the library's scans are done (or ten seconds pass).
-fn settle(h: &mut Harness<'static, Option<App>>) {
+fn settle(h: &mut LiveHarness) {
+    let _stage = diag::stage(format_args!("settle library scans"));
     let end = Instant::now() + Duration::from_secs(10);
     loop {
         h.step();
@@ -103,271 +100,305 @@ fn listed(app: &App) -> Vec<String> {
 /// its root is removed and added again; removing a root leaves Recent and tabs alone.
 #[test]
 fn configured_roots_list_open_and_hide() {
-    let base = tree("roots");
-    let code = base.join("code");
-    for repo in ["alpha", "beta", "group/gamma"] {
-        init(&code.join(repo));
-    }
-    let mut h = harness();
-    let a = app(&mut h);
-    let profile = a.profile();
-    a.library.add_root(profile, code.clone(), 1);
-    settle(&mut h);
-    let a = app(&mut h);
-    assert_eq!(listed(a), ["alpha", "beta"]);
-    let id = a.library.get(profile).map_or(0, |l| l.roots[0].id);
-    a.roots_click(RootsClick::Depth(id, 2));
-    settle(&mut h);
-    assert_eq!(listed(app(&mut h)), ["alpha", "beta", "gamma"]);
+    diag::bounded("configured_roots_list_open_and_hide", || {
+        let fixture = tree("roots");
+        let base = fixture.0.clone();
+        let code = base.join("code");
+        for repo in ["alpha", "beta", "group/gamma"] {
+            init(&code.join(repo));
+        }
+        let mut h = harness();
+        let a = app(&mut h);
+        let profile = a.profile();
+        a.library.add_root(profile, code.clone(), 1);
+        settle(&mut h);
+        let a = app(&mut h);
+        assert_eq!(listed(a), ["alpha", "beta"]);
+        let id = a.library.get(profile).map_or(0, |l| l.roots[0].id);
+        a.roots_click(RootsClick::Depth(id, 2));
+        settle(&mut h);
+        assert_eq!(listed(app(&mut h)), ["alpha", "beta", "gamma"]);
 
-    let alpha = code.join("alpha");
-    h.get_by_label(&crate::remote::display(&alpha)).click();
-    h.step();
-    let a = app(&mut h);
-    assert_eq!(
-        a.recent,
-        std::slice::from_ref(&alpha),
-        "open error: {:?}",
-        a.error
-    );
-    assert!(matches!(&a.tabs[a.active], Tab::Repo(r) if r.path == alpha));
-    assert_eq!(a.tabs.len(), 1, "one tab, for the one opened");
+        let alpha = code.join("alpha");
+        h.get_by_label(&crate::remote::display(&alpha)).click();
+        h.step();
+        let a = app(&mut h);
+        assert_eq!(
+            a.recent,
+            std::slice::from_ref(&alpha),
+            "open error: {:?}",
+            a.error
+        );
+        assert!(matches!(&a.tabs[a.active], Tab::Repo(r) if r.path == alpha));
+        assert_eq!(a.tabs.len(), 1, "one tab, for the one opened");
 
-    let beta = code.join("beta");
-    let ctx = h.ctx.clone();
-    app(&mut h).library_click(LibraryClick::Hide(beta.clone()), &ctx);
-    settle(&mut h);
-    let a = app(&mut h);
-    a.roots_click(RootsClick::Remove(id));
-    // Opening alpha listed its folder's repositories as Nearby: those stay, gamma goes.
-    assert_eq!(listed(a), ["alpha", "beta"]);
-    let lib = a.library.get(profile).cloned().unwrap_or_default();
-    assert!(
-        lib.entries
-            .iter()
-            .all(|e| !e.sources.contains(&Source::Root(id)))
-    );
-    assert_eq!(
-        a.recent,
-        std::slice::from_ref(&alpha),
-        "Recent keeps what was opened"
-    );
-    a.library.add_root(profile, code.clone(), 1);
-    settle(&mut h);
-    let a = app(&mut h);
-    let lib = a.library.get(profile).cloned().unwrap_or_default();
-    let rows = rows::all(&lib, &a.recent);
-    assert!(
-        rows.iter().all(|r| r.path != beta),
-        "hidden survives root changes"
-    );
-    assert!(rows.iter().any(|r| r.path == alpha));
-    let _ = std::fs::remove_dir_all(&base);
+        let beta = code.join("beta");
+        let ctx = h.ctx.clone();
+        app(&mut h).library_click(LibraryClick::Hide(beta.clone()), &ctx);
+        settle(&mut h);
+        let a = app(&mut h);
+        a.roots_click(RootsClick::Remove(id));
+        // Opening alpha listed its folder's repositories as Nearby: those stay, gamma goes.
+        assert_eq!(listed(a), ["alpha", "beta"]);
+        let lib = a.library.get(profile).cloned().unwrap_or_default();
+        assert!(
+            lib.entries
+                .iter()
+                .all(|e| !e.sources.contains(&Source::Root(id)))
+        );
+        assert_eq!(
+            a.recent,
+            std::slice::from_ref(&alpha),
+            "Recent keeps what was opened"
+        );
+        a.library.add_root(profile, code.clone(), 1);
+        settle(&mut h);
+        let a = app(&mut h);
+        let lib = a.library.get(profile).cloned().unwrap_or_default();
+        let rows = rows::all(&lib, &a.recent);
+        assert!(
+            rows.iter().all(|r| r.path != beta),
+            "hidden survives root changes"
+        );
+        assert!(rows.iter().any(|r| r.path == alpha));
+        drop(h);
+        drop(fixture);
+    });
 }
 
 /// Opening `…/work/projects/app` lists `…/work/projects/tool` as Nearby without any root;
 /// `…/work` (a level up) isn't looked in. Turned off, the nearby rows go; Recent stays.
 #[test]
 fn an_opened_repository_lists_its_siblings() {
-    let base = tree("nearby");
-    let projects = base.join("work/projects");
-    init(&projects.join("app"));
-    init(&projects.join("tool"));
-    init(&base.join("work/far"));
-    let _ = std::fs::create_dir_all(projects.join("notes"));
-    let mut h = harness();
-    let ctx = h.ctx.clone();
-    app(&mut h).open_repo(&projects.join("app"), &ctx);
-    settle(&mut h);
-    let a = app(&mut h);
-    assert_eq!(listed(a), ["app", "tool"], "open error: {:?}", a.error);
-    let lib = a.library.get(a.profile()).cloned().unwrap_or_default();
-    assert_eq!(lib.nearby.len(), 1);
-    assert_eq!(lib.nearby[0].parent, projects);
-    assert_eq!(
-        lib.nearby[0].last.as_ref().map(|l| l.outcome.clone()),
-        Some(Outcome::Complete)
-    );
-    // Opened again soon: not scanned again.
-    a.open_repo(&projects.join("app"), &ctx);
-    assert!(!a.library.scheduler.busy());
-    let profile = a.profile();
-    a.roots_click(RootsClick::Nearby(false));
-    assert!(listed(a).is_empty());
-    assert_eq!(a.recent, [projects.join("app")]);
-    // Off: opening a repository looks nowhere.
-    a.open_repo(&projects.join("tool"), &ctx);
-    assert!(!a.library.scheduler.busy());
-    assert!(a.library.get(profile).is_some_and(|l| l.nearby.is_empty()));
-    let _ = std::fs::remove_dir_all(&base);
+    diag::bounded("an_opened_repository_lists_its_siblings", || {
+        let fixture = tree("nearby");
+        let base = fixture.0.clone();
+        let projects = base.join("work/projects");
+        init(&projects.join("app"));
+        init(&projects.join("tool"));
+        init(&base.join("work/far"));
+        let _ = std::fs::create_dir_all(projects.join("notes"));
+        let mut h = harness();
+        let ctx = h.ctx.clone();
+        app(&mut h).open_repo(&projects.join("app"), &ctx);
+        settle(&mut h);
+        let a = app(&mut h);
+        assert_eq!(listed(a), ["app", "tool"], "open error: {:?}", a.error);
+        let lib = a.library.get(a.profile()).cloned().unwrap_or_default();
+        assert_eq!(lib.nearby.len(), 1);
+        assert_eq!(lib.nearby[0].parent, projects);
+        assert_eq!(
+            lib.nearby[0].last.as_ref().map(|l| l.outcome.clone()),
+            Some(Outcome::Complete)
+        );
+        // Opened again soon: not scanned again.
+        a.open_repo(&projects.join("app"), &ctx);
+        assert!(!a.library.scheduler.busy());
+        let profile = a.profile();
+        a.roots_click(RootsClick::Nearby(false));
+        assert!(listed(a).is_empty());
+        assert_eq!(a.recent, [projects.join("app")]);
+        // Off: opening a repository looks nowhere.
+        a.open_repo(&projects.join("tool"), &ctx);
+        assert!(!a.library.scheduler.busy());
+        assert!(a.library.get(profile).is_some_and(|l| l.nearby.is_empty()));
+        drop(h);
+        drop(fixture);
+    });
 }
 
 /// Thirty repositories are all listed and searchable; Recent, its order and the tabs stay
 /// as they were; only the rows in view are laid out.
 #[test]
 fn thirty_repositories_leave_recent_alone() {
-    let base = tree("thirty");
-    for i in 0..32 {
-        init(&base.join(format!("repo{i:02}")));
-    }
-    let mut h = harness();
-    let a = app(&mut h);
-    let recent = vec![
-        PathBuf::from("/elsewhere/one"),
-        PathBuf::from("/elsewhere/two"),
-    ];
-    a.recent = recent.clone();
-    let profile = a.profile();
-    a.library.add_root(profile, base.clone(), 1);
-    settle(&mut h);
-    let a = app(&mut h);
-    assert_eq!(listed(a).len(), 32);
-    assert_eq!(a.recent, recent);
-    assert_eq!(a.tabs.len(), 1);
-    assert!(matches!(a.tabs[0], Tab::Home));
-    h.run_steps(2);
-    let laid_out = h
-        .query_all_by(|n| {
-            n.label()
-                .is_some_and(|l| l.contains("repo") && l.contains("gitcraft-library-thirty"))
-        })
-        .count();
-    assert!((1..=12).contains(&laid_out), "{laid_out} rows laid out");
-    // The library's search and keys: typed, then Enter opens the match.
-    h.ctx.memory_mut(|m| m.request_focus(search_id()));
-    h.step();
-    h.input_mut()
-        .events
-        .push(egui::Event::Text("repo31".into()));
-    h.run_steps(2);
-    h.key_press(egui::Key::Enter);
-    h.run_steps(2);
-    let a = app(&mut h);
-    assert_eq!(
-        a.recent[0],
-        base.join("repo31"),
-        "open error: {:?}",
-        a.error
-    );
-    assert_eq!(a.recent[1..], recent[..]);
-    let _ = std::fs::remove_dir_all(&base);
+    diag::bounded("thirty_repositories_leave_recent_alone", || {
+        let fixture = tree("thirty");
+        let base = fixture.0.clone();
+        for i in 0..32 {
+            init(&base.join(format!("repo{i:02}")));
+        }
+        let mut h = harness();
+        let a = app(&mut h);
+        let recent = vec![
+            PathBuf::from("/elsewhere/one"),
+            PathBuf::from("/elsewhere/two"),
+        ];
+        a.recent = recent.clone();
+        let profile = a.profile();
+        a.library.add_root(profile, base.clone(), 1);
+        settle(&mut h);
+        let a = app(&mut h);
+        assert_eq!(listed(a).len(), 32);
+        assert_eq!(a.recent, recent);
+        assert_eq!(a.tabs.len(), 1);
+        assert!(matches!(a.tabs[0], Tab::Home));
+        h.run_steps(2);
+        let laid_out = h
+            .query_all_by(|n| {
+                n.label()
+                    .is_some_and(|l| l.contains("repo") && l.contains("gitcraft-library-thirty"))
+            })
+            .count();
+        assert!((1..=12).contains(&laid_out), "{laid_out} rows laid out");
+        // The library's search and keys: typed, then Enter opens the match.
+        h.ctx.memory_mut(|m| m.request_focus(search_id()));
+        h.step();
+        h.input_mut()
+            .events
+            .push(egui::Event::Text("repo31".into()));
+        h.run_steps(2);
+        h.key_press(egui::Key::Enter);
+        h.run_steps(2);
+        let a = app(&mut h);
+        assert_eq!(
+            a.recent[0],
+            base.join("repo31"),
+            "open error: {:?}",
+            a.error
+        );
+        assert_eq!(a.recent[1..], recent[..]);
+        drop(h);
+        drop(fixture);
+    });
 }
 
 /// What a scan of one profile sends after a switch to another is never applied to either;
 /// a stopped scan keeps what was found, and Rescan finishes the job.
 #[test]
 fn profile_switches_stops_and_retries() {
-    let base = tree("profiles");
-    init(&base.join("a"));
-    init(&base.join("b"));
-    let mut h = harness();
-    let ctx = h.ctx.clone();
-    let a = app(&mut h);
-    let first = a.profile();
-    a.library.add_root(first, base.clone(), 1);
-    let other = a.settings.add_profile("Other", false);
-    a.settings.set(&ctx);
-    assert!(a.switch_profile(other, &ctx));
-    settle(&mut h);
-    let a = app(&mut h);
-    assert!(listed(a).is_empty());
-    let root = a.library.get(first).map(|l| l.roots[0].clone());
-    assert!(
-        root.as_ref().is_some_and(|r| r.last.is_none()),
-        "nothing applied to the first"
-    );
-    assert!(a.switch_profile(first, &ctx));
-    let id = root.map_or(0, |r| r.id);
-    // Stopped while waiting: nothing changes; Rescan does it.
-    a.library.rescan(first, &Source::Root(id));
-    a.roots_click(RootsClick::Stop(Source::Root(id)));
-    settle(&mut h);
-    assert!(listed(app(&mut h)).is_empty());
-    app(&mut h).roots_click(RootsClick::Rescan(Source::Root(id)));
-    settle(&mut h);
-    let a = app(&mut h);
-    assert_eq!(listed(a), ["a", "b"]);
-    // The dialog shows the root with its state.
-    a.library_open = true;
-    h.run_steps(2);
-    h.get_by_label_contains("2 repositories");
-    let _ = std::fs::remove_dir_all(&base);
+    diag::bounded("profile_switches_stops_and_retries", || {
+        let fixture = tree("profiles");
+        let base = fixture.0.clone();
+        init(&base.join("a"));
+        init(&base.join("b"));
+        let mut h = harness();
+        let ctx = h.ctx.clone();
+        let a = app(&mut h);
+        let first = a.profile();
+        a.library.add_root(first, base.clone(), 1);
+        let other = a.settings.add_profile("Other", false);
+        a.settings.set(&ctx);
+        assert!(a.switch_profile(other, &ctx));
+        settle(&mut h);
+        let a = app(&mut h);
+        assert!(listed(a).is_empty());
+        let root = a.library.get(first).map(|l| l.roots[0].clone());
+        assert!(
+            root.as_ref().is_some_and(|r| r.last.is_none()),
+            "nothing applied to the first"
+        );
+        assert!(a.switch_profile(first, &ctx));
+        let id = root.map_or(0, |r| r.id);
+        // Stopped while waiting: nothing changes; Rescan does it.
+        a.library.rescan(first, &Source::Root(id));
+        a.roots_click(RootsClick::Stop(Source::Root(id)));
+        settle(&mut h);
+        assert!(listed(app(&mut h)).is_empty());
+        app(&mut h).roots_click(RootsClick::Rescan(Source::Root(id)));
+        settle(&mut h);
+        let a = app(&mut h);
+        assert_eq!(listed(a), ["a", "b"]);
+        // The dialog shows the root with its state.
+        a.library_open = true;
+        h.run_steps(2);
+        h.get_by_label_contains("2 repositories");
+        drop(h);
+        drop(fixture);
+    });
 }
 
 /// The library is saved with the window's state and read back on start, shown at once from
 /// the cache; state saved before the library existed reads with an empty one.
 #[test]
 fn the_library_survives_a_restart() {
-    let old: super::super::Saved = ron::from_str("(recent: [\"/r/one\"])").assert_value();
-    assert!(old.library.is_empty());
-    assert_eq!(old.recent, [PathBuf::from("/r/one")]);
-    let mut lib = Library::default();
-    let id = lib.add_root(PathBuf::from("/code"), 1);
-    lib.finish(
-        &Source::Root(id),
-        model::ScanResult {
-            repos: vec![PathBuf::from("/code/a")],
-            outcome: Outcome::Complete,
-            at: 5,
-        },
-    );
-    let saved = super::super::Saved {
-        library: Libraries::from([(7, lib.clone())]),
-        ..Default::default()
-    };
-    let text = ron::to_string(&saved).assert_value();
-    let back: super::super::Saved = ron::from_str(&text).assert_value();
-    let state = LibraryState::new(back.library);
-    let cached = state.get(7).cloned().unwrap_or_default();
-    assert_eq!(cached, lib);
-    assert_eq!(rows::all(&cached, &[]).len(), 1);
+    diag::bounded("the_library_survives_a_restart", || {
+        let old: super::super::Saved = ron::from_str("(recent: [\"/r/one\"])").assert_value();
+        assert!(old.library.is_empty());
+        assert_eq!(old.recent, [PathBuf::from("/r/one")]);
+        let mut lib = Library::default();
+        let id = lib.add_root(PathBuf::from("/code"), 1);
+        lib.finish(
+            &Source::Root(id),
+            model::ScanResult {
+                repos: vec![PathBuf::from("/code/a")],
+                outcome: Outcome::Complete,
+                at: 5,
+            },
+        );
+        let saved = super::super::Saved {
+            library: Libraries::from([(7, lib.clone())]),
+            ..Default::default()
+        };
+        let text = ron::to_string(&saved).assert_value();
+        let back: super::super::Saved = ron::from_str(&text).assert_value();
+        let state = LibraryState::new(back.library);
+        let cached = state.get(7).cloned().unwrap_or_default();
+        assert_eq!(cached, lib);
+        assert_eq!(rows::all(&cached, &[]).len(), 1);
+    });
 }
 
 #[test]
 fn opening_a_deleted_library_row_removes_only_its_auto_entry() {
-    let base = tree("deleted-row");
-    let missing = base.join("removed-worktree");
-    let mut h = harness();
-    let ctx = h.ctx.clone();
-    let a = app(&mut h);
-    let profile = a.profile();
-    let id = a.library.lib(profile).add_root(base.clone(), 1);
-    a.library
-        .lib(profile)
-        .add_found(&Source::Root(id), std::slice::from_ref(&missing));
-    a.recent.push(missing.clone());
-    a.library_click(LibraryClick::Open(missing.clone()), &ctx);
-    settle(&mut h);
-    let a = app(&mut h);
-    assert!(a.library.get(profile).assert_value().entries.is_empty());
-    assert_eq!(a.recent, [missing]);
-    std::fs::remove_dir_all(base).assert_value();
+    diag::bounded(
+        "opening_a_deleted_library_row_removes_only_its_auto_entry",
+        || {
+            let fixture = tree("deleted-row");
+            let base = fixture.0.clone();
+            let missing = base.join("removed-worktree");
+            let mut h = harness();
+            let ctx = h.ctx.clone();
+            let a = app(&mut h);
+            let profile = a.profile();
+            let id = a.library.lib(profile).add_root(base.clone(), 1);
+            a.library
+                .lib(profile)
+                .add_found(&Source::Root(id), std::slice::from_ref(&missing));
+            a.recent.push(missing.clone());
+            a.library_click(LibraryClick::Open(missing.clone()), &ctx);
+            settle(&mut h);
+            let a = app(&mut h);
+            assert!(a.library.get(profile).assert_value().entries.is_empty());
+            assert_eq!(a.recent, [missing]);
+            drop(h);
+            drop(fixture);
+        },
+    );
 }
 
 #[test]
 fn practice_handoff_skips_nearby_even_with_permissive_guards() {
-    let base = tree("practice-handoff");
-    let repo = base.join("repository");
-    init(&repo);
-    let mut h = harness();
-    let ctx = h.ctx.clone();
-    let a = app(&mut h);
-    a.recorded_practice_completion(a.windows.current, Ok(repo));
-    a.poll_practice(&ctx);
-    assert!(
-        !a.library.checks.busy(),
-        "practice must not even queue a guard check"
+    diag::bounded(
+        "practice_handoff_skips_nearby_even_with_permissive_guards",
+        || {
+            let fixture = tree("practice-handoff");
+            let base = fixture.0.clone();
+            let repo = base.join("repository");
+            init(&repo);
+            let mut h = harness();
+            let ctx = h.ctx.clone();
+            let a = app(&mut h);
+            a.recorded_practice_completion(a.windows.current, Ok(repo));
+            a.poll_practice(&ctx);
+            assert!(
+                !a.library.checks.busy(),
+                "practice must not even queue a guard check"
+            );
+            drop(h);
+            drop(fixture);
+        },
     );
-    std::fs::remove_dir_all(base).assert_value();
 }
 
 #[test]
 fn save_scan_as_root_uses_the_discovered_depth() {
-    let mut h = harness();
-    let a = app(&mut h);
-    a.save_scan_as_root(PathBuf::from("/review-save-root"), 3);
-    let lib = a.library.get(a.profile()).assert_value();
-    assert_eq!(lib.roots[0].depth, 3);
-    a.save_scan_as_root(PathBuf::from("/review-save-root"), 1);
-    assert_eq!(a.library.get(a.profile()).assert_value().roots[0].depth, 3);
+    diag::bounded("save_scan_as_root_uses_the_discovered_depth", || {
+        let mut h = harness();
+        let a = app(&mut h);
+        a.save_scan_as_root(PathBuf::from("/review-save-root"), 3);
+        let lib = a.library.get(a.profile()).assert_value();
+        assert_eq!(lib.roots[0].depth, 3);
+        a.save_scan_as_root(PathBuf::from("/review-save-root"), 1);
+        assert_eq!(a.library.get(a.profile()).assert_value().roots[0].depth, 3);
+    });
 }
