@@ -121,6 +121,7 @@ pub(crate) enum Act {
     Routes(String),
     SaveRoutes(Box<routing::Browser>, String),
     PushBranch(String, String),
+    PublishPrepared(Box<routing::PreparedPush>),
     ForceBranch(String, String),
     ForceConfirmed(Box<routing::Force>),
     SubmoduleConflict(String),

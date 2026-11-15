@@ -26,6 +26,7 @@ pub(super) enum Effect {
     Mutation(Mutation),
     Dependencies(dependency::Plan, bool),
     Branch(Option<(String, String)>, Option<routing::Force>),
+    ReviewedPublication(routing::PreparedPush),
     PreparePublication(publishing::Manager),
     Publish(publishing::Manager, bool),
     Preview(remote_config::Editor),
@@ -56,6 +57,7 @@ impl Owner {
                 move |runner| routing::save(runner, &browser, &name),
             )),
             Act::PushBranch(name, oid) => Effect::Branch(Some((name, oid)), None),
+            Act::PublishPrepared(plan) => Effect::ReviewedPublication(*plan),
             Act::SaveGroup(manager) => Effect::Mutation(Mutation::new(
                 "Save publication group",
                 false,
@@ -144,7 +146,7 @@ impl Owner {
             Act::Dependencies => (String::new(), Tool::Dependencies),
             Act::CheckDependencies(..) | Act::PublishDependencies(..) => return None,
             Act::ResolveSubmodule(..) => return None,
-            Act::SaveRoutes(..) | Act::PushBranch(..) => return None,
+            Act::SaveRoutes(..) | Act::PushBranch(..) | Act::PublishPrepared(..) => return None,
             Act::SaveGroup(..) | Act::PreparePublication(..) | Act::PublishGroup(..) => {
                 return None;
             }
