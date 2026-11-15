@@ -362,3 +362,19 @@ pub fn credential_helper() -> Option<i32> {
         }
     })
 }
+
+/// Prepare a read with one immutable token; the caller preserves its verification protocol.
+pub(crate) fn discovery_command<E>(
+    account: &Account,
+    verify: impl FnOnce(Command) -> Result<(), E>,
+    unavailable: impl Fn(String) -> E,
+) -> Result<Command, E> {
+    let secret = token("gh", account).map_err(&unavailable)?;
+    let mut identity = account_command("gh", account).map_err(&unavailable)?;
+    install_token(&mut identity, "gh", account, &secret);
+    identity.args(["api", "user", "--hostname", &account.host, "--include"]);
+    verify(identity)?;
+    let mut command = account_command("gh", account).map_err(unavailable)?;
+    install_token(&mut command, "gh", account, &secret);
+    Ok(command)
+}

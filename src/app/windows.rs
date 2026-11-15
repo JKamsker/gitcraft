@@ -28,6 +28,7 @@ pub(super) struct Window {
     pub tabs: Vec<Tab>,
     active: usize,
     palette: Option<Palette>,
+    repo_browser: Option<super::repo_browser::Browser>,
     clone_form: Option<super::clone::CloneForm>,
     practice_open: bool,
     remote_form: Option<super::remote_open::RemoteForm>,
@@ -62,6 +63,7 @@ impl Window {
             tabs,
             active: 0,
             palette: None,
+            repo_browser: None,
             clone_form: None,
             practice_open: false,
             remote_form: None,
@@ -97,6 +99,7 @@ impl Window {
         std::mem::swap(&mut self.tabs, &mut app.tabs);
         std::mem::swap(&mut self.active, &mut app.active);
         std::mem::swap(&mut self.palette, &mut app.palette);
+        std::mem::swap(&mut self.repo_browser, &mut app.repo_browser);
         std::mem::swap(&mut self.clone_form, &mut app.clone_form);
         std::mem::swap(&mut self.practice_open, &mut app.practice_open);
         std::mem::swap(&mut self.remote_form, &mut app.remote_form);
