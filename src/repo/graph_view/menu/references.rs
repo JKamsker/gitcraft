@@ -138,7 +138,7 @@ impl RepoTab {
                 crate::i18n::text("dev-integration-ui-advanced"),
                 |ui| {
                     crate::repo::rehearse::rehearse_item(ui, acts, git_ref);
-                    if branch != current {
+                    if git_ref.full() != format!("refs/heads/{current}") {
                         crate::repo::interaction::interaction_item(ui, acts, &git_ref.full());
                     }
                 },

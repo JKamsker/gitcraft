@@ -354,6 +354,7 @@ fn a_keep_reset_refuses_to_touch_a_changed_file() {
 fn interaction_menu_passes_the_full_clicked_ref_to_the_dialog() -> Result<(), String> {
     use crate::repo::{Action, Dialog, interaction::InteractionAct};
     let mut tab = area_d_tab();
+    tab.refs.current = Some("origin/topic".into());
     tab.refs.local.push(git::Branch {
         name: "origin/topic".into(),
         target: "a".repeat(40),
