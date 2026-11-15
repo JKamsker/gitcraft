@@ -49,7 +49,7 @@ impl Purge {
         })
     }
 
-    pub fn remove(self) -> Result<(), String> {
+    pub fn remove(self, before: impl FnOnce() -> Result<(), String>) -> Result<(), String> {
         if identity(&self.entry)? != identity(&open_dir(&self.directory)?)? {
             return Err("Recovery entry identity changed".into());
         }
@@ -57,6 +57,7 @@ impl Purge {
         if identity(&self.entry)? != identity(&open_dir(&self.directory)?)? {
             return Err("Recovery entry identity changed".into());
         }
+        before()?;
         walk(&self.directory, true, true, 0)?;
         std::fs::remove_file(self.directory.join("record.json")).map_err(|e| e.to_string())?;
         drop(self.entry);

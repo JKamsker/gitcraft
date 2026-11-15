@@ -92,7 +92,9 @@ impl RepoTab {
             ctx,
             move || {
                 if purge {
-                    Store::purge_recovery(&repo, &directory)
+                    Store::purge_recovery(&repo, &directory, |path| {
+                        super::jobs::current_use(&repo, path)
+                    })
                 } else {
                     Store::restore_recovery(&repo, &directory)
                 }

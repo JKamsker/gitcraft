@@ -75,7 +75,15 @@ fn reasons(path: &Path, except: Option<u64>, entries: &[Open]) -> Vec<String> {
     let root = path.canonicalize().unwrap_or_else(|_| path.to_owned());
     let (mut views, mut terminals, mut unknown) = (0, 0, false);
     for entry in entries {
-        views += usize::from(Some(entry.id) != except && same(&entry.path));
+        views += usize::from(
+            Some(entry.id) != except
+                && (same(&entry.path)
+                    || entry
+                        .path
+                        .canonicalize()
+                        .unwrap_or_else(|_| entry.path.clone())
+                        .starts_with(&root)),
+        );
         for probe in &entry.terminals {
             match probe() {
                 Some(paths) if !paths.is_empty() => {
@@ -122,5 +130,26 @@ mod tests {
             terminals: vec![std::sync::Arc::new(|| None)],
         };
         assert!(!super::reasons(&root.join("worktree"), None, &[entry]).is_empty());
+    }
+
+    #[test]
+    fn purge_refuses_an_unavailable_terminal_observation() -> Result<(), String> {
+        use crate::git::worktree_cleanup::archive::Store;
+        let (repo, entry) = super::super::tests_in_use::retained("224 purge unknown terminal")?;
+        // Inject an isolated observation; do not poison the process-wide test registry.
+        let observation = super::Open {
+            id: 0,
+            path: repo.path().to_owned(),
+            terminals: vec![std::sync::Arc::new(|| None)],
+        };
+        assert!(
+            Store::purge_recovery(repo.path(), &entry, |path| {
+                let reasons = super::reasons(path, None, &[observation]);
+                Ok((!reasons.is_empty()).then(|| reasons.join("; ")))
+            })
+            .is_err()
+        );
+        assert!(entry.join("tree/base.txt").is_file());
+        Ok(())
     }
 }

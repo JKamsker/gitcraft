@@ -99,7 +99,7 @@ fn purge_is_explicit_and_rejects_other_repositories() -> Result {
     let items = Store::recoveries(f.repo.path())?;
     let directory = &items[0].0;
     let other = Fixture::new("purge wrong repository")?;
-    assert!(Store::purge_recovery(other.repo.path(), directory).is_err());
+    assert!(Store::purge_recovery(other.repo.path(), directory, |_| Ok(None)).is_err());
     assert!(directory.join("tree").exists());
     #[cfg(unix)]
     {
@@ -107,11 +107,11 @@ fn purge_is_explicit_and_rejects_other_repositories() -> Result {
         std::fs::create_dir(&outside)?;
         write(&outside, "precious", b"keep")?;
         std::os::unix::fs::symlink(&outside, directory.join("tree/link"))?;
-        Store::purge_recovery(f.repo.path(), directory)?;
+        Store::purge_recovery(f.repo.path(), directory, |_| Ok(None))?;
         assert_eq!(std::fs::read(outside.join("precious"))?, b"keep");
     }
     #[cfg(not(unix))]
-    Store::purge_recovery(f.repo.path(), directory)?;
+    Store::purge_recovery(f.repo.path(), directory, |_| Ok(None))?;
     assert!(!directory.exists());
     Ok(())
 }

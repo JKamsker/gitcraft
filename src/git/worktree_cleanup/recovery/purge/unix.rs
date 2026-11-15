@@ -85,17 +85,17 @@ impl Purge {
         Ok(())
     }
 
-    pub fn remove(self) -> Result<(), String> {
-        self.remove_after_check(|| {})
+    pub fn remove(self, before: impl FnOnce() -> Result<(), String>) -> Result<(), String> {
+        self.remove_after_check(before)
     }
 
-    fn remove_after_check(self, after: impl FnOnce()) -> Result<(), String> {
+    fn remove_after_check(self, after: impl FnOnce() -> Result<(), String>) -> Result<(), String> {
         self.verify()?;
         #[cfg(target_os = "linux")]
         super::mounts::check(&self.root.join(&self.name))?;
         walk(&self.entry, false, true, 0)?;
         self.verify()?;
-        after();
+        after()?;
         // Every recursive open repeats NO_XDEV/NOFOLLOW on the held parent, even
         // after preflight. Renames cannot redirect traversal to another ancestor.
         walk(&self.entry, true, true, 0)?;
@@ -119,6 +119,10 @@ fn walk(fd: &OwnedFd, delete: bool, top: bool, depth: usize) -> Result<(), Strin
         let stat = fs::statat(fd, name, AtFlags::SYMLINK_NOFOLLOW).map_err(|e| e.to_string())?;
         if FileType::from_raw_mode(stat.st_mode) == FileType::Directory {
             let opened = child(fd, name)?;
+            #[cfg(test)]
+            if delete {
+                super::super::tests::traversal_hook();
+            }
             walk(&opened, delete, false, depth + 1)?;
             if delete {
                 fs::unlinkat(fd, name, AtFlags::REMOVEDIR).map_err(|e| e.to_string())?;
@@ -137,7 +141,7 @@ mod tests {
     fn ancestor_replacement_after_last_check_cannot_redirect_the_walk()
     -> Result<(), Box<dyn std::error::Error>> {
         let temp = tempfile::tempdir()?;
-        let root = temp.path().join("recovery");
+        let root = temp.path().canonicalize()?.join("recovery");
         let entry = root.join("tree-one");
         std::fs::create_dir_all(entry.join("tree"))?;
         std::fs::write(entry.join("record.json"), "record")?;
@@ -148,6 +152,7 @@ mod tests {
             assert!(std::fs::rename(&root, &parked).is_ok());
             assert!(std::fs::create_dir_all(entry.join("tree")).is_ok());
             assert!(std::fs::write(entry.join("tree/precious"), "keep this").is_ok());
+            Ok(())
         });
         assert!(result.is_err());
         assert_eq!(

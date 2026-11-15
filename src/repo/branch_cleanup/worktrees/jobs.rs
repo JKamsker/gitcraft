@@ -187,10 +187,14 @@ pub(super) fn describe_restore(into: &Path, report: &RestoreReport) -> String {
 pub(super) fn current_use(repo: &Path, path: &Path) -> Result<Option<String>, String> {
     let mut reasons = super::presence::Presence::using(path, None);
     let same = crate::remote::is_same_dir_as(path);
-    for task in crate::agent::tasks::load(repo)?
-        .iter()
-        .filter(|t| same(Path::new(&t.path)))
-    {
+    let root = path.canonicalize().unwrap_or_else(|_| path.to_owned());
+    for task in crate::agent::tasks::load(repo)?.iter().filter(|t| {
+        same(Path::new(&t.path))
+            || Path::new(&t.path)
+                .canonicalize()
+                .unwrap_or_else(|_| PathBuf::from(&t.path))
+                .starts_with(&root)
+    }) {
         reasons.push(crate::i18n::message(
             "worktree-cleanup-in-use-agent",
             &[(

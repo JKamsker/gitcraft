@@ -1,5 +1,6 @@
 //! Whole-tree recovery. Cleanup renames; only an explicit purge deletes content. The
 //! worktree's private Git metadata (including its index) is retained beside the tree.
+mod lock;
 mod purge;
 
 use std::path::{Path, PathBuf};
@@ -19,6 +20,7 @@ struct Record {
 pub(super) struct Capture {
     pub directory: PathBuf,
     record: Record,
+    _operation: std::fs::File,
 }
 
 fn root(repo: &Path) -> Result<PathBuf, String> {
@@ -67,6 +69,11 @@ impl Capture {
             .tempdir_in(root)
             .map_err(|e| e.to_string())?
             .keep();
+        // Hold exclusion before publishing a record that another window can discover.
+        let operation = lock::acquire(
+            directory.parent().ok_or("Missing recovery root")?,
+            &directory,
+        )?;
         let record = Record {
             original: target.path.clone(),
             admin,
@@ -77,7 +84,11 @@ impl Capture {
         // No copy/delete fallback, including across devices. No TempDir destructor may
         // recursively delete this directory once it can contain user content.
         std::fs::rename(&target.path, directory.join("tree")).map_err(|e| e.to_string())?;
-        Ok(Self { directory, record })
+        Ok(Self {
+            directory,
+            record,
+            _operation: operation,
+        })
     }
 
     pub fn tree(&self) -> PathBuf {
@@ -149,6 +160,7 @@ impl Store {
     /// Restore the full tree and its index, refusing an occupied original path. The record
     /// stays behind on partial failure; no registration is restored without a retained tree.
     pub fn restore_recovery(repo: &Path, directory: &Path) -> Result<(), String> {
+        let _operation = lock::acquire(&root(repo)?, directory)?;
         let record = record(repo, directory)?;
         let tree = directory.join("tree");
         if !plain_dir(&tree) || !vacant(&record.original) {
@@ -179,8 +191,12 @@ impl Store {
 
     /// Only called after a separate explicit confirmation. Traversal is anchored to held
     /// directory handles; mount boundaries/reparse points are refused.
-    pub fn purge_recovery(repo: &Path, directory: &Path) -> Result<(), String> {
-        purge_after_validation(repo, directory, || {})
+    pub fn purge_recovery(
+        repo: &Path,
+        directory: &Path,
+        check_use: impl FnOnce(&Path) -> Result<Option<String>, String>,
+    ) -> Result<(), String> {
+        purge_after_validation(repo, directory, || {}, check_use)
     }
 }
 
@@ -188,7 +204,9 @@ fn purge_after_validation(
     repo: &Path,
     directory: &Path,
     after: impl FnOnce(),
+    check_use: impl FnOnce(&Path) -> Result<Option<String>, String>,
 ) -> Result<(), String> {
+    let _operation = lock::acquire(&root(repo)?, directory)?;
     let held = purge::Purge::open(&root(repo)?, directory)?;
     record(repo, directory)?;
     eprintln!(
@@ -196,7 +214,14 @@ fn purge_after_validation(
         directory.display()
     );
     after();
-    let result = held.remove();
+    // The mandatory observer check runs after filesystem preflight, immediately before
+    // destructive traversal, while restore and other purges are still excluded.
+    let result = held.remove(|| {
+        if let Some(reason) = check_use(directory)? {
+            return Err(reason);
+        }
+        Ok(())
+    });
     eprintln!(
         "gitcraft recovery purge result for {}: {result:?}",
         directory.display()
