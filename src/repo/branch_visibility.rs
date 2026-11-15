@@ -16,6 +16,7 @@ use crate::git::Refs;
 pub(crate) struct Visibility {
     /// Left out of the graph, while nothing is soloed.
     pub hidden: BTreeSet<String>,
+    pub label_remote: super::ref_presentation::Preference,
     /// When any are: the only branches the graph shows.
     pub solo: BTreeSet<String>,
     /// Group hiding in the sidebar is independent of graph reachability.
@@ -186,6 +187,7 @@ pub(crate) enum Change {
     ShowAll,
     RemoteSidebar(String),
     RemoteGraph(String),
+    LabelRemote(String),
 }
 
 impl RepoTab {
@@ -203,6 +205,20 @@ impl RepoTab {
     /// Changes which branches the graph shows, keeps that, and reads the graph again.
     pub(super) fn change_visibility(&mut self, change: Change, ctx: &egui::Context) {
         match change {
+            Change::LabelRemote(name) => {
+                self.visibility.label_remote = self
+                    .remotes
+                    .iter()
+                    .find(|r| r.name == name)
+                    .map(|r| super::ref_presentation::Preference {
+                        name: r.name.clone(),
+                        url: r.url.clone(),
+                    })
+                    .unwrap_or_default();
+                self.visibility.store(ctx, self.repo_key());
+                self.rebuild_graph_labels();
+                return;
+            }
             Change::Toggle(full) => self.visibility.toggle(&full),
             Change::Solo(full) => self.visibility.toggle_solo(&full),
             Change::ShowAll => self.visibility.show_all(),
@@ -227,6 +243,8 @@ impl RepoTab {
             self.search.retire();
         }
         let mut visibility = Visibility::load(ctx, self.repo_key());
+        visibility.label_remote.reconcile(&self.remotes);
+        visibility.store(ctx, self.repo_key());
         if visibility.prune(&self.refs) {
             visibility.store(ctx, self.repo_key());
         }

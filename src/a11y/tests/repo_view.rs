@@ -191,7 +191,10 @@ fn the_graph_is_reached_with_tab_and_read_aloud() -> Result<(), String> {
         label.starts_with(&format!("commit {head}, Third: 日本語, Jöns Ñ, ")),
         "{label}"
     );
-    assert!(label.ends_with("branch main, checked out"), "{label}");
+    assert!(
+        label.ends_with("branch main, checked out refs/heads/main"),
+        "{label}"
+    );
     assert!(harness.query_by_label_contains("Second, Jöns Ñ").is_some());
     assert!(
         harness

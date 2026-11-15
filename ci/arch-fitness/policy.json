@@ -175,7 +175,8 @@
         "gitcraft::vscode_theme",
         "gitcraft::tab_look",
         "gitcraft::keymap",
-        "gitcraft::operation_labels"
+        "gitcraft::operation_labels",
+        "gitcraft::ref_labels"
       ]
     },
     "git": {
@@ -320,6 +321,7 @@
         "gitcraft::repo::graph_walk",
         "gitcraft::repo::branch_bands",
         "gitcraft::repo::branch_visibility",
+        "gitcraft::repo::ref_presentation",
         "gitcraft::repo::columns",
         "gitcraft::repo::history_reader",
         "gitcraft::repo::history_filter",

@@ -99,7 +99,7 @@ pub(super) fn ref_pill(
     // At the column's minimum, the branch name takes precedence over its decorations. Keep
     // room for at least a short name such as `dev`; the tooltip still describes every mark.
     let name_w = painter
-        .layout_no_wrap(badge.label.clone(), font.clone(), white)
+        .layout_no_wrap(badge.caption.clone(), font.clone(), white)
         .size()
         .x;
     let short_w = painter
@@ -124,7 +124,7 @@ pub(super) fn ref_pill(
     let icons_w = (lead.len() + trail.len()) as f32 * ICON + dot_w;
     let text_room = (max_w - 16.0 - icons_w).max(16.0);
     let keep_end = crate::settings::Settings::branch_names_keep_end(ui.ctx());
-    let label = truncate(painter, &badge.label, &font, text_room, keep_end);
+    let label = truncate(painter, &badge.caption, &font, text_room, keep_end);
     let galley = painter.layout_no_wrap(label, font, white);
     let w = (galley.size().x + 16.0 + icons_w).min(max_w);
     let r = Rect::from_min_size(pos2(left_center.x, left_center.y - 10.0), vec2(w, 20.0));

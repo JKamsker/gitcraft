@@ -35,7 +35,7 @@ fn lane_names_distinguish_refs_tags_detached_and_reused_columns() {
         // A visible real pill suppresses the faint duplicate, even if it is a tag.
         assert!(tab.readable_viewport(ui, 3..5, 24).labels.is_empty());
         let tip_offscreen = tab.readable_viewport(ui, 4..6, 24);
-        assert_eq!(tip_offscreen.labels[&4], "origin/topic");
+        assert_eq!(tip_offscreen.labels[&4], "topic");
         let tag_visible = tab.readable_viewport(ui, 6..7, 24);
         assert!(tag_visible.labels.is_empty());
         let detached = tab.readable_viewport(ui, 7..8, 24);
@@ -88,7 +88,7 @@ fn auto_sized_pills_keep_double_click_and_branch_context_hitboxes() {
     let hash = &tab.commits[0].hash;
     assert_eq!(
         ctx.data(|d| d.get_temp::<Option<String>>(super::menu::pill_menu_id(hash))),
-        Some(Some("feature".to_owned()))
+        Some(Some("refs/heads/feature".to_owned()))
     );
     assert!(egui::Popup::is_any_open(&ctx));
 }

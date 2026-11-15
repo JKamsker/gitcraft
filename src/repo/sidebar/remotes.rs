@@ -60,12 +60,18 @@ impl RepoTab {
         if !open {
             return;
         }
+        let labels = self.ref_labels();
         for remote in &self.remotes {
             let hidden = self.visibility.sidebar_remotes.contains(&remote.name);
             let primary = self.primary_forge_remote() == Some(remote.name.as_str());
             let branches: Vec<&Branch> = self
                 .remote_branches(&remote.name)
-                .filter(|b| matches(filter, b))
+                .filter(|b| {
+                    matches(filter, b)
+                        || labels
+                            .get(&remote_ref(&b.name))
+                            .is_some_and(|l| l.caption.to_lowercase().contains(filter))
+                })
                 .collect();
             // A collapsible row per remote, open or closed in this repository only.
             let id = egui::Id::new(("remote-open", self.repo_key(), &remote.name));
@@ -187,7 +193,22 @@ impl RepoTab {
                 &|_: &&Branch| false,
                 &|b: &&Branch| ("branch-row", remote_ref(&b.name)),
                 &mut |ui, row, b: &&Branch| {
-                    self.remote_branch_row(ui, acts, &remote.name, b, row, idle);
+                    let full = remote_ref(&b.name);
+                    let caption = labels
+                        .get(&full)
+                        .map(|l| l.caption.as_str())
+                        .unwrap_or(row.name);
+                    self.remote_branch_row(
+                        ui,
+                        acts,
+                        &remote.name,
+                        b,
+                        LeafRow {
+                            name: caption,
+                            ..row
+                        },
+                        idle,
+                    );
                 },
             );
         }
@@ -207,13 +228,10 @@ impl RepoTab {
             && self.prs.iter().any(|p| !p.from_fork && p.branch == short);
         let full = remote_ref(&b.name);
         let shown = self.branch_shown(&full, false);
-        let r = remote_row(ui, &full, row, has_pr, !shown);
+        let r = remote_row(ui, &full, row, has_pr, !shown, &self.ref_description(&full));
         let r = self.branch_drag_drop(ui, r, &b.name, true, &b.target, acts);
         acts.extend(visibility::eye(ui, &r, &full, shown));
-        let r = r.on_hover_text(crate::i18n::message(
-            "repo-core-3485",
-            &[("name", b.name.to_string().into())],
-        ));
+        let r = r.on_hover_text(self.ref_description(&full));
         if r.double_clicked() && idle {
             acts.push(Action::CheckoutRemote(b.name.clone()));
         } else if r.clicked() {
@@ -318,7 +336,14 @@ fn paint_remote_header(
 
 /// A remote's branch, `full` its whole ref: only the icon and the name, in from its remote; the
 /// name dimmed while the graph leaves the branch out.
-fn remote_row(ui: &mut Ui, full: &str, row: LeafRow<'_>, has_pr: bool, hidden: bool) -> Response {
+fn remote_row(
+    ui: &mut Ui,
+    full: &str,
+    row: LeafRow<'_>,
+    has_pr: bool,
+    hidden: bool,
+    details: &str,
+) -> Response {
     let t = Tokens::get(ui.ctx());
     // Known by the branch, not its place: a fetch adds and prunes rows under an open menu.
     let (rect, resp) = widgets::keyed_row(ui, ROW_H, ("branch-row", full));
@@ -331,7 +356,7 @@ fn remote_row(ui: &mut Ui, full: &str, row: LeafRow<'_>, has_pr: bool, hidden: b
             (has_pr, crate::i18n::text("repo-core-3418")),
             (hidden, crate::i18n::text("repo-core-3419")),
         ];
-        labels::with_notes(&name, &notes)
+        format!("{} {details}", labels::with_notes(&name, &notes))
     });
     if resp.hovered() {
         ui.painter().rect_filled(rect, 0.0, t.hover);

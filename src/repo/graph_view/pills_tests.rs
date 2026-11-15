@@ -78,6 +78,8 @@ fn tab(refs: Refs) -> RepoTab {
 fn remote_pill(label: &str, remote: &str) -> Badge {
     Badge {
         label: label.to_owned(),
+        caption: label.to_owned(),
+        full_ref: format!("refs/remotes/{remote}/{label}"),
         kind: BadgeKind::Branch,
         local: false,
         remotes: vec![remote.to_owned()],
@@ -106,6 +108,8 @@ fn white_pill_labels_meet_aa_for_every_builtin_and_lane_setting() {
                     ] {
                         let badge = Badge {
                             label: "test".to_owned(),
+                            caption: "test".to_owned(),
+                            full_ref: "refs/heads/test".into(),
                             kind,
                             local,
                             remotes: vec![],
@@ -187,7 +191,7 @@ fn minimum_column_keeps_dev_and_the_extra_refs_count_visible() {
     for shape in &output.shapes {
         if let egui::epaint::Shape::Text(text) = &shape.shape {
             let label = text.galley.text();
-            if label == "dev" || label == "+1" {
+            if label == "dev" || label == "+2" {
                 assert!(text.pos.x >= shape.clip_rect.left());
                 assert!(text.pos.x + text.galley.size().x <= shape.clip_rect.right());
                 names.push(label);
@@ -199,7 +203,7 @@ fn minimum_column_keeps_dev_and_the_extra_refs_count_visible() {
         "the short branch name must stay whole"
     );
     assert!(
-        names.contains(&"+1"),
+        names.contains(&"+2"),
         "the extra refs count must stay reachable"
     );
     output.textures_delta.clear();
@@ -225,5 +229,10 @@ fn only_the_tracked_remote_pill_of_the_checked_out_branch_pulls() {
         Some(Action::Pull)
     ));
     // `git pull` would bring in origin/main, not fork/main.
-    assert!(tab.pill_checkout(&remote_pill("main", "fork")).is_none());
+    assert!(
+        matches!(tab.pill_checkout(&remote_pill("main", "fork")), Some(Action::CheckoutRemote(name)) if name == "fork/main")
+    );
 }
+
+#[path = "pills_review_tests.rs"]
+mod review_tests;
