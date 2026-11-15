@@ -10,6 +10,8 @@ pub mod alignment;
 pub mod compare;
 pub mod diagnostics;
 mod load;
+pub mod log_evidence;
+pub mod test_history;
 pub mod workflow;
 pub use load::{read, read_pinned};
 
