@@ -1,0 +1,11 @@
+{
+  "source": "28be1228e4621ee0371a201dfa0682108a6bb1e4",
+  "architecture": {
+    "violations": [],
+    "ratchet": [
+      "forge: fan-out 5/5, exported 165/166"
+    ]
+  },
+  "cleanup_passed": 41,
+  "presence_passed": 17
+}
