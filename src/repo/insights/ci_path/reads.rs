@@ -16,6 +16,7 @@ impl RepoTab {
         };
         if state.subject != subject {
             state.explorer = Slot::default();
+            state.logs = Slot::default();
             state.run = None;
             state.pinned = None;
             state.workflow = None;
@@ -134,6 +135,7 @@ impl RepoTab {
         };
         let baseline = state.baseline;
         let pinned = state.pinned;
+        state.logs = Slot::default();
         let request = state.explorer.restart();
         self.insight_forge_then(
             ctx,
@@ -167,5 +169,57 @@ impl RepoTab {
             state.selected = state.selected.filter(|&i| i < jobs);
             state.expanded.retain(|&i| i < jobs);
         }
+    }
+
+    /// Reads the logs behind job `job` of the run shown (GitHub): bounded to its baseline job
+    /// and the recorded same-SHA attempts, each exact job once.
+    pub(in crate::repo) fn ci_path_read_logs(&mut self, job: usize, ctx: &egui::Context) {
+        let path = self.path.clone();
+        let Some(state) = self.insights.as_mut().map(|v| &mut v.ci_path) else {
+            return;
+        };
+        let Some(explorer) = state.explorer.ready() else {
+            return;
+        };
+        if state.selected != Some(job) || explorer.project.forge != crate::forge::Forge::GitHub {
+            return;
+        }
+        let Some(plan) = analysis::test_history::plan(explorer, job) else {
+            return;
+        };
+        let project = explorer.project.clone();
+        let request = state.logs.restart();
+        self.insight_forge_then(
+            ctx,
+            move || {
+                Ok(analysis::test_history::read(plan, |id| {
+                    ci::timing::logs::job_log(&path, &project, id)
+                }))
+            },
+            move |tab, result, _ctx| tab.ci_path_logs(request, result),
+        );
+    }
+
+    /// Log evidence arrived: kept only for the same job, attempt, baseline and history.
+    pub(in crate::repo) fn ci_path_logs(
+        &mut self,
+        request: u64,
+        result: Result<analysis::test_history::JobEvidence, String>,
+    ) {
+        let Some(state) = self.insights.as_mut().map(|v| &mut v.ci_path) else {
+            return;
+        };
+        let current = state
+            .explorer
+            .ready()
+            .zip(state.selected)
+            .and_then(|(explorer, job)| analysis::test_history::plan(explorer, job));
+        if result
+            .as_ref()
+            .is_ok_and(|evidence| current.as_ref() != Some(&evidence.plan))
+        {
+            return;
+        }
+        state.logs.accept(request, result);
     }
 }

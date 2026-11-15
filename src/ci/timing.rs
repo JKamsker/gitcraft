@@ -12,6 +12,7 @@ use crate::forge::{self, Forge};
 use crate::pull_request::{at, items};
 
 pub mod history;
+pub mod logs;
 
 /// So many jobs of a run are read; a run with more is read in part.
 pub const MAX_JOBS: usize = 100;

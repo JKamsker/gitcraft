@@ -3,18 +3,35 @@ use super::*;
 
 /// Run the captured forge's command-line tool for repository operations.
 pub(crate) fn tool(hosting: &Hosting, repo: &Path, args: &[&str]) -> Result<String, String> {
-    let forge = hosting.forge;
-    let tool = match forge {
-        Forge::GitHub => "gh",
-        Forge::GitLab => "glab",
+    let tool = tool_name(hosting.forge)?;
+    cli::run(tool, hosting.forge.noun(), repo, hosting, args)
+}
+
+impl Hosting {
+    /// [`tool`], with the tool's answer captured up to `limit` bytes instead of the usual
+    /// limit: a longer answer comes back cut there (`true`), not refused.
+    pub(crate) fn tool_capped(
+        &self,
+        repo: &Path,
+        args: &[&str],
+        limit: usize,
+    ) -> Result<(String, bool), String> {
+        let tool = tool_name(self.forge)?;
+        cli::run_capped(tool, self.forge.noun(), repo, self, args, limit)
+    }
+}
+
+fn tool_name(forge: Forge) -> Result<&'static str, String> {
+    match forge {
+        Forge::GitHub => Ok("gh"),
+        Forge::GitLab => Ok("glab"),
         Forge::Forgejo | Forge::Gitea | Forge::Azure | Forge::Bitbucket => {
-            return Err(crate::i18n::message(
+            Err(crate::i18n::message(
                 "backend-gitcraft-has-no-tool-for-c05ef1",
                 &[("name", (forge.name()).to_string().into())],
-            ));
+            ))
         }
-    };
-    cli::run(tool, forge.noun(), repo, hosting, args)
+    }
 }
 
 /// Never let a CLI answer's URL override the repository captured for follow-up mutations.
