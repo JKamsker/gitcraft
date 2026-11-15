@@ -114,7 +114,13 @@ fn responsive_composer_matrix_reserves_identity_and_keeps_one_toolbar() {
             let icon = h.get_by_label("Commit as…").rect();
             let identity = h.get_by_label("as An author with an exceptionally long name <an-exceptionally-long-email-address@example.invalid> · global").rect();
             assert!(identity.right() <= icon.left());
-            let summary = h.get_by_value(&h.state().0.commit_summary).rect();
+            let summary = h
+                .get(
+                    egui_kittest::kittest::By::new()
+                        .role(egui::accesskit::Role::TextInput)
+                        .value(&h.state().0.commit_summary),
+                )
+                .rect();
             assert!(
                 summary.right() <= width / scale,
                 "file scrolling widened editor"
