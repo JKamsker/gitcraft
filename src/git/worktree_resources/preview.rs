@@ -30,6 +30,9 @@ pub(crate) fn previews(found: &Inventory) -> [Preview; 2] {
     if found.presence.is_some() {
         blockers.push("resources-active".into());
     }
+    if found.measurements[3].files > 0 || found.measurements[4].files > 0 {
+        blockers.push("resources-protected-data".into());
+    }
     // Owned terminal observations cannot establish the absence of external users.
     blockers.push("resources-external-unknown".into());
     let size = found.complete().then(|| found.logical_bytes());

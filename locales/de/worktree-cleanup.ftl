@@ -162,3 +162,4 @@ resources-link = Symbolischer Link oder Spezialdatei
 resources-ambiguous-build = Blockiert: Kandidat enthält nicht als entbehrlich erkannte Dateien
 resources-remote = SSH/WSL: nur Git-Metadaten; Größen, Prozesszuordnung und Bereinigungsvorschauen nicht unterstützt.
 resources-busy = Kapazität belegt; nach Ende laufender Messungen erneut versuchen.
+resources-protected-data = Blockiert: sonstige ignorierte oder unklassifizierte Dateien können Benutzerdaten enthalten.

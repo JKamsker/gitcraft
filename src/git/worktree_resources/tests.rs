@@ -153,10 +153,14 @@ fn detached_missing_upstream_and_rewritten_remote_refs_remain_protected() -> Res
     let detached = collect(repo.path(), repo.path(), 1, None, None)?;
     assert!(detached.branch.is_none());
     assert!(
-        previews(&detached)[1]
-            .blockers
-            .iter()
-            .any(|b| b == crate::i18n::text("worktree-cleanup-blocker-not-merged"))
+        crate::git::worktree_cleanup::resource_blockers(
+            repo.path(),
+            repo.path(),
+            None,
+            &detached.head,
+            None
+        )
+        .contains(&crate::git::worktree_cleanup::Blocker::NotMerged)
     );
     repo.commit("unpublished", &[("b", Some("b"))])?;
     let unpublished = collect(repo.path(), repo.path(), 2, None, None)?;

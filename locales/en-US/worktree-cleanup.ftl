@@ -162,3 +162,4 @@ resources-link = Symbolic link or special-file boundary
 resources-ambiguous-build = Blocked: candidate contains files not recognized as disposable artifacts
 resources-remote = SSH/WSL: Git metadata only; sizing, process association and cleanup previews unsupported.
 resources-busy = Resource measurement capacity occupied; retry after running jobs exit.
+resources-protected-data = Blocked: other ignored or unclassified files may contain user data.

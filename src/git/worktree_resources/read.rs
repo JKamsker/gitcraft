@@ -54,7 +54,7 @@ pub(crate) fn collect(
         ],
     )?;
     use sha2::{Digest, Sha256};
-    found.fingerprint = format!("{:x}", Sha256::digest(&refs));
+    found.fingerprint = format!("{:?}", Sha256::digest(&refs));
     let status = git_read(
         path,
         &[

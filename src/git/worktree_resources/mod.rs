@@ -45,7 +45,7 @@ pub(crate) enum Category {
     Ignored,
     Unclassified,
 }
-#[cfg(any(target_os = "linux", test))]
+#[cfg(target_os = "linux")]
 impl Category {
     fn index(self) -> usize {
         self as usize
