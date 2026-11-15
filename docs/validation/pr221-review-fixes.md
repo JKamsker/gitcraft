@@ -101,3 +101,35 @@ Total focused Rust tests: **25 passed**. No full Rust, Windows or forge-server
 suite ran locally. CI uses Rust 1.100 and remains the authority for that toolchain
 and platform coverage. This evidence addition changes documentation only after
 the listed application checks; its commit claims no additional test execution.
+
+
+## Combined dev merge (2026-11-15)
+
+Application/configuration candidate: `d023ed9f46caa2e79d0615d2171db0fd4803160b`.
+It plainly merges dev `112e8aa6` (including #222 and #223), preserving history.
+Only `ci/arch-fitness/baseline.json` needed conflict resolution: the common base's
+insights export budget 293 combines #222's +9 and #221's +2 into 304. Forge keeps
+#222's 166; repo-core symbols keep #221's 609. No increment was dropped.
+
+Validation on that immutable candidate:
+
+- `cargo +stable fmt --check`: passed.
+- Strict application all-target Clippy (`-D warnings`): passed on Rust 1.100.0.
+- Architecture `check --revision HEAD`: 28 domains, 291 edges, 239 cross-feature
+  mutations, zero violations; checked again with Rust 1.100.0.
+- Rust file-size check: 2739 tracked files, zero errors. Complexity: zero errors.
+- Fast Python tooling: 125 passed.
+- Focused Rust tests: purpose 19, diff 4, folding 20, attributes 2, i18n 5,
+  queued-job cancellation 1; **51 passed**, zero failed or ignored.
+
+All Rust commands ran at nice 19 with two build jobs in the dedicated target.
+The shared stable toolchain changed from 1.97.1 to 1.100.0 during the first test
+build, causing incompatible dependency metadata. Task-owned Rust outputs were
+cleared; formatting, architecture, strict Clippy and the focused tests then passed
+on 1.100.0. The final application Clippy/tests used debug information disabled and
+`--config 'profile.dev.package."*".opt-level=0'` to limit compilation cost. Repository
+fixtures used disposable Git 2.51. No full, Windows or forge-server suite ran locally.
+
+This evidence addition changes documentation only. Its application/configuration
+files are verified unchanged from the tested candidate; no additional execution
+is claimed for the documentation commit.
