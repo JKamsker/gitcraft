@@ -70,7 +70,7 @@ impl RepoTab {
         {
             ui.ctx().copy_text(b.name.clone());
         }
-        if let Some((menu, target)) = self.branch_link_menu(&b.name) {
+        if let Some((menu, target)) = self.branch_link_menu(&remote_ref(&b.name)) {
             menu.items(ui, "branch", &target, acts);
         }
         ui.separator();
@@ -169,6 +169,21 @@ impl RepoTab {
                 .clicked()
         {
             acts.push(Action::PrimaryForge(None));
+        }
+        ui.label(crate::i18n::text("ref-label-preferred"));
+        if ui
+            .selectable_label(
+                self.visibility.label_remote.name == remote.name,
+                &remote.name,
+            )
+            .clicked()
+        {
+            acts.push(Action::BranchVisibility(Change::LabelRemote(
+                remote.name.clone(),
+            )));
+        }
+        if ui.button(crate::i18n::text("ref-label-default")).clicked() {
+            acts.push(Action::BranchVisibility(Change::LabelRemote(String::new())));
         }
         let sidebar_hidden = self.visibility.sidebar_remotes.contains(&remote.name);
         if ui

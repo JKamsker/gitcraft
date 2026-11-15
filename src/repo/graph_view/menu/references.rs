@@ -45,13 +45,11 @@ impl RepoTab {
         idle: bool,
         acts: &mut Vec<Action>,
     ) {
-        // A pill names the local branch when there is one here, else `remote/branch`: a local
-        // branch elsewhere that happens to be called `origin/topic` is not this pill's.
-        let local = self
-            .refs
-            .local
-            .iter()
-            .any(|b| b.name == branch && b.target == hash);
+        let local = branch.starts_with("refs/heads/");
+        let branch = branch
+            .strip_prefix("refs/heads/")
+            .or_else(|| branch.strip_prefix("refs/remotes/"))
+            .unwrap_or(branch);
         let git_ref = BranchRef {
             name: branch,
             remote: !local,
@@ -140,8 +138,8 @@ impl RepoTab {
                 crate::i18n::text("dev-integration-ui-advanced"),
                 |ui| {
                     crate::repo::rehearse::rehearse_item(ui, acts, git_ref);
-                    if branch != current {
-                        crate::repo::interaction::interaction_item(ui, acts, branch);
+                    if git_ref.full() != format!("refs/heads/{current}") {
+                        crate::repo::interaction::interaction_item(ui, acts, &git_ref.full());
                     }
                 },
             );

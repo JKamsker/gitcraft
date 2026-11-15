@@ -35,7 +35,7 @@ impl RepoTab {
         };
         let text = ui
             .painter()
-            .layout_no_wrap(first.label.clone(), font, Color32::WHITE)
+            .layout_no_wrap(first.caption.clone(), font, Color32::WHITE)
             .size()
             .x;
         Some(
@@ -140,7 +140,10 @@ impl RepoTab {
         let refs_cell = Rect::from_min_max(rect.min, pos2(gx, rect.bottom()));
         // No tooltip in the way of a drag.
         if !stack_open && !dragging && ui.rect_contains_pointer(refs_cell) {
-            let mut lines: Vec<String> = badges.iter().map(Badge::describe).collect();
+            let mut lines: Vec<String> = badges
+                .iter()
+                .map(|b| format!("{}\n{}", b.describe(), self.ref_description(&b.full_ref)))
+                .collect();
             lines.extend(
                 badges
                     .iter()
@@ -173,7 +176,13 @@ impl RepoTab {
     fn marks(&self, badge: &Badge, hash: &str) -> Marks {
         let branch = badge.kind == BadgeKind::Branch;
         Marks {
-            pr: branch && self.prs.iter().any(|p| p.branch == badge.label),
+            pr: branch
+                && (badge.local
+                    || badge.remotes.first().map(String::as_str) == self.primary_forge_remote())
+                && self
+                    .prs
+                    .iter()
+                    .any(|p| !p.from_fork && p.branch == badge.label),
             ci: self
                 .ci_status(hash)
                 .filter(|_| branch)
@@ -225,23 +234,17 @@ impl RepoTab {
             return None;
         }
         // The checked-out branch's remote pill, further on than the branch: pull.
-        let current = self.refs.current.as_deref() == Some(badge.label.as_str());
-        if badge.kind == BadgeKind::Branch && !badge.local && current {
-            // Only for the branch it tracks: `git pull` brings that one in, not another
-            // remote's branch of the same name.
-            let behind = self
-                .refs
-                .local
-                .iter()
-                .find(|b| b.name == badge.label)
-                .is_some_and(|b| {
-                    b.ahead_behind().1 > 0
-                        && badge
-                            .remotes
-                            .iter()
-                            .any(|r| b.upstream == format!("{r}/{}", badge.label))
-                });
-            return behind.then_some(Action::Pull);
+        let current = self
+            .refs
+            .local
+            .iter()
+            .find(|b| Some(&b.name) == self.refs.current.as_ref());
+        if badge.kind == BadgeKind::Branch
+            && !badge.local
+            && let Some(branch) = current
+            && badge.full_ref.strip_prefix("refs/remotes/") == Some(branch.upstream.as_str())
+        {
+            return (branch.ahead_behind().1 > 0).then_some(Action::Pull);
         }
         match badge.kind {
             BadgeKind::Branch if badge.local => {
@@ -286,7 +289,7 @@ impl RepoTab {
         // when rows shift.
         let id = ui.id().with(("ref_stack", hash));
         let last: Option<Rect> = ui.data(|d| d.get_temp(id));
-        let slot_id = |n: usize| id.with(("slot", n));
+        let slot_id = |n: usize| id.with(("slot", &badges[n].full_ref));
         // A pill's menu keeps the list up while the pointer is on the menu.
         let menu_open =
             (0..badges.len()).any(|n| egui::Popup::is_id_open(ui.ctx(), slot_id(n).with("popup")));
@@ -339,8 +342,14 @@ impl RepoTab {
             Some(Action::Pull) => crate::i18n::text("repo-core-2692"),
             _ => crate::i18n::text("repo-core-2693"),
         };
-        let resp = resp.on_hover_text(format!("{} ({hint})", b.describe()));
-        widgets::a11y(&resp, egui::WidgetType::Button, || b.spoken());
+        let resp = resp.on_hover_text(format!(
+            "{} ({hint})\n{}",
+            b.describe(),
+            self.ref_description(&b.full_ref)
+        ));
+        widgets::a11y(&resp, egui::WidgetType::Button, || {
+            format!("{} {}", b.spoken(), self.ref_description(&b.full_ref))
+        });
         if resp.double_clicked() {
             if let Some(act) = self.pill_checkout(b) {
                 acts.push(act);

@@ -142,3 +142,6 @@ dev-integration-ui-history-filters = Verlaufsfilter
 dev-integration-ui-global-history-filters = Globale Verlaufsfilter
 
 dev-integration-ui-context-menus = Kontextmenüs
+
+ref-label-preferred = Bevorzugtes Remote für Branch-Beschriftungen
+ref-label-default = Automatisch (origin, wenn verfügbar)

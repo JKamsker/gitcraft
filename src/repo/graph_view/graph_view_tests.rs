@@ -13,7 +13,7 @@ fn a_selected_pr_branch_is_visible_ahead_of_other_branches_at_its_tip() {
     tab.compare = Some(crate::repo::Compare {
         base: "main".into(),
         base_label: "main".into(),
-        target: Some("head".into()),
+        target: Some("refs/heads/feature".into()),
         target_label: "feature".into(),
         captions: [None, None],
         since_fork: true,
@@ -38,6 +38,7 @@ fn a_selected_pr_branch_is_visible_ahead_of_other_branches_at_its_tip() {
     });
     if let Some(compare) = &mut tab.compare {
         compare.target_label = "fork-feature".into();
+        compare.target = Some("head".into());
     }
     let focused = tab.graph_badges(&commit);
     assert_eq!(focused[0].label, "fork-feature");

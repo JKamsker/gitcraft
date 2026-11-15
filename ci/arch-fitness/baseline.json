@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "note": "Reviewed legacy exceptions and budgets measured when the architecture fitness gate was adopted (#209). CI only reads this file. Remove entries (`ratchet`) as coupling is removed; additions need a reviewed reason.",
+  "note": "Reviewed legacy exceptions and budgets measured when the architecture fitness gate was adopted (#209). CI only reads this file. Remove entries (`ratchet`) as coupling is removed; additions need a reviewed reason. Issue #233 adds four shared pure ref-label API items (Entry, Kind, Label, labels) to ui-kit and one persisted display Preference type to graph; these visibility additions introduce no new domain dependencies. Independent review follow-up for #233 adds one graph Catalog type for the shared caption/details cache; the cache lives in the existing BadgeIndex and adds no coordinator dependency.",
   "forbidden_edges": [
     {
       "from": "agents",
@@ -3765,7 +3765,7 @@
     },
     "graph": {
       "domains": 18,
-      "exported": 52
+      "exported": 54
     },
     "guidance": {
       "domains": 8,
@@ -3827,7 +3827,7 @@
     },
     "ui-kit": {
       "domains": 4,
-      "exported": 98
+      "exported": 102
     },
     "update": {
       "domains": 2,

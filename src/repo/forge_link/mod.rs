@@ -141,7 +141,17 @@ impl RepoTab {
     /// The menu of links to the branch `name` (local, or `remote/branch`), and what the remote
     /// calls it: a local branch goes to the remote branch it tracks, a remote one to its remote.
     pub(in crate::repo) fn branch_link_menu(&self, name: &str) -> Option<(LinkMenu, Target)> {
-        let (remotes, on_remote) = match self.refs.local.iter().find(|b| b.name == name) {
+        let remote_ref = name.strip_prefix("refs/remotes/");
+        let name = name
+            .strip_prefix("refs/heads/")
+            .or(remote_ref)
+            .unwrap_or(name);
+        let (remotes, on_remote) = match self
+            .refs
+            .local
+            .iter()
+            .find(|b| remote_ref.is_none() && b.name == name)
+        {
             Some(b) => {
                 let tracked = links::upstream_remote(&b.upstream, &self.remotes);
                 let remotes = links::candidates(
@@ -176,7 +186,14 @@ impl RepoTab {
 
     /// The remote whose branch the local branch `name` tracks, or whose branch `name` is.
     fn tracked_remote(&self, name: &str) -> Option<String> {
-        let tracked = match self.refs.local.iter().find(|b| b.name == name) {
+        let remote = name.strip_prefix("refs/remotes/");
+        let name = name.strip_prefix("refs/heads/").or(remote).unwrap_or(name);
+        let tracked = match self
+            .refs
+            .local
+            .iter()
+            .find(|b| remote.is_none() && b.name == name)
+        {
             Some(b) => b.upstream.as_str(),
             None => name,
         };
@@ -285,3 +302,6 @@ fn deliver(result: Result<Link, String>, open: bool, ctx: &egui::Context) -> (St
 
 #[cfg(test)]
 mod tests;
+
+#[cfg(test)]
+mod namespace_tests;

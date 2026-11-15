@@ -9,7 +9,7 @@ fn refs_with_origin() -> Refs {
 }
 
 #[test]
-fn remote_twin_folds_into_local_badge() {
+fn remote_twin_stays_separate_from_local_badge() {
     let decos = [
         "origin/main",
         "HEAD -> main",
@@ -20,10 +20,10 @@ fn remote_twin_folds_into_local_badge() {
     .map(String::from);
     let b = badges(&decos, &refs_with_origin());
     let labels: Vec<&str> = b.iter().map(|b| b.label.as_str()).collect();
-    assert_eq!(labels, vec!["main", "dev", "v1"]);
-    assert!(b[0].head && b[0].local && b[0].remotes == ["origin"]);
+    assert_eq!(labels, vec!["main", "main", "dev", "v1"]);
+    assert!(b[0].head && b[0].local && b[0].remotes.is_empty());
     assert!(!b[1].local && b[1].remotes == ["origin"]);
-    assert_eq!(b[2].kind, BadgeKind::Tag);
+    assert_eq!(b.last().map(|b| &b.kind), Some(&BadgeKind::Tag));
 }
 
 /// The refs gitcraft keeps earlier versions in make no pill, however git lists them.
@@ -42,7 +42,7 @@ fn kept_versions_are_no_branches() {
     assert_eq!(labels, ["main"]);
 }
 
-fn branch(name: &str) -> git::Branch {
+pub(super) fn branch(name: &str) -> git::Branch {
     git::Branch {
         name: name.to_owned(),
         target: String::new(),
@@ -64,7 +64,7 @@ fn a_remote_named_like_the_start_of_another_does_not_take_its_branches() {
     let b = badges(&["my/fork/main".to_owned()], &refs);
     assert_eq!(b[0].label, "main");
     assert_eq!(b[0].remotes, ["my/fork"]);
-    assert_eq!(b[0].git_ref(), "my/fork/main");
+    assert_eq!(b[0].git_ref(), "refs/remotes/my/fork/main");
     // Not in the lists yet (refs not reloaded): still the longest remote.
     let b = badges(&["my/fork/topic".to_owned()], &refs);
     assert_eq!(
@@ -83,7 +83,7 @@ fn a_local_branch_named_under_a_remote_is_local() {
     let b = badges(&["origin/wip".to_owned()], &refs);
     assert_eq!(b[0].label, "origin/wip");
     assert!(b[0].local && b[0].remotes.is_empty());
-    assert_eq!(b[0].git_ref(), "origin/wip");
+    assert_eq!(b[0].git_ref(), "refs/heads/origin/wip");
 }
 
 #[test]
@@ -111,16 +111,17 @@ fn full_ref_names_make_the_same_pills() {
     assert_eq!(
         pills,
         vec![
-            ("main", true, &["origin".to_owned()][..]),
+            ("main", true, &[][..]),
+            ("main", false, &["origin".to_owned()][..]),
             ("x", true, &[][..]),
             ("topic", false, &["gone".to_owned()][..]),
             ("x", false, &[][..]),
         ]
     );
     assert!(b[0].head);
-    assert_eq!(b[1].git_ref(), "x");
-    assert_eq!(b[2].git_ref(), "gone/topic");
-    assert_eq!(b[3].kind, BadgeKind::Tag);
+    assert_eq!(b[2].git_ref(), "refs/heads/x");
+    assert_eq!(b[3].git_ref(), "refs/remotes/gone/topic");
+    assert_eq!(b.last().map(|b| &b.kind), Some(&BadgeKind::Tag));
 }
 
 #[test]
@@ -207,7 +208,7 @@ fn thousands_of_local_and_remote_twins_keep_head_order_and_separate_tags() {
     decorations.push("HEAD -> team/feature-2999".to_owned());
     decorations.push("tag: team/feature-2999".to_owned());
     let got = badges(&decorations, &refs);
-    assert_eq!(got.len(), 3001);
+    assert_eq!(got.len(), 6001);
     assert_eq!(got[0].label, "team/feature-2999");
     assert!(got[0].head);
     let mut sorted = names[..2999].to_vec();
@@ -219,8 +220,8 @@ fn thousands_of_local_and_remote_twins_keep_head_order_and_separate_tags() {
     assert!(
         got[..3000]
             .iter()
-            .all(|b| b.kind == BadgeKind::Branch && b.local && b.remotes == ["origin"])
+            .all(|b| b.kind == BadgeKind::Branch && b.local && b.remotes.is_empty())
     );
-    assert_eq!(got[3000].kind, BadgeKind::Tag);
-    assert_eq!(got[3000].label, "team/feature-2999");
+    assert_eq!(got[6000].kind, BadgeKind::Tag);
+    assert_eq!(got[6000].label, "team/feature-2999");
 }

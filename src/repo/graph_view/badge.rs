@@ -3,16 +3,18 @@
 use std::collections::{HashMap, HashSet};
 
 use crate::git::Refs;
-use crate::repo::sidebar;
 
-/// One pill in the refs column: a branch (local, remote or both), a tag or a detached HEAD.
+/// One selectable full ref in the refs column, or a detached HEAD.
 #[derive(Debug)]
 pub(super) struct Badge {
+    /// Raw branch path; never a display caption.
     pub(super) label: String,
+    pub(super) caption: String,
+    pub(super) full_ref: String,
     pub(super) kind: BadgeKind,
     /// The branch exists locally.
     pub(super) local: bool,
-    /// Remotes that have the branch at this commit.
+    /// The owning remote for a remote-tracking ref (empty for a local ref).
     pub(super) remotes: Vec<String>,
     /// The checked-out branch (or a detached HEAD).
     pub(super) head: bool,
@@ -28,12 +30,9 @@ pub(super) enum BadgeKind {
 }
 
 impl Badge {
-    /// The name git knows a branch pill by: the local branch, else `remote/branch`.
+    /// The immutable full Git ref; captions never participate in action routing.
     pub(super) fn git_ref(&self) -> String {
-        match self.remotes.first() {
-            Some(remote) if !self.local => format!("{remote}/{}", self.label),
-            _ => self.label.clone(),
-        }
+        self.full_ref.clone()
     }
 
     /// The pill as a screen reader says it, in a row's name: "branch dev, checked out".
@@ -77,21 +76,10 @@ impl Badge {
 
     /// The full names of the refs the pill stands for.
     pub(super) fn full_refs(&self) -> Vec<String> {
-        match self.kind {
-            BadgeKind::Tag => vec![format!("refs/tags/{}", self.label)],
-            BadgeKind::DetachedHead => vec!["HEAD".to_owned()],
-            BadgeKind::PullRequest => Vec::new(),
-            BadgeKind::Branch => {
-                let mut refs: Vec<String> = self
-                    .remotes
-                    .iter()
-                    .map(|r| format!("refs/remotes/{r}/{}", self.label))
-                    .collect();
-                if self.local {
-                    refs.insert(0, format!("refs/heads/{}", self.label));
-                }
-                refs
-            }
+        if self.kind == BadgeKind::PullRequest {
+            Vec::new()
+        } else {
+            vec![self.full_ref.clone()]
         }
     }
 
@@ -129,7 +117,7 @@ impl Badge {
 }
 
 /// Turns `git log --format=%D` decorations into pills: `x` and `origin/x` at the same commit
-/// become one pill marked local and remote.
+/// remain separate selectable pills.
 #[cfg(test)]
 pub(super) fn badges(decorations: &[String], refs: &Refs) -> Vec<Badge> {
     if decorations.is_empty() {
@@ -141,11 +129,17 @@ pub(super) fn badges(decorations: &[String], refs: &Refs) -> Vec<Badge> {
 /// Reuse the repository-wide lookup tables across all decorated commits in a rebuild.
 #[derive(Default)]
 pub(in crate::repo) struct BadgeIndex {
+    pub(in crate::repo) presentation_cache:
+        std::cell::RefCell<Option<std::sync::Arc<crate::repo::ref_presentation::Catalog>>>,
     local: HashSet<String>,
     heads: HashSet<String>,
     current: Option<String>,
+    symbolic: std::collections::BTreeSet<String>,
+    tags: HashSet<String>,
     names: Vec<String>,
     remote_branches: HashMap<String, String>,
+    pub(in crate::repo) captions:
+        std::sync::Arc<std::collections::BTreeMap<String, crate::ref_labels::Label>>,
 }
 
 impl BadgeIndex {
@@ -167,11 +161,15 @@ impl BadgeIndex {
             .map(|b| b.name.clone())
             .collect();
         Self {
+            presentation_cache: Default::default(),
             heads,
+            symbolic: refs.symbolic.clone(),
+            tags: refs.tags.iter().map(|b| b.name.clone()).collect(),
             current: refs.current.clone(),
             local,
             names,
             remote_branches,
+            captions: Default::default(),
         }
     }
 
@@ -182,12 +180,16 @@ impl BadgeIndex {
             local,
             names,
             remote_branches,
+            ..
         } = self;
         // The remote whose branch list has it, else the longest remote it is under (`my/fork/main`
         // is `my/fork`'s even when there is a remote `my`), unless it is a local branch's name.
         // `tracking`: it is known to be a remote-tracking branch (a full `refs/remotes/` name),
         // then of its first part when no remote fits (one since removed from the config).
         let remote_of = |d: &str, tracking: bool| {
+            if !tracking && local.contains(d) {
+                return None;
+            }
             let remote = remote_branches
                 .get(d)
                 .map(|remote| (*remote).to_owned())
@@ -195,31 +197,39 @@ impl BadgeIndex {
                     if !tracking && local.contains(d) {
                         return None;
                     }
-                    match sidebar::remote_of(
-                        d,
-                        &names.iter().map(String::as_str).collect::<Vec<_>>(),
-                    ) {
+                    match remote_of(d, &names.iter().map(String::as_str).collect::<Vec<_>>()) {
                         Some(remote) => Some(remote.to_owned()),
                         None if tracking => d.split_once('/').map(|(remote, _)| remote.to_owned()),
                         None => None,
                     }
                 })?;
-            let branch = sidebar::remote_short(d, &remote)?;
+            let branch = d.strip_prefix(&remote)?.strip_prefix('/')?;
             Some((branch.to_owned(), remote))
         };
-        fn branch(out: &mut Vec<Badge>, indices: &mut HashMap<String, usize>, name: &str) -> usize {
-            if let Some(&i) = indices.get(name) {
+        fn branch(
+            out: &mut Vec<Badge>,
+            indices: &mut HashMap<String, usize>,
+            name: &str,
+            remote: Option<&str>,
+        ) -> usize {
+            let full = match remote {
+                Some(r) => format!("refs/remotes/{r}/{name}"),
+                None => format!("refs/heads/{name}"),
+            };
+            if let Some(&i) = indices.get(&full) {
                 return i;
             }
             let i = out.len();
             out.push(Badge {
                 label: name.to_owned(),
+                caption: name.to_owned(),
+                full_ref: full.clone(),
                 kind: BadgeKind::Branch,
                 local: false,
                 remotes: Vec::new(),
                 head: false,
             });
-            indices.insert(name.to_owned(), i);
+            indices.insert(full, i);
             i
         }
         let mut indices = HashMap::new();
@@ -232,8 +242,15 @@ impl BadgeIndex {
             }
             // With `log.decorate=full` in the user's config, `%D` gives full ref names.
             if let Some(name) = d.strip_prefix("HEAD -> ") {
-                let name = name.strip_prefix("refs/heads/").unwrap_or(name);
-                let i = branch(&mut out, &mut indices, name);
+                let name = name
+                    .strip_prefix("refs/heads/")
+                    .filter(|_| !local.contains(name))
+                    .or_else(|| {
+                        name.strip_prefix("heads/")
+                            .filter(|_| !local.contains(name))
+                    })
+                    .unwrap_or(name);
+                let i = branch(&mut out, &mut indices, name, None);
                 if let Some(b) = out.get_mut(i) {
                     b.local = true;
                     b.head = true;
@@ -241,39 +258,70 @@ impl BadgeIndex {
             } else if d == "HEAD" {
                 out.push(Badge {
                     label: "HEAD".to_owned(),
+                    caption: "HEAD".to_owned(),
+                    full_ref: "HEAD".into(),
                     kind: BadgeKind::DetachedHead,
                     local: false,
                     remotes: Vec::new(),
                     head: true,
                 });
             } else if let Some(tag) = d.strip_prefix("tag: ") {
-                let tag = tag.strip_prefix("refs/tags/").unwrap_or(tag);
+                let tag = tag
+                    .strip_prefix("refs/tags/")
+                    .filter(|_| !self.tags.contains(tag))
+                    .or_else(|| {
+                        tag.strip_prefix("tags/")
+                            .filter(|_| !self.tags.contains(tag))
+                    })
+                    .unwrap_or(tag);
                 out.push(Badge {
                     label: tag.to_owned(),
+                    caption: tag.to_owned(),
+                    full_ref: format!("refs/tags/{tag}"),
                     kind: BadgeKind::Tag,
                     local: false,
                     remotes: Vec::new(),
                     head: false,
                 });
-            } else if let Some(name) = d.strip_prefix("refs/heads/") {
-                let i = branch(&mut out, &mut indices, name);
+            } else if let Some(name) = d
+                .strip_prefix("refs/heads/")
+                .filter(|_| !local.contains(d))
+                .or_else(|| {
+                    d.strip_prefix("heads/")
+                        .filter(|_| !local.contains(d) && !remote_branches.contains_key(d))
+                })
+            {
+                let i = branch(&mut out, &mut indices, name, None);
                 if let Some(b) = out.get_mut(i) {
                     b.local = true;
                 }
-            } else if let Some((name, remote)) = match d.strip_prefix("refs/remotes/") {
+            } else if let Some((name, remote)) = match d
+                .strip_prefix("refs/remotes/")
+                .filter(|_| !local.contains(d) && !remote_branches.contains_key(d))
+                .or_else(|| {
+                    d.strip_prefix("remotes/")
+                        .filter(|_| !local.contains(d) && !remote_branches.contains_key(d))
+                }) {
                 Some(rest) => remote_of(rest, true),
                 None => remote_of(d, false),
             } {
-                // `origin/HEAD` only says which branch the remote defaults to.
-                if name == "HEAD" {
+                // Symbolic defaults can have arbitrary names. A real branch ending in
+                // HEAD remains selectable when present in the fetched catalog.
+                if self
+                    .symbolic
+                    .contains(&format!("refs/remotes/{remote}/{name}"))
+                {
                     continue;
                 }
-                let i = branch(&mut out, &mut indices, &name);
+                if name == "HEAD" && !remote_branches.contains_key(&format!("{remote}/{name}")) {
+                    continue;
+                }
+                let i = branch(&mut out, &mut indices, &name, Some(&remote));
                 if let Some(b) = out.get_mut(i) {
                     b.remotes.push(remote);
                 }
             } else {
-                let i = branch(&mut out, &mut indices, d);
+                let i = branch(&mut out, &mut indices, d, None);
                 if let Some(b) = out.get_mut(i) {
                     b.local = true;
                 }
@@ -290,6 +338,13 @@ impl BadgeIndex {
             }
             badge.remotes.sort();
             badge.remotes.dedup();
+        }
+        for badge in &mut out {
+            if let Some(full) = badge.full_refs().first()
+                && let Some(label) = self.captions.get(full)
+            {
+                badge.caption = label.caption.clone();
+            }
         }
         // These pills all point at the same commit, so their commit distance to the default
         // branch ties. Show the checked-out branch first, then the usual default/integration
@@ -326,3 +381,12 @@ mod tests;
 #[cfg(test)]
 #[path = "badge_index_tests.rs"]
 mod index_tests;
+
+// Resolve nested aliases without depending on sidebar presentation.
+fn remote_of<'a>(name: &str, names: &[&'a str]) -> Option<&'a str> {
+    names
+        .iter()
+        .copied()
+        .filter(|r| name.strip_prefix(r).is_some_and(|s| s.starts_with('/')))
+        .max_by_key(|r| r.len())
+}

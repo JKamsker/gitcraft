@@ -188,7 +188,7 @@ fn typing_reb_ranks_rebase_first_and_its_branch_is_picked_next() -> Result<(), S
     );
     // Remembered: the verb and the branch, first when nothing is typed next time.
     let recent = &harness.state().palette_recent;
-    assert_eq!(recent.rank("rebase:side"), Some(0));
+    assert_eq!(recent.rank("rebase:refs/heads/side"), Some(0));
     assert_eq!(recent.rank("pick:rebase"), Some(1));
     Ok(())
 }
