@@ -101,10 +101,8 @@ pub(super) fn retained(
         in_use: None,
     };
     let preview = inspect(repo.path(), &target)?;
-    assert!(matches!(
-        remove(repo.path(), &target, &preview, None, false),
-        Outcome::Removed { .. }
-    ));
+    let outcome = remove(repo.path(), &target, &preview, None, false);
+    assert!(matches!(outcome, Outcome::Removed { .. }), "{outcome:?}");
     let entry = Store::recoveries(repo.path())?
         .into_iter()
         .next()

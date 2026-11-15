@@ -81,7 +81,7 @@ fn late_descriptor_writes_survive_archive_verification_and_cleanup() -> Result {
     assert!(
         crate::git::worktrees(f.repo.path(), None)?
             .iter()
-            .any(|w| w.path == wt)
+            .any(|w| crate::remote::same_dir(&w.path, &wt))
     );
     Ok(())
 }
@@ -92,10 +92,8 @@ fn purge_is_explicit_and_rejects_other_repositories() -> Result {
     let wt = f.merged_worktree("done")?;
     let target = f.target(&wt, "done")?;
     let preview = inspect(f.repo.path(), &target)?;
-    assert!(matches!(
-        remove(f.repo.path(), &target, &preview, Some(&f.store), false),
-        Outcome::Removed { .. }
-    ));
+    let outcome = remove(f.repo.path(), &target, &preview, Some(&f.store), false);
+    assert!(matches!(outcome, Outcome::Removed { .. }), "{outcome:?}");
     let items = Store::recoveries(f.repo.path())?;
     let directory = &items[0].0;
     let other = Fixture::new("purge wrong repository")?;
@@ -146,10 +144,8 @@ fn missing_retained_tree_cannot_restore_a_phantom_registration() -> Result {
     let wt = f.merged_worktree("done")?;
     let target = f.target(&wt, "done")?;
     let preview = inspect(f.repo.path(), &target)?;
-    assert!(matches!(
-        remove(f.repo.path(), &target, &preview, Some(&f.store), false),
-        Outcome::Removed { .. }
-    ));
+    let outcome = remove(f.repo.path(), &target, &preview, Some(&f.store), false);
+    assert!(matches!(outcome, Outcome::Removed { .. }), "{outcome:?}");
     let items = Store::recoveries(f.repo.path())?;
     let directory = &items[0].0;
     std::fs::rename(directory.join("tree"), f.scratch.join("moved-by-user"))?;
@@ -174,5 +170,43 @@ fn symlinked_recovery_area_is_refused_before_moving_content() -> Result {
         Outcome::Failed(_)
     ));
     assert!(wt.join("done.txt").exists());
+    Ok(())
+}
+
+/// A missing original path cannot resolve its aliases after capture. Git's registered
+/// spelling must be retained while the original is still present (also Windows 8.3/case).
+#[cfg(unix)]
+#[test]
+fn cleanup_through_symlinked_ancestry_keeps_registration_identity() -> Result {
+    let f = Fixture::new("capture aliased ancestry")?;
+    let wt = f.merged_worktree("done")?;
+    let alias = f.scratch.join("alias");
+    std::os::unix::fs::symlink(&f.scratch, &alias)?;
+    let path = alias.join("tree done");
+    let target = f.target(&path, "done")?;
+    let preview = inspect(f.repo.path(), &target)?;
+    let outcome = remove(f.repo.path(), &target, &preview, Some(&f.store), false);
+    assert!(matches!(outcome, Outcome::Removed { .. }), "{outcome:?}");
+    assert!(!wt.exists());
+    let items = Store::recoveries(f.repo.path())?;
+    Store::restore_recovery(f.repo.path(), &items[0].0)?;
+    assert!(path.join("base.txt").is_file());
+    Ok(())
+}
+
+#[cfg(windows)]
+#[test]
+fn cleanup_with_alternate_drive_case_keeps_registration_identity() -> Result {
+    let f = Fixture::new("capture drive case")?;
+    let wt = f.merged_worktree("done")?;
+    let mut alternate = wt.to_string_lossy().into_owned();
+    if alternate.as_bytes().get(1) == Some(&b':') {
+        let first = alternate[..1].to_ascii_lowercase();
+        alternate.replace_range(..1, &first);
+    }
+    let target = f.target(std::path::Path::new(&alternate), "done")?;
+    let preview = inspect(f.repo.path(), &target)?;
+    let outcome = remove(f.repo.path(), &target, &preview, Some(&f.store), false);
+    assert!(matches!(outcome, Outcome::Removed { .. }), "{outcome:?}");
     Ok(())
 }

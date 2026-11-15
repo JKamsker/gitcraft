@@ -9,10 +9,8 @@ fn retained(f: &Fixture) -> std::result::Result<std::path::PathBuf, String> {
     let wt = f.merged_worktree("done")?;
     let target = f.target(&wt, "done")?;
     let preview = inspect(f.repo.path(), &target)?;
-    assert!(matches!(
-        remove(f.repo.path(), &target, &preview, Some(&f.store), false),
-        Outcome::Removed { .. }
-    ));
+    let outcome = remove(f.repo.path(), &target, &preview, Some(&f.store), false);
+    assert!(matches!(outcome, Outcome::Removed { .. }), "{outcome:?}");
     Store::recoveries(f.repo.path())?
         .into_iter()
         .next()

@@ -155,7 +155,7 @@ fn submodule_inspection_refusal_preserves_the_complete_worktree() -> Result<(), 
     assert!(
         crate::git::worktrees(f.repo.path(), None)?
             .iter()
-            .any(|w| w.path == wt)
+            .any(|w| crate::remote::same_dir(&w.path, &wt))
     );
     assert!(f.store.list(None).is_empty());
     Ok(())

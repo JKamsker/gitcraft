@@ -19,6 +19,7 @@ struct Record {
 
 pub(super) struct Capture {
     pub directory: PathBuf,
+    pub registered: PathBuf,
     record: Record,
     _operation: std::fs::File,
 }
@@ -55,6 +56,13 @@ impl Capture {
         if root.starts_with(target.path.canonicalize().map_err(|e| e.to_string())?) {
             return Err("Recovery area is inside the worktree".into());
         }
+        // Resolve the registered spelling while the original still exists. After rename,
+        // canonicalization cannot equate Windows short names/case or symlink ancestry.
+        let registered = crate::git::worktree_list(repo, None)?
+            .into_iter()
+            .find(|wt| crate::remote::same_dir(&target.path, &wt.path))
+            .ok_or("Worktree registration disappeared before capture")?
+            .path;
         let admin = crate::git::run(Some(&target.path), &["rev-parse", "--absolute-git-dir"])?;
         let admin = PathBuf::from(admin.trim())
             .canonicalize()
@@ -86,6 +94,7 @@ impl Capture {
         std::fs::rename(&target.path, directory.join("tree")).map_err(|e| e.to_string())?;
         Ok(Self {
             directory,
+            registered,
             record,
             _operation: operation,
         })

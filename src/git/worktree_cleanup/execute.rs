@@ -84,7 +84,11 @@ fn finish(
     captured: &Capture,
 ) -> Result<Option<Listed>, String> {
     let tree = captured.tree();
-    let now = super::inspect::at(repo, target, &tree, true)?;
+    let registered = Target {
+        path: captured.registered.clone(),
+        ..target.clone()
+    };
+    let now = super::inspect::at(repo, &registered, &tree, true)?;
     if now.fingerprint != preview.fingerprint
         || now.fingerprint.is_empty()
         || !now.blockers_with(store.is_some()).is_empty()
