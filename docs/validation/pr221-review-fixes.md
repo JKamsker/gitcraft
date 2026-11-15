@@ -60,3 +60,44 @@ shard-selection source files are unchanged between that check and the combined c
 
 This file is a documentation-only evidence addition after the application checks;
 no new application test execution is claimed for its documentation commit.
+
+
+## Independent review follow-up (de884625)
+
+The maintainer supplied an independent read-only review of
+`de8846254fa81a0e0ed45b6249a8d91009d76c93`; that review replaces another re-review.
+All four follow-up findings are addressed; none was skipped or deferred.
+
+Implementation commit: `a8e76b0f93ed667c9ac106abaedc6fde04c50ea5`, preserved on
+`work/221` and verified against the remote. Combined application candidate:
+`fa9595dbd9dad598b2be9c9618616a1ff5708381`. It normally merges `origin/dev`
+`70d0bb8f` (including #223), without rewriting published history.
+
+- Proposal jobs use guarded `then_or` failure completions. Recorded-job regressions
+  cover rejection, retry and stale request/proposal failures; arrangement errors
+  enable the existing standard-order fallback.
+- Oversized base blobs cache a sentinel per path. A recorded-command test checks
+  one size lookup per file and no oversized blob reads.
+- The rename editor uses English/German catalog entries. The UI harness exercises
+  both controls, cancellation, the original group ID and a UTF-8 rename action.
+- #224 remained open at the final implementation fetch. The merged candidate's
+  architecture check passes with repo-core symbols at 609 and no baseline change.
+  Before merging #221, fetch/check dev again; if #224 lands first, merge dev and
+  validate the composed repo-core symbols budget of 610.
+
+Executed on this combined candidate with low-priority `cargo +stable` (Rust
+1.97.1), two build jobs and disposable Git 2.51:
+
+- Formatting, strict application all-target Clippy (`-D warnings`, including the
+  repository's denied unwrap lint), file-size and complexity gates: passed.
+  File-size check: 2724 tracked Rust files, zero errors.
+- Architecture: 28 domains, 291 edges, 239 cross-feature mutations, zero violations.
+- `repo::insights::purpose`: 19 passed, including the four new follow-up regressions.
+- `i18n::tests`: 5 passed.
+- `feature_failure_continuation_runs_when_a_queued_job_is_cancelled`: 1 passed.
+- Python CI tooling tests: 125 passed.
+
+Total focused Rust tests: **25 passed**. No full Rust, Windows or forge-server
+suite ran locally. CI uses Rust 1.100 and remains the authority for that toolchain
+and platform coverage. This evidence addition changes documentation only after
+the listed application checks; its commit claims no additional test execution.
