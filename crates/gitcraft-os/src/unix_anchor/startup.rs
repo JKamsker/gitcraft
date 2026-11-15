@@ -172,6 +172,12 @@ mod tests {
         drop(writer);
 
         let mut command = Command::new(&fixture.0);
+        assert_eq!(
+            spawn(&mut command, Instant::now())
+                .expect_err("an expired budget must preserve the exec refusal")
+                .raw_os_error(),
+            Some(libc::ETXTBSY)
+        );
         let attempts = Cell::new(0);
         let mut child = retry_text_busy(
             || {
