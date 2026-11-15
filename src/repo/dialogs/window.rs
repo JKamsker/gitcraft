@@ -209,6 +209,7 @@ impl RepoTab {
                     url,
                     focus,
                 } => remote::remote(ui, enter, original, name, url, focus),
+                Dialog::Tracking(form) => form.show(ui, idle),
                 Dialog::SetUpstream {
                     branch,
                     remote,

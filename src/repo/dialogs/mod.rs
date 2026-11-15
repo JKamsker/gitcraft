@@ -25,6 +25,7 @@ mod rehearse;
 mod remote;
 mod stash;
 mod test_commits;
+mod tracking;
 mod upstream;
 mod window;
 mod worktree;
@@ -157,6 +158,7 @@ pub enum Dialog {
         focus: bool,
     },
     /// The remote branch `branch` tracks: `remote`/`name`. `undo` brings back the one before.
+    Tracking(Box<tracking::Form>),
     SetUpstream {
         branch: String,
         remote: String,

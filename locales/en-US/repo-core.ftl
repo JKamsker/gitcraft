@@ -3297,3 +3297,17 @@ repo-core-panel-diff = diff
 repo-core-panel-terminal = terminal
 repo-core-panel-pr = pull request
 diff-pick-line = Select this line for Git actions. Shift-click to select a range.
+
+tracking-set = Set upstream…
+tracking-change = Change upstream…
+tracking-none = None
+tracking-current = Upstream
+tracking-unavailable = Current upstream is unavailable. Choose a fetched branch or unset it.
+tracking-search = Search branch, remote, or caption
+tracking-hidden = Include hidden remotes
+tracking-empty = No fetched branches match. Fetch a remote, then refresh this picker.
+tracking-apply = Set upstream
+tracking-unset = Unset upstream
+tracking-refresh = Refresh
+tracking-cancel = Cancel
+tracking-stale = Tracking, refs, or remote configuration changed. Refresh and reselect an upstream.

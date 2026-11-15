@@ -3300,3 +3300,17 @@ repo-core-panel-diff = Diff
 repo-core-panel-terminal = Terminal
 repo-core-panel-pr = Pull-Request
 diff-pick-line = Diese Zeile für Git-Aktionen auswählen. Mit Umschalt-Klick einen Bereich auswählen.
+
+tracking-set = Upstream festlegen…
+tracking-change = Upstream ändern…
+tracking-none = Keine
+tracking-current = Upstream
+tracking-unavailable = Der aktuelle Upstream ist nicht verfügbar. Einen abgerufenen Branch wählen oder die Zuordnung entfernen.
+tracking-search = Branch, Remote oder Beschriftung suchen
+tracking-hidden = Ausgeblendete Remotes einbeziehen
+tracking-empty = Keine passenden abgerufenen Branches. Ein Remote abrufen und diese Auswahl aktualisieren.
+tracking-apply = Upstream festlegen
+tracking-unset = Upstream entfernen
+tracking-refresh = Aktualisieren
+tracking-cancel = Abbrechen
+tracking-stale = Tracking, Referenzen oder Remote-Konfiguration wurden geändert. Aktualisieren und einen Upstream erneut wählen.

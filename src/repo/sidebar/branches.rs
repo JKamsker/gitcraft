@@ -176,6 +176,7 @@ impl RepoTab {
                 ],
             )),
         };
+        let r = r.on_hover_ui(|ui| self.tracking_items(ui, acts, b, idle));
         if r.double_clicked() && elsewhere.is_some() {
             if let Some(wt) = elsewhere {
                 acts.push(Action::OpenWorktree(wt.path.clone()));
