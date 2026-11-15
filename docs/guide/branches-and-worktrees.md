@@ -7,6 +7,13 @@ The left panel: local and remote branches, stacked branches, worktrees, submodul
 - Local branches with ahead/behind; right-click: check out (or in a new worktree), fast-forward,
   merge into / (interactively) rebase onto the current branch, push, create a pull request,
   rename, delete (here, or here and on the remote in one go)…
+- _Set upstream…_ / _Change upstream…_ is directly in every local branch menu,
+  including the checked-out branch. Branch details show its current upstream or _None_.
+  Search the picker by branch path, remote alias, or displayed caption; choices are grouped
+  by remote and show the full remote/branch and URL. _Include hidden remotes_ reveals
+  remotes hidden in the sidebar or graph. Only already fetched refs can be selected.
+  An unavailable upstream can be changed or unset. Apply rechecks the snapshot; if it
+  changed, refresh and choose again. Undo restores the exact previous tracking values.
 - _Pin to top_ (a branch's menu) keeps a branch at the top of _Local_; _Name_ / _Recent_ in the
   panel's header sorts the others by name or by their last commit, newest first. Both are kept
   per repository.

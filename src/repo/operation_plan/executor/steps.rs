@@ -18,6 +18,13 @@ impl Execution<'_> {
         if self.check_expectation(&step.kind)? {
             return Ok(None);
         }
+        if let [marker, json] = op
+            && marker == git::repository_tools::tracking::APPLY
+        {
+            return git::repository_tools::tracking::execute(self.path, json, self.control)
+                .map(Some)
+                .map_err(Into::into);
+        }
         crate::repo::partial_stash::validate_push(self.path, op)?;
         if let model::Step::Try { note, args } = &step.kind {
             let args: Vec<&str> = args.iter().map(String::as_str).collect();
