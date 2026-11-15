@@ -131,3 +131,28 @@ fn compact_entry_opens_a_keyboard_accessible_command_popup() -> Result<(), Strin
     );
     Ok(())
 }
+
+#[test]
+fn watch_dependency_rebuild_keeps_verdict_unverified_until_registration() -> Result<(), String> {
+    let repo = Repo::new("staged-watch-rebuild")?;
+    repo.commit("base", &[])?;
+    let ctx = egui::Context::default();
+    let mut tab = RepoTab::new_deferred(repo.path().into(), &ctx);
+    let result = git::test_staged(repo.path(), "exit 0", &RunStop::default())?;
+    let fingerprint = result.key.fingerprint.clone();
+    tab.test_lane.staged.result = Some(Ok(result));
+    tab.test_lane
+        .staged
+        .finish_check(0, 0, Ok(fingerprint.clone()));
+    tab.staged_watching(true, &ctx);
+    assert!(tab.test_lane.staged.watching);
+    assert!(tab.test_lane.staged.stale);
+    assert!(!tab.test_lane.staged.checking);
+    let epoch = tab.test_lane.staged.freshness;
+    tab.staged_watching(false, &ctx);
+    assert!(!tab.test_lane.staged.watching);
+    assert!(tab.test_lane.staged.freshness > epoch);
+    tab.test_lane.staged.finish_check(0, epoch, Ok(fingerprint));
+    assert!(tab.test_lane.staged.stale);
+    Ok(())
+}

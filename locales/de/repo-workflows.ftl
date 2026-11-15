@@ -7815,3 +7815,6 @@ staged-budget = Snapshot überschreitet das Vorbereitungsbudget (512 MiB geschä
 staged-verifying = Aktualität des Snapshots wird geprüft… Das bisherige Ergebnis gilt derzeit nicht.
 
 staged-run = Vorgemerkten Stand testen
+
+staged-metadata = Index und Info-Attribute müssen reguläre Dateien sein (keine Links, Geräte oder Pipes). Reguläre Git-Metadaten wiederherstellen und erneut versuchen.
+staged-raw = Tests verwenden unveränderte Index-Inhalte, ohne Checkout-Filter, Zeilenenden- oder Zeichenkodierungskonvertierung. Build-Ausgaben im Befehl begrenzen.

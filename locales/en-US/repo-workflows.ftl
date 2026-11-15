@@ -7817,3 +7817,6 @@ staged-budget = Snapshot exceeds the preparation budget (512 MiB estimated check
 staged-verifying = Verifying snapshot freshness… previous verdict is not current.
 
 staged-run = Run staged test
+
+staged-metadata = Index and info attributes must be regular files (no links, devices or pipes). Restore ordinary Git metadata and retry.
+staged-raw = Tests use raw indexed bytes, without checkout filters, line-ending or encoding conversion. Build outputs need limits in your command.

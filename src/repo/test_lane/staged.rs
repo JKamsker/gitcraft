@@ -11,6 +11,7 @@ pub(super) struct Staged {
     result: Option<Result<git::StagedResult, String>>,
     stale: bool,
     checking: bool,
+    watching: bool,
     checked: Option<Instant>,
 }
 impl Staged {
@@ -83,6 +84,7 @@ impl RepoTab {
             );
         }
         self.check_staged(ui.ctx());
+        ui.small(crate::i18n::text("staged-raw"));
         let state = &mut self.test_lane.staged;
         if self.busy_op.is_some() || self.work_pending != 0 {
             state.stale = true;
@@ -125,10 +127,10 @@ impl RepoTab {
             ui.label(crate::i18n::text("staged-running"));
         }
         if let Some(result) = &state.result {
-            if state.stale || state.checking {
+            if state.stale || state.checking || state.watching {
                 ui.colored_label(
                     ui.visuals().warn_fg_color,
-                    crate::i18n::text(if state.checking {
+                    crate::i18n::text(if state.checking || state.watching {
                         "staged-verifying"
                     } else {
                         "staged-stale"
@@ -181,6 +183,11 @@ impl RepoTab {
         ui.ctx().request_repaint_after(Duration::from_secs(1));
     }
 
+    pub(in crate::repo) fn staged_watching(&mut self, pending: bool, ctx: &egui::Context) {
+        self.test_lane.staged.watching = pending;
+        self.invalidate_staged(ctx);
+    }
+
     pub(in crate::repo) fn invalidate_staged(&mut self, ctx: &egui::Context) {
         self.test_lane.staged.stale = true;
         self.test_lane.staged.freshness += 1;
@@ -190,7 +197,8 @@ impl RepoTab {
 
     fn check_staged(&mut self, ctx: &egui::Context) {
         let state = &mut self.test_lane.staged;
-        if state.checking
+        if state.watching
+            || state.checking
             || state.result.is_none()
             || state
                 .checked

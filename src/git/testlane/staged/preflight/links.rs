@@ -7,6 +7,11 @@ use std::{
 };
 
 pub(super) fn validate(repo: &Path, entries: &[Entry], root: &Path) -> Result<(), String> {
+    resolve(&targets(repo, entries)?)?;
+    support(repo, entries, root)
+}
+
+pub(super) fn targets(repo: &Path, entries: &[Entry]) -> Result<BTreeMap<String, String>, String> {
     let mut links = BTreeMap::new();
     for entry in entries.iter().filter(|e| e.mode == "120000") {
         crate::processes::deadline::check()?;
@@ -20,6 +25,13 @@ pub(super) fn validate(repo: &Path, entries: &[Entry], root: &Path) -> Result<()
         }
         links.insert(folded(&entry.path), target);
     }
+    Ok(links)
+}
+
+pub(super) fn resolve(
+    links: &BTreeMap<String, String>,
+) -> Result<BTreeMap<String, String>, String> {
+    let mut result = BTreeMap::new();
     for path in links.keys() {
         let mut pending: std::collections::VecDeque<_> =
             path.split('/').map(str::to_owned).collect();
@@ -33,7 +45,12 @@ pub(super) fn validate(repo: &Path, entries: &[Entry], root: &Path) -> Result<()
                         return Err(fail("staged-links"));
                     }
                 }
-                _ => resolved.push(part),
+                _ => {
+                    if super::names::git_alias(&part) {
+                        return Err(fail("staged-links"));
+                    }
+                    resolved.push(part);
+                }
             }
             if let Some(target) = links.get(&folded(&resolved.join("/"))) {
                 if !expanded.insert(resolved.join("/")) {
@@ -56,14 +73,9 @@ pub(super) fn validate(repo: &Path, entries: &[Entry], root: &Path) -> Result<()
             STORAGE,
         )
         .map_err(|_| fail("staged-links"))?;
-        if resolved
-            .first()
-            .is_some_and(|p| p.eq_ignore_ascii_case(".git"))
-        {
-            return Err(fail("staged-links"));
-        }
+        result.insert(path.clone(), folded(&resolved.join("/")));
     }
-    support(repo, entries, root)
+    Ok(result)
 }
 
 fn support(repo: &Path, entries: &[Entry], root: &Path) -> Result<(), String> {
@@ -89,4 +101,24 @@ fn support(repo: &Path, entries: &[Entry], root: &Path) -> Result<(), String> {
     let result: std::io::Result<()> = Err(std::io::Error::other("symlinks unsupported"));
     result.map_err(|_| fail("staged-paths"))?;
     probe.close().map_err(|_| fail("staged-paths"))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn links_cannot_resolve_through_git_directory_aliases_on_any_host() {
+        for target in [
+            "GIT~1/config",
+            ".g\u{200c}it/config",
+            ".git::$INDEX_ALLOCATION",
+            "dir/GIT~1/../helper",
+            ".git\u{feff}/HEAD",
+        ] {
+            let links = BTreeMap::from([("LINK".into(), target.into())]);
+            assert!(resolve(&links).is_err(), "{target:?}");
+        }
+        let links = BTreeMap::from([("LINK".into(), "dir/../helper".into())]);
+        assert!(resolve(&links).is_ok());
+    }
 }

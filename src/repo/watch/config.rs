@@ -24,6 +24,38 @@ pub(super) fn paths(repo: &Path) -> Vec<PathBuf> {
     if let Some(profile) = crate::connections::current().git_config {
         paths.push(profile);
     }
+    // Parse every discovered file without evaluating includeIf conditions: an
+    // inactive include can become active after HEAD/config changes. Missing targets
+    // remain dependencies, so creating them invalidates before the poll fallback.
+    let mut seen = std::collections::BTreeSet::new();
+    let mut pending = paths.clone();
+    while let Some(file) = pending.pop() {
+        if !file.is_absolute() || !seen.insert(key(&file)) {
+            continue;
+        }
+        let Ok(raw) = crate::git::run(
+            Some(repo),
+            &[
+                "config",
+                "--no-includes",
+                "--file",
+                &file.to_string_lossy(),
+                "--null",
+                "--path",
+                "--get-regexp",
+                "^(include|includeif\\..*)\\.path$",
+            ],
+        ) else {
+            continue;
+        };
+        for row in raw.split('\0') {
+            if let Some((_, target)) = row.split_once('\n') {
+                let included = file.parent().unwrap_or(repo).join(target);
+                paths.push(included.clone());
+                pending.push(included);
+            }
+        }
+    }
     paths
         .into_iter()
         .filter(|p| p.is_absolute())
@@ -52,6 +84,20 @@ fn windows_key(text: &str) -> String {
     } else {
         text.strip_prefix("//?/").unwrap_or(&text).into()
     }
+}
+pub(super) fn parents(files: &[PathBuf]) -> Vec<PathBuf> {
+    files
+        .iter()
+        .filter_map(|file| {
+            file.parent()?
+                .ancestors()
+                .find(|p| p.is_dir())
+                .map(Path::to_path_buf)
+        })
+        .collect()
+}
+pub(super) fn changed(files: &[PathBuf], path: &Path) -> bool {
+    contains(files, path) || files.iter().any(|file| covers(file, path))
 }
 pub(super) fn contains(files: &[PathBuf], path: &Path) -> bool {
     let wanted = key(path);
@@ -106,3 +152,6 @@ mod tests {
         Ok(())
     }
 }
+
+#[cfg(test)]
+mod include_tests;

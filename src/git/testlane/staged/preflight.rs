@@ -6,6 +6,8 @@ use std::{
 };
 use unicode_normalization::UnicodeNormalization;
 mod links;
+mod materialize;
+mod names;
 const STORAGE: u64 = 512 * 1024 * 1024;
 const FILES: usize = 10_000;
 const PATH_UNITS: usize = 240;
@@ -106,7 +108,7 @@ fn portable(entries: &[Entry], root: &Path, budget: u64) -> Result<(), String> {
             if component.is_empty()
                 || component == "."
                 || component == ".."
-                || component.eq_ignore_ascii_case(".git")
+                || names::git_alias(component)
                 || component.ends_with(['.', ' '])
                 || component.len() > 255
                 || reserved
@@ -242,14 +244,15 @@ pub(super) fn faithful(root: &Path, entries: &[Entry]) -> Result<(), String> {
         }
     }
     namespace(root, entries)?;
-    let filemode = if cfg!(unix) {
-        "core.filemode=true"
-    } else {
-        "core.filemode=false"
-    };
-    git::run(Some(root), &["-c", filemode, "diff-files", "--quiet"])?;
     Ok(())
 }
 
 #[cfg(test)]
 mod tests;
+
+pub(super) fn materialize(repo: &Path, root: &Path, entries: &[Entry]) -> Result<(), String> {
+    materialize::write(repo, root, entries)
+}
+
+#[cfg(test)]
+mod materialize_tests;

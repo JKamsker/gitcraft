@@ -35,6 +35,12 @@ fn portable_names_are_checked_independently_of_host_filesystem() {
         "a\\b",
         "../escape",
         ".GiT/config",
+        "GIT~1/config",
+        "directory/git~1/HEAD",
+        ".g\u{200c}it/config",
+        ".git\u{feff}/config",
+        ".git::$INDEX_ALLOCATION",
+        "GIT~1:stream",
     ] {
         assert!(
             portable(&[entry(name, 0)], root, STORAGE).is_err(),

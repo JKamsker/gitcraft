@@ -3,8 +3,10 @@
 #[cfg(test)]
 use super::run_command;
 use super::{RunStop, Scratch};
+mod bounded;
 mod preflight;
 use crate::git::{self, Ended};
+use bounded::read as read_bounded;
 use sha2::{Digest, Sha256};
 use std::{
     path::Path,
@@ -43,6 +45,7 @@ fn fingerprint_for(repo: &Path, command: &str, index: Option<&[u8]>) -> Result<S
     let mut hash = Sha256::new();
     // Raw flags matter too: intent-to-add and an actually staged empty file have
     // identical ls-files --stage rows but different write-tree results.
+    hash.update(b"staged/raw-blobs-v1\0");
     hash.update(index.unwrap_or_default());
     hash.update(command.as_bytes());
     hash.update(crate::git::command::snapshot_policy::without_hooks(|| {
@@ -73,17 +76,6 @@ fn index_bytes(repo: &Path) -> Result<Option<Vec<u8>>, String> {
         &["rev-parse", "--path-format=absolute", "--git-path", "index"],
     )?;
     read_bounded(Path::new(index.trim()))
-}
-
-fn read_bounded(path: &Path) -> Result<Option<Vec<u8>>, String> {
-    if std::fs::metadata(path).is_ok_and(|m| m.len() > 64 * 1024 * 1024) {
-        return Err(crate::i18n::text("staged-budget").into());
-    }
-    match std::fs::read(path) {
-        Ok(bytes) => Ok(Some(bytes)),
-        Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(None),
-        Err(e) => Err(e.to_string()),
-    }
 }
 
 fn initial_revision(repo: &Path) -> Result<String, String> {
@@ -137,44 +129,30 @@ fn snapshot_inner(repo: &Path, expected: Option<&[u8]>) -> Result<(Scratch, Stri
         &["rev-parse", "--path-format=absolute", "--git-path", "index"],
     )?;
     let target = target.trim();
-    match std::fs::copy(source.trim(), target) {
-        Ok(_) => {}
-        Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
-            git::run(Some(&scratch.path), &["read-tree", "--empty"])?;
-        }
-        Err(e) => return Err(e.to_string()),
+    let copied = read_bounded(Path::new(source.trim()))?;
+    if expected.is_some() && copied.as_deref() != expected {
+        return Err(crate::i18n::text("staged-stale").into());
     }
-    if let Some(expected) = expected {
-        let copied = std::fs::read(target).map_err(|e| e.to_string())?;
-        if copied != expected {
-            return Err(crate::i18n::text("staged-stale").into());
-        }
+    if let Some(bytes) = copied {
+        bounded::write(Path::new(target), &bytes)?;
+    } else {
+        git::run(Some(&scratch.path), &["read-tree", "--empty"])?;
     }
     let tree = index_tree(repo, target, &scratch.path)?;
     let entries = preflight::manifest(repo, &tree, &scratch.path)?;
-    // Replace the copied split index with a standalone scratch index before checkout.
+    // A raw read-tree creates a standalone scratch index without touching worktree
+    // files. Materialization never calls checkout, diff-files or attribute conversions.
     std::fs::remove_file(target).map_err(|e| e.to_string())?;
-    // HEAD must describe the snapshot too: tools that inspect HEAD or reset their
-    // disposable checkout must not silently switch back to the source commit.
+    git::run(Some(&scratch.path), &["read-tree", &tree])?;
     let revision = synthetic_revision(repo, &tree)?;
-    git::run(
-        Some(&scratch.path),
-        &[
-            "-c",
-            "core.hooksPath=/dev/null",
-            "-c",
-            "core.sparseCheckout=false",
-            "-c",
-            "core.sparseCheckoutCone=false",
-            "-c",
-            "index.sparse=false",
-            "checkout",
-            "--detach",
-            "--force",
-            "-q",
-            &revision,
-        ],
+    git::command::run_inert_objects(
+        &scratch.path,
+        &["update-ref", "--no-deref", "HEAD", &revision],
+        None,
+        4096,
+        &[0],
     )?;
+    preflight::materialize(repo, &scratch.path, &entries)?;
     preflight::faithful(&scratch.path, &entries)?;
     Ok((scratch, tree))
 }

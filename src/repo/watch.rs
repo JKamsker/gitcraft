@@ -15,6 +15,7 @@ impl RepoTab {
     /// Setting that up walks every folder of the worktree (a big `node_modules` is tens of
     /// thousands), so it is done in the background; the watcher comes back as a message.
     pub(super) fn watch(&mut self, ctx: &egui::Context) {
+        self.staged_watching(true, ctx);
         self.watches += 1;
         let watch = self.watches;
         let (tx, rx) = channel();
@@ -92,6 +93,9 @@ fn start_watcher(
         .collect();
     let configurations = config::paths(path);
     let watched_configurations = configurations.clone();
+    let watched_parents = config::parents(&watched_configurations);
+    let retry = tx.clone();
+    let retry_ctx = ctx.clone();
     let root = path.to_owned();
     let handler = move |res: notify::Result<notify::Event>| {
         let Ok(event) = res else { return };
@@ -99,7 +103,7 @@ fn start_watcher(
             return;
         }
         for path in &event.paths {
-            let change = if config::contains(&configurations, path) {
+            let change = if config::changed(&configurations, path) {
                 Some(FsChange::Git)
             } else if config::covers(path, &root)
                 || git_dirs.iter().any(|d| config::covers(path, d))
@@ -139,14 +143,19 @@ fn start_watcher(
             let _ = watcher.watch(&common.join("reftable"), Recursive);
         }
     }
-    for file in watched_configurations {
-        if let Some(parent) = file.parent()
-            && !recursive.iter().any(|root| config::covers(parent, root))
-        {
+    for parent in &watched_parents {
+        if !recursive.iter().any(|root| config::covers(parent, root)) {
             // Re-registering an existing recursive root as nonrecursive can downgrade
             // its coverage. Only add config parents outside those roots.
             let _ = watcher.watch(parent, notify::RecursiveMode::NonRecursive);
         }
+    }
+    // Cover dependencies changed during registration, before their parent watch
+    // existed. The receiver rebuilds again while keeping the verdict unverified.
+    let latest = config::paths(path);
+    if latest != watched_configurations || config::parents(&latest) != watched_parents {
+        let _ = retry.send(FsChange::Git);
+        retry_ctx.request_repaint();
     }
     Some(watcher)
 }
