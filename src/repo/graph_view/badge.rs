@@ -136,7 +136,8 @@ pub(in crate::repo) struct BadgeIndex {
     tags: HashSet<String>,
     names: Vec<String>,
     remote_branches: HashMap<String, String>,
-    pub(in crate::repo) captions: std::collections::BTreeMap<String, crate::ref_labels::Label>,
+    pub(in crate::repo) captions:
+        std::sync::Arc<std::collections::BTreeMap<String, crate::ref_labels::Label>>,
 }
 
 impl BadgeIndex {

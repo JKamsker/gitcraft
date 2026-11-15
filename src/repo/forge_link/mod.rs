@@ -186,7 +186,14 @@ impl RepoTab {
 
     /// The remote whose branch the local branch `name` tracks, or whose branch `name` is.
     fn tracked_remote(&self, name: &str) -> Option<String> {
-        let tracked = match self.refs.local.iter().find(|b| b.name == name) {
+        let remote = name.strip_prefix("refs/remotes/");
+        let name = name.strip_prefix("refs/heads/").or(remote).unwrap_or(name);
+        let tracked = match self
+            .refs
+            .local
+            .iter()
+            .find(|b| remote.is_none() && b.name == name)
+        {
             Some(b) => b.upstream.as_str(),
             None => name,
         };

@@ -58,3 +58,52 @@ fn presentation_search_and_visibility_preserve_refs_without_submitting_jobs() {
         "alice"
     );
 }
+
+#[test]
+fn large_catalog_is_built_once_per_change_and_lookups_share_the_cache() {
+    let ctx = egui::Context::default();
+    let mut tab = RepoTab::new_deferred("/recording/233-large-catalog".into(), &ctx);
+    for alias in ["origin", "alice"] {
+        tab.remotes.push(Remote {
+            name: alias.into(),
+            url: format!("https://example.org/{alias}/repo"),
+        });
+        tab.refs.remotes.push((
+            alias.into(),
+            (0..10000)
+                .map(|i| Branch {
+                    name: format!("{alias}/topic-{i}"),
+                    target: "same".into(),
+                    is_head: false,
+                    upstream: String::new(),
+                    track: String::new(),
+                })
+                .collect(),
+        ));
+    }
+    let first = tab.presentation();
+    assert_eq!(first.entries_visited, 20000);
+    for i in 0..10000 {
+        assert!(std::sync::Arc::ptr_eq(&first, &tab.presentation()));
+        assert!(std::sync::Arc::ptr_eq(&first.labels, &tab.ref_labels()));
+        assert!(
+            tab.ref_description(&format!("refs/remotes/alice/topic-{i}"))
+                .contains("https://example.org/alice/repo")
+        );
+    }
+    tab.remotes[1].url = "https://other.example/bob/repo".into();
+    tab.rebuild_graph_labels();
+    assert!(!std::sync::Arc::ptr_eq(&first, &tab.presentation()));
+    assert!(
+        tab.ref_description("refs/remotes/alice/topic-0")
+            .contains("other.example")
+    );
+    tab.change_visibility(Change::LabelRemote("alice".into()), &ctx);
+    assert_eq!(
+        tab.ref_labels()["refs/remotes/alice/topic-0"].caption,
+        "topic-0"
+    );
+    tab.refs.remotes[1].1.pop();
+    tab.rebuild_graph_labels();
+    assert_eq!(tab.ref_labels().len(), 19999);
+}

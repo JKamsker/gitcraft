@@ -234,23 +234,17 @@ impl RepoTab {
             return None;
         }
         // The checked-out branch's remote pill, further on than the branch: pull.
-        let current = self.refs.current.as_deref() == Some(badge.label.as_str());
-        if badge.kind == BadgeKind::Branch && !badge.local && current {
-            // Only for the branch it tracks: `git pull` brings that one in, not another
-            // remote's branch of the same name.
-            let behind = self
-                .refs
-                .local
-                .iter()
-                .find(|b| b.name == badge.label)
-                .is_some_and(|b| {
-                    b.ahead_behind().1 > 0
-                        && badge
-                            .remotes
-                            .iter()
-                            .any(|r| b.upstream == format!("{r}/{}", badge.label))
-                });
-            return behind.then_some(Action::Pull);
+        let current = self
+            .refs
+            .local
+            .iter()
+            .find(|b| Some(&b.name) == self.refs.current.as_ref());
+        if badge.kind == BadgeKind::Branch
+            && !badge.local
+            && let Some(branch) = current
+            && badge.full_ref.strip_prefix("refs/remotes/") == Some(branch.upstream.as_str())
+        {
+            return (branch.ahead_behind().1 > 0).then_some(Action::Pull);
         }
         match badge.kind {
             BadgeKind::Branch if badge.local => {

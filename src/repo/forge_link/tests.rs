@@ -450,3 +450,32 @@ fn primary_forge_defaults_commit_links_but_explicit_remote_branch_links_keep_the
         },
     )
 }
+
+#[test]
+fn full_ref_commit_links_distinguish_local_and_remote_of_the_same_name() {
+    let ctx = egui::Context::default();
+    let mut tab = RepoTab::new_deferred("/recording/233-links".into(), &ctx);
+    tab.remotes = [("origin", "alice"), ("upstream", "bob")]
+        .map(|(name, owner)| git::Remote {
+            name: name.into(),
+            url: format!("https://github.com/{owner}/repo"),
+        })
+        .to_vec();
+    tab.refs.local.push(git::Branch {
+        name: "origin/topic".into(),
+        upstream: "upstream/topic".into(),
+        target: "tip".into(),
+        is_head: false,
+        track: String::new(),
+    });
+    for (full, expected) in [
+        ("refs/heads/origin/topic", "upstream"),
+        ("refs/remotes/origin/topic", "origin"),
+    ] {
+        let Some(menu) = tab.link_menu(Some(full)) else {
+            panic!("link menu required")
+        };
+        assert_eq!(menu.choices.len(), 1);
+        assert_eq!(menu.choices[0].remote, expected);
+    }
+}

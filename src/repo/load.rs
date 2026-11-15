@@ -118,6 +118,7 @@ impl RepoTab {
         let from_snapshot = std::mem::take(&mut self.snapshot_shown);
         let refs_moved = loaded.refs != self.refs || from_snapshot;
         self.refs = loaded.refs;
+        self.invalidate_ref_labels();
         self.graph_badge_index = super::graph_view::BadgeIndex::new(&self.refs);
         self.graph_badge_index.captions = self.ref_labels();
         self.has_more = loaded.history.len() >= loaded.requested;

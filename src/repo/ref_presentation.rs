@@ -1,5 +1,14 @@
 //! Adapts the repository catalog to shared, display-only ref captions.
 use std::collections::BTreeMap;
+use std::sync::Arc;
+
+#[derive(Default)]
+pub(in crate::repo) struct Catalog {
+    pub labels: Arc<BTreeMap<String, Label>>,
+    details: BTreeMap<String, String>,
+    #[cfg(test)]
+    pub entries_visited: usize,
+}
 
 use super::RepoTab;
 use crate::ref_labels::{Entry, Kind, Label};
@@ -40,7 +49,24 @@ impl RepoTab {
         }
     }
 
-    pub(super) fn ref_labels(&self) -> BTreeMap<String, Label> {
+    pub(super) fn invalidate_ref_labels(&self) {
+        self.ref_presentation_cache.borrow_mut().take();
+    }
+
+    fn presentation(&self) -> Arc<Catalog> {
+        if let Some(catalog) = self.ref_presentation_cache.borrow().as_ref() {
+            return catalog.clone();
+        }
+        let catalog = Arc::new(self.build_ref_presentation());
+        *self.ref_presentation_cache.borrow_mut() = Some(catalog.clone());
+        catalog
+    }
+
+    pub(super) fn ref_labels(&self) -> Arc<BTreeMap<String, Label>> {
+        self.presentation().labels.clone()
+    }
+
+    fn build_ref_presentation(&self) -> Catalog {
         let mut entries: Vec<_> = self
             .refs
             .local
@@ -60,14 +86,19 @@ impl RepoTab {
                 owner: None,
             }))
             .collect();
+        let urls: BTreeMap<_, _> = self
+            .remotes
+            .iter()
+            .map(|r| (r.name.as_str(), r.url.as_str()))
+            .collect();
+        let mut details = BTreeMap::new();
         for (remote, branches) in &self.refs.remotes {
-            let owner = self
-                .remotes
-                .iter()
-                .find(|r| r.name == *remote)
-                .and_then(|r| crate::forge::location(&r.url))
+            let url = urls.get(remote.as_str()).copied().unwrap_or_default();
+            let owner = crate::forge::location(url)
                 .and_then(|(_, path)| path.rsplit_once('/').map(|(owner, _)| owner.to_owned()));
             for b in branches {
+                let full = format!("refs/remotes/{}", b.name);
+                details.insert(full.clone(), format!("{remote}\n{full}\n{url}"));
                 entries.push(Entry {
                     full_ref: format!("refs/remotes/{}", b.name),
                     kind: Kind::Remote,
@@ -82,7 +113,7 @@ impl RepoTab {
                 });
             }
         }
-        crate::ref_labels::labels(
+        let labels = crate::ref_labels::labels(
             &entries,
             self.remotes
                 .iter()
@@ -90,18 +121,21 @@ impl RepoTab {
                 .or_else(|| self.remotes.iter().find(|r| r.name == "origin"))
                 .or_else(|| self.remotes.iter().min_by_key(|r| &r.name))
                 .map(|r| r.name.as_str()),
-        )
+        );
+        Catalog {
+            labels: Arc::new(labels),
+            details,
+            #[cfg(test)]
+            entries_visited: entries.len(),
+        }
     }
 
     pub(super) fn ref_description(&self, full: &str) -> String {
-        let remote = self.refs.remotes.iter().find(|(_, bs)| {
-            bs.iter()
-                .any(|b| format!("refs/remotes/{}", b.name) == full)
-        });
-        match remote.and_then(|(name, _)| self.remotes.iter().find(|r| r.name == *name)) {
-            Some(r) => format!("{}\n{full}\n{}", r.name, r.url),
-            None => full.to_owned(),
-        }
+        self.presentation()
+            .details
+            .get(full)
+            .cloned()
+            .unwrap_or_else(|| full.to_owned())
     }
 }
 

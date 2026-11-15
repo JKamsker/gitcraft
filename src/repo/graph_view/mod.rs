@@ -101,26 +101,25 @@ impl RepoTab {
         badges.retain(|b| {
             b.kind != BadgeKind::Branch || b.head || self.visibility.shows(&b.full_ref)
         });
-        if let Some(compare) = &self.compare
-            && compare.target.as_deref() == Some(commit.hash.as_str())
-        {
+        if let Some(compare) = &self.compare {
             let focused = match badges.iter().position(|badge| {
                 badge.kind == BadgeKind::Branch
-                    && (badge.git_ref() == compare.target_label
-                        || badge.full_ref.strip_prefix("refs/remotes/")
-                            == Some(compare.target_label.as_str())
-                        || (badge.local && badge.label == compare.target_label))
+                    && compare.target.as_deref() == Some(&badge.full_ref)
             }) {
                 Some(index) => badges.remove(index),
-                None if self.prs.iter().any(|pr| pr.branch == compare.target_label) => Badge {
-                    label: compare.target_label.clone(),
-                    caption: compare.target_label.clone(),
-                    full_ref: String::new(),
-                    kind: BadgeKind::PullRequest,
-                    local: false,
-                    remotes: Vec::new(),
-                    head: false,
-                },
+                None if compare.target.as_deref() == Some(commit.hash.as_str())
+                    && self.prs.iter().any(|pr| pr.branch == compare.target_label) =>
+                {
+                    Badge {
+                        label: compare.target_label.clone(),
+                        caption: compare.target_label.clone(),
+                        full_ref: String::new(),
+                        kind: BadgeKind::PullRequest,
+                        local: false,
+                        remotes: Vec::new(),
+                        head: false,
+                    }
+                }
                 None => return badges,
             };
             badges.insert(0, focused);
@@ -248,3 +247,6 @@ mod registry_tests;
 #[cfg(test)]
 #[path = "graph_view_remote_visibility_tests.rs"]
 mod remote_visibility_tests;
+
+#[cfg(test)]
+mod review_regression_tests;

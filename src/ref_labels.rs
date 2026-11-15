@@ -34,6 +34,11 @@ pub(crate) fn labels(entries: &[Entry], preferred: Option<&str>) -> BTreeMap<Str
             remotes.first().copied()
         }
     });
+    let non_remote: BTreeSet<_> = entries
+        .iter()
+        .filter(|e| e.kind != Kind::Remote)
+        .map(|e| e.path.as_str())
+        .collect();
     let mut paths = BTreeMap::<&str, usize>::new();
     let mut owners = BTreeMap::<&str, BTreeSet<&str>>::new();
     for e in entries {
@@ -60,10 +65,7 @@ pub(crate) fn labels(entries: &[Entry], preferred: Option<&str>) -> BTreeMap<Str
     for e in &ordered {
         let bare = e.kind != Kind::Remote
             || paths.get(e.path.as_str()) == Some(&1)
-            || (e.remote.as_deref() == preferred
-                && !entries
-                    .iter()
-                    .any(|other| other.path == e.path && other.kind != Kind::Remote));
+            || (e.remote.as_deref() == preferred && !non_remote.contains(e.path.as_str()));
         if bare && !reserved.contains(e.path.as_str()) && used.insert(e.path.clone()) {
             out.insert(
                 e.full_ref.clone(),

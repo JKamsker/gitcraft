@@ -349,3 +349,42 @@ fn a_keep_reset_refuses_to_touch_a_changed_file() {
     assert_eq!(head, two);
     assert_eq!(kept, "mine, not committed\n");
 }
+
+#[test]
+fn interaction_menu_passes_the_full_clicked_ref_to_the_dialog() {
+    use crate::repo::{Action, Dialog, interaction::InteractionAct};
+    let mut tab = area_d_tab();
+    tab.refs.local.push(git::Branch {
+        name: "origin/topic".into(),
+        target: "a".repeat(40),
+        is_head: false,
+        upstream: String::new(),
+        track: String::new(),
+    });
+    let mut h = egui_kittest::Harness::builder().build_ui_state(
+        |ui, (tab, acts): &mut (crate::repo::RepoTab, Vec<Action>)| {
+            let mut settings = crate::settings::Settings::get(ui.ctx());
+            settings.context_menus.rehearsal = true;
+            settings.put_for_test(ui.ctx());
+            tab.pill_items(ui, "refs/remotes/origin/topic", &"a".repeat(40), true, acts);
+        },
+        (tab, Vec::new()),
+    );
+    h.run();
+    h.get_by_label(crate::i18n::text("dev-integration-ui-advanced"))
+        .click();
+    h.run();
+    h.get_by_label(crate::i18n::text("repo-core-4149")).click();
+    h.run();
+    let Some(Action::Interaction(InteractionAct::Open { other })) = h.state_mut().1.pop() else {
+        panic!("interaction action required")
+    };
+    assert_eq!(other, "refs/remotes/origin/topic");
+    let ctx = egui::Context::default();
+    h.state_mut()
+        .0
+        .interaction_act(InteractionAct::Open { other }, &ctx);
+    assert!(
+        matches!(&h.state().0.dialog, Some(Dialog::FindInteraction { spec, .. }) if spec.b == "refs/remotes/origin/topic")
+    );
+}

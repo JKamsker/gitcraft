@@ -18,6 +18,7 @@ pub(super) struct Viewport {
 
 impl RepoTab {
     pub(in crate::repo) fn rebuild_graph_labels(&mut self) {
+        self.invalidate_ref_labels();
         self.graph_labels.clear();
         self.graph_badge_index = BadgeIndex::new(&self.refs);
         self.graph_badge_index.captions = self.ref_labels();

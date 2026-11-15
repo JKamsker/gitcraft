@@ -228,5 +228,10 @@ fn only_the_tracked_remote_pill_of_the_checked_out_branch_pulls() {
         Some(Action::Pull)
     ));
     // `git pull` would bring in origin/main, not fork/main.
-    assert!(tab.pill_checkout(&remote_pill("main", "fork")).is_none());
+    assert!(
+        matches!(tab.pill_checkout(&remote_pill("main", "fork")), Some(Action::CheckoutRemote(name)) if name == "fork/main")
+    );
 }
+
+#[path = "pills_review_tests.rs"]
+mod review_tests;
