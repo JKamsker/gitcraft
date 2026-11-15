@@ -1,0 +1,26 @@
+{
+  "233-tracking-backend-api": {
+    "changes": [
+      "budget/git/exported=381"
+    ],
+    "reason": "Issue #233 PR2 adds six shared backend items: fetched Choice, View, Plan, read, execute and the operation marker. They bind fetched full refs to revalidated local tracking changes and exact undo. No new domain dependency is introduced.",
+    "owner": "@JKamsker",
+    "remediation": "Consolidate the marker and execution adapter into one backend entrypoint when operation envelopes are typed; keep metadata helpers private."
+  },
+  "233-tracking-dialog-api": {
+    "changes": [
+      "budget/doctor/exported=35"
+    ],
+    "reason": "Issue #233 PR2 exposes one owned upstream picker Form to the existing Dialog coordinator. Picker state and asynchronous snapshots stay in the tracking feature.",
+    "owner": "@JKamsker",
+    "remediation": "Keep state private and reduce this export when Dialog composition becomes feature-owned."
+  },
+  "233-tracking-dispatch": {
+    "changes": [
+      "budget/repo-core/symbols=612"
+    ],
+    "reason": "Issue #233 PR2 adds three coordinator references for the existing operation pipeline to dispatch the tracking marker and for Dialog to hold the owned Form. The picker uses existing domain dependencies.",
+    "owner": "@JKamsker",
+    "remediation": "Consolidate tracking marker dispatch behind a typed operation boundary and keep all picker logic in its owning feature."
+  }
+}
