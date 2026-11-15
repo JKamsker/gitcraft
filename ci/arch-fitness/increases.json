@@ -234,5 +234,29 @@
     "reason": "After #236 merged alongside the #238 effective-visibility checker, forge measured 223 against 218. Narrowing the GitHub adapter to forge and replacing the discovery model glob with explicit UI exports confines RateLimit to forge and reduces the measurement to 222. The remaining query, repository/owner/visibility, page/error, session and discovery capability definitions form the app repository browser contract and must cross the forge boundary. This declares only the remaining four-item measured increase.",
     "owner": "@JKamsker",
     "remediation": "Keep transport, rate-limit parsing and provider adapters forge-scoped; use explicit discovery exports. Narrow unused browser contract types as consumers change, then ratchet this budget."
+  },
+  "224-worktree-cleanup-coordinator-symbols": {
+    "changes": [
+      "budget/repo-core/symbols=610"
+    ],
+    "reason": "PR #224 adds the WorktreeCleanup state dependency to the RepoTab coordinator. Combined with #221 and current dev, measured foreign symbols are 610 rather than 609.",
+    "owner": "@JKamsker",
+    "remediation": "Keep cleanup implementation behind its owned state and callbacks; remove unused coordinator imports and ratchet when dependencies shrink."
+  },
+  "224-archive-settings-symbols": {
+    "changes": [
+      "budget/settings/symbols=181"
+    ],
+    "reason": "PR #224 archive settings and commit file-tree preference require two additional cross-domain symbols; the merged checker measures 181 rather than dev's 179.",
+    "owner": "@JKamsker",
+    "remediation": "Keep archive settings storage and page behavior encapsulated; narrow dependencies through the settings boundary and ratchet unused symbols."
+  },
+  "224-sidebar-cleanup-state-export": {
+    "changes": [
+      "budget/sidebar/exported=37"
+    ],
+    "reason": "PR #224 re-exports WorktreeCleanup from branch_cleanup for the RepoTab state field. Corrected effective-visibility measurement is 37 exports rather than dev's 36.",
+    "owner": "@JKamsker",
+    "remediation": "Keep nested cleanup implementation private and expose only the coordinator state contract; narrow or remove that contract if state ownership moves."
   }
 }
