@@ -215,3 +215,24 @@ fn cancelled_tab_scope_still_removes_its_snapshot() -> Result<(), String> {
     assert_eq!(repo.scratch_left(), 0);
     Ok(())
 }
+
+#[cfg(unix)]
+#[test]
+fn materialization_never_runs_source_checkout_hooks() -> Result<(), String> {
+    use std::os::unix::fs::PermissionsExt;
+    let repo = Repo::new("staged-hooks")?;
+    repo.commit("base", &[])?;
+    let marker = repo.path().join("hook-ran");
+    let hook = repo.path().join(".git/hooks/post-checkout");
+    std::fs::write(
+        &hook,
+        format!("#!/bin/sh\necho unsafe > '{}'\n", marker.display()),
+    )
+    .map_err(|e| e.to_string())?;
+    std::fs::set_permissions(&hook, std::fs::Permissions::from_mode(0o755))
+        .map_err(|e| e.to_string())?;
+    let (scratch, _) = snapshot(repo.path(), None)?;
+    scratch.remove()?;
+    assert!(!marker.exists());
+    Ok(())
+}

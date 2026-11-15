@@ -125,7 +125,19 @@ fn snapshot(repo: &Path, expected: Option<&[u8]>) -> Result<(Scratch, String), S
     std::fs::remove_file(target).map_err(|e| e.to_string())?;
     // HEAD must describe the snapshot too: tools that inspect HEAD or reset their
     // disposable checkout must not silently switch back to the source commit.
-    scratch.checkout(&synthetic_revision(repo, &tree)?)?;
+    let revision = synthetic_revision(repo, &tree)?;
+    git::run(
+        Some(&scratch.path),
+        &[
+            "-c",
+            "core.hooksPath=/dev/null",
+            "checkout",
+            "--detach",
+            "--force",
+            "-q",
+            &revision,
+        ],
+    )?;
     Ok((scratch, tree))
 }
 
