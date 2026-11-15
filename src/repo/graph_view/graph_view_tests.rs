@@ -30,6 +30,7 @@ fn a_selected_pr_branch_is_visible_ahead_of_other_branches_at_its_tip() {
         base: "main".into(),
         base_oid: String::new(),
         sha: "head".into(),
+        head_repo: None,
         from_fork: true,
         author: String::new(),
         url: String::new(),

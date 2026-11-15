@@ -58,6 +58,7 @@ pub(super) fn parse_list(json: &str) -> Result<Vec<PullRequest>, String> {
             branch: text(item, "/source_branch"),
             base: text(item, "/target_branch"),
             base_oid: String::new(),
+            head_repo: None,
             from_fork: item.get("source_project_id") != item.get("target_project_id"),
             sha: text(item, "/sha"),
             author: text(item, "/author/username"),
