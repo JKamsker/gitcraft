@@ -13,7 +13,7 @@ fn branch(name: &str, upstream: &str) -> git::Branch {
 }
 
 #[test]
-fn comparison_focus_and_row_comparison_keep_full_remote_identity() {
+fn comparison_focus_and_row_comparison_keep_full_remote_identity() -> Result<(), String> {
     let ctx = egui::Context::default();
     let mut tab = RepoTab::new_deferred("/recording/233-focus".into(), &ctx);
     tab.refs.local = vec![branch("origin/topic", "")];
@@ -47,7 +47,7 @@ fn comparison_focus_and_row_comparison_keep_full_remote_identity() {
         since_fork,
     } = action
     else {
-        panic!("comparison required")
+        return Err("comparison required".into());
     };
     tab.compare = Some(crate::repo::Compare {
         base,
@@ -65,4 +65,5 @@ fn comparison_focus_and_row_comparison_keep_full_remote_identity() {
         matches!(tab.compare_rows(0, 1), Some(Action::Compare { target: Some(full), target_label, .. })
         if full == "refs/remotes/origin/topic" && target_label == "topic")
     );
+    Ok(())
 }

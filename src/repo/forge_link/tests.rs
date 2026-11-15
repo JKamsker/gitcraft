@@ -452,7 +452,7 @@ fn primary_forge_defaults_commit_links_but_explicit_remote_branch_links_keep_the
 }
 
 #[test]
-fn full_ref_commit_links_distinguish_local_and_remote_of_the_same_name() {
+fn full_ref_commit_links_distinguish_local_and_remote_of_the_same_name() -> Result<(), String> {
     let ctx = egui::Context::default();
     let mut tab = RepoTab::new_deferred("/recording/233-links".into(), &ctx);
     tab.remotes = [("origin", "alice"), ("upstream", "bob")]
@@ -473,9 +473,10 @@ fn full_ref_commit_links_distinguish_local_and_remote_of_the_same_name() {
         ("refs/remotes/origin/topic", "origin"),
     ] {
         let Some(menu) = tab.link_menu(Some(full)) else {
-            panic!("link menu required")
+            return Err("link menu required".into());
         };
         assert_eq!(menu.choices.len(), 1);
         assert_eq!(menu.choices[0].remote, expected);
     }
+    Ok(())
 }

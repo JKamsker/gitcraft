@@ -351,7 +351,7 @@ fn a_keep_reset_refuses_to_touch_a_changed_file() {
 }
 
 #[test]
-fn interaction_menu_passes_the_full_clicked_ref_to_the_dialog() {
+fn interaction_menu_passes_the_full_clicked_ref_to_the_dialog() -> Result<(), String> {
     use crate::repo::{Action, Dialog, interaction::InteractionAct};
     let mut tab = area_d_tab();
     tab.refs.local.push(git::Branch {
@@ -377,7 +377,7 @@ fn interaction_menu_passes_the_full_clicked_ref_to_the_dialog() {
     h.get_by_label(crate::i18n::text("repo-core-4149")).click();
     h.run();
     let Some(Action::Interaction(InteractionAct::Open { other })) = h.state_mut().1.pop() else {
-        panic!("interaction action required")
+        return Err("interaction action required".into());
     };
     assert_eq!(other, "refs/remotes/origin/topic");
     let ctx = egui::Context::default();
@@ -387,4 +387,5 @@ fn interaction_menu_passes_the_full_clicked_ref_to_the_dialog() {
     assert!(
         matches!(&h.state().0.dialog, Some(Dialog::FindInteraction { spec, .. }) if spec.b == "refs/remotes/origin/topic")
     );
+    Ok(())
 }
