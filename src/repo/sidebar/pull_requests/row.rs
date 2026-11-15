@@ -130,6 +130,7 @@ impl RepoTab {
                 }
             });
     }
+
     /// A contributor's branch name is never a local or base-repository checkout target.
     fn pr_checkout_action(&self, pr: &PullRequest) -> Option<Action> {
         if pr.from_fork {

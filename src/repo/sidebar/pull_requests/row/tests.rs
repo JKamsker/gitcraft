@@ -5,8 +5,19 @@ fn fixture() -> (RepoTab, PullRequest) {
     let mut tab = RepoTab::new_deferred("/nonexistent/pr-checkout-test".into(), &ctx);
     tab.remotes = vec![crate::git::Remote {
         name: "origin".into(),
-        url: String::new(),
+        url: "https://github.com/owner/repo".into(),
     }];
+    tab.forge_remotes = vec![(
+        "origin".into(),
+        Hosting {
+            forge: Forge::GitHub,
+            host: "github.com".into(),
+            path: "owner/repo".into(),
+            web: "https://github.com".into(),
+        },
+    )];
+    tab.take_forge_selection(false, &ctx);
+    assert_eq!(tab.primary_forge_remote(), Some("origin"));
     let pr = PullRequest {
         number: 7,
         title: "Incoming change".into(),
