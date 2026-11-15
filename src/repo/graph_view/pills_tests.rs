@@ -5,7 +5,7 @@ use crate::git::{Branch, Refs};
 fn primary_and_stacked_branch_pills_select_details_without_row_selection() {
     use crate::repo::graph_view::readability_tests::painted_text_center;
     use egui::{Event, Modifiers, PointerButton};
-    for stacked in [false, true] {
+    for (stacked, keyboard) in [(false, false), (true, false), (true, true)] {
         let ctx = egui::Context::default();
         crate::theme::install_fonts(&ctx);
         let mut tab = RepoTab::new_deferred("/recording-only/pill-click".into(), &ctx);
@@ -15,54 +15,93 @@ fn primary_and_stacked_branch_pills_select_details_without_row_selection() {
             ..Default::default()
         }));
         tab.graph = crate::graph::layout(&tab.commits);
+        let mut settings = crate::settings::Settings::get(&ctx);
+        settings.diff_beside_graph = true;
+        settings.put_for_test(&ctx);
+        tab.diff = Some(crate::repo::DiffView::new(crate::repo::DiffKey::Remerge {
+            hash: "b".repeat(40),
+            path: "previous.txt".into(),
+            old_path: None,
+            conflicts: Vec::new(),
+        }));
         let badge = Badge {
             local: true,
             ..remote_pill("topic", "origin")
         };
-        let mut frame = |events| {
-            let mut acts = Vec::new();
-            let mut output = ctx.run_ui(
-                egui::RawInput {
-                    screen_rect: Some(Rect::from_min_size(Pos2::ZERO, vec2(1200.0, 800.0))),
-                    events,
-                    ..Default::default()
-                },
-                |ui| {
-                    egui::CentralPanel::default().show(ui, |ui| {
-                        if stacked {
-                            let resp = ui.button("topic");
-                            tab.stack_slot_clicks(resp, &badge, 0, &mut acts);
-                        } else {
-                            tab.graph_view(ui, &mut acts);
-                        }
-                    });
-                },
+        let acts = {
+            let mut frame = |events| {
+                let mut acts = Vec::new();
+                let (mut output, _) = crate::repo::messages::record_jobs(|| {
+                    ctx.run_ui(
+                        egui::RawInput {
+                            screen_rect: Some(Rect::from_min_size(Pos2::ZERO, vec2(1200.0, 800.0))),
+                            events,
+                            ..Default::default()
+                        },
+                        |ui| {
+                            egui::CentralPanel::default().show(ui, |ui| {
+                                if stacked {
+                                    let resp = ui.button("topic");
+                                    if keyboard {
+                                        resp.request_focus();
+                                    }
+                                    tab.stack_slot_clicks(resp, &badge, 0, &mut acts);
+                                } else {
+                                    tab.graph_view(ui, &mut acts);
+                                }
+                            });
+                        },
+                    )
+                });
+                output.textures_delta.clear();
+                (acts, output.shapes)
+            };
+            frame(Vec::new());
+            let (_, shapes) = frame(Vec::new());
+            let point = painted_text_center(&shapes, "topic");
+            if !keyboard {
+                frame(vec![Event::PointerMoved(point)]);
+            }
+            let button = |pressed| Event::PointerButton {
+                pos: point,
+                button: PointerButton::Primary,
+                pressed,
+                modifiers: Modifiers::NONE,
+            };
+            let (acts, _) = if keyboard {
+                frame(vec![Event::Key {
+                    key: egui::Key::Enter,
+                    physical_key: None,
+                    pressed: true,
+                    repeat: false,
+                    modifiers: Modifiers::NONE,
+                }])
+            } else {
+                frame(vec![button(true)]);
+                frame(vec![button(false)])
+            };
+            assert_eq!(
+                acts.iter()
+                    .filter(|a| matches!(a, Action::SelectBranchTip(0)))
+                    .count(),
+                1
             );
-            output.textures_delta.clear();
-            (acts, output.shapes)
+            assert!(
+                !acts
+                    .iter()
+                    .any(|a| matches!(a, Action::Select(_) | Action::OpenCommitChanges(_)))
+            );
+            acts
         };
-        frame(Vec::new());
-        let (_, shapes) = frame(Vec::new());
-        let point = painted_text_center(&shapes, "topic");
-        frame(vec![Event::PointerMoved(point)]);
-        let button = |pressed| Event::PointerButton {
-            pos: point,
-            button: PointerButton::Primary,
-            pressed,
-            modifiers: Modifiers::NONE,
-        };
-        frame(vec![button(true)]);
-        let (acts, _) = frame(vec![button(false)]);
+        crate::repo::messages::record_jobs(|| {
+            for action in acts {
+                tab.apply(action, &ctx);
+            }
+        });
+        assert!(tab.diff.is_none());
         assert_eq!(
-            acts.iter()
-                .filter(|a| matches!(a, Action::SelectBranchTip(0)))
-                .count(),
-            1
-        );
-        assert!(
-            !acts
-                .iter()
-                .any(|a| matches!(a, Action::Select(_) | Action::OpenCommitChanges(_)))
+            tab.detail_hash.as_deref(),
+            Some("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
         );
     }
 }

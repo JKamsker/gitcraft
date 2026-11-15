@@ -157,6 +157,7 @@ pub enum Dialog {
         focus: bool,
     },
     Tracking(Box<super::tracking::Form>),
+    Publish(Box<super::publish::Form>),
     /// Username and password / token for an HTTPS remote that asked for them.
     Credentials {
         url: String,

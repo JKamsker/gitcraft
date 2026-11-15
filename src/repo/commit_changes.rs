@@ -52,19 +52,20 @@ fn completed(
 }
 impl RepoTab {
     /// Graph rows and branch tips reveal details without requesting an automatic file diff.
-    pub(super) fn select_graph_row(&mut self, row: usize, ctx: &egui::Context) {
-        if row >= self.commits.len() {
+    pub(super) fn select_graph_row(&mut self, row: usize, branch_tip: bool, ctx: &egui::Context) {
+        let Some(commit) = self.commits.get(row) else {
             return;
-        }
+        };
+        let selected_hash = commit.hash.clone();
         self.leave_pages();
         self.doctor = None;
-        // A link's automatic diff belongs to its history-follow presentation. Retire
-        // both together, including when select() returns early for the current row.
-        if self
-            .diff
-            .as_ref()
-            .is_some_and(|view| self.commit_changes.graph_with_diff(&view.key))
-        {
+        // Retire automatic history diffs. Only branch tips discard another commit's
+        // explicit diff; ordinary rows keep its place for back/forward navigation.
+        if self.diff.as_ref().is_some_and(|view| {
+            self.commit_changes.graph_with_diff(&view.key)
+                || (branch_tip
+                    && matches!(&view.key, DiffKey::Commit { hash, .. } | DiffKey::Remerge { hash, .. } if hash != &selected_hash))
+        }) {
             self.diff = None;
         }
         self.commit_changes.stop();

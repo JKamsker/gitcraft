@@ -204,6 +204,7 @@ mod parsing;
 mod routing;
 mod scan;
 mod secrets;
+mod tracking;
 
 pub(crate) use approval::{
     is_reviewed_auth_error, register, registered, remember_auth_endpoint, take_auth_endpoint,

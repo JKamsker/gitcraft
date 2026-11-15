@@ -314,5 +314,29 @@
     "reason": "Plain merge combines dev #239 upstream-picker coordinator dependencies (612 symbols) with PR #224 independent WorktreeCleanup state dependency (+1), for a combined 613. Prior published declarations remain unchanged.",
     "owner": "@JKamsker",
     "remediation": "Keep worktree cleanup and tracking implementation encapsulated in their owners; reduce unused coordinator dependencies and ratchet the budget."
+  },
+  "233-publication-dialog-api": {
+    "changes": [
+      "budget/doctor/exported=42"
+    ],
+    "reason": "Issue #233 PR3 exposes one owned publication Form to the existing Dialog coordinator. Its private state holds destination input and a read-only preview; execution continues through root push preflight.",
+    "owner": "@JKamsker",
+    "remediation": "Keep publication state private; remove the Form export when dialog composition becomes feature-owned."
+  },
+  "233-publication-dialog-dispatch": {
+    "changes": [
+      "budget/repo-core/symbols=613"
+    ],
+    "reason": "Issue #233 PR3 adds one coordinator reference for Dialog to hold the owned publication Form. No new domain edge or direct push continuation is introduced.",
+    "owner": "@JKamsker",
+    "remediation": "Move dialog composition into the owning feature when the coordinator is decomposed."
+  },
+  "224-243-combined-repo-core-symbols-614": {
+    "changes": [
+      "budget/repo-core/symbols=614"
+    ],
+    "reason": "Plain merge combines dev #243 publication-dialog coordinator dependency (613 symbols) with PR #224 independent WorktreeCleanup state dependency (+1), for a combined 614. All declarations published on either branch remain unchanged.",
+    "owner": "@JKamsker",
+    "remediation": "Keep publication and cleanup implementation in owned feature modules; reduce coordinator symbol dependencies as dialog composition is decomposed and ratchet the budget."
   }
 }

@@ -264,6 +264,7 @@ impl RepoTab {
         b: &crate::git::Branch,
         idle: bool,
     ) {
+        self.publish_item(ui, acts, &b.name, idle);
         ui.label(format!(
             "{}: {}",
             crate::i18n::text("tracking-current"),
