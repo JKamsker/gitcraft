@@ -152,7 +152,7 @@ mod recording_tests {
         };
         assert!(retire(&mut fake, |_| false).is_err());
         assert!(fake.removed.is_empty());
-        retire(&mut fake, |b| b == b"receipt").unwrap();
+        retire(&mut fake, |b| b == b"receipt").expect("matching receipt can be retired");
         assert_eq!(fake.removed, ["original"]);
     }
 }

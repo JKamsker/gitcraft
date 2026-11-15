@@ -353,7 +353,13 @@ mod recording_tests {
             OsString::from_vec(vec![b'a', 255, b'b']),
         );
         assert_eq!(
-            binary.get_envs().next().unwrap().1.unwrap().as_bytes(),
+            binary
+                .get_envs()
+                .next()
+                .expect("one explicit environment entry")
+                .1
+                .expect("entry sets a value")
+                .as_bytes(),
             &[b'a', 255, b'b']
         );
         let mut path = Command::new("relative-program");
@@ -415,7 +421,7 @@ mod recording_tests {
             backend.target_failure = true;
             backend.cleanup_failure = refused;
             let error = launch_with(&mut command, &mut backend)
-                .unwrap_err()
+                .expect_err("target launch was refused")
                 .to_string();
             assert!(error.contains("target pre_exec/exec failed"));
             assert_eq!(error.contains("anchor cleanup unconfirmed"), refused);
