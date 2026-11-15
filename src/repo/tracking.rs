@@ -149,7 +149,7 @@ impl Form {
                 crate::i18n::text("tracking-hidden"),
             );
             self.catalog
-                .filter(view, &self.query, self.include_hidden, &self.hidden);
+                .update_matches(view, &self.query, self.include_hidden, &self.hidden);
             let count = self.catalog.filtered.len();
             let height = ui.text_style_height(&egui::TextStyle::Body) * 3.0
                 + ui.spacing().item_spacing.y * 2.0;

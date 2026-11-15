@@ -32,7 +32,7 @@ impl Catalog {
         }
         catalog
     }
-    pub(super) fn filter(
+    pub(super) fn update_matches(
         &mut self,
         view: &View,
         query: &str,
