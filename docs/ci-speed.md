@@ -163,3 +163,89 @@ Application gates bind to green run 43741657210 for that commit, preserving the
 failed first-attempt evidence above. Independent read-only review passed on
 45ba60ed; its P2 baseline-attribution finding is corrected here. A documentation
 update does not constitute new execution of those application gates.
+
+## Follow-up: Windows-target Clippy on Linux
+
+Decision: **retain native Windows Clippy**. This evaluation is a separate
+follow-up to #249, not a replacement gate or a reason to delay its merge.
+
+The exact locked default-feature graph was attempted on Linux with stable Rust
+1.100.0, two workers, lowest OS priority and an isolated target/TMPDIR:
+
+```sh
+rustup target add --toolchain stable x86_64-pc-windows-msvc
+nice -n 19 cargo +stable clippy --locked --all-targets \
+  --target x86_64-pc-windows-msvc -- -D warnings
+```
+
+It failed in `ring 0.17.14`'s build script: `cc-rs: failed to find tool
+"lib.exe": No such file or directory`. The cold attempt's log spans about
+129 seconds before that error; this is a failed local experiment, not a passing
+CI benchmark. Clippy avoids the final target Rust link, but Cargo still executes
+build scripts that compile and archive target C code. Installing Rust's target
+standard library does not install those C/SDK tools.
+
+The locked graph includes these relevant native build requirements:
+
+| Crate | Build requirement / implication |
+| --- | --- |
+| `ring` | Target C/assembly compilation and archive tools; observed MSVC `lib.exe` failure. A compatible MSVC/clang-cl environment and target headers/libraries would require separate provisioning. |
+| `onig_sys` | Oniguruma's C sources compiled through `cc`; requires the target C compiler and runtime headers. |
+| `tree-sitter` and C/C++/Go/JS/Python/Rust/TypeScript grammars | Runtime/parser/scanner C sources compiled through `cc`; the Rust-only target installation is insufficient. |
+| `winresource` / root build script | Windows resources need a resource compiler/SDK; the root treats missing resource compilation as a warning, so success would not prove native resource verification. |
+| `windows` / `windows-sys` | Rust bindings are not the observed compiler blocker. |
+
+`libgit2-sys`, `curl-sys`, `libz-sys` and `openssl-sys` are not in this locked
+project graph; its native Git feature uses `gix`. They must not be cited as the
+cause of this failure. A GNU target would additionally require MinGW tools
+(absent on this machine), and selects `target_env=gnu`, not the native job's
+`target_env=msvc`. Its minimal probe passed the expected cfg selection, but a
+full GNU dependency-graph build was not claimed or used as MSVC parity evidence.
+
+### Deliberate lint probes
+
+An isolated Git repository on scratch branch
+`scratch/windows-clippy-equivalence` held intentional violations; none were added
+to gitcraft or merged. Each command used `--all-targets -- -D warnings`:
+
+| Probe | Windows MSVC target on Linux | Linux native target |
+| --- | --- | --- |
+| Private unused `#[cfg(windows)]` function | Reports `windows_dead_marker` | Excluded |
+| Private unused `#[cfg(unix)]` function | Excluded | Reports `linux_dead_marker` |
+| Unused variable in a Windows-only `#[cfg(test)]` branch | Reports `windows_test_marker` | Excluded |
+| Unused variable in a Unix-only test branch | Excluded | Reports `linux_test_marker` |
+| Windows-gated `Permissions::set_readonly(false)` | Reports `permissions_set_readonly_false` | Excluded |
+
+The permissions probe took 0.244s for cross-Msvc (expected failure) and 0.133s
+for Linux (success), with warm fixture artifacts. These tiny-fixture times do
+not measure gitcraft's dependency graph. The earlier cfg probe initially waited
+for the full attempt's Cargo lock, so its first 78.719s is not compiler time.
+The GNU and Linux cfg probes then took 0.100s and 0.092s respectively.
+
+These probes confirm that target-code cfg/dead-code/test analysis can catch the
+classes of Windows-only warnings seen in #244 and #242. They do **not** establish
+identical full-job coverage. A second scratch probe placed Windows-only and
+Linux-only dead functions in `build.rs`: cross-Msvc reported
+`linux_host_marker` and excluded `windows_host_marker`, because build scripts
+compile for the Linux **host**. Native Windows compilation selects the opposite
+host cfg. Proc macros/build dependencies also execute on the host. The existing
+job additionally checks all four tracked Cargo packages (including independent
+workspaces and the recovery-recording cfg); a single root Cargo invocation would
+not replace that inventory.
+
+### Runner-time decision
+
+The measured #249 native Windows Clippy job took **542s (9m02s)**, while existing
+Linux lint took **144s (2m24s)**, in parallel. A viable full cross-target job did
+not complete, so its added Linux CI time and net savings cannot honestly be
+measured from these failed/local probes. The adopted change saves **zero runner
+minutes**: native Windows remains required. Deleting it would nominally remove
+9m02s of Windows runner use, but adds unknown Linux compilation/SDK provisioning
+cost and loses native-host compilation coverage. Even after solving toolchain
+provisioning, host equivalence would need its own explicit verification contract.
+That is a fragile trade for a job already outside the measured critical path.
+
+This documentation-only follow-up changes no workflow, Cargo or application
+files. Application verification remains bound to reviewed commit 45ba60ed and
+run 43741657210, with the failed attempt retained. No successful full cross-target
+Clippy build or new application test run is claimed.
