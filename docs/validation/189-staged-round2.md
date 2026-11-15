@@ -1,4 +1,6 @@
-# Issue 189: round-2 fixes and local evidence
+# Issue 189: round-2 fixes and historical evidence
+
+Superseded by the [extra inline-review evidence](189-staged-inline-review.md).
 
 Application/test candidate: `b560095f8c5e7930dfa991954c80656baf7fcfce`.
 Base `origin/dev` at `8e69afb7df4141eada62495793a9645d181abe0e` was merged
