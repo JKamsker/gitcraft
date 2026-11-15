@@ -39,8 +39,6 @@ pub struct RepoTab {
     pub(in crate::repo) reload_again: bool,
     pub(in crate::repo) load_error: Option<String>,
     pub(in crate::repo) refs: Refs,
-    pub(in crate::repo) ref_presentation_cache:
-        std::cell::RefCell<Option<std::sync::Arc<ref_presentation::Catalog>>>,
     pub(in crate::repo) graph_badge_index: graph_view::BadgeIndex,
     /// Commits as git listed them.
     pub(in crate::repo) content_recovery: content_recovery::State,

@@ -129,6 +129,8 @@ pub(super) fn badges(decorations: &[String], refs: &Refs) -> Vec<Badge> {
 /// Reuse the repository-wide lookup tables across all decorated commits in a rebuild.
 #[derive(Default)]
 pub(in crate::repo) struct BadgeIndex {
+    pub(in crate::repo) presentation_cache:
+        std::cell::RefCell<Option<std::sync::Arc<crate::repo::ref_presentation::Catalog>>>,
     local: HashSet<String>,
     heads: HashSet<String>,
     current: Option<String>,
@@ -159,6 +161,7 @@ impl BadgeIndex {
             .map(|b| b.name.clone())
             .collect();
         Self {
+            presentation_cache: Default::default(),
             heads,
             symbolic: refs.symbolic.clone(),
             tags: refs.tags.iter().map(|b| b.name.clone()).collect(),

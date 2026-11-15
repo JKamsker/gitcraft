@@ -49,7 +49,6 @@ impl RepoTab {
             reload_again: false,
             load_error: None,
             refs: Refs::default(),
-            ref_presentation_cache: Default::default(),
             graph_badge_index: graph_view::BadgeIndex::default(),
             content_recovery: Default::default(),
             working_drafts: Default::default(),

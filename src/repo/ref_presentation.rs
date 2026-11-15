@@ -50,15 +50,18 @@ impl RepoTab {
     }
 
     pub(super) fn invalidate_ref_labels(&self) {
-        self.ref_presentation_cache.borrow_mut().take();
+        self.graph_badge_index
+            .presentation_cache
+            .borrow_mut()
+            .take();
     }
 
     fn presentation(&self) -> Arc<Catalog> {
-        if let Some(catalog) = self.ref_presentation_cache.borrow().as_ref() {
+        if let Some(catalog) = self.graph_badge_index.presentation_cache.borrow().as_ref() {
             return catalog.clone();
         }
         let catalog = Arc::new(self.build_ref_presentation());
-        *self.ref_presentation_cache.borrow_mut() = Some(catalog.clone());
+        *self.graph_badge_index.presentation_cache.borrow_mut() = Some(catalog.clone());
         catalog
     }
 
