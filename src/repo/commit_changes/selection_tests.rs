@@ -88,3 +88,56 @@ fn row_selection_retires_automatic_diffs_and_preserves_explicit_split_diffs() {
         }
     }
 }
+
+#[test]
+fn branch_pill_selection_retires_another_commits_split_diff() {
+    for by_hash in [false, true] {
+        for same_row in [false, true] {
+            let ctx = egui::Context::default();
+            let mut tab = RepoTab::new_deferred("/recording-only/stale-branch-diff".into(), &ctx);
+            tab.life.phase = crate::repo::lifecycle::Phase::Live;
+            let target = "b".repeat(40);
+            tab.commits.push(std::sync::Arc::new(crate::git::Commit {
+                hash: target.clone(),
+                ..Default::default()
+            }));
+            tab.index.insert(target.clone(), 0);
+            tab.selected = same_row.then_some(0);
+            let mut settings = crate::settings::Settings::get(&ctx);
+            settings.diff_beside_graph = true;
+            settings.put_for_test(&ctx);
+            let old = crate::repo::DiffView::new(DiffKey::Commit {
+                hash: "a".repeat(40),
+                path: "previous.txt".into(),
+            });
+            let request = old.request;
+            tab.diff = Some(old);
+            crate::repo::messages::record_jobs(|| {
+                let action = if by_hash {
+                    Action::SelectBranch(target.clone())
+                } else {
+                    Action::SelectBranchTip(0)
+                };
+                tab.apply(action, &ctx);
+                assert!(
+                    tab.diff.is_none(),
+                    "previous commit's diff survived the branch click"
+                );
+                tab.handle(Msg::Diff(request, Err("late previous diff".into())), &ctx);
+                tab.handle(
+                    Msg::Detail(target.clone(), Ok(super::reveal_tests::detail(&target))),
+                    &ctx,
+                );
+            });
+            assert_eq!(tab.selected, Some(0));
+            assert!(
+                tab.diff.is_none(),
+                "a late response reopened the previous diff"
+            );
+            assert!(tab.commit_changes.pending.is_none());
+            assert!(!tab.commit_changes.follows_history());
+            assert!(crate::settings::Settings::get(&ctx).show_detail);
+            assert!(crate::settings::Settings::get(&ctx).diff_beside_graph);
+        }
+    }
+}
