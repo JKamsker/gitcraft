@@ -105,14 +105,26 @@ fn raw_blob_identity_is_verified_for_sha1_and_sha256_before_writing() -> Result<
             .write_all(b"blob 4\0evil")
             .map_err(|e| e.to_string())?;
         let compressed = compressed.finish().map_err(|e| e.to_string())?;
-        std::fs::write(
-            repo.path()
-                .join(".git/objects")
-                .join(&oid[..2])
-                .join(&oid[2..]),
-            compressed,
-        )
-        .map_err(|e| e.to_string())?;
+        let object = repo
+            .path()
+            .join(".git/objects")
+            .join(&oid[..2])
+            .join(&oid[2..]);
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            std::fs::set_permissions(&object, std::fs::Permissions::from_mode(0o600))
+                .map_err(|e| e.to_string())?;
+        }
+        #[cfg(not(unix))]
+        {
+            let mut permissions = std::fs::metadata(&object)
+                .map_err(|e| e.to_string())?
+                .permissions();
+            permissions.set_readonly(false);
+            std::fs::set_permissions(&object, permissions).map_err(|e| e.to_string())?;
+        }
+        std::fs::write(&object, compressed).map_err(|e| e.to_string())?;
         let refused = tempfile::tempdir().map_err(|e| e.to_string())?;
         assert_eq!(
             materialize(repo.path(), refused.path(), &entries),
