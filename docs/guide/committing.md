@@ -23,6 +23,26 @@ The right panel: staging files, hunks or single lines, the commit box, sign-offs
   repository's own, the profile's or the global one), and saved identities or profile authors
   to switch a repository to; _Use the profile's author_ takes the repository's own out again.
 
+## Test staged changes
+
+Beside Commit, **Test staged changes** runs the test-lane command against a disposable
+checkout of the index, including partial staging, additions, deletions, renames and modes.
+Edit the command for this tab before running it. The repository default is the existing
+`test.default.command` setting used by Test commits.
+
+The panel shows the tested tree, command, exit code, elapsed time and last 200 output lines.
+A staging operation or changed command/environment marks the result stale; external changes
+are detected through status refreshes and a background fingerprint check. Results stay in
+this tab only and never become commit-history test notes. Tool or dependency changes outside
+the environment variables and Git configuration require another run.
+
+Only local repositories are supported in this first version. Resolve index conflicts first;
+submodules are refused. Ignored assets, build outputs and untracked helpers are excluded.
+Prepare dependencies inside the snapshot in the test command (for example, `npm ci && npm test`).
+The command runs through Git's shell, stops after 20 minutes, and can be cancelled. Closing
+the tab cancels it too. The existing scratch-worktree registry removes the checkout after a
+run and sweeps abandoned checkouts when another scratch checkout is created after a crash.
+
 ## Templates, trailers and issue links
 
 - The commit box starts from the repository's `commit.template` (`~` and relative paths as git
