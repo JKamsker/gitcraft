@@ -235,7 +235,8 @@ impl Service {
         }
         let (reply, receive) = mpsc::channel();
         let ticket = Cancellation::default();
-        let deadline = options.timeout.map(|limit| Instant::now() + limit);
+        let deadline =
+            super::deadline::effective(options.timeout.map(|limit| Instant::now() + limit));
         #[cfg(test)]
         let trace = trace::Trace::new(&command).map(Arc::new);
         let mut queued = self.counters.queued.load(Ordering::Relaxed);

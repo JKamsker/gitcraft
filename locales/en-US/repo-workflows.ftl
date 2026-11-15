@@ -7793,3 +7793,31 @@ purpose-open-insight = Open in { $insight }
 
 purpose-rename-confirm = Rename
 purpose-rename-cancel = Cancel
+
+# Index snapshot verification (#189)
+staged-command = Staged test command
+staged-test = Test staged changes
+staged-stop = Cancel staged test
+staged-isolation = All indexed files, including unchanged tracked files, are included; unstaged and untracked content is excluded. Ignored assets and dependencies must be prepared by this command inside the snapshot. Runs locally; SSH/WSL and submodules are unsupported.
+staged-running = Testing staged snapshot…
+staged-stale = Stale / freshness unverified — run again for the current index and environment.
+staged-result = Tree { $tree } · exit { $code } · { $seconds } s
+staged-output = Staged test output (last 200 lines)
+staged-cancelled = Staged test cancelled.
+staged-tooling = Command or tool missing. Install it locally or prepare dependencies in the snapshot command.
+staged-remote = Staged verification supports local repositories only; SSH/WSL snapshots are not supported yet.
+staged-unmerged = Resolve all unmerged index entries before testing staged changes.
+staged-submodules = Staged verification does not support submodules yet; no working-tree submodule files were copied.
+
+staged-sparse = Sparse checkout and skip-worktree entries are unsupported. Use a full index/checkout before staged verification.
+staged-links = Staged symlinks are not supported yet. Test them in your working tree.
+staged-filters = Checkout filters (including Git LFS) are unsupported for staged verification. Stage ordinary file contents without filter attributes; no filter or LFS download was run.
+staged-paths = The staged tree cannot be represented faithfully: conflicting/reserved paths, path longer than 240 UTF-16 units, unsupported names, symlinks, or modes. Rename paths or use a filesystem that preserves the staged types.
+staged-budget = Snapshot exceeds the preparation budget (512 MiB estimated checkout, 10,000 files, 64 MiB index/info attributes). Reduce the staged tree. Build outputs need limits in your command.
+staged-verifying = Verifying snapshot freshness… previous verdict is not current.
+
+staged-run = Run staged test
+
+staged-metadata = Index and info attributes must be regular files (no links, devices or pipes). Restore ordinary Git metadata and retry.
+staged-raw = Tests use raw indexed bytes, without checkout filters, line-ending or encoding conversion. Build outputs need limits in your command.
+staged-object = A staged blob does not match its object ID. Repair the repository object store before testing staged changes.

@@ -1,0 +1,22 @@
+   Compiling gitcraft v0.3.5 (/home/jonas/.t3/worktrees/gitcraft/t3-bf6dbd6d)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 1m 37s
+     Running unittests src/lib.rs (/home/jonas/work/gitcraft-targets/189/debug/build/gitcraft/97823850e1821fdf/out/gitcraft-97823850e1821fdf)
+
+running 1 test
+test repo::layout::followup_tests::responsive_followup_full_height_composer_needs_no_scrolling_after_resize ... FAILED
+
+failures:
+
+---- repo::layout::followup_tests::responsive_followup_full_height_composer_needs_no_scrolling_after_resize stdout ----
+
+thread 'repo::layout::followup_tests::responsive_followup_full_height_composer_needs_no_scrolling_after_resize' (3739907) panicked at src/repo/direct_tests/layout_followup_tests.rs:116:13:
+toolbar scrolled out at full height
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    repo::layout::followup_tests::responsive_followup_full_height_composer_needs_no_scrolling_after_resize
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 5489 filtered out; finished in 0.31s
+
+error: test failed, to rerun pass `-p gitcraft --lib`

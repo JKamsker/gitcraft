@@ -1,0 +1,2 @@
+    Checking gitcraft v0.3.5 (/home/jonas/.t3/worktrees/gitcraft/t3-bf6dbd6d)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 22.03s

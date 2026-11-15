@@ -40,6 +40,16 @@ fn a_linked_worktree_is_watched_where_git_keeps_its_data() {
         Some(FsChange::Git)
     );
     assert_eq!(fs_change(&common.join("objects/ab/cd"), &watched), None);
+    for config in ["config", "config.worktree", "info/attributes"] {
+        assert_eq!(
+            fs_change(&common.join(config), &watched),
+            Some(FsChange::Git)
+        );
+        assert_eq!(
+            fs_change(&Path::new("/r/.git").join(config), &[]),
+            Some(FsChange::Git)
+        );
+    }
     assert_eq!(
         fs_change(&linked.join("src/a.rs"), &watched),
         Some(FsChange::Files)

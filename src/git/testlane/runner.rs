@@ -119,7 +119,7 @@ impl RunStop {
 
     /// A stopper for one command of the run: stopped already when the run is.
     pub fn command_stopper(&self) -> Stopper {
-        let stopper = Stopper::default();
+        let stopper = Stopper::scoped();
         match self.0.lock() {
             Ok(mut s) if !s.stopped => {
                 s.going.retain(|st| !st.stopped());
@@ -172,34 +172,11 @@ pub fn parse_jobs(out: &str) -> Vec<TestJob> {
         .collect()
 }
 
-/// The alias git runs the user's command with, at the top of the worktree, in its own `sh`
-/// (so none is needed on PATH, on Windows either). What git sets for an alias run in a linked
-/// worktree (`GIT_DIR`…) is unset: a test suite that makes repositories of its own would
-/// otherwise have them all be this one.
-pub fn command_alias(command: &str) -> String {
-    format!(
-        "alias.gitcraft-test=!unset GIT_DIR GIT_WORK_TREE GIT_PREFIX GIT_INDEX_FILE \
-         GIT_CONFIG_PARAMETERS GIT_OPTIONAL_LOCKS; {command}"
-    )
-}
-
-/// Runs `command` in the worktree `dir` until it ends or `stopper` stops it: its exit code
-/// (`None`: a signal ended it) and its last [`KEPT_LINES`] lines, or why it couldn't run.
-pub fn run_command(
-    dir: &Path,
-    command: &str,
-    stopper: &Stopper,
-) -> Result<(git::Ended, Vec<String>), String> {
-    let alias = command_alias(command);
-    let mut lines = VecDeque::new();
-    let ended = git::stream(dir, &["-c", &alias, "gitcraft-test"], stopper, |line| {
-        if lines.len() >= KEPT_LINES {
-            lines.pop_front();
-        }
-        lines.push_back(line);
-    })?;
-    Ok((ended, lines.into()))
-}
+mod command;
+#[cfg(test)]
+use command::command_alias;
+pub use command::run_command;
+pub(in crate::git) use command::run_command_timed;
 
 /// The verdict of a command that ended so: exit 0 is good, anything else bad (as git-test
 /// reads it); `None` when it was stopped.

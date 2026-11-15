@@ -7791,3 +7791,31 @@ purpose-open-insight = In { $insight } öffnen
 
 purpose-rename-confirm = Umbenennen
 purpose-rename-cancel = Abbrechen
+
+# Index snapshot verification (#189)
+staged-command = Testbefehl für vorgemerkte Änderungen
+staged-test = Vorgemerkte Änderungen testen
+staged-stop = Test abbrechen
+staged-isolation = Alle Dateien im Index werden übernommen, auch unveränderte versionierte Dateien; nicht vorgemerkte und unversionierte Inhalte bleiben ausgeschlossen. Ignorierte Dateien und Abhängigkeiten muss der Befehl im Snapshot vorbereiten. Nur lokal; SSH/WSL und Submodule werden nicht unterstützt.
+staged-running = Vorgemerkten Snapshot testen…
+staged-stale = Veraltet / Aktualität ungeprüft — für aktuellen Index und Umgebung erneut ausführen.
+staged-result = Baum { $tree } · Exit { $code } · { $seconds } s
+staged-output = Testausgabe (letzte 200 Zeilen)
+staged-cancelled = Test abgebrochen.
+staged-tooling = Befehl oder Werkzeug fehlt. Lokal installieren oder Abhängigkeiten im Snapshot-Befehl vorbereiten.
+staged-remote = Snapshot-Tests unterstützen derzeit nur lokale Repositorys; SSH/WSL werden noch nicht unterstützt.
+staged-unmerged = Vor dem Test alle ungelösten Index-Konflikte auflösen.
+staged-submodules = Snapshot-Tests unterstützen noch keine Submodule; Dateien daraus wurden nicht kopiert.
+
+staged-sparse = Sparse-Checkouts und Skip-Worktree-Einträge werden nicht unterstützt. Vor dem Test einen vollständigen Index/Checkout verwenden.
+staged-links = Vorgemerkte Symlinks werden noch nicht unterstützt. Teste sie im Arbeitsverzeichnis.
+staged-filters = Checkout-Filter (einschließlich Git LFS) werden nicht unterstützt. Reguläre Dateiinhalte ohne Filterattribute vormerken; es wurde kein Filter oder LFS-Download ausgeführt.
+staged-paths = Der vorgemerkte Baum lässt sich nicht originalgetreu abbilden: kollidierende/reservierte Pfade, Pfadlänge über 240 UTF-16-Einheiten, ungeeignete Namen, Symlinks oder Dateimodi. Pfade umbenennen oder ein geeignetes Dateisystem verwenden.
+staged-budget = Snapshot überschreitet das Vorbereitungsbudget (512 MiB geschätzter Checkout, 10.000 Dateien, 64 MiB Index/Info-Attribute). Vorgemerkten Baum verkleinern. Build-Ausgaben im Befehl begrenzen.
+staged-verifying = Aktualität des Snapshots wird geprüft… Das bisherige Ergebnis gilt derzeit nicht.
+
+staged-run = Vorgemerkten Stand testen
+
+staged-metadata = Index und Info-Attribute müssen reguläre Dateien sein (keine Links, Geräte oder Pipes). Reguläre Git-Metadaten wiederherstellen und erneut versuchen.
+staged-raw = Tests verwenden unveränderte Index-Inhalte, ohne Checkout-Filter, Zeilenenden- oder Zeichenkodierungskonvertierung. Build-Ausgaben im Befehl begrenzen.
+staged-object = Ein vorgemerkter Blob stimmt nicht mit seiner Objekt-ID überein. Repariere die Objektdatenbank, bevor du vorgemerkte Änderungen testest.

@@ -6,6 +6,7 @@ use std::path::{Path, PathBuf};
 use std::sync::mpsc::{Sender, channel};
 use std::time::Duration;
 
+mod config;
 use super::RepoTab;
 use super::messages::{Msg, spawn};
 
@@ -14,6 +15,7 @@ impl RepoTab {
     /// Setting that up walks every folder of the worktree (a big `node_modules` is tens of
     /// thousands), so it is done in the background; the watcher comes back as a message.
     pub(super) fn watch(&mut self, ctx: &egui::Context) {
+        self.staged_watching(true, ctx);
         self.watches += 1;
         let watch = self.watches;
         let (tx, rx) = channel();
@@ -89,6 +91,11 @@ fn start_watcher(
         .iter()
         .flat_map(|(own, common)| [own.clone(), common.clone()])
         .collect();
+    let configurations = config::paths(path);
+    let watched_configurations = configurations.clone();
+    let watched_parents = config::parents(&watched_configurations);
+    let retry = tx.clone();
+    let retry_ctx = ctx.clone();
     let root = path.to_owned();
     let handler = move |res: notify::Result<notify::Event>| {
         let Ok(event) = res else { return };
@@ -96,10 +103,23 @@ fn start_watcher(
             return;
         }
         for path in &event.paths {
-            if let Some(change) = fs_change(path, &git_dirs) {
+            let change = if config::changed(&configurations, path) {
+                Some(FsChange::Git)
+            } else if config::covers(path, &root)
+                || git_dirs.iter().any(|d| config::covers(path, d))
+            {
+                fs_change(path, &git_dirs)
+            } else {
+                None
+            };
+            if let Some(change) = change {
                 saw(&root, path);
                 let _ = tx.send(change);
-                ctx.request_repaint_after(Duration::from_millis(500));
+                if matches!(change, FsChange::Index | FsChange::Git) {
+                    ctx.request_repaint();
+                } else {
+                    ctx.request_repaint_after(Duration::from_millis(500));
+                }
             }
         }
     };
@@ -108,16 +128,34 @@ fn start_watcher(
     let config = notify::Config::default().with_follow_symlinks(false);
     let mut watcher = notify::RecommendedWatcher::new(handler, config).ok()?;
     watcher.watch(path, notify::RecursiveMode::Recursive).ok()?;
+    let mut recursive = vec![path.to_owned()];
     if let Some((own, common)) = &linked {
+        recursive.push(own.clone());
         use notify::RecursiveMode::{NonRecursive, Recursive};
         let _ = watcher.watch(own, Recursive);
         if common != own {
+            recursive.extend([common.join("refs"), common.join("reftable")]);
             // Not all of it: objects are written all the time.
             let _ = watcher.watch(common, NonRecursive);
             let _ = watcher.watch(&common.join("refs"), Recursive);
+            let _ = watcher.watch(&common.join("info"), NonRecursive);
             // Where a repository made with `--ref-format=reftable` keeps them.
             let _ = watcher.watch(&common.join("reftable"), Recursive);
         }
+    }
+    for parent in &watched_parents {
+        if !recursive.iter().any(|root| config::covers(parent, root)) {
+            // Re-registering an existing recursive root as nonrecursive can downgrade
+            // its coverage. Only add config parents outside those roots.
+            let _ = watcher.watch(parent, notify::RecursiveMode::NonRecursive);
+        }
+    }
+    // Cover dependencies changed during registration, before their parent watch
+    // existed. The receiver rebuilds again while keeping the verdict unverified.
+    let latest = config::paths(path);
+    if latest != watched_configurations || config::parents(&latest) != watched_parents {
+        let _ = retry.send(FsChange::Git);
+        retry_ctx.request_repaint();
     }
     Some(watcher)
 }
@@ -185,6 +223,9 @@ pub(super) fn fs_change(path: &Path, git_dirs: &[PathBuf]) -> Option<FsChange> {
                 && !inside.starts_with(super::timeline::snapshot::ROOT)
                 && inside != "refs/gitcraft")
                 || inside.starts_with("reftable")
+                || inside == "config"
+                || inside == "config.worktree"
+                || inside == "info/attributes"
                 || inside == "HEAD"
                 || inside == "packed-refs"
                 || (inside.ends_with("_HEAD") && inside != "FETCH_HEAD" && inside != "ORIG_HEAD")

@@ -4,6 +4,7 @@
 
 pub(super) mod bounded;
 mod memo;
+pub(in crate::git) mod snapshot_policy;
 mod source;
 pub use source::CommandSource;
 
@@ -134,6 +135,7 @@ pub(super) fn git_cmd() -> Command {
         cmd.env_remove(name);
     }
     clear_repository_environment(&mut cmd);
+    snapshot_policy::apply(&mut cmd);
     crate::shell_path::apply(&mut cmd);
     #[cfg(windows)]
     {
