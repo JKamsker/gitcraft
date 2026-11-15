@@ -266,5 +266,13 @@
     "reason": "Combine #238’s corrected re-export visibility measurement (40) with the independently declared #233 picker Form (+1) during a plain dev merge. Existing declarations are preserved unchanged.",
     "owner": "@JKamsker",
     "remediation": "Keep picker state private and reduce the Form boundary when dialogs become feature-owned."
+  },
+  "233-merge-236-forge-export-budget": {
+    "changes": [
+      "budget/forge/exported=223"
+    ],
+    "reason": "The updated #238 checker measures 223 forge exports on untouched origin/dev a84d2e4f after #236, against its retained budget of 218. The same 223 are measured on the merged #233 candidate. A separate check of origin/dev confirms this five-item incoming increase; no forge application code is changed here.",
+    "owner": "@JKamsker",
+    "remediation": "Narrow discovery model/session exports and existing forge re-export boundaries, then ratchet the measured budget."
   }
 }
