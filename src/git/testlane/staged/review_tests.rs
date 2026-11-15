@@ -37,13 +37,15 @@ fn private_index_writes_and_cleanup_never_run_source_hooks() -> Result<(), Strin
     repo.git(&["add", "staged"])?;
     hook(&repo, "post-index-change", "index-hook")?;
     hook(&repo, "post-checkout", "checkout-hook")?;
+    hook(&repo, "fsmonitor-probe", "fsmonitor-ran")?;
+    repo.git(&["config", "core.fsmonitor", ".git/hooks/fsmonitor-probe"])?;
     let index = index_bytes(repo.path())?;
     let refs = repo.git(&["show-ref"])?;
     let result = test_staged(repo.path(), "exit 0", &RunStop::default())?;
     assert_eq!(result.ended.code, Some(0));
     assert_eq!(index_bytes(repo.path())?, index);
     assert_eq!(repo.git(&["show-ref"])?, refs);
-    for name in ["index-hook", "checkout-hook"] {
+    for name in ["index-hook", "checkout-hook", "fsmonitor-ran"] {
         assert!(!repo.path().join(name).exists());
     }
     Ok(())
@@ -87,7 +89,16 @@ fn filters_lfs_and_info_attributes_are_refused_before_they_can_execute() -> Resu
             format!("payload {attribute}\n"),
         )
         .map_err(|e| e.to_string())?;
-        repo.git(&["add", ".gitattributes"])?;
+        // Git add refreshes other entries too. Keep fixture staging inert while
+        // retaining the dangerous configured drivers for the operation under test.
+        repo.git(&[
+            "-c",
+            "filter.probe.process=",
+            "-c",
+            "filter.probe.smudge=",
+            "add",
+            ".gitattributes",
+        ])?;
         refuses(&repo, "staged-filters")?;
         assert_eq!(repo.worktree_count()?, 1);
     }
@@ -193,5 +204,41 @@ fn too_many_staged_entries_are_refused_before_materialization() -> Result<(), St
     refuses(&repo, "staged-budget")?;
     assert_eq!(repo.worktree_count()?, 1);
     assert_eq!(repo.scratch_left(), 0);
+    Ok(())
+}
+
+#[test]
+fn global_attributes_cannot_switch_from_unstaged_source_to_staged_filter_rules()
+-> Result<(), String> {
+    let repo = Repo::new("staged-review-global-attributes")?;
+    repo.commit(
+        "base",
+        &[
+            ("payload", Some("literal")),
+            ("attrs", Some("payload filter=probe\n")),
+        ],
+    )?;
+    repo.git(&["config", "core.attributesFile", "attrs"])?;
+    repo.git(&[
+        "config",
+        "filter.probe.smudge",
+        &format!("echo unsafe > {}; cat", shell_marker(&repo, "filter-ran")),
+    ])?;
+    std::fs::write(repo.path().join("attrs"), "").map_err(|e| e.to_string())?;
+    let result = test_staged(
+        repo.path(),
+        "test $(cat payload) = literal",
+        &RunStop::default(),
+    )?;
+    assert_eq!(result.ended.code, Some(0));
+    assert!(!repo.path().join("filter-ran").exists());
+    let before = staged_fingerprint(repo.path(), "exit 0")?;
+    std::fs::write(
+        repo.path().join(".git/info/attributes"),
+        "payload text eol=lf\n",
+    )
+    .map_err(|e| e.to_string())?;
+    assert_ne!(before, staged_fingerprint(repo.path(), "exit 0")?);
+    assert_eq!(repo.worktree_count()?, 1);
     Ok(())
 }

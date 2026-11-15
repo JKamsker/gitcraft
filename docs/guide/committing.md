@@ -40,23 +40,27 @@ the environment variables and Git configuration require another run.
 
 Only local repositories are supported in this first version. Resolve index conflicts first;
 submodules, sparse checkouts and skip-worktree entries are refused. Checkout filters,
-including Git LFS and effective negative filter declarations, are refused before they execute: use a checkout without those filters
-or prepare the required assets explicitly in the command. Symlinks must resolve entirely
-inside the snapshot; escaping links and cycles are refused. The portable path preflight
+including Git LFS and effective negative filter declarations in tree/info attributes, are
+refused before they execute: use a checkout without those filters
+or prepare the required assets explicitly in the command. Global attributes are disabled
+for preparation so a relative attributes path cannot resolve to live source content.
+Repository info attributes are included in the result fingerprint. Source hooks and
+filesystem-monitor extensions are disabled throughout preparation. Symlinks must resolve
+entirely inside the snapshot; escaping links and cycles are refused. The portable path preflight
 rejects case/Unicode collisions, Windows reserved names, invalid components and absolute
 checkout paths longer than 240 UTF-16 units. The materialized files, modes and symlink
-types are checked before execution; symlink fallback files are refused.
+types are checked before execution; symlink support is probed on the snapshot filesystem
+before checkout, and symlink fallback files are refused.
 
 Ignored assets, build outputs and untracked helpers are excluded.
 Prepare dependencies inside the snapshot in the test command (for example, `npm ci && npm test`).
-The copied index is limited to 64 MiB; a snapshot is limited to 10,000 files and an
-estimated 512 MiB of checkout storage (4 KiB allocation units plus directory entries).
+The copied index and repository info attributes are each limited to 64 MiB. A snapshot is
+limited to 10,000 files and an estimated 512 MiB of checkout storage (4 KiB allocation units plus directory entries).
 These limits are checked before materialization. Build outputs have no filesystem quota:
 choose commands that bound their generated files and disk use. Preparation and execution
 share one cancellable 20-minute deadline; each cleanup attempt has a separate 30-second
-process budget (at most three attempts).
-The command runs through Git's shell. Closing
-the tab cancels it too. The existing scratch-worktree registry removes the checkout after a
+process budget (at most three attempts). The command runs through Git's shell. Closing the
+tab cancels it too. The existing scratch-worktree registry removes the checkout after a
 run and sweeps abandoned checkouts when another scratch checkout is created after a crash.
 
 ## Templates, trailers and issue links

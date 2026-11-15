@@ -7811,7 +7811,7 @@ staged-sparse = Sparse-Checkouts und Skip-Worktree-Einträge werden nicht unters
 staged-links = Ein vorgemerkter Symlink verlässt den Snapshot, verweist auf Git-Metadaten oder hat ein unsicheres/zyklisches Ziel. Nur Ziele innerhalb des Snapshots verwenden.
 staged-filters = Checkout-Filter (einschließlich Git LFS) werden nicht unterstützt. Reguläre Dateiinhalte ohne Filterattribute vormerken; es wurde kein Filter oder LFS-Download ausgeführt.
 staged-paths = Der vorgemerkte Baum lässt sich nicht originalgetreu abbilden: kollidierende/reservierte Pfade, Pfadlänge über 240 UTF-16-Einheiten, ungeeignete Namen, Symlinks oder Dateimodi. Pfade umbenennen oder ein geeignetes Dateisystem verwenden.
-staged-budget = Snapshot überschreitet das Vorbereitungsbudget (512 MiB geschätzter Checkout, 10.000 Dateien, 64 MiB Index). Vorgemerkten Baum verkleinern. Build-Ausgaben im Befehl begrenzen.
+staged-budget = Snapshot überschreitet das Vorbereitungsbudget (512 MiB geschätzter Checkout, 10.000 Dateien, 64 MiB Index/Info-Attribute). Vorgemerkten Baum verkleinern. Build-Ausgaben im Befehl begrenzen.
 staged-verifying = Aktualität des Snapshots wird geprüft… Das bisherige Ergebnis gilt derzeit nicht.
 
 staged-run = Vorgemerkten Stand testen

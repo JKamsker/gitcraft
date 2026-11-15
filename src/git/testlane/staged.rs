@@ -48,6 +48,16 @@ fn fingerprint_for(repo: &Path, command: &str, index: Option<&[u8]>) -> Result<S
     hash.update(crate::git::command::snapshot_policy::without_hooks(|| {
         git::run_bytes(Some(repo), &["config", "--null", "--list"])
     })?);
+    let attributes = git::run(
+        Some(repo),
+        &[
+            "rev-parse",
+            "--path-format=absolute",
+            "--git-path",
+            "info/attributes",
+        ],
+    )?;
+    hash.update(read_bounded(Path::new(attributes.trim()))?.unwrap_or_default());
     let mut env: Vec<_> = std::env::vars_os().collect();
     env.sort();
     for (name, value) in env {
@@ -62,10 +72,14 @@ fn index_bytes(repo: &Path) -> Result<Option<Vec<u8>>, String> {
         Some(repo),
         &["rev-parse", "--path-format=absolute", "--git-path", "index"],
     )?;
-    if std::fs::metadata(index.trim()).is_ok_and(|m| m.len() > 64 * 1024 * 1024) {
+    read_bounded(Path::new(index.trim()))
+}
+
+fn read_bounded(path: &Path) -> Result<Option<Vec<u8>>, String> {
+    if std::fs::metadata(path).is_ok_and(|m| m.len() > 64 * 1024 * 1024) {
         return Err(crate::i18n::text("staged-budget").into());
     }
-    match std::fs::read(index.trim()) {
+    match std::fs::read(path) {
         Ok(bytes) => Ok(Some(bytes)),
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(None),
         Err(e) => Err(e.to_string()),
