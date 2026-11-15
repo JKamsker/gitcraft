@@ -93,7 +93,9 @@ def main():
     output.write_text(
         json.dumps({"binaries": [binaries[name] for name in sorted(binaries)]}, indent=2) + "\n"
     )
-    write_upload_paths([*sorted(binaries), output.relative_to(root).as_posix()])
+    symbols = [str(Path(path).with_suffix(".pdb")) for path in sorted(binaries)
+               if Path(path).with_suffix(".pdb").is_file()]
+    write_upload_paths([*sorted(binaries), *symbols, output.relative_to(root).as_posix()])
     print(f"Built {len(binaries)} Windows test executables: {sorted(binaries)}", flush=True)
     return 0
 

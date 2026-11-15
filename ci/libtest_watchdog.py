@@ -26,6 +26,7 @@ import time
 from xml.sax.saxutils import escape, quoteattr
 
 from process_tree import OwnedProcess
+from windows_dump import capture as capture_dump
 
 SCHEMA = "gitcraft-test-report/1"
 LOG_CAP = 8 * 1024 * 1024
@@ -286,6 +287,10 @@ def run_process(report, label, command, cwd=None, *, binary="", kind="parallel",
             at, raw = item
             echo.write(raw)
             log.write(redact(raw.decode("utf-8", "replace")).encode("utf-8"))
+            if b"[hang-deadline " in raw:
+                record["test_deadline"] = redact(raw.decode("utf-8", "replace")).strip()
+                reason = "deadline"
+                break
             if parser.feed(raw.decode("utf-8", "replace"), round(at - began, 3)):
                 last_progress = at
         if not lines.qsize():
@@ -311,6 +316,7 @@ def run_process(report, label, command, cwd=None, *, binary="", kind="parallel",
 
     elapsed = time.monotonic() - began
     if reason is not None or child.poll() is None:
+        record["thread_dump"] = capture_dump(child, report.directory / f"{index:02d}-stacks.dmp")
         record["snapshot"] = child.snapshot()
         record["killed"] = child.kill_tree()
     else:

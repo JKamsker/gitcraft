@@ -56,3 +56,47 @@ isolated shard. Tests and runtime assertions retain their existing coverage.
 No native Windows execution is available locally; Linux passes cannot establish
 resolution of a Windows hang. Parent validation and independent review remain
 required before publishing a final candidate.
+
+## Lane follow-up (#211): blocking calls and owned lifetimes
+
+The `dev` run 43704238820 (job 132790729702, d24ac13d) and PR #238
+run 43671605139 (job 132689023607) stalled in the lane tests. The former
+finished 185/186 tests and stopped at 676 seconds. The reported Job Object
+contained only the Rust executable; this does not identify the blocking Rust
+frame or prove a root cause. Prompt/editor and pipe-holder explanations lack
+support in these snapshots.
+
+The live lane tests now seed `show_test_lane` through `put_for_test`, avoiding
+`Settings::set` and its process-wide profile application. Their bodies run under
+an immutable default connection context inherited by background work. The rebase
+test explicitly drops its first live tab before rebasing and reopening.
+
+Eight live lane tests, the Git lane rebase test, the stack conflict-resume/abort
+test and the ghost rebase-key test supervise their entire owned body with a
+90-second `recv_timeout`. This includes fixture setup, synchronous Git, blocking
+polls, assertions and teardown; the inner elapsed-time loops alone cannot bound
+these calls. A worker panic is propagated to libtest. A timed-out worker is never
+joined, since that could hang again; CI's existing owned-process watchdog is
+responsible for terminating it and its descendants. Local libtest fails without
+waiting for that worker, and process exit ends it. No production timeout changes.
+
+Read `[hang-stage TEST] begin/end/unwind LABEL` in the uploaded per-process log.
+The last unmatched begin locates a fixture Git operation, opening/settling poll,
+start, rebase, reopen, assertions/actions or cleanup. `[hang-deadline TEST]`
+prints the active scope chain independently of the blocked worker. Existing
+`GITCRAFT_TEST_PROCESS_TRACE=1` remains enabled for all Windows shards: correlate
+its process launch/completion entries with the stage, rather than assuming that
+a missing Git child establishes which Rust lock is blocked.
+
+On Windows Actions, the deadline reporter leaves a 15-second diagnostic window.
+The watchdog recognizes the deadline marker immediately, saves a bounded
+10-second `MiniDumpNormal` attempt of its still-owned direct child, records the
+Job Object snapshot, then terminates only its owned process tree. The same dump
+attempt runs on ordinary shard/stall expiry. `report.json` records `thread_dump`
+status/path/error; `NN-stacks.dmp` is uploaded alongside logs and JSON/JUnit by the
+existing always-upload step. Open the dump with WinDbg and run `~* kb` to inspect
+all thread stacks (matching executable/PDB symbols improve frame names). These
+stack dumps can contain stack memory; treat them as diagnostic artifacts. Dump
+failure is recorded and never converts a timeout to success. No extra GitHub CI
+retry or longer test budget is introduced. Native Windows resolution remains
+unproven until these diagnostics and repeated Windows runs establish it.

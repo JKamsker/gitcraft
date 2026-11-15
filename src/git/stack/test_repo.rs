@@ -37,6 +37,7 @@ impl TestRepo {
 
     /// Runs git, saying which command failed should it fail.
     pub fn git(&self, args: &[&str]) -> Result<String, String> {
+        let _stage = crate::repo::hang_diagnostics::stage(format_args!("fixture git {args:?}"));
         git::run(Some(&self.dir), args).map_err(|e| format!("git {args:?}: {e}"))
     }
 

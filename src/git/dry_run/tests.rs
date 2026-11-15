@@ -31,6 +31,7 @@ impl TestRepo {
     }
 
     pub(crate) fn git(&self, args: &[&str]) -> Result<String, String> {
+        let _stage = crate::repo::hang_diagnostics::stage(format_args!("fixture git {args:?}"));
         run(Some(&self.dir), args)
     }
 
