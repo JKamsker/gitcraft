@@ -1,0 +1,10 @@
+2026-11-13T20:06:10.1234567Z      Running unittests src/lib.rs (target/debug/deps/gitcraft-0123456789abcdef)
+2026-11-13T20:06:10.1234567Z running 1 test
+2026-11-13T20:06:10.1234567Z test tests::shared ... FAILED
+2026-11-13T20:06:10.1234567Z test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+2026-11-13T20:06:10.1234567Z      Running unittests src/lib.rs (target/debug/deps/gitcraft_os-fedcba9876543210)
+2026-11-13T20:06:10.1234567Z running 1 test
+2026-11-13T20:06:10.1234567Z test tests::shared ... ok
+2026-11-13T20:06:10.1234567Z test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+2026-11-13T20:06:10.1234567Z error: 1 target failed:
+2026-11-13T20:06:10.1234567Z     `-p gitcraft --lib`
