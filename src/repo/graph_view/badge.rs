@@ -244,6 +244,7 @@ impl BadgeIndex {
             if let Some(name) = d.strip_prefix("HEAD -> ") {
                 let name = name
                     .strip_prefix("refs/heads/")
+                    .filter(|_| !local.contains(name))
                     .or_else(|| {
                         name.strip_prefix("heads/")
                             .filter(|_| !local.contains(name))
@@ -267,6 +268,7 @@ impl BadgeIndex {
             } else if let Some(tag) = d.strip_prefix("tag: ") {
                 let tag = tag
                     .strip_prefix("refs/tags/")
+                    .filter(|_| !self.tags.contains(tag))
                     .or_else(|| {
                         tag.strip_prefix("tags/")
                             .filter(|_| !self.tags.contains(tag))
@@ -283,21 +285,26 @@ impl BadgeIndex {
                 });
             } else if let Some(name) = d
                 .strip_prefix("refs/heads/")
-                .or_else(|| d.strip_prefix("heads/").filter(|_| !local.contains(d)))
+                .filter(|_| !local.contains(d))
+                .or_else(|| {
+                    d.strip_prefix("heads/")
+                        .filter(|_| !local.contains(d) && !remote_branches.contains_key(d))
+                })
             {
                 let i = branch(&mut out, &mut indices, name, None);
                 if let Some(b) = out.get_mut(i) {
                     b.local = true;
                 }
-            } else if let Some((name, remote)) =
-                match d.strip_prefix("refs/remotes/").or_else(|| {
+            } else if let Some((name, remote)) = match d
+                .strip_prefix("refs/remotes/")
+                .filter(|_| !local.contains(d) && !remote_branches.contains_key(d))
+                .or_else(|| {
                     d.strip_prefix("remotes/")
                         .filter(|_| !local.contains(d) && !remote_branches.contains_key(d))
                 }) {
-                    Some(rest) => remote_of(rest, true),
-                    None => remote_of(d, false),
-                }
-            {
+                Some(rest) => remote_of(rest, true),
+                None => remote_of(d, false),
+            } {
                 // Symbolic defaults can have arbitrary names. A real branch ending in
                 // HEAD remains selectable when present in the fetched catalog.
                 if self

@@ -302,3 +302,6 @@ fn deliver(result: Result<Link, String>, open: bool, ctx: &egui::Context) -> (St
 
 #[cfg(test)]
 mod tests;
+
+#[cfg(test)]
+mod namespace_tests;

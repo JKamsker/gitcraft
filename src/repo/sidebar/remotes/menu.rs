@@ -70,7 +70,7 @@ impl RepoTab {
         {
             ui.ctx().copy_text(b.name.clone());
         }
-        if let Some((menu, target)) = self.branch_link_menu(&b.name) {
+        if let Some((menu, target)) = self.branch_link_menu(&remote_ref(&b.name)) {
             menu.items(ui, "branch", &target, acts);
         }
         ui.separator();

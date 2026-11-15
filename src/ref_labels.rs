@@ -34,14 +34,13 @@ pub(crate) fn labels(entries: &[Entry], preferred: Option<&str>) -> BTreeMap<Str
             remotes.first().copied()
         }
     });
-    let non_remote: BTreeSet<_> = entries
-        .iter()
-        .filter(|e| e.kind != Kind::Remote)
-        .map(|e| e.path.as_str())
-        .collect();
+    let mut non_remote = BTreeSet::new();
     let mut paths = BTreeMap::<&str, usize>::new();
     let mut owners = BTreeMap::<&str, BTreeSet<&str>>::new();
     for e in entries {
+        if e.kind != Kind::Remote {
+            non_remote.insert(e.path.as_str());
+        }
         *paths.entry(&e.path).or_default() += 1;
         if let (Some(owner), Some(remote)) = (e.owner.as_deref(), e.remote.as_deref()) {
             owners.entry(owner).or_default().insert(remote);

@@ -390,3 +390,16 @@ fn interaction_menu_passes_the_full_clicked_ref_to_the_dialog() -> Result<(), St
     );
     Ok(())
 }
+
+#[test]
+fn copy_shortcut_compares_full_identity_but_copies_only_branch_text() {
+    let mut tab = area_d_tab();
+    std::sync::Arc::make_mut(&mut tab.commits[1]).refs = vec!["HEAD -> main".into()];
+    tab.rebuild_graph_labels();
+    assert_eq!(tab.copy_branch_ref(1).as_deref(), Some("refs/heads/main"));
+    assert_eq!(tab.copy_branch(1).as_deref(), Some("main"));
+    assert_eq!(
+        super::branch_copy_text("refs/remotes/refs/heads/topic"),
+        "refs/heads/topic"
+    );
+}

@@ -96,3 +96,37 @@ fn literal_namespace_paths_are_not_mistaken_for_short_ref_qualifiers() {
         .collect()
     );
 }
+
+#[test]
+fn literal_full_namespace_branch_and_heads_remote_keep_their_ref_kind() {
+    let refs = Refs {
+        local: ["refs/heads/topic", "topic"]
+            .map(super::tests::branch)
+            .to_vec(),
+        remotes: vec![(
+            "heads".into(),
+            vec![super::tests::branch("heads/remote-only")],
+        )],
+        ..Default::default()
+    };
+    for literal in ["refs/heads/topic", "HEAD -> refs/heads/topic"] {
+        let got = BadgeIndex::new(&refs).badges(&[
+            literal.into(),
+            "topic".into(),
+            "heads/remote-only".into(),
+        ]);
+        let full: std::collections::BTreeSet<_> = got.iter().map(|b| b.git_ref()).collect();
+        assert_eq!(
+            full,
+            [
+                "refs/heads/refs/heads/topic",
+                "refs/heads/topic",
+                "refs/remotes/heads/remote-only"
+            ]
+            .map(str::to_owned)
+            .into_iter()
+            .collect()
+        );
+        assert!(got.iter().any(|b| !b.local && b.remotes == ["heads"]));
+    }
+}

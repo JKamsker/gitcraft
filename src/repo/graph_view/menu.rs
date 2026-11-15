@@ -43,17 +43,16 @@ fn apply_patch_item(ui: &mut Ui, idle: bool, acts: &mut Vec<Action>) {
 
 impl RepoTab {
     pub(super) fn copy_branch(&self, i: usize) -> Option<String> {
+        self.copy_branch_ref(i)
+            .map(|full| branch_copy_text(&full).to_owned())
+    }
+
+    fn copy_branch_ref(&self, i: usize) -> Option<String> {
         let commit = self.commits.get(i)?;
         self.graph_badges(commit)
             .into_iter()
             .find(|b| b.kind == BadgeKind::Branch)
-            .map(|b| {
-                b.full_ref
-                    .strip_prefix("refs/heads/")
-                    .or_else(|| b.full_ref.strip_prefix("refs/remotes/"))
-                    .unwrap_or(&b.full_ref)
-                    .to_owned()
-            })
+            .map(|b| b.full_ref)
     }
 
     /// Right-click menu of a commit row.
@@ -111,7 +110,7 @@ impl RepoTab {
         let summary = commit.summary.clone();
         let is_head = hash == self.refs.head;
         // The right-clicked branch, else the commit's first branch, for copying.
-        let first_branch = self.copy_branch(i);
+        let first_branch = self.copy_branch_ref(i);
         let branch_name = pill.clone().or_else(|| {
             self.graph_badges(commit)
                 .into_iter()
@@ -262,7 +261,7 @@ impl RepoTab {
                     ui,
                     &hash,
                     &summary,
-                    branch_name.as_deref(),
+                    branch_name.as_deref().map(branch_copy_text),
                     self.selected == Some(i),
                     branch_name == first_branch,
                 );
@@ -388,3 +387,9 @@ mod registry_menu_tests;
 #[cfg(test)]
 #[path = "menu_apply_patch_tooltip_tests.rs"]
 mod apply_patch_tooltip_tests;
+
+fn branch_copy_text(full: &str) -> &str {
+    full.strip_prefix("refs/heads/")
+        .or_else(|| full.strip_prefix("refs/remotes/"))
+        .unwrap_or(full)
+}
