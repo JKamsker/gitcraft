@@ -1,5 +1,7 @@
 # Issue 189: extra inline-review fixes
 
+Historical record. Superseded by the [round-3 simplification and ownership fixes](189-staged-round3.md).
+
 Application/test candidate: `82c9a55ba61f1032a47c1d9dafcb508017aa2a2f`.
 Base `origin/dev` remains `8e69afb7df4141eada62495793a9645d181abe0e` (#240/#243,
 including `d3a759bd`); fetched again after the wider run. No rebase or rewritten
