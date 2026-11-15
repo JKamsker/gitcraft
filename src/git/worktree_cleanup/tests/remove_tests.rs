@@ -122,9 +122,10 @@ fn a_full_archive_store_keeps_the_worktree_and_a_retry_works() -> Result<(), Str
     Ok(())
 }
 
-/// Submodule files and their private Git metadata are retained along with the full tree.
+/// Relative submodule gitfiles do not survive relocation. Final inspection must refuse and
+/// roll the complete tree back instead of unlinking archived files or pruning private state.
 #[test]
-fn submodule_content_is_retained_without_git_removal() -> Result<(), String> {
+fn submodule_inspection_refusal_preserves_the_complete_worktree() -> Result<(), String> {
     let f = Fixture::new("remove refused")?;
     let sub = crate::git::stack::test_repo::TestRepo::new("wt cleanup submodule")?;
     let url = sub.path().to_string_lossy().into_owned();
@@ -142,20 +143,21 @@ fn submodule_content_is_retained_without_git_removal() -> Result<(), String> {
     let preview = inspect(f.repo.path(), &target)?;
     assert_eq!(preview.blockers_with(true), []);
     let outcome = remove(f.repo.path(), &target, &preview, Some(&f.store), true);
-    let Outcome::Removed { recovery, .. } = outcome else {
-        return Err(format!("{outcome:?}"));
-    };
+    assert!(matches!(outcome, Outcome::Failed(_)), "{outcome:?}");
     assert_eq!(
-        std::fs::read(recovery.join(UNICODE)).map_err(|e| e.to_string())?,
+        std::fs::read(wt.join(UNICODE)).map_err(|e| e.to_string())?,
         b"keep me\n"
     );
-    assert!(recovery.join("sub/.git").exists());
     assert!(
-        recovery
-            .parent()
-            .is_some_and(|p| p.join("git-state/modules").is_dir())
+        f.git(&wt.join("sub"), &["status", "--porcelain"])?
+            .is_empty()
     );
-    assert_eq!(f.store.list(None).len(), 1);
+    assert!(
+        crate::git::worktrees(f.repo.path(), None)?
+            .iter()
+            .any(|w| w.path == wt)
+    );
+    assert!(f.store.list(None).is_empty());
     Ok(())
 }
 
