@@ -478,7 +478,8 @@
         "gitcraft::repo::repository_tools",
         "gitcraft::repo::cleanup",
         "gitcraft::repo::error_help",
-        "gitcraft::repo::activity"
+        "gitcraft::repo::activity",
+        "gitcraft::repo::dialogs::tracking"
       ]
     },
     "update": {

@@ -1,5 +1,5 @@
 //! Owned, asynchronous upstream picker; presentation never fetches or publishes.
-use super::{Action, Outcome, Refresh, Undo};
+use super::{Action, Dialog, Outcome, Refresh, RepoTab, Undo};
 use crate::git::repository_tools::tracking::{self, View};
 use std::{
     collections::{BTreeMap, BTreeSet},
@@ -217,3 +217,46 @@ impl Form {
 
 #[cfg(test)]
 mod tests;
+
+impl RepoTab {
+    pub(in crate::repo) fn tracking_dialog(&self, branch: &str) -> Dialog {
+        Dialog::Tracking(Box::new(Form::new(
+            self.path.clone(),
+            branch.to_owned(),
+            self.ref_labels(),
+            self.visibility.sidebar_remotes.clone(),
+        )))
+    }
+}
+
+impl RepoTab {
+    pub(in crate::repo) fn tracking_items(
+        &self,
+        ui: &mut egui::Ui,
+        acts: &mut Vec<Action>,
+        b: &crate::git::Branch,
+        idle: bool,
+    ) {
+        ui.label(format!(
+            "{}: {}",
+            crate::i18n::text("tracking-current"),
+            if b.upstream.is_empty() {
+                crate::i18n::text("tracking-none")
+            } else {
+                &b.upstream
+            }
+        ));
+        if crate::menu_item::MenuItem::new(crate::i18n::text(if b.upstream.is_empty() {
+            "tracking-set"
+        } else {
+            "tracking-change"
+        }))
+        .icon("git-branch")
+        .enabled(idle)
+        .show(ui)
+        .clicked()
+        {
+            acts.push(Action::Dialog(self.tracking_dialog(&b.name)));
+        }
+    }
+}

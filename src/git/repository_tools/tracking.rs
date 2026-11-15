@@ -5,7 +5,7 @@ use std::{path::Path, sync::Arc};
 
 pub(crate) const APPLY: &str = "\0tracking";
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-pub(crate) struct Values {
+struct Values {
     remote: Vec<String>,
     merge: Vec<String>,
 }
@@ -158,7 +158,7 @@ impl View {
                 merge: vec![],
             },
         };
-        let make = |expected, desired, target, config| Request {
+        let make = |expected, desired, target, config: Option<String>| Request {
             branch: self.branch.clone(),
             oid: self.oid.clone(),
             expected,

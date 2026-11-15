@@ -18,7 +18,7 @@ impl Execution<'_> {
         if self.check_expectation(&step.kind)? {
             return Ok(None);
         }
-        if let [marker, json] = op.as_slice()
+        if let [marker, json] = op
             && marker == git::repository_tools::tracking::APPLY
         {
             return git::repository_tools::tracking::execute(self.path, json, self.control)

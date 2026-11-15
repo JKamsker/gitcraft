@@ -18,8 +18,7 @@ use crate::repo::graph_view;
 use crate::repo::pinned_sections::{Button, Header, Sections};
 use crate::repo::reflog::{ReflogAct, Source};
 use crate::repo::{
-    Action, Dialog, RepoTab, ci_status, fast_forward_action, merge_action, ops, rebase_action,
-    widgets,
+    Action, Dialog, RepoTab, ci_status, fast_forward_action, merge_action, rebase_action, widgets,
 };
 use crate::settings::Settings;
 use crate::theme::{self, Tokens};
