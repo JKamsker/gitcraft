@@ -2,9 +2,14 @@ use super::conflict_labels::SETTLE;
 use super::*;
 
 impl RepoTab {
-    /// Reads the repository again and forgets the conflict checks (F5, the toolbar's button,
-    /// coming back to the window): `.gitattributes` or git's config may have changed.
+    /// Explicit F5/toolbar refresh also asks for a fresh PR list.
     pub fn refresh(&mut self, ctx: &egui::Context) {
+        self.retire_pr_list();
+        self.refresh_on_focus(ctx);
+    }
+
+    /// Re-read local state on focus, retaining background forge freshness throttling.
+    pub fn refresh_on_focus(&mut self, ctx: &egui::Context) {
         self.invalidate_repository_context();
         self.conflict_checks.forget();
         self.reload(ctx);

@@ -140,6 +140,7 @@ fn minimum_column_keeps_dev_and_the_extra_refs_count_visible() {
         branch: "dev".to_owned(),
         base: "main".to_owned(),
         base_oid: String::new(),
+        head_repo: None,
         from_fork: false,
         sha: "a".to_owned(),
         author: String::new(),
