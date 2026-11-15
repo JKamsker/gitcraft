@@ -133,6 +133,26 @@ jobs:
           if-no-files-found: warn
           retention-days: 14
 
+  windows-clippy:
+    needs: rust-file-size
+    name: Windows Clippy
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+      - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: windows-clippy-v1
+          save-if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/dev' }}
+      - name: Clippy and complexity gate
+        run: python ci/clippy_packages.py
+
   windows-tests:
     needs: rust-file-size
     uses: ./.github/workflows/windows-tests.yml
@@ -257,7 +277,7 @@ jobs:
   # classifies every recorded test failure (ci/ci_summary.py).
   ci-result:
     name: CI result
-    needs: [rust-file-size, lint, test, windows-tests, windows-test-result, package-version, package-smoke, changes, forges]
+    needs: [rust-file-size, lint, test, windows-clippy, windows-tests, windows-test-result, package-version, package-smoke, changes, forges]
     if: ${{ always() }}
     runs-on: ubuntu-latest
     steps:

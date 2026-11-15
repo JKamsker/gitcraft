@@ -61,7 +61,7 @@ ISOLATED = {
     "repo-s": ["repo::stack::tests::undoing_a_rebase_that_updated_dependent_branches_puts_them_back"],
     # The end-to-end CLI blame launch hung under concurrent Windows repo-rest tests.
     "repo-rest": ["repo::tests::the_command_line_opens_a_file_s_blame_at_a_line"],
-    "core": [
+    "repo-g-m": [
         # Native PowerShell ACL snapshot occasionally exhausts its bounded process
         # deadline when run after other standalone fixtures in the same process.
         "standalone::model::tests::binary_whole_side_choices_preserve_bytes_and_stale_inputs_refuse_save",
@@ -71,9 +71,9 @@ ISOLATED = {
 }
 
 # Native Windows ACL fixtures start PowerShell helpers with bounded deadlines.
-# Run their whole feature group serially, outside the other core tests, without
+# Run their whole feature group serially on the light repo-g-m runner, without
 # changing production timeouts or omitting tests from the partition.
-SERIAL_GROUPS = {"core": ["standalone::"]}
+SERIAL_GROUPS = {"repo-g-m": ["standalone::"]}
 
 # libtest accepts multiple substring includes and --skip exclusions.
 # Catch-all shards ensure new or unusually named tests cannot silently disappear.
@@ -104,8 +104,8 @@ SHARDS = {
     "core": [
         "--skip", "git::",
         "--skip", "repo::",
-        *[arg for test in ISOLATED["core"] for arg in ("--skip", test)],
-        *[arg for group in SERIAL_GROUPS["core"] for arg in ("--skip", group)],
+        *[arg for test in ISOLATED["repo-g-m"] for arg in ("--skip", test)],
+        *[arg for group in SERIAL_GROUPS["repo-g-m"] for arg in ("--skip", group)],
     ],
 }
 
