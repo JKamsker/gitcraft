@@ -251,8 +251,11 @@ explain why it is needed and how to reduce it later, then commit and rerun. Keep
 entries unchanged. Existing PRs (#224, #236, #237) can declare their legitimate budget
 increases this way; there is no retroactive requirement for already merged PRs.
 On concurrent baseline conflicts, merge `origin/dev` normally, combine increments
-(and preserve both declarations), then update your own declaration to the combined
-budget value and rerun the gate. Never rebase published history.
+(and preserve both published declarations unchanged), then add a fresh declaration
+with a unique key for the combined budget value and rerun the gate. The push-event
+check compares with the previous pushed commit, which may contain declarations absent
+from `origin/dev`; also check with `--base <previous-pushed-SHA>` when resolving conflicts.
+Never rebase published history.
 
 Receiver mutation detection is conservative: any analyzed `&mut self` definition of
 a method name counts, regardless of unrelated shared receivers with that name. Without

@@ -1,6 +1,6 @@
 //! Effective visibility follows named and glob re-export bindings, including module aliases.
 //! Keep scopes separately: exporting into two sibling subtrees does not expose a third.
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 
 use crate::domains;
 use crate::model::{Inventory, ItemKind, ModId, Ns, Scope, VisSyntax};
@@ -35,42 +35,20 @@ fn intersect(inv: &Inventory, a: Reach, b: Reach) -> Option<Reach> {
 /// Resolve glob members through the resolver so private names and ambiguous globs follow
 /// the same rules as ordinary references. Names include aliases and chained globs.
 fn bindings(inv: &Inventory, res: &Resolver) -> Vec<(ModId, Def, Reach)> {
-    let mut names: Vec<BTreeSet<String>> = inv
-        .modules
-        .iter()
-        .map(|m| m.items.keys().chain(m.imports.keys()).cloned().collect())
-        .collect();
-    let mut globs = Vec::new();
-    for (id, import) in inv.imports.iter().enumerate().filter(|(_, i)| !i.block) {
-        if import.name.is_none() {
-            for target in res.import_any(id) {
-                if let Def::Mod(m) = target {
-                    globs.push((id, m));
-                }
-            }
-        }
-    }
-    loop {
-        let mut changed = false;
-        for &(id, target) in &globs {
-            let extra = names[target].clone();
-            let into = &mut names[inv.imports[id].module];
-            let before = into.len();
-            into.extend(extra);
-            changed |= before != into.len();
-        }
-        if !changed {
-            break;
-        }
-    }
-    let mut out = Vec::new();
+    // Keep visibility on each name binding, rather than on its resolved definition only.
+    // A public definition can be re-exported through a narrower alias or glob binding.
+    let mut members = vec![BTreeMap::<String, BTreeSet<(Def, Reach)>>::new(); inv.modules.len()];
     for (id, item) in inv.items.iter().enumerate().filter(|(_, i)| !i.site.test) {
         let target = match item.kind {
             ItemKind::Mod(m) => Def::Mod(m),
             _ => Def::Item(id),
         };
-        out.push((item.module, target, scope(inv, res, item.module, &item.vis)));
+        members[item.module]
+            .entry(item.name.clone())
+            .or_default()
+            .insert((target, scope(inv, res, item.module, &item.vis)));
     }
+    let mut globs = Vec::new();
     for (id, import) in inv
         .imports
         .iter()
@@ -78,20 +56,50 @@ fn bindings(inv: &Inventory, res: &Resolver) -> Vec<(ModId, Def, Reach)> {
         .filter(|(_, i)| !i.block && !i.site.test)
     {
         let reach = scope(inv, res, import.module, &import.vis);
-        if import.name.is_some() {
-            for target in res.import_any(id) {
-                out.push((import.module, target, reach));
+        for target in res.import_any(id) {
+            if let Some(name) = &import.name {
+                members[import.module]
+                    .entry(name.clone())
+                    .or_default()
+                    .insert((target, reach));
+            } else if let Def::Mod(m) = target {
+                globs.push((import.module, m, reach));
             }
-        } else {
-            for &(_, target) in globs.iter().filter(|(glob, _)| *glob == id) {
-                for name in &names[target] {
-                    for ns in [Ns::Type, Ns::Value, Ns::Macro] {
-                        for def in res.lookup(target, name, ns, Some(import.module)) {
-                            out.push((import.module, def, reach));
-                        }
+        }
+    }
+    loop {
+        let mut changed = false;
+        for &(module, target, outer) in &globs {
+            for (name, bindings) in members[target].clone() {
+                let visible: BTreeSet<Def> = [Ns::Type, Ns::Value, Ns::Macro]
+                    .into_iter()
+                    .flat_map(|ns| res.lookup(target, &name, ns, Some(module)))
+                    .collect();
+                for (def, source) in bindings {
+                    if !visible.contains(&def) {
+                        continue;
+                    }
+                    if let Some(reach) = intersect(inv, outer, source) {
+                        changed |= members[module]
+                            .entry(name.clone())
+                            .or_default()
+                            .insert((def, reach));
                     }
                 }
             }
+        }
+        if !changed {
+            break;
+        }
+    }
+    let mut out = Vec::new();
+    for (module, names) in members.into_iter().enumerate() {
+        for bindings in names.into_values() {
+            out.extend(
+                bindings
+                    .into_iter()
+                    .map(|(def, reach)| (module, def, reach)),
+            );
         }
     }
     out

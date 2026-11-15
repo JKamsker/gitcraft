@@ -201,11 +201,25 @@ fn inherited_trait_mutators_are_mutation_evidence() {
 
 #[test]
 fn reexport_visibility_increases_budget_once_per_definition() {
-    for export in [
-        "pub(crate) use hidden::*;",
-        "pub(crate) use hidden::A; pub(crate) use hidden::A as Again;",
-        "mod bridge { pub(super) use super::hidden::*; } pub(crate) use bridge::*;",
-        "pub(crate) use hidden::nested as exposed;",
+    for (export, expected) in [
+        ("pub(crate) use hidden::*;", 2),
+        (
+            "pub(crate) use hidden::A; pub(crate) use hidden::A as Again;",
+            1,
+        ),
+        (
+            "mod bridge { pub(super) use super::hidden::*; } pub(crate) use bridge::*;",
+            0,
+        ),
+        (
+            "mod bridge { pub(super) use super::hidden::A as Alias; } pub(crate) use bridge::*;",
+            0,
+        ),
+        (
+            "mod bridge { pub(crate) use super::hidden::*; } pub(crate) use bridge::*;",
+            2,
+        ),
+        ("pub(crate) use hidden::nested as exposed;", 1),
     ] {
         let hidden =
             "pub struct State; mod hidden { pub struct A; pub mod nested { pub struct B; } }";
@@ -214,10 +228,11 @@ fn reexport_visibility_increases_budget_once_per_definition() {
         let changed = tree(&[("src/alpha.rs", &source)]);
         let before = analysis(&original).domains["alpha"].exported;
         let after = analysis(&changed).domains["alpha"].exported;
-        let expected = if export.contains("hidden::*") { 2 } else { 1 };
         assert_eq!(after, before + expected, "{export}");
-        assert!(
-            rules(&outcome(&changed, &adopted(&original))).contains(&"visibility-budget".into())
+        assert_eq!(
+            rules(&outcome(&changed, &adopted(&original))).contains(&"visibility-budget".into()),
+            expected > 0,
+            "{export}"
         );
     }
 }
