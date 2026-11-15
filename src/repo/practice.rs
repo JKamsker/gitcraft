@@ -209,11 +209,8 @@ mod tests {
         diag::bounded(
             "sharing_violation_cleanup_warns_and_can_be_retried_after_release",
             || {
-                let root = diag::FixtureRoot(
-                    std::env::temp_dir()
-                        .join(format!("practice-cleanup-sharing-{}", std::process::id())),
-                );
-                std::fs::create_dir_all(&root.0).map_err(|e| e.to_string())?;
+                let temp = tempfile::tempdir().map_err(|e| e.to_string())?;
+                let root = diag::FixtureRoot(temp.keep());
                 let file = std::fs::OpenOptions::new()
                     .write(true)
                     .create(true)
