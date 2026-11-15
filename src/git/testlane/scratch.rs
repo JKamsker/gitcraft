@@ -333,18 +333,34 @@ fn process_alive(pid: u32) -> bool {
     }
     #[cfg(windows)]
     {
-        use std::os::windows::process::CommandExt;
-        const CREATE_NO_WINDOW: u32 = 0x0800_0000;
-        std::process::Command::new("tasklist")
-            .args(["/FI", &format!("PID eq {pid}"), "/NH", "/FO", "CSV"])
-            .creation_flags(CREATE_NO_WINDOW)
-            .output()
-            .is_ok_and(|o| String::from_utf8_lossy(&o.stdout).contains(&format!("\"{pid}\"")))
+        windows_alive(pid)
     }
     #[cfg(not(any(unix, windows)))]
     {
         let _ = pid;
         true
+    }
+}
+
+/// Query only the PID from a verified ownership record; never enumerate processes.
+#[cfg(windows)]
+#[allow(unsafe_code)] // Narrow Win32 query adapter; acquired handle is always closed.
+fn windows_alive(pid: u32) -> bool {
+    use windows_sys::Win32::{
+        Foundation::{CloseHandle, ERROR_INVALID_PARAMETER, GetLastError, STILL_ACTIVE},
+        System::Threading::{GetExitCodeProcess, OpenProcess, PROCESS_QUERY_LIMITED_INFORMATION},
+    };
+    // SAFETY: OpenProcess returns an owned query-only handle or null. The output
+    // code is initialized, only read on success, and the handle is closed once.
+    unsafe {
+        let handle = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, 0, pid);
+        if handle.is_null() {
+            return GetLastError() != ERROR_INVALID_PARAMETER;
+        }
+        let mut code = 0;
+        let queried = GetExitCodeProcess(handle, &mut code);
+        CloseHandle(handle);
+        queried == 0 || code == STILL_ACTIVE as u32
     }
 }
 

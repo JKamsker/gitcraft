@@ -115,7 +115,7 @@ objc2-app-kit = { version = "0.3", default-features = false, features = ["std", 
 [target.'cfg(windows)'.dependencies]
 # Compare retained Windows file identities when detaching an alternate; already used transitively.
 winapi-util = "0.1"
-windows-sys = { version = "0.61", features = ["Win32_Foundation", "Win32_Graphics_Dwm", "Win32_Storage_FileSystem"] }
+windows-sys = { version = "0.61", features = ["Win32_Foundation", "Win32_Graphics_Dwm", "Win32_Storage_FileSystem", "Win32_System_Threading"] }
 # Whether the connection is metered (WinRT's NetworkInformation: safe calls, no unsafe code).
 windows = { version = "0.62", features = ["Networking_Connectivity"] }
 # The window's handle, for the taskbar button (the version winit uses).

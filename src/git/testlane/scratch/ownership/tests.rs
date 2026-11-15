@@ -13,12 +13,14 @@ fn recovery_requires_matching_records_and_dead_owner_evidence() -> Result<(), St
     assert!(!owner.abandoned("another-machine", None, |_| false));
     let mut boot_owner = owner.clone();
     boot_owner.boot = Some("previous-boot".into());
+    let mut probed = false;
     assert!(
         boot_owner.abandoned(&owner.machine, Some("current-boot"), |_| {
-            assert!(false, "a changed boot must not probe a reused PID");
+            probed = true;
             true
         })
     );
+    assert!(!probed, "a changed boot must not probe a reused PID");
     let mut forged = owner.clone();
     forged.token = "0".repeat(32);
     remote::write(
