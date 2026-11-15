@@ -139,6 +139,7 @@ fn parse(v: &Value, h: &Hosting) -> Result<PullRequest, String> {
         base: required(v, "/destination/branch/name")?.into(),
         base_oid: String::new(),
         sha: required(v, "/source/commit/hash")?.into(),
+        head_repo: None,
         from_fork: text(v, "/source/repository/uuid") != text(v, "/destination/repository/uuid"),
         author: text(v, "/author/display_name"),
         url: url(h, n),

@@ -17,7 +17,12 @@ pub(super) fn provider_boundary_ssh_selects_cross_host_secondary_and_checks_conf
     ] {
         let h = hosting(forge, host);
         let tool = if forge == Forge::GitHub { "gh" } else { "glab" };
-        let calls = recording::run(vec![ok("signed in"), ok("[]")], || {
+        let answer = if forge == Forge::GitHub {
+            GITHUB_EMPTY_LIST
+        } else {
+            "[]"
+        };
+        let calls = recording::run(vec![ok("signed in"), ok(answer)], || {
             recording::set_remotes(vec![
                 Remote {
                     name: "origin".into(),
@@ -52,12 +57,17 @@ pub(super) fn provider_boundary_ssh_selects_cross_host_secondary_and_checks_conf
         ] {
             assert!(calls[0].env.iter().any(|(k, v)| k == secret && v.is_none()));
         }
-        let expected = if forge == Forge::GitHub {
-            format!("{host}/fork/project")
+        if forge == Forge::GitHub {
+            assert_eq!(flag(&calls[1], "--hostname"), Some(host));
+            assert_eq!(flag(&calls[1], "--repo"), None);
+            let input: serde_json::Value =
+                serde_json::from_str(calls[1].input.as_deref().ok_or("stdin")?)?;
+            assert_eq!(input["variables"]["owner"], "fork");
+            assert_eq!(input["variables"]["name"], "project");
         } else {
-            format!("https://{host}/fork/project")
-        };
-        assert_eq!(flag(&calls[1], "--repo"), Some(expected.as_str()));
+            let expected = format!("https://{host}/fork/project");
+            assert_eq!(flag(&calls[1], "--repo"), Some(expected.as_str()));
+        }
     }
 
     Ok(())

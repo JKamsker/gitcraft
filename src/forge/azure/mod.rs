@@ -178,6 +178,7 @@ fn parse(v: &Value, h: &Hosting) -> Result<PullRequest, String> {
                 "backend-azure-target-is-not-a-branch-d6829b",
             ))?
             .into(),
+        head_repo: None,
         from_fork: v.get("forkSource").is_some_and(|f| !f.is_null()),
         base_oid: String::new(),
         sha: required(v, "/lastMergeSourceCommit/commitId")?.into(),
