@@ -178,3 +178,23 @@ fn detached_missing_upstream_and_rewritten_remote_refs_remain_protected() -> Res
     assert!(missing.blockers.contains(&"resources-unpublished".into()));
     Ok(())
 }
+
+#[test]
+fn missing_linked_worktree_keeps_registration_but_not_zero_measurements() -> Result<(), String> {
+    let repo = Repo::new("resources-missing")?;
+    repo.commit("base", &[("a", Some("a"))])?;
+    repo.git(&["branch", "topic"])?;
+    let linked = repo.path().join("linked");
+    repo.git(&["worktree", "add", linked.to_str().ok_or("path")?, "topic"])?;
+    std::fs::remove_dir_all(&linked).map_err(|e| e.to_string())?;
+    let found = collect(repo.path(), &linked, 1, None, None)?;
+    assert_eq!(found.root, linked);
+    assert!(
+        found
+            .measurements
+            .iter()
+            .all(|m| matches!(m.status, Completeness::Unavailable(_)))
+    );
+    assert_eq!(previews(&found)[1].potential_purge, None);
+    Ok(())
+}

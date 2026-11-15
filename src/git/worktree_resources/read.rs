@@ -44,6 +44,12 @@ pub(crate) fn collect(
     if wt.main || wt.current || wt.locked.is_some() || wt.bare || wt.prunable.is_some() {
         found.blockers.push("resources-registration-blocked".into());
     }
+    if wt.prunable.is_some() || wt.bare {
+        for m in &mut found.measurements {
+            m.status = Completeness::Unavailable("resources-registration-blocked".into());
+        }
+        return Ok(found);
+    }
     let refs = git_read(
         repo,
         &[
