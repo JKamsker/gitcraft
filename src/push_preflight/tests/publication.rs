@@ -176,3 +176,18 @@ fn stale_explicit_publication_refuses_without_changing_tracking() -> Result<(), 
     assert!(git::run(Some(&f.receiver), &["for-each-ref", "refs/heads/explicit/"])?.is_empty());
     Ok(())
 }
+
+#[test]
+fn rejected_explicit_publication_preserves_prior_tracking() -> Result<(), String> {
+    let f = Fixture::new()?;
+    f.git(&["config", "branch.main.remote", "."])?;
+    let before = f.git(&["config", "--null", "--list"])?;
+    let prepared = git::repository_tools::routes::prepare_publication(&f.repo, "main", "origin", "main")?;
+    let mut plan = scan(&f.repo, prepared.route.publication_operations(), f.profile(), &|| true)?;
+    plan.retain_selection(prepared)?;
+    let advanced = f.advance_receiver()?;
+    assert!(execute(&f.repo, &plan, None).is_err());
+    assert_eq!(f.git(&["config", "--null", "--list"])?, before);
+    assert_eq!(f.receiver_head()?, advanced);
+    Ok(())
+}
