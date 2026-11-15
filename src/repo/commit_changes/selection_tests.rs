@@ -90,6 +90,45 @@ fn row_selection_retires_automatic_diffs_and_preserves_explicit_split_diffs() {
 }
 
 #[test]
+fn ordinary_rows_preserve_another_commits_explicit_split_diff() {
+    for remerge in [false, true] {
+        for ready in [false, true] {
+            let ctx = egui::Context::default();
+            let mut tab = RepoTab::new_deferred("/recording-only/explicit-split".into(), &ctx);
+            tab.commits.push(std::sync::Arc::new(crate::git::Commit {
+                hash: "b".repeat(40),
+                ..Default::default()
+            }));
+            let mut settings = crate::settings::Settings::get(&ctx);
+            settings.diff_beside_graph = true;
+            settings.put_for_test(&ctx);
+            let hash = "a".repeat(40);
+            let path = "explicit.txt".into();
+            let key = if remerge {
+                DiffKey::Remerge {
+                    hash,
+                    path,
+                    old_path: None,
+                    conflicts: Vec::new(),
+                }
+            } else {
+                DiffKey::Commit { hash, path }
+            };
+            let mut view = crate::repo::DiffView::new(key.clone());
+            view.data = ready.then(|| Ok(Default::default()));
+            let request = view.request;
+            tab.diff = Some(view);
+            crate::repo::messages::record_jobs(|| tab.apply(Action::Select(0), &ctx));
+            assert_eq!(tab.selected_hash(), Some("b".repeat(40)));
+            assert_eq!(
+                tab.diff.as_ref().map(|d| (&d.key, d.request)),
+                Some((&key, request))
+            );
+        }
+    }
+}
+
+#[test]
 fn branch_pill_selection_retires_another_commits_split_diff() {
     for by_hash in [false, true] {
         for same_row in [false, true] {
