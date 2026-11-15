@@ -336,9 +336,8 @@ fn a_huge_range_is_refused() -> Result<(), String> {
     Ok(())
 }
 
-/// A scratch worktree left by a gitcraft of this machine that is gone is removed when the
-/// next is made; a worktree of the user's in a folder that happens to have the same name, or
-/// one named otherwise in the scratch folder, never is.
+/// Names identify scratch paths for presentation, but do not prove cleanup ownership.
+/// Even a matching dead-PID legacy path must survive without matching ownership records.
 #[test]
 fn legacy_unmarked_worktrees_are_never_adopted_by_crash_recovery() -> Result<(), String> {
     let (repo, _) = branch_with_a_break("sweep", 1, 9)?;

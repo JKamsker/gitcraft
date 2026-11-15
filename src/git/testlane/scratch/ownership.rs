@@ -3,11 +3,7 @@
 use super::{ScratchName, allocation, this_machine};
 use crate::remote;
 use serde::{Deserialize, Serialize};
-use std::{
-    collections::hash_map::RandomState,
-    hash::BuildHasher,
-    path::{Path, PathBuf},
-};
+use std::path::{Path, PathBuf};
 const MARKER: &str = "gitcraft-owner.json";
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -36,18 +32,7 @@ fn read(path: &Path) -> Option<Ownership> {
         let parent = path.parent()?;
         remote::read_within(parent, path.file_name()?.to_str()?, 4096)?.ok()??
     } else {
-        use std::io::Read;
-        let metadata = std::fs::symlink_metadata(path).ok()?;
-        if !metadata.is_file() || metadata.is_symlink() || metadata.len() > 4096 {
-            return None;
-        }
-        let mut bytes = Vec::new();
-        std::fs::File::open(path)
-            .ok()?
-            .take(4097)
-            .read_to_end(&mut bytes)
-            .ok()?;
-        bytes
+        crate::safe_read::read_inside(path.parent()?, path.file_name()?.to_str()?, 4096)?
     };
     if bytes.len() > 4096 {
         return None;
@@ -62,11 +47,7 @@ impl Ownership {
             .ok_or("invalid scratch allocation")?;
         let owner = Self {
             allocation: allocation.into(),
-            token: format!(
-                "{:016x}{:016x}",
-                RandomState::new().hash_one(()),
-                RandomState::new().hash_one(())
-            ),
+            token: remote::askpass::random_token(),
             created: std::time::SystemTime::now()
                 .duration_since(std::time::UNIX_EPOCH)
                 .map_err(|e| e.to_string())?
