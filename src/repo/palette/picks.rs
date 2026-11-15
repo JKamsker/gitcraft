@@ -101,7 +101,9 @@ impl RepoTab {
     /// What to pick from once `pick` is chosen.
     pub(crate) fn palette_choices(&self, pick: &Pick) -> Vec<PaletteItem> {
         let key = |name: &str| format!("{}:{name}", pick.key());
-        let labels = self.ref_labels();
+        // One shared catalog per build; filtering uses the already constructed items.
+        let catalog = self.presentation();
+        let labels = &catalog.labels;
         match pick {
             Pick::Checkout => self
                 .other_branches()
@@ -120,7 +122,7 @@ impl RepoTab {
                             .get(&full)
                             .map(|l| l.caption.as_str())
                             .unwrap_or(&b.name),
-                        &format!("{} {}", b.name, self.ref_description(&full)),
+                        &format!("{} {}", b.name, catalog.description(&full)),
                         action,
                     )
                     .key(key(&full))
@@ -164,7 +166,7 @@ impl RepoTab {
                                     .get(&full)
                                     .map(|l| l.caption.as_str())
                                     .unwrap_or(&b.name),
-                                &format!("{} {}", b.name, self.ref_description(&full)),
+                                &format!("{} {}", b.name, catalog.description(&full)),
                                 action,
                             )
                             .key(key(&full)),
