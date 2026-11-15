@@ -139,3 +139,62 @@ fn merge_pure_reviewed_send_receipt_refuses_changed_exact_push() -> Result<(), S
     }
     Ok(())
 }
+
+#[test]
+fn explicit_publication_sets_tracking_only_after_reviewed_success() -> Result<(), String> {
+    let f = Fixture::new()?;
+    f.git(&["config", "branch.autoSetupRebase", "always"])?;
+    for (index, branch) in ["main", "refs/heads/töpíc", "-leading"].into_iter().enumerate() {
+        let source = format!("refs/heads/{branch}");
+        f.git(&["update-ref", &source, "HEAD"])?;
+        f.git(&["config", &format!("branch.{branch}.rebase"), "false"])?;
+        let before = f.git(&["config", "--null", "--list"])?;
+        let destination = format!("explicit/new-{index}");
+        let prepared = git::repository_tools::routes::prepare_publication(&f.repo, branch, "origin", &destination)?;
+        let mut plan = scan(&f.repo, prepared.route.publication_operations(), f.profile(), &|| true)?;
+        plan.retain_selection(prepared)?;
+        assert!(plan.tracking);
+        assert_eq!(f.git(&["config", "--null", "--list"])?, before);
+        execute(&f.repo, &plan, None)?;
+        assert_eq!(f.git(&["config", &format!("branch.{branch}.remote")])?, "origin");
+        assert_eq!(f.git(&["config", &format!("branch.{branch}.merge")])?, format!("refs/heads/{destination}"));
+        assert_eq!(f.git(&["config", &format!("branch.{branch}.rebase")])?, "true");
+        assert_eq!(git::run(Some(&f.receiver), &["rev-parse", &format!("refs/heads/{destination}")])?.trim(), f.git(&["rev-parse", &source])?);
+    }
+    Ok(())
+}
+
+#[test]
+fn stale_explicit_publication_refuses_without_changing_tracking() -> Result<(), String> {
+    for change in ["url", "rename", "source"] {
+        let f = Fixture::new()?;
+        let prepared = git::repository_tools::routes::prepare_publication(&f.repo, "main", "origin", "explicit/stale")?;
+        let mut plan = scan(&f.repo, prepared.route.publication_operations(), f.profile(), &|| true)?;
+        plan.retain_selection(prepared)?;
+        match change {
+            "url" => { f.git(&["config", "remote.origin.pushurl", "https://changed.invalid/repo"])?; }
+            "rename" => { f.git(&["remote", "rename", "origin", "renamed"])?; }
+            _ => { f.commit("moved", "moved", "Source moved")?; }
+        }
+        let before = f.git(&["config", "--null", "--list"])?;
+        assert!(execute(&f.repo, &plan, None).is_err(), "{change}");
+        assert_eq!(f.git(&["config", "--null", "--list"])?, before);
+        assert!(git::run(Some(&f.receiver), &["for-each-ref", "refs/heads/explicit/"])?.is_empty());
+    }
+    Ok(())
+}
+
+#[test]
+fn rejected_explicit_publication_preserves_prior_tracking() -> Result<(), String> {
+    let f = Fixture::new()?;
+    f.git(&["config", "branch.main.remote", "."])?;
+    let before = f.git(&["config", "--null", "--list"])?;
+    let prepared = git::repository_tools::routes::prepare_publication(&f.repo, "main", "origin", "main")?;
+    let mut plan = scan(&f.repo, prepared.route.publication_operations(), f.profile(), &|| true)?;
+    plan.retain_selection(prepared)?;
+    let advanced = f.advance_receiver()?;
+    assert!(execute(&f.repo, &plan, None).is_err());
+    assert_eq!(f.git(&["config", "--null", "--list"])?, before);
+    assert_eq!(f.receiver_head()?, advanced);
+    Ok(())
+}

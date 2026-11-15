@@ -217,6 +217,7 @@ pub(crate) fn execute_controlled_with_guard(
     }
     check(repo, plan)?;
     let mut args = push_args(plan)?;
+    let rebase = tracking::auto_rebase(repo, plan)?;
     for (i, url) in plan.urls.iter().enumerate() {
         if let Some(why) = crate::network::refused() {
             return Err(why.why().into());
@@ -274,24 +275,6 @@ pub(crate) fn execute_controlled_with_guard(
         };
         let _ = git::forecast_run(repo, &args, &[], &[0], &|| true);
     }
-    if plan.tracking
-        && plan.branch.starts_with("refs/heads/")
-        && plan.destination.starts_with("refs/heads/")
-    {
-        // Setting an upstream is local metadata; it is never used to choose this push's ref.
-        let branch = plan.branch.trim_start_matches("refs/heads/");
-        git::run(
-            Some(repo),
-            &["config", &format!("branch.{branch}.remote"), &plan.remote],
-        )?;
-        git::run(
-            Some(repo),
-            &[
-                "config",
-                &format!("branch.{branch}.merge"),
-                &plan.destination,
-            ],
-        )?;
-    }
+    tracking::install(repo, plan, rebase)?;
     Ok("Push completed to the reviewed target(s).".into())
 }

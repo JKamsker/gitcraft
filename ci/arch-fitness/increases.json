@@ -282,5 +282,21 @@
     "reason": "After #236 merged alongside the #238 effective-visibility checker, forge measured 223 against 218. Narrowing the GitHub adapter to forge and replacing the discovery model glob with explicit UI exports confines RateLimit to forge and reduces the measurement to 222. The remaining query, repository/owner/visibility, page/error, session and discovery capability definitions form the app repository browser contract and must cross the forge boundary. This declares only the remaining four-item measured increase.",
     "owner": "@JKamsker",
     "remediation": "Keep transport, rate-limit parsing and provider adapters forge-scoped; use explicit discovery exports. Narrow unused browser contract types as consumers change, then ratchet this budget."
+  },
+  "233-publication-dialog-api": {
+    "changes": [
+      "budget/doctor/exported=42"
+    ],
+    "reason": "Issue #233 PR3 exposes one owned publication Form to the existing Dialog coordinator. Its private state holds destination input and a read-only preview; execution continues through root push preflight.",
+    "owner": "@JKamsker",
+    "remediation": "Keep publication state private; remove the Form export when dialog composition becomes feature-owned."
+  },
+  "233-publication-dialog-dispatch": {
+    "changes": [
+      "budget/repo-core/symbols=613"
+    ],
+    "reason": "Issue #233 PR3 adds one coordinator reference for Dialog to hold the owned publication Form. No new domain edge or direct push continuation is introduced.",
+    "owner": "@JKamsker",
+    "remediation": "Move dialog composition into the owning feature when the coordinator is decomposed."
   }
 }

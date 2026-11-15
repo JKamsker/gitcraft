@@ -3,7 +3,9 @@ use super::{
     remote_config::{set_values, values},
 };
 use std::path::Path;
+mod publish;
 mod reviewed;
+pub(crate) use publish::prepare_publication;
 pub(crate) use reviewed::{PreparedPush, PushRoute};
 #[derive(Clone, Debug)]
 pub(crate) struct Route {

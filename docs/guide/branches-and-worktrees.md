@@ -14,6 +14,11 @@ The left panel: local and remote branches, stacked branches, worktrees, submodul
   remotes hidden in the sidebar or graph. Only already fetched refs can be selected.
   An unavailable upstream can be changed or unset. Apply rechecks the snapshot; if it
   changed, refresh and choose again. Undo restores the exact previous tracking values.
+- _Publish branch…_ chooses a remote and destination branch. _Preview publication_ shows
+  the local source commit, full destination ref and effective push URLs without fetching or
+  pushing. _Push and set upstream_ continues through the normal push checklist, including
+  protection, authentication and conflict handling. Cancel leaves tracking unchanged; only
+  a successful reviewed push sets the upstream. Gerrit review submission remains separate.
 - _Pin to top_ (a branch's menu) keeps a branch at the top of _Local_; _Name_ / _Recent_ in the
   panel's header sorts the others by name or by their last commit, newest first. Both are kept
   per repository.
