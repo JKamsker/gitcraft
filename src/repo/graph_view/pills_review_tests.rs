@@ -15,7 +15,7 @@ fn another_remotes_same_name_pill_checks_out_from_primary_and_overflow() {
             }],
             ..Default::default()
         };
-        let mut h = Harness::builder().build_ui_state(
+        let mut h = Harness::builder().with_step_dt(0.01).build_ui_state(
             move |ui, (tab, acts): &mut (RepoTab, Vec<Action>)| {
                 let resp = ui.button("alice/topic");
                 let badge = remote_pill("topic", "alice");
@@ -30,14 +30,15 @@ fn another_remotes_same_name_pill_checks_out_from_primary_and_overflow() {
         );
         h.run();
         h.get_by_label_contains("alice/topic").click();
-        h.run();
+        h.step();
         h.get_by_label_contains("alice/topic").click();
-        h.run();
+        h.step();
         assert!(
             h.state()
                 .1
                 .iter()
-                .any(|a| matches!(a, Action::CheckoutRemote(name) if name == "alice/topic"))
+                .any(|a| matches!(a, Action::CheckoutRemote(name) if name == "alice/topic")),
+            "overflow={overflow}"
         );
         assert!(!h.state().1.iter().any(|a| matches!(a, Action::Pull)));
     }
