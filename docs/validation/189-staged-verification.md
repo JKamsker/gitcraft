@@ -1,5 +1,8 @@
 # Issue 189 local validation
 
+Historical initial-candidate evidence. For the current candidate, see
+[review fixes and final evidence](189-staged-review-fixes.md).
+
 Application/test candidate: `79b2269e8102ea2e536697b78f4b305002308acb`.
 Base includes `d3a759bd` and the normal merge of `dev` at `eabb0ad1`.
 The subsequent evidence-only commit changes documentation; bind these application gates
