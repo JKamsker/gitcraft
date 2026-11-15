@@ -80,7 +80,7 @@ impl Browser {
             Err(TryRecvError::Empty) => return,
             Err(TryRecvError::Disconnected) => {
                 self.pending = None;
-                self.error = Some(DiscoveryError::Transport);
+                self.apply(Err(DiscoveryError::Transport));
                 return;
             }
         };

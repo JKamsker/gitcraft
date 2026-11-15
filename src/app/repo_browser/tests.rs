@@ -57,6 +57,8 @@ fn browser_reset_retires_receiver_and_query_generation() {
 #[test]
 fn browser_disconnected_worker_releases_loading() {
     let mut browser = browser();
+    browser.next = Some("retry-page".into());
+    browser.seen_pages.insert("retry-page".into());
     let (tx, rx) = std::sync::mpsc::channel();
     drop(tx);
     browser.pending = Some(Pending {
@@ -71,6 +73,7 @@ fn browser_disconnected_worker_releases_loading() {
     });
     browser.poll();
     assert!(browser.pending.is_none());
+    assert!(!browser.seen_pages.contains("retry-page"));
     assert_eq!(browser.error, Some(DiscoveryError::Transport));
 }
 
