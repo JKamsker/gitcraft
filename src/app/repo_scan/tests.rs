@@ -1,5 +1,7 @@
 use super::*;
+use crate::app::library::test_support::AssertValue;
 use crate::git;
+use std::path::Path;
 
 fn tree(name: &str) -> PathBuf {
     let dir = std::env::temp_dir().join(format!("gitcraft-scan-{name}-{}", std::process::id()));
@@ -28,7 +30,7 @@ fn names(root: &Path, found: &Found) -> Vec<String> {
 
 fn run(root: &Path, limits: ScanLimits) -> Found {
     let stop = AtomicBool::new(false);
-    scan(root, limits, &stop, &mut |_| {}).unwrap_or_default()
+    scan(root, limits, &stop, &mut |_| {}).assert_value()
 }
 
 #[test]
@@ -103,7 +105,7 @@ fn the_folders_kept_stay_within_the_limit() {
     };
     let found = scan(&root, limits, &stop, &mut |p| most = most.max(p.folders));
     let _ = std::fs::remove_dir_all(&root);
-    let found = found.unwrap_or_default();
+    let found = found.assert_value();
     assert_eq!(found.stopped, Some(Stopped::Folders));
     assert!(most <= 10, "{most}");
     assert_eq!(names(&root, &found), vec!["d00"]);
@@ -126,7 +128,8 @@ fn a_missing_folder_is_an_error_and_an_empty_one_finds_nothing() {
         scan(&root, LIMITS, &stopped, &mut |_| {}),
         Ok(Found {
             repos: Vec::new(),
-            stopped: Some(Stopped::Asked)
+            stopped: Some(Stopped::Asked),
+            ..Default::default()
         })
     );
     let _ = std::fs::remove_dir_all(&root);

@@ -11,7 +11,10 @@ Repositories in WSL or on another machine over SSH have [a page of their own](re
 - Drop a folder on the window to open it, or a `.patch` / `.diff` / `.eml` / `.mbox` on a
   repository tab to apply it.
 - _Scan a folder for repositories_ finds the repositories a few folders down and lists them to
-  open or add to the recent list.
+  open or add to the recent list, or _Save as root_ to keep finding them (see
+  [All repositories](#all-repositories-roots-and-nearby-folders)).
+- _All repositories_, under Recent: every repository gitcraft found for this profile, in folders
+  you configured and next to repositories you opened, together with the Recent ones.
 - Workspaces on the start page: named groups of repositories (here, in WSL or over SSH). Each
   shows every repository's branch, uncommitted files, ahead / behind and last fetch, looked at in
   the background a few at a time; _Fetch all_ and _Open all_ work on the whole group.
@@ -26,6 +29,54 @@ Repositories in WSL or on another machine over SSH have [a page of their own](re
   or comments you haven't seen. A click opens one in its repository's tab (a GitLab merge request
   in the browser). It uses the logins gh and glab have; for Forgejo and Gitea, one from the
   environment, tea's, or one gitcraft already used: it never runs git's credential helper unasked.
+
+## All repositories: roots and nearby folders
+
+**Recent** stays what it always was: the last 12 repositories you opened, in the order you
+opened them. **All repositories** is a separate list of every repository gitcraft found for the
+profile in use, as many as there are (up to 5,000), plus the Recent ones. Nothing found there
+is added to Recent, opened in a tab or fetched: a row opens its repository as _Open_ does (and
+only then does it go into Recent).
+
+- **Roots** are folders you keep repositories in. Add one with _Repository roots… → Add a root
+  folder…_ on the start page, from Settings → Profile → Repository roots, or with _Save as root_
+  after _Scan a folder_. Each root has a **depth**: 0 is only the folder itself (when it is a
+  repository), 1 (the default) its folders, up to 4 folders down. A repository inside another
+  one is listed too when it is within reach. A root can be turned off (its repositories leave the
+  list until it is turned on again), pointed at another folder, rescanned, stopped or removed.
+  Turning off or removing a root never closes a tab or takes anything out of Recent or a
+  workspace.
+- **Nearby** folders are inferred: when you open a repository on this computer, the other
+  repositories in its folder (its siblings, one level deep) are listed as _Nearby_. Opening
+  `/work/projects/app` lists `/work/projects/tool`, but `/work` and folders further up are never
+  looked in. It never looks in your home folder itself, a drive or file system root, a top-level
+  system folder (`/Users`, `/home`, `/mnt`, `/Volumes`, `C:\Users`…), the temporary folder, a
+  network share (`\\server\share`), WSL or a repository on another machine. The last five
+  nearby folders are kept; they never become roots unless you add them. Switch it off in
+  _Repository roots… → List repositories next to the ones I open_.
+- **Filter and search**: _All_, _Recent_, _Nearby_ or one root; type to search by name or path,
+  ↑ / ↓ and Enter to open, Esc to clear. Each row says where it was found. _Hide from library_
+  (the eye on a row) keeps a repository out of the list for good, whatever finds it again; it
+  stays in Recent and can still be opened (_Repository roots… → Show them again_ brings hidden
+  ones back). Removing a repository from Recent is a different thing: the × on a Recent row.
+- **When it scans**: the roots a couple of seconds after the window opens (never while it starts),
+  then again when their last scan is 15 minutes old while the window is in use; a nearby folder
+  when a repository in it is opened and it wasn't looked at in the last 15 minutes. _Rescan_ and
+  _Rescan all_ scan at once. There are no folder watchers and no scanning while gitcraft isn't
+  in use.
+- **Limits**: at most two scans run at once, in the background. A root scan stops after 5,000
+  folders, 1,000 repositories, 200,000 folder entries or 30 seconds; a nearby scan after 256
+  folders, 128 repositories, 4,096 entries or 5 seconds. Hidden folders, links (and Windows
+  junctions) and folders like `node_modules`, `target`, `build` or `vendor` are not looked in.
+  A scan cut short says _Partial_ (and why); one that couldn't look at all (a folder gone, a
+  drive not plugged in, not allowed) says _Unavailable_. A folder that is slow to answer holds
+  its scan's slot until it answers; other scans wait rather than pile up.
+- **What is kept**: the roots, the nearby folders and the list are saved with gitcraft's state,
+  per profile, never inside your repositories, and shown at once on the next start. A complete
+  scan takes away the repositories that are gone from that folder (unless another root or a
+  nearby folder still has them); a partial or failed one keeps them, marked _Stale_. Only
+  folders are read: gitcraft runs no git command, hook or credential helper for a repository it
+  found until you open it, so a row's branch and changes show only when it is also in Recent.
 
 ## Tabs and keyboard shortcuts
 

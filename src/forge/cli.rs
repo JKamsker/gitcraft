@@ -352,6 +352,9 @@ mod tests;
 mod auth;
 use auth::*;
 
+mod capped;
+pub(super) use capped::run_capped;
+
 mod routing;
 pub(crate) use routing::tool_location;
 use routing::*;

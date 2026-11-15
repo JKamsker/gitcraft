@@ -34,7 +34,7 @@ pub(super) fn repo_name(path: &Path) -> String {
 /// no match. A name that starts with it comes first, then a name that contains it, then a path
 /// that does, then a name whose letters come in its order (never a path so: almost every path
 /// has the letters of a short query somewhere).
-fn rank(path: &Path, query: &str) -> Option<u8> {
+pub(super) fn rank(path: &Path, query: &str) -> Option<u8> {
     let name = repo_name(path).to_lowercase();
     let full = crate::remote::display(path).to_lowercase();
     if name.starts_with(query) {

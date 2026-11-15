@@ -111,6 +111,7 @@ impl App {
                 || self.practice_open
                 || self.setup.open
                 || self.manual_open
+                || self.library_open
                 || self.my_work.open,
             update: self.update_check(),
             check_updates_now: false,

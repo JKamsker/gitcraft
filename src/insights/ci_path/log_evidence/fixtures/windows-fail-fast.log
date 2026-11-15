@@ -1,0 +1,10 @@
+2026-11-13T20:06:10.1234567Z Running precompiled Windows test shard core (budget 1080s, no-progress limit 600s)
+2026-11-13T20:06:10.1234567Z gitcraft-0123456789abcdef.exe: serial standalone::: 2 tests
+2026-11-13T20:06:10.1234567Z running 2 tests
+2026-11-13T20:06:10.1234567Z test standalone::tests::saves ... opening C:\Users\runneradmin\AppData\Local\Temp\gitcraft-test
+2026-11-13T20:06:10.1234567Z thread 'standalone::tests::saves' panicked at src/standalone/tests.rs:42:5:
+2026-11-13T20:06:10.1234567Z assertion `left == right` failed
+2026-11-13T20:06:10.1234567Z FAILED
+2026-11-13T20:06:10.1234567Z test standalone::tests::opens ... opened file
+2026-11-13T20:06:10.1234567Z ok
+2026-11-13T20:06:10.1234567Z test result: FAILED. 1 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.10s
