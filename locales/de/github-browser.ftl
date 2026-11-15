@@ -33,3 +33,6 @@ github-browser-cancelled = Anfrage abgebrochen.
 github-browser-queue = Hintergrundwarteschlange nicht verfügbar. Später erneut versuchen.
 github-browser-transport = GitHub-Anfrage fehlgeschlagen oder Zeitlimit überschritten. Erneut versuchen.
 github-browser-total = GitHub meldet { $count } Ergebnisse.
+github-browser-open-local = Lokal öffnen
+github-browser-local-stale = Das lokale Repository wurde verschoben oder seine Remotes wurden geändert. Browser aktualisieren.
+github-browser-open-after = Nach dem Klonen öffnen

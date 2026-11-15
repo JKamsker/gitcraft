@@ -1,4 +1,5 @@
 //! Window-owned, transient GitHub discovery. No result or credential is serialized.
+mod local;
 mod requests;
 mod view;
 use super::App;
@@ -8,6 +9,7 @@ use std::sync::mpsc::Receiver;
 
 pub(super) struct Browser {
     owner: egui::ViewportId,
+    local: local::Local,
     session: DiscoverySession,
     serial: u64,
     mode: usize,
@@ -38,7 +40,8 @@ struct Pending {
     _scope: crate::tasks::Scope,
 }
 pub(super) enum Intent {
-    Clone(String),
+    Clone { https: String, ssh: String },
+    Open(std::path::PathBuf),
     Manual,
     Settings,
 }
@@ -48,6 +51,7 @@ impl Browser {
         let mode = if session.account.selected() { 0 } else { 2 };
         Self {
             owner,
+            local: Default::default(),
             session,
             serial: 0,
             mode,
@@ -68,6 +72,7 @@ impl Browser {
     }
     fn reset(&mut self) {
         self.pending = None;
+        self.local.retire_open();
         self.serial = self.serial.saturating_add(1);
         self.repositories.clear();
         self.owners.clear();
@@ -95,7 +100,15 @@ impl Browser {
 }
 impl App {
     pub(super) fn start_repo_browser(&mut self) {
-        self.repo_browser = Some(Browser::new(self.windows.current));
+        let known = self
+            .all_repo_paths()
+            .into_iter()
+            .chain(self.recent.iter().cloned())
+            .chain(self.workspaces.all_repos())
+            .collect();
+        let mut browser = Browser::new(self.windows.current);
+        browser.local = local::Local::new(known);
+        self.repo_browser = Some(browser);
     }
     pub(super) fn poll_repo_browser(&mut self) {
         if let Some(browser) = &mut self.repo_browser {
@@ -112,10 +125,8 @@ impl App {
             self.repo_browser = None;
         }
         match intent {
-            Some(Intent::Clone(url)) => {
-                self.start_clone();
-                self.set_clone_url(&url);
-            }
+            Some(Intent::Clone { https, ssh }) => self.start_discovered_clone(https, ssh),
+            Some(Intent::Open(root)) => self.open_root(root, ctx),
             Some(Intent::Manual) => self.start_clone(),
             Some(Intent::Settings) => self.open_settings(),
             None => {}

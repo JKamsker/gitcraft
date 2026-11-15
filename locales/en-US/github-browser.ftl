@@ -33,3 +33,6 @@ github-browser-cancelled = Request cancelled.
 github-browser-queue = Background queue unavailable. Try again later.
 github-browser-transport = GitHub request failed or timed out. Try again.
 github-browser-total = GitHub reports { $count } results.
+github-browser-open-local = Open locally
+github-browser-local-stale = The local repository moved or its remotes changed. Refresh the browser.
+github-browser-open-after = Open after clone

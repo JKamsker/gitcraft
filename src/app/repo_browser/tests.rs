@@ -174,3 +174,27 @@ fn browser_discards_reply_for_another_window() {
     assert!(browser.pending.is_none());
     assert!(browser.repositories.is_empty());
 }
+
+#[test]
+fn browser_clone_handoff_contains_both_transports_without_credentials() {
+    use egui_kittest::{Harness, kittest::Queryable};
+    crate::i18n::set_language("en-US");
+    let mut browser = browser();
+    browser.repositories.push(repository());
+    browser.loaded = true;
+    let mut harness = Harness::new_ui_state(
+        |ui, state: &mut (Browser, Option<Intent>)| {
+            let (_, intent) = state.0.show(ui.ctx());
+            if intent.is_some() {
+                state.1 = intent;
+            }
+        },
+        (browser, None),
+    );
+    harness.run();
+    harness.get_by_label("Clone…").click();
+    harness.run();
+    assert!(
+        matches!(&harness.state().1, Some(Intent::Clone { https, ssh }) if https == "https://github.com/owner/repo.git" && ssh == "git@github.com:owner/repo.git")
+    );
+}

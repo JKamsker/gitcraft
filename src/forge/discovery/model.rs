@@ -22,7 +22,6 @@ pub(crate) struct Owner {
 #[derive(Clone, Debug)]
 pub(crate) struct Repository {
     pub id: u64,
-    #[allow(dead_code)] // Used by local identity matching in the next unit.
     pub hosting: Hosting,
     pub owner: String,
     pub name: String,
@@ -32,7 +31,6 @@ pub(crate) struct Repository {
     pub visibility: Visibility,
     pub web_url: String,
     pub https_url: String,
-    #[allow(dead_code)] // Used by clone transport selection in the next unit.
     pub ssh_url: String,
 }
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]

@@ -3,8 +3,8 @@ use super::DiscoveryError;
 use std::io::Read;
 use std::time::Duration;
 
-pub(crate) const BODY_LIMIT: usize = 2 * 1024 * 1024;
-pub(crate) struct Response {
+pub(in crate::forge) const BODY_LIMIT: usize = 2 * 1024 * 1024;
+pub(in crate::forge) struct Response {
     pub status: u16,
     pub headers: Vec<(String, String)>,
     pub body: Vec<u8>,

@@ -30,7 +30,11 @@ fn error_text(error: &DiscoveryError) -> String {
 }
 impl Browser {
     pub(super) fn show(&mut self, ctx: &egui::Context) -> (bool, Option<Intent>) {
+        if let Some(root) = self.local.tick(ctx) {
+            return (false, Some(Intent::Open(root)));
+        }
         let mut intent = None;
+        let mut open = None;
         let mut close = false;
         let response =
             egui::Modal::new(egui::Id::new("github-repository-browser")).show(ctx, |ui| {
@@ -92,6 +96,12 @@ impl Browser {
                         close = true;
                     }
                 });
+                if let Some(error) = &self.local.error {
+                    ui.label(error);
+                }
+                if self.mode < 2 && !self.session.account.selected() {
+                    ui.label(text("github-browser-sign-in"));
+                }
                 if let Some(error) = &self.error {
                     ui.label(error_text(error));
                 }
@@ -165,9 +175,29 @@ impl Browser {
                                         .map(|stars| stars.to_string())
                                         .unwrap_or_else(|| "—".into())
                                 ));
-                                if ui.button(text("github-browser-clone")).clicked() {
-                                    intent = Some(Intent::Clone(repo.https_url.clone()));
-                                }
+                                ui.horizontal(|ui| {
+                                    if ui.button(text("github-browser-clone")).clicked() {
+                                        intent = Some(Intent::Clone {
+                                            https: repo.https_url.clone(),
+                                            ssh: repo.ssh_url.clone(),
+                                        });
+                                    }
+                                    let paths = self.local.matches(&repo.hosting);
+                                    if paths.len() == 1 {
+                                        if ui.button(text("github-browser-open-local")).clicked() {
+                                            open = Some((paths[0].clone(), repo.hosting.clone()));
+                                        }
+                                    } else if !paths.is_empty() {
+                                        ui.menu_button(text("github-browser-open-local"), |ui| {
+                                            for path in paths {
+                                                if ui.button(path.display().to_string()).clicked() {
+                                                    open = Some((path, repo.hosting.clone()));
+                                                    ui.close();
+                                                }
+                                            }
+                                        });
+                                    }
+                                });
                             });
                         }
                     });
@@ -212,6 +242,9 @@ impl Browser {
                     self.request(query.clone(), true, ctx);
                 }
             });
+        if let Some((path, hosting)) = open {
+            self.local.open(path, hosting, ctx);
+        }
         (close || response.should_close(), intent)
     }
 }

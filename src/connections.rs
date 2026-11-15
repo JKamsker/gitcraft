@@ -333,3 +333,6 @@ pub(crate) fn expected_account(host: &str) -> Option<String> {
         .find(|account| account.selected() && account.host.eq_ignore_ascii_case(host))
         .map(|account| account.user.clone())
 }
+
+#[cfg(all(test, unix))]
+mod discovery_tests;
