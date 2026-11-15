@@ -228,8 +228,7 @@ impl RepoTab {
             && self.prs.iter().any(|p| !p.from_fork && p.branch == short);
         let full = remote_ref(&b.name);
         let shown = self.branch_shown(&full, false);
-        let r = remote_row(ui, &full, row, has_pr, !shown);
-        widgets::a11y(&r, egui::WidgetType::Button, || self.ref_description(&full));
+        let r = remote_row(ui, &full, row, has_pr, !shown, &self.ref_description(&full));
         let r = self.branch_drag_drop(ui, r, &b.name, true, &b.target, acts);
         acts.extend(visibility::eye(ui, &r, &full, shown));
         let r = r.on_hover_text(self.ref_description(&full));
@@ -337,7 +336,14 @@ fn paint_remote_header(
 
 /// A remote's branch, `full` its whole ref: only the icon and the name, in from its remote; the
 /// name dimmed while the graph leaves the branch out.
-fn remote_row(ui: &mut Ui, full: &str, row: LeafRow<'_>, has_pr: bool, hidden: bool) -> Response {
+fn remote_row(
+    ui: &mut Ui,
+    full: &str,
+    row: LeafRow<'_>,
+    has_pr: bool,
+    hidden: bool,
+    details: &str,
+) -> Response {
     let t = Tokens::get(ui.ctx());
     // Known by the branch, not its place: a fetch adds and prunes rows under an open menu.
     let (rect, resp) = widgets::keyed_row(ui, ROW_H, ("branch-row", full));
@@ -350,7 +356,7 @@ fn remote_row(ui: &mut Ui, full: &str, row: LeafRow<'_>, has_pr: bool, hidden: b
             (has_pr, crate::i18n::text("repo-core-3418")),
             (hidden, crate::i18n::text("repo-core-3419")),
         ];
-        labels::with_notes(&name, &notes)
+        format!("{} {details}", labels::with_notes(&name, &notes))
     });
     if resp.hovered() {
         ui.painter().rect_filled(rect, 0.0, t.hover);
