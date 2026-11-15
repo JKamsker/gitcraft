@@ -21,8 +21,8 @@ fn every_feature_has_a_paired_whole_message_without_missing_variables() -> Resul
         .flat_map(|(title, points)| std::iter::once(*title).chain(points.iter().copied()))
         .collect();
     assert_eq!(features().len(), 25);
-    assert_eq!(features().iter().map(|(_, p)| p.len()).sum::<usize>(), 219);
-    assert_eq!(expected.len(), 244);
+    assert_eq!(features().iter().map(|(_, p)| p.len()).sum::<usize>(), 220);
+    assert_eq!(expected.len(), 245);
     let mut values = Vec::new();
     for (locale, source) in CATALOGS {
         let resource = FluentResource::try_new(source.to_owned())

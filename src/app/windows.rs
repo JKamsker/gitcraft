@@ -34,6 +34,7 @@ pub(super) struct Window {
     teleport: Option<super::teleport::TeleportForm>,
     teleport_drag: Option<super::teleport::drag::DragTargets>,
     repo_scan: Option<super::repo_scan::RepoScan>,
+    library_open: bool,
     my_work: super::my_work::MyWork,
     pick_on_start: bool,
     error: Option<super::AppError>,
@@ -67,6 +68,7 @@ impl Window {
             teleport: None,
             teleport_drag: None,
             repo_scan: None,
+            library_open: false,
             my_work: Default::default(),
             pick_on_start: false,
             error: None,
@@ -101,6 +103,7 @@ impl Window {
         std::mem::swap(&mut self.teleport, &mut app.teleport);
         std::mem::swap(&mut self.teleport_drag, &mut app.teleport_drag);
         std::mem::swap(&mut self.repo_scan, &mut app.repo_scan);
+        std::mem::swap(&mut self.library_open, &mut app.library_open);
         std::mem::swap(&mut self.my_work, &mut app.my_work);
         std::mem::swap(&mut self.pick_on_start, &mut app.pick_on_start);
         std::mem::swap(&mut self.error, &mut app.error);
