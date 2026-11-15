@@ -9,6 +9,8 @@ use std::path::PathBuf;
 use std::process::Command;
 use std::sync::OnceLock;
 
+mod startup;
+
 const IMAGE: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/gitcraft-group-anchor"));
 static HELPER: OnceLock<Result<PathBuf, String>> = OnceLock::new();
 
@@ -58,6 +60,7 @@ pub(super) struct Anchor {
 }
 impl Anchor {
     fn start() -> io::Result<Self> {
+        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(5);
         let mut command = Command::new(helper()?);
         command
             .env_clear()
@@ -67,14 +70,14 @@ impl Anchor {
             .stdout(std::process::Stdio::piped())
             .stderr(std::process::Stdio::null());
         let mut anchor = Self {
-            child: Some(command.spawn()?),
+            child: Some(startup::spawn(&mut command, deadline)?),
         };
-        if let Err(primary) = anchor.ready() {
+        if let Err(primary) = anchor.ready(deadline) {
             return Err(with_cleanup(primary, anchor.retire()));
         }
         Ok(anchor)
     }
-    fn ready(&mut self) -> io::Result<()> {
+    fn ready(&mut self, deadline: std::time::Instant) -> io::Result<()> {
         let mut pipe = self
             .child
             .as_mut()
@@ -87,7 +90,6 @@ impl Anchor {
         {
             return Err(io::Error::last_os_error());
         }
-        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(5);
         let mut bytes = Vec::new();
         loop {
             // A startup failure is reaped and permanently loses signal authority before
