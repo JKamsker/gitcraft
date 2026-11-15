@@ -8,7 +8,6 @@ use paint::*;
 use egui::{Align2, Color32, CornerRadius, FontId, Painter, Pos2, Rect, Response, Sense, Stroke};
 use egui::{Ui, pos2, vec2};
 
-use super::badge::Badge;
 use super::{AVATAR_D, ROW_GAP, ROW_H, ROW_PITCH};
 use crate::a11y::labels;
 use crate::git::{self, Commit};
@@ -325,7 +324,13 @@ impl RepoTab {
         let refs: Vec<String> = self
             .graph_badges(commit)
             .iter()
-            .map(Badge::spoken)
+            .map(|badge| {
+                format!(
+                    "{} {}",
+                    badge.spoken(),
+                    self.ref_description(&badge.full_ref)
+                )
+            })
             .collect();
         let short = crate::repo::short(&commit.hash);
         labels::commit(short, &commit.summary, &commit.author, &when, &refs)

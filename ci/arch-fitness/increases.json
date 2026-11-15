@@ -93,9 +93,9 @@
   },
   "215-reexport-visibility-graph": {
     "changes": [
-      "budget/graph/exported=59"
+      "budget/graph/exported=61"
     ],
-    "reason": "Existing graph definitions exposed through named/glob re-exports and module aliases were omitted by the declaration-only visibility calculation. Corrected measurement 52 -> 59; application source unchanged.",
+    "reason": "Existing graph definitions exposed through named/glob re-exports and module aliases were omitted by the declaration-only visibility calculation. Corrected measurement 52 -> 59; application source unchanged. Combined with the independent #237 export increments during the plain dev merge.",
     "owner": "@JKamsker",
     "remediation": "Narrow or remove existing re-export bindings at the domain boundary, then ratchet the budget."
   },
@@ -205,9 +205,9 @@
   },
   "215-reexport-visibility-ui-kit": {
     "changes": [
-      "budget/ui-kit/exported=168"
+      "budget/ui-kit/exported=172"
     ],
-    "reason": "Existing ui-kit definitions exposed through named/glob re-exports and module aliases were omitted by the declaration-only visibility calculation. Corrected measurement 98 -> 168; application source unchanged.",
+    "reason": "Existing ui-kit definitions exposed through named/glob re-exports and module aliases were omitted by the declaration-only visibility calculation. Corrected measurement 98 -> 168; application source unchanged. Combined with the independent #237 export increments during the plain dev merge.",
     "owner": "@JKamsker",
     "remediation": "Narrow or remove existing re-export bindings at the domain boundary, then ratchet the budget."
   },

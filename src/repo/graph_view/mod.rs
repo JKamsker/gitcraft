@@ -98,37 +98,28 @@ impl RepoTab {
     /// branches share its tip and the ordinary ordering would put it behind `+N`.
     fn graph_badges(&self, commit: &git::Commit) -> Vec<Badge> {
         let mut badges = self.graph_badge_index.badges(&commit.refs);
-        for badge in &mut badges {
-            if badge.kind != BadgeKind::Branch {
-                continue;
-            }
-            badge.remotes.retain(|remote| {
-                self.visibility
-                    .shows(&super::branch_visibility::remote_ref(&format!(
-                        "{remote}/{}",
-                        badge.label
-                    )))
-            });
-            badge.local &= badge.head
-                || self
-                    .visibility
-                    .shows(&super::branch_visibility::local_ref(&badge.label));
-        }
-        badges.retain(|b| b.kind != BadgeKind::Branch || b.local || !b.remotes.is_empty());
-        if let Some(compare) = &self.compare
-            && compare.target.as_deref() == Some(commit.hash.as_str())
-        {
+        badges.retain(|b| {
+            b.kind != BadgeKind::Branch || b.head || self.visibility.shows(&b.full_ref)
+        });
+        if let Some(compare) = &self.compare {
             let focused = match badges.iter().position(|badge| {
-                badge.kind == BadgeKind::Branch && badge.label == compare.target_label
+                badge.kind == BadgeKind::Branch
+                    && compare.target.as_deref() == Some(&badge.full_ref)
             }) {
                 Some(index) => badges.remove(index),
-                None if self.prs.iter().any(|pr| pr.branch == compare.target_label) => Badge {
-                    label: compare.target_label.clone(),
-                    kind: BadgeKind::PullRequest,
-                    local: false,
-                    remotes: Vec::new(),
-                    head: false,
-                },
+                None if compare.target.as_deref() == Some(commit.hash.as_str())
+                    && self.prs.iter().any(|pr| pr.branch == compare.target_label) =>
+                {
+                    Badge {
+                        label: compare.target_label.clone(),
+                        caption: compare.target_label.clone(),
+                        full_ref: String::new(),
+                        kind: BadgeKind::PullRequest,
+                        local: false,
+                        remotes: Vec::new(),
+                        head: false,
+                    }
+                }
                 None => return badges,
             };
             badges.insert(0, focused);
@@ -256,3 +247,6 @@ mod registry_tests;
 #[cfg(test)]
 #[path = "graph_view_remote_visibility_tests.rs"]
 mod remote_visibility_tests;
+
+#[cfg(test)]
+mod review_regression_tests;

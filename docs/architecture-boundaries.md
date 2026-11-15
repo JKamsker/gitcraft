@@ -305,3 +305,8 @@ remediation in `increases.json`.
 | ui-kit | 98 | 168 | +70 |
 | update | 10 | 20 | +10 |
 | worktrees | 52 | 74 | +22 |
+
+Integration with #237 preserves both independent export increments: graph is now 61
+(59 from corrected visibility plus #237's +2) and ui-kit is 172 (168 plus #237's +4).
+The declarations cover this PR's resulting visibility correction relative to updated
+`dev`; #237's already merged increases require no retroactive declaration.

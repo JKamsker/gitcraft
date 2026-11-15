@@ -3856,7 +3856,7 @@
     },
     "graph": {
       "domains": 18,
-      "exported": 59
+      "exported": 61
     },
     "guidance": {
       "domains": 8,
@@ -3918,7 +3918,7 @@
     },
     "ui-kit": {
       "domains": 4,
-      "exported": 168
+      "exported": 172
     },
     "update": {
       "domains": 2,
