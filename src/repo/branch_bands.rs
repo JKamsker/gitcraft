@@ -246,35 +246,42 @@ impl RepoTab {
                                     }),
                                 )
                         {
-                            ui.menu_button(
-                                labels
-                                    .get(&full)
-                                    .map(|l| l.caption.as_str())
-                                    .unwrap_or(name),
-                                |ui| {
-                                    for band in 0..4 {
-                                        if ui
-                                            .selectable_label(
-                                                self.branch_bands.pins.get(&full) == Some(&band),
-                                                crate::i18n::message(
-                                                    "repo-core-0231",
-                                                    &[("band", format!("{}", band + 1).into())],
-                                                ),
-                                            )
-                                            .clicked()
+                            ui.push_id(&full, |ui| {
+                                ui.menu_button(
+                                    labels
+                                        .get(&full)
+                                        .map(|l| l.caption.as_str())
+                                        .unwrap_or(name),
+                                    |ui| {
+                                        for band in 0..4 {
+                                            if ui
+                                                .selectable_label(
+                                                    self.branch_bands.pins.get(&full)
+                                                        == Some(&band),
+                                                    crate::i18n::message(
+                                                        "repo-core-0231",
+                                                        &[("band", format!("{}", band + 1).into())],
+                                                    ),
+                                                )
+                                                .clicked()
+                                            {
+                                                self.branch_bands.pins.insert(full.clone(), band);
+                                                changed = true;
+                                                ui.close();
+                                            }
+                                        }
+                                        if ui.button(crate::i18n::text("repo-core-0232")).clicked()
                                         {
-                                            self.branch_bands.pins.insert(full.clone(), band);
+                                            self.branch_bands.pins.remove(&full);
                                             changed = true;
                                             ui.close();
                                         }
-                                    }
-                                    if ui.button(crate::i18n::text("repo-core-0232")).clicked() {
-                                        self.branch_bands.pins.remove(&full);
-                                        changed = true;
-                                        ui.close();
-                                    }
-                                },
-                            );
+                                    },
+                                )
+                            })
+                            .inner
+                            .response
+                            .on_hover_text(self.ref_description(&full));
                         }
                     });
                 if ui.button(crate::i18n::text("repo-core-0233")).clicked() {
