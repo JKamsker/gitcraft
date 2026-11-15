@@ -73,49 +73,66 @@ fn restacking_from_the_tab_is_one_undo() -> Result<(), String> {
 
 #[test]
 fn a_restack_stopped_on_conflicts_continues_or_aborts_from_the_tab() -> Result<(), String> {
-    for resolve in [true, false] {
-        let repo = TestRepo::new(&format!("tab restack conflict {resolve}"))?;
-        repo.stack(&["schema", "api"])?;
-        repo.checkout("api")?;
-        repo.commit("schema.txt", "api's\n", "api changes schema's file")?;
-        repo.checkout("schema")?;
-        repo.commit("schema.txt", "schema 2\n", "schema again")?;
-        repo.checkout("main")?;
-        let api = repo.tip("api")?;
-        let ctx = egui::Context::default();
-        let mut tab = open(&repo, &ctx)?;
-        settle(&mut tab, &ctx, |t| {
-            t.stacks.layer("api").is_some_and(|l| l.needs_restack())
-        })?;
-        restack_all(&mut tab, &ctx)?;
-        settle(&mut tab, &ctx, |t| t.stacks.pending.is_some())?;
-        let status = tab.status.as_deref().cloned().unwrap_or_default();
-        assert!(
-            status.1 && status.0.contains("stopped at api"),
-            "{status:?}"
-        );
-        if resolve {
-            std::fs::write(repo.dir.join("schema.txt"), "both\n").map_err(|e| e.to_string())?;
-            repo.git(&["add", "schema.txt"])?;
-            tab.apply(Action::Stack(StackAct::ResumeRestack), &ctx);
-            settle(&mut tab, &ctx, |t| {
-                t.stacks.pending.is_none() && t.status.is_some()
-            })?;
-            assert!(is_ancestor(&repo, "schema", "api"));
-            assert_eq!(repo.git(&["show", "api:schema.txt"])?, "both\n");
-        } else {
-            tab.apply(Action::Stack(StackAct::AbortRestack), &ctx);
-            settle(&mut tab, &ctx, |t| {
-                t.stacks.pending.is_none() && t.status.is_some()
-            })?;
-            assert_eq!(repo.tip("api")?, api);
-        }
-        assert_eq!(
-            repo.git(&["symbolic-ref", "--short", "HEAD"])?.trim(),
-            "main"
-        );
-    }
-    Ok(())
+    use crate::repo::hang_diagnostics as diag;
+    diag::bounded(
+        "a_restack_stopped_on_conflicts_continues_or_aborts_from_the_tab",
+        || {
+            for resolve in [true, false] {
+                let _setup = diag::stage(format_args!("fixture setup"));
+                let repo = diag::owned(
+                    "remove repository",
+                    TestRepo::new(&format!("tab restack conflict {resolve}"))?,
+                );
+                repo.stack(&["schema", "api"])?;
+                repo.checkout("api")?;
+                repo.commit("schema.txt", "api's\n", "api changes schema's file")?;
+                repo.checkout("schema")?;
+                repo.commit("schema.txt", "schema 2\n", "schema again")?;
+                repo.checkout("main")?;
+                let api = repo.tip("api")?;
+                drop(_setup);
+                let ctx = diag::owned("drop context", egui::Context::default());
+                let mut tab = diag::owned(
+                    "drop tab and watcher",
+                    diag::run(format_args!("open tab"), || open(&repo, &ctx))?,
+                );
+                settle(&mut tab, &ctx, |t| {
+                    t.stacks.layer("api").is_some_and(|l| l.needs_restack())
+                })?;
+                let _actions =
+                    diag::stage(format_args!("restack and assertions resolve={resolve}"));
+                restack_all(&mut tab, &ctx)?;
+                settle(&mut tab, &ctx, |t| t.stacks.pending.is_some())?;
+                let status = tab.status.as_deref().cloned().unwrap_or_default();
+                assert!(
+                    status.1 && status.0.contains("stopped at api"),
+                    "{status:?}"
+                );
+                if resolve {
+                    std::fs::write(repo.dir.join("schema.txt"), "both\n")
+                        .map_err(|e| e.to_string())?;
+                    repo.git(&["add", "schema.txt"])?;
+                    tab.apply(Action::Stack(StackAct::ResumeRestack), &ctx);
+                    settle(&mut tab, &ctx, |t| {
+                        t.stacks.pending.is_none() && t.status.is_some()
+                    })?;
+                    assert!(is_ancestor(&repo, "schema", "api"));
+                    assert_eq!(repo.git(&["show", "api:schema.txt"])?, "both\n");
+                } else {
+                    tab.apply(Action::Stack(StackAct::AbortRestack), &ctx);
+                    settle(&mut tab, &ctx, |t| {
+                        t.stacks.pending.is_none() && t.status.is_some()
+                    })?;
+                    assert_eq!(repo.tip("api")?, api);
+                }
+                assert_eq!(
+                    repo.git(&["symbolic-ref", "--short", "HEAD"])?.trim(),
+                    "main"
+                );
+            }
+            Ok(())
+        },
+    )
 }
 
 /// The interactive rebase of a stack's top with Update dependent branches: one undo puts the
@@ -174,7 +191,9 @@ fn undoing_a_rebase_that_updated_dependent_branches_puts_them_back() -> Result<(
     let accepted = run(format_args!("click interactive confirmation"), || {
         tab.accept_rebase_for_test(&ctx, "ui", &before.2, &onto)
     })?;
-    run(format_args!("start confirmed rebase"), || tab.apply(accepted, &ctx));
+    run(format_args!("start confirmed rebase"), || {
+        tab.apply(accepted, &ctx)
+    });
     settle(&mut tab, &ctx, |t| t.rebase.is_none() && t.status.is_some())?;
     assert!(is_ancestor(&repo, "main", "schema") && is_ancestor(&repo, "main", "api"));
     let tips = || -> Result<(String, String, String), String> {

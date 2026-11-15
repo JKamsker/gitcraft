@@ -376,32 +376,43 @@ fn an_ended_hover_leaves_no_scroll_behind() {
 /// an untracked file appears.
 #[test]
 fn the_key_follows_what_a_rebase_checks() -> Result<(), String> {
-    let repo = diverged("ghost-key")?;
-    let ctx = egui::Context::default();
-    let mut tab = crate::repo::RepoTab::new(repo.dir.clone(), &ctx);
-    wait(&mut tab, &ctx, |t| t.history_gen > 0 && !t.loading);
-    let op = GhostOp::Rebase {
-        onto: "refs/heads/main".to_owned(),
-        label: "main".to_owned(),
-    };
-    let clean = tab.ghost_key(op.clone());
-    let file = |path: &str, code, area| crate::git::StatusFile {
-        path: path.to_owned(),
-        old_path: None,
-        code,
-        area,
-    };
-    tab.work
-        .unstaged
-        .push(file("notes.txt", '?', crate::git::Area::Untracked));
-    let with_untracked = tab.ghost_key(op.clone());
-    tab.work
-        .unstaged
-        .push(file("b", 'M', crate::git::Area::Unstaged));
-    let with_tracked = tab.ghost_key(op);
-    assert_eq!(clean, with_untracked);
-    assert_ne!(clean, with_tracked);
-    Ok(())
+    use crate::repo::hang_diagnostics as diag;
+    diag::bounded("the_key_follows_what_a_rebase_checks", || {
+        let _setup = diag::stage(format_args!("fixture setup"));
+        let repo = diag::owned("remove repository", diverged("ghost-key")?);
+        drop(_setup);
+        let ctx = diag::owned("drop context", egui::Context::default());
+        let mut tab = diag::owned(
+            "drop tab and watcher",
+            diag::run(format_args!("open tab"), || {
+                crate::repo::RepoTab::new(repo.dir.clone(), &ctx)
+            }),
+        );
+        wait(&mut tab, &ctx, |t| t.history_gen > 0 && !t.loading);
+        let _assertions = diag::stage(format_args!("ghost key assertions"));
+        let op = GhostOp::Rebase {
+            onto: "refs/heads/main".to_owned(),
+            label: "main".to_owned(),
+        };
+        let clean = tab.ghost_key(op.clone());
+        let file = |path: &str, code, area| crate::git::StatusFile {
+            path: path.to_owned(),
+            old_path: None,
+            code,
+            area,
+        };
+        tab.work
+            .unstaged
+            .push(file("notes.txt", '?', crate::git::Area::Untracked));
+        let with_untracked = tab.ghost_key(op.clone());
+        tab.work
+            .unstaged
+            .push(file("b", 'M', crate::git::Area::Unstaged));
+        let with_tracked = tab.ghost_key(op);
+        assert_eq!(clean, with_untracked);
+        assert_ne!(clean, with_tracked);
+        Ok(())
+    })
 }
 
 #[test]

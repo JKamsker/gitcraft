@@ -17,6 +17,7 @@ fn branch_with_a_break(
     n: usize,
     bad_from: usize,
 ) -> Result<(Repo, Vec<String>), String> {
+    let _setup = crate::repo::hang_diagnostics::stage(format_args!("fixture setup {name}"));
     let repo = Repo::new(name)?;
     repo.commit("base", &[("README.md", Some("hi\n"))])?;
     repo.git(&["checkout", "-q", "-b", "feature"])?;
@@ -146,34 +147,38 @@ fn the_notes_are_shared_with_git_test() -> Result<(), String> {
 /// A rebase that leaves a commit's files as they were keeps its result: nothing is run again.
 #[test]
 fn results_survive_a_rebase_that_keeps_the_trees() -> Result<(), String> {
-    let (repo, _) = branch_with_a_break("rebase", 3, 9)?;
-    let (first, _) = run_branch(&repo, &plan(TEST, 2))?;
-    assert_eq!((first.good, first.known), (3, 0));
-    // Every message reworded: new commits, same trees.
-    repo.git(&[
-        "-c",
-        "sequence.editor=true",
-        "rebase",
-        "-q",
-        "--exec",
-        "git commit -q --amend -m reworded",
-        "main",
-    ])?;
-    let (again, events) = run_branch(&repo, &plan("false", 2))?;
-    assert_eq!((again.good, again.bad, again.known), (3, 0, 3));
-    assert!(events.iter().all(|e| matches!(
-        e,
-        TestEvent::Done {
-            end: TestEnd::Known(_),
-            ..
-        }
-    )));
-    // Asked to, it runs them again.
-    let mut retest = plan("false", 2);
-    retest.retest = true;
-    let (third, _) = run_branch(&repo, &retest)?;
-    assert_eq!((third.good, third.bad, third.known), (0, 3, 0));
-    Ok(())
+    use crate::repo::hang_diagnostics as diag;
+    diag::bounded("results_survive_a_rebase_that_keeps_the_trees", || {
+        let (repo, _) = branch_with_a_break("rebase", 3, 9)?;
+        let (first, _) = run_branch(&repo, &plan(TEST, 2))?;
+        assert_eq!((first.good, first.known), (3, 0));
+        // Every message reworded: new commits, same trees.
+        let _rebase = diag::stage(format_args!("rebase and result assertions"));
+        repo.git(&[
+            "-c",
+            "sequence.editor=true",
+            "rebase",
+            "-q",
+            "--exec",
+            "git commit -q --amend -m reworded",
+            "main",
+        ])?;
+        let (again, events) = run_branch(&repo, &plan("false", 2))?;
+        assert_eq!((again.good, again.bad, again.known), (3, 0, 3));
+        assert!(events.iter().all(|e| matches!(
+            e,
+            TestEvent::Done {
+                end: TestEnd::Known(_),
+                ..
+            }
+        )));
+        // Asked to, it runs them again.
+        let mut retest = plan("false", 2);
+        retest.retest = true;
+        let (third, _) = run_branch(&repo, &retest)?;
+        assert_eq!((third.good, third.bad, third.known), (0, 3, 0));
+        Ok(())
+    })
 }
 
 /// Two commits with the same tree are tested once.

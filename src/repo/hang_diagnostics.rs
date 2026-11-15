@@ -1,8 +1,14 @@
 //! Opt-in, test-thread-only stages for the unresolved native Windows CI hangs.
-//! No timers, background threads, process inspection, or changed test deadlines.
-use std::{cell::Cell, fmt, time::Instant};
+//! Traces stay opt-in; bounded tests also supervise blocking calls and teardown.
+use std::{
+    cell::{Cell, RefCell},
+    fmt,
+    sync::{Arc, Mutex},
+    time::{Duration, Instant},
+};
 
 thread_local! {
+    static ACTIVE: RefCell<Option<Arc<Mutex<Vec<String>>>>> = const { RefCell::new(None) };
     static TEST: Cell<Option<&'static str>> = const { Cell::new(None) };
 }
 
@@ -22,6 +28,7 @@ pub(crate) struct Stage {
     test: &'static str,
     label: String,
     started: Instant,
+    active: Option<Arc<Mutex<Vec<String>>>>,
 }
 
 pub(crate) fn stage(label: fmt::Arguments<'_>) -> Option<Stage> {
@@ -30,13 +37,26 @@ pub(crate) fn stage(label: fmt::Arguments<'_>) -> Option<Stage> {
         test,
         label: label.to_string(),
         started: Instant::now(),
+        active: ACTIVE.with(|slot| slot.borrow().clone()),
     };
+    if let Some(active) = &stage.active {
+        active
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .push(stage.label.clone());
+    }
     eprintln!("[hang-stage {test}] begin {}", stage.label);
     Some(stage)
 }
 
 impl Drop for Stage {
     fn drop(&mut self) {
+        if let Some(active) = &self.active {
+            active
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner)
+                .pop();
+        }
         eprintln!(
             "[hang-stage {}] {} {} ({:?})",
             self.test,
@@ -96,4 +116,76 @@ pub(super) fn message(msg: &super::messages::Msg) -> Option<Stage> {
         "handle {label} {:?}",
         std::mem::discriminant(msg)
     ))
+}
+
+/// A deadline on the whole owned body, including synchronous Git, polls and destructors.
+/// Never join after timeout: the worker may be blocked. CI's owned-process watchdog
+/// captures its stacks before terminating the test process; no host PID selectors.
+#[allow(clippy::expect_used, clippy::panic)] // Harness launch/deadline failures must fail libtest.
+pub(crate) fn bounded<T: Send + 'static>(
+    test: &'static str,
+    work: impl FnOnce() -> T + Send + 'static,
+) -> T {
+    let active = Arc::new(Mutex::new(Vec::<String>::new()));
+    let stages = active.clone();
+    let (send, receive) = std::sync::mpsc::sync_channel(1);
+    std::thread::Builder::new()
+        .name(std::thread::current().name().unwrap_or(test).to_owned())
+        .spawn(move || {
+            let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                let _trace = trace(test);
+                ACTIVE.with(|slot| *slot.borrow_mut() = Some(stages));
+                crate::connections::Context::default().run(|| run(format_args!("test body"), work))
+            }));
+            let _ = send.send(result);
+        })
+        .expect("spawn bounded test");
+    match receive.recv_timeout(Duration::from_secs(90)) {
+        Ok(Ok(value)) => value,
+        Ok(Err(panic)) => std::panic::resume_unwind(panic),
+        Err(error) => {
+            let stages = active
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner)
+                .clone();
+            eprintln!("[hang-deadline {test}] {error}; active stages: {stages:?}");
+            // Give the Windows CI watchdog time to snapshot/dump the still-live worker.
+            if cfg!(windows) && std::env::var_os("GITHUB_ACTIONS").is_some() {
+                std::thread::sleep(Duration::from_secs(15));
+            }
+            panic!("{test} exceeded its 90s body deadline: {stages:?}");
+        }
+    }
+}
+
+/// Preserve normal scope drop order and trace cleanup on success, errors and unwinding.
+pub(crate) struct Owned<T> {
+    label: &'static str,
+    value: Option<T>,
+}
+
+pub(crate) fn owned<T>(label: &'static str, value: T) -> Owned<T> {
+    Owned {
+        label,
+        value: Some(value),
+    }
+}
+
+#[allow(clippy::expect_used)] // The slot is emptied only during Drop, after all access ends.
+impl<T> std::ops::Deref for Owned<T> {
+    type Target = T;
+    fn deref(&self) -> &T {
+        self.value.as_ref().expect("owned value")
+    }
+}
+#[allow(clippy::expect_used)] // The slot is emptied only during Drop, after all access ends.
+impl<T> std::ops::DerefMut for Owned<T> {
+    fn deref_mut(&mut self) -> &mut T {
+        self.value.as_mut().expect("owned value")
+    }
+}
+impl<T> Drop for Owned<T> {
+    fn drop(&mut self) {
+        run(format_args!("{}", self.label), || drop(self.value.take()));
+    }
 }

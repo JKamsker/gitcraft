@@ -21,7 +21,7 @@ fn wait(
     done: impl Fn(&crate::repo::RepoTab) -> bool,
 ) {
     for _ in 0..400 {
-        tab.poll(ctx);
+        crate::repo::hang_diagnostics::poll(tab, ctx);
         if done(tab) {
             return;
         }
