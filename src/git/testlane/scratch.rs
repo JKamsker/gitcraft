@@ -6,7 +6,8 @@
 
 use crate::remote;
 use std::path::{Path, PathBuf};
-use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
+use std::sync::atomic::{AtomicBool, Ordering};
+mod allocation;
 
 fn run(dir: Option<&Path>, args: &[&str]) -> Result<String, String> {
     let mut safe = vec!["-c", "core.hooksPath=/dev/null"];
@@ -19,9 +20,6 @@ pub const SCRATCH_DIR: &str = "gitcraft-scratch";
 
 /// What the worktrees are made for: the first part of their names.
 const LABELS: [&str; 4] = ["test", "rehearse", "interaction", "resolve"];
-
-/// Numbers the worktrees this process makes.
-static MADE: AtomicU64 = AtomicU64::new(0);
 
 /// A worktree of `repo`, detached, removed when dropped.
 #[derive(Debug)]
@@ -39,27 +37,21 @@ impl Scratch {
     pub fn add_empty(repo: &Path, label: &str, rev: &str) -> Result<Scratch, String> {
         let root = scratch_root(repo)?;
         sweep_left_over(repo, &root);
-        let name = ScratchName {
-            label: label.to_owned(),
-            machine: this_machine(),
-            pid: std::process::id(),
-            n: MADE.fetch_add(1, Ordering::Relaxed),
-        };
-        let path = remote::join(&root, &name.to_string());
+        let path = allocation::reserve(repo, &root, label)?;
         let there = remote::git_path(&path);
         let args = [
             "worktree",
             "add",
             "--detach",
-            "--force",
             "--no-checkout",
             "-q",
             &there,
             rev,
         ];
         run(Some(repo), &args).map_err(|e| {
-            // Cancellation may arrive after Git registered the new worktree.
-            let _ = remove_worktree(repo, &path);
+            // A failure is not proof that Git created/owns a worktree. Only
+            // release our exclusive empty reservation, never a nonempty directory.
+            allocation::discard_empty(&path);
             crate::i18n::message(
                 "backend-could-not-make-a-scratch-worktree-e-76b327",
                 &[("detail", (e).to_string().into())],
@@ -204,6 +196,7 @@ pub fn scratch_root(repo: &Path) -> Result<PathBuf, String> {
 
 /// A scratch worktree's folder name, `<label>-<machine>-<pid>-<n>`: the machine and process of
 /// the gitcraft that made it, so that one left by a crash can be told from one in use.
+/// New attempts use a random n and exclusively create their destination.
 #[derive(Clone, Debug, PartialEq, Eq)]
 struct ScratchName {
     label: String,
