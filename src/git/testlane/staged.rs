@@ -77,7 +77,7 @@ fn initial_revision(repo: &Path) -> Result<String, String> {
 
 /// The scratch registry supplies RAII removal and next-launch crash recovery. No refs
 /// or files in the source worktree are changed. Tree objects may be added to its ODB.
-fn snapshot(repo: &Path) -> Result<(Scratch, String), String> {
+fn snapshot(repo: &Path, expected: Option<&[u8]>) -> Result<(Scratch, String), String> {
     local(repo)?;
     let scratch = Scratch::add_empty(repo, "test", &initial_revision(repo)?)?;
     let source = git::run(
@@ -95,6 +95,12 @@ fn snapshot(repo: &Path) -> Result<(Scratch, String), String> {
             git::run(Some(&scratch.path), &["read-tree", "--empty"])?;
         }
         Err(e) => return Err(e.to_string()),
+    }
+    if let Some(expected) = expected {
+        let copied = std::fs::read(target).map_err(|e| e.to_string())?;
+        if copied != expected {
+            return Err(crate::i18n::text("staged-stale").into());
+        }
     }
     let env = [("GIT_INDEX_FILE", target)];
     // Run in the source repository so split-index shared files resolve there.
@@ -125,8 +131,18 @@ pub(crate) fn test_staged(
     if stop.stopped() {
         return Err(crate::i18n::text("staged-cancelled").into());
     }
+    local(repo)?;
+    let index = git::run(
+        Some(repo),
+        &["rev-parse", "--path-format=absolute", "--git-path", "index"],
+    )?;
+    let expected = match std::fs::read(index.trim()) {
+        Ok(bytes) => Some(bytes),
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => None,
+        Err(e) => return Err(e.to_string()),
+    };
     let fingerprint = staged_fingerprint(repo, command)?;
-    let (scratch, tree) = snapshot(repo)?;
+    let (scratch, tree) = snapshot(repo, expected.as_deref())?;
     // A concurrent staging operation must never label a mixed/new snapshot as this run.
     if staged_fingerprint(repo, command)? != fingerprint {
         return Err(crate::i18n::text("staged-stale").into());

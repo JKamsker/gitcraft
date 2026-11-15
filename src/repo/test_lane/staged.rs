@@ -13,6 +13,28 @@ pub(super) struct Staged {
     checking: bool,
     checked: Option<Instant>,
 }
+impl Staged {
+    fn finish_check(
+        &mut self,
+        generation: u64,
+        freshness: u64,
+        fingerprint: Result<String, String>,
+    ) {
+        if self.generation != generation {
+            return;
+        }
+        self.checking = false;
+        if self.freshness != freshness {
+            return;
+        }
+        self.checked = Some(Instant::now());
+        self.stale = match (&self.result, fingerprint) {
+            (Some(Ok(result)), Ok(current)) => result.key.fingerprint != current,
+            _ => true,
+        };
+    }
+}
+
 impl Drop for Staged {
     fn drop(&mut self) {
         if let Some(stop) = &self.stop {
@@ -171,19 +193,9 @@ impl RepoTab {
             Err,
             move || git::staged_fingerprint(&path, &command),
             move |tab, fingerprint, _| {
-                let state = &mut tab.test_lane.staged;
-                if state.generation != generation {
-                    return;
-                }
-                state.checking = false;
-                if state.freshness != freshness {
-                    return;
-                }
-                state.checked = Some(Instant::now());
-                state.stale = match (&state.result, fingerprint) {
-                    (Some(Ok(result)), Ok(current)) => result.key.fingerprint != current,
-                    _ => true,
-                };
+                tab.test_lane
+                    .staged
+                    .finish_check(generation, freshness, fingerprint);
             },
         );
     }
@@ -207,10 +219,7 @@ impl RepoTab {
             ctx,
             false,
             Err,
-            move || {
-                git::set_test_command(&path, git::DEFAULT_TEST, &command)?;
-                git::test_staged(&path, &command, &stop)
-            },
+            move || git::test_staged(&path, &command, &stop),
             move |tab, result, ctx| {
                 let state = &mut tab.test_lane.staged;
                 if state.generation != generation {

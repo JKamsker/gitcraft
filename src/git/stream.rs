@@ -52,7 +52,13 @@ pub(in crate::git) fn stream_timed(
             stopped: true,
         });
     }
-    let _timer = super::backend::CliTimer::new(args);
+    // Timed test commands may embed credentials; retain only the operation label.
+    let log_args = if timeout.is_some() {
+        &["gitcraft-test"][..]
+    } else {
+        args
+    };
+    let _timer = super::backend::CliTimer::new(log_args);
     let (sent, received) = queue::queue(queue::LIMIT);
     let stopping = stopper.clone();
     let full = sent.clone();

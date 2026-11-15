@@ -5,8 +5,8 @@
 
 mod read_error;
 use read_error::*;
-mod worker;
 mod staged;
+mod worker;
 use crate::repo::messages::Continuation as ToTab;
 pub(crate) use worker::REMOTE_WORKERS;
 use worker::*;
