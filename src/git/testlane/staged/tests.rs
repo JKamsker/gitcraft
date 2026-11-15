@@ -236,3 +236,17 @@ fn materialization_never_runs_source_checkout_hooks() -> Result<(), String> {
     assert!(!marker.exists());
     Ok(())
 }
+
+#[test]
+fn intent_to_add_and_staged_empty_file_have_different_freshness() -> Result<(), String> {
+    let repo = Repo::new("staged-intent")?;
+    repo.commit("base", &[])?;
+    std::fs::write(repo.path().join("empty"), "").map_err(|e| e.to_string())?;
+    repo.git(&["add", "-N", "empty"])?;
+    let before = staged_fingerprint(repo.path(), "exit 0")?;
+    let listing = repo.git(&["ls-files", "--stage"])?;
+    repo.git(&["add", "empty"])?;
+    assert_eq!(listing, repo.git(&["ls-files", "--stage"])?);
+    assert_ne!(before, staged_fingerprint(repo.path(), "exit 0")?);
+    Ok(())
+}

@@ -38,6 +38,9 @@ pub(crate) fn staged_fingerprint(repo: &Path, command: &str) -> Result<String, S
     let entries = git::run_bytes(Some(repo), &["ls-files", "--stage", "-z"])?;
     let mut hash = Sha256::new();
     hash.update(entries);
+    // Raw flags matter too: intent-to-add and an actually staged empty file have
+    // identical ls-files --stage rows but different write-tree results.
+    hash.update(index_bytes(repo)?.unwrap_or_default());
     hash.update(command.as_bytes());
     hash.update(git::run_bytes(Some(repo), &["config", "--null", "--list"])?);
     let mut env: Vec<_> = std::env::vars_os().collect();
@@ -47,6 +50,18 @@ pub(crate) fn staged_fingerprint(repo: &Path, command: &str) -> Result<String, S
         hash.update(format!("{name:?}={value:?}\0").as_bytes());
     }
     Ok(hash.finalize().iter().map(|b| format!("{b:02x}")).collect())
+}
+
+fn index_bytes(repo: &Path) -> Result<Option<Vec<u8>>, String> {
+    let index = git::run(
+        Some(repo),
+        &["rev-parse", "--path-format=absolute", "--git-path", "index"],
+    )?;
+    match std::fs::read(index.trim()) {
+        Ok(bytes) => Ok(Some(bytes)),
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(None),
+        Err(e) => Err(e.to_string()),
+    }
 }
 
 fn initial_revision(repo: &Path) -> Result<String, String> {
@@ -158,15 +173,7 @@ fn verify(repo: &Path, command: &str, stop: &RunStop) -> Result<StagedResult, St
         return Err(crate::i18n::text("staged-cancelled").into());
     }
     local(repo)?;
-    let index = git::run(
-        Some(repo),
-        &["rev-parse", "--path-format=absolute", "--git-path", "index"],
-    )?;
-    let expected = match std::fs::read(index.trim()) {
-        Ok(bytes) => Some(bytes),
-        Err(e) if e.kind() == std::io::ErrorKind::NotFound => None,
-        Err(e) => return Err(e.to_string()),
-    };
+    let expected = index_bytes(repo)?;
     let fingerprint = staged_fingerprint(repo, command)?;
     let (scratch, tree) = snapshot(repo, expected.as_deref())?;
     // A concurrent staging operation must never label a mixed/new snapshot as this run.
