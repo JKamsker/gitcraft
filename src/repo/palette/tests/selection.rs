@@ -33,7 +33,10 @@ fn the_second_step_lists_every_other_branch() {
     assert_eq!(merge.len(), 3001);
     assert!(!labels(&merge).contains(&"main"));
     let remote = merge.iter().find(|i| i.label == "origin/main");
-    assert_eq!(remote.map(|i| i.hint.as_str()), Some("origin/main refs/remotes/origin/main"));
+    assert_eq!(
+        remote.map(|i| i.hint.as_str()),
+        Some("origin/main origin\nrefs/remotes/origin/main\n")
+    );
     assert!(merge.iter().all(|i| i.key.starts_with("merge:")));
     assert!(matches!(
         &merge[0].run,
@@ -60,7 +63,9 @@ fn operation_looking_branch_names_and_remote_hints_remain_opaque_in_both_locales
         for (pick, key) in [(Pick::Checkout, "checkout"), (Pick::Merge, "merge")] {
             let choices = tab.palette_choices(&pick);
             for name in names {
-                let item = choices.iter().find(|i| i.key == format!("{key}:refs/heads/{name}"));
+                let item = choices
+                    .iter()
+                    .find(|i| i.key == format!("{key}:refs/heads/{name}"));
                 assert_eq!(item.map(|i| i.label.as_str()), Some(name));
                 let item = item.ok_or("actual branch choice missing")?;
                 match (&pick, &item.run) {
@@ -75,7 +80,10 @@ fn operation_looking_branch_names_and_remote_hints_remain_opaque_in_both_locales
                 }
             }
             let remote = choices.iter().find(|i| i.label == "topic");
-            assert_eq!(remote.map(|i| i.hint.as_str()), Some("Fetch/topic refs/remotes/Fetch/topic"));
+            assert_eq!(
+                remote.map(|i| i.hint.as_str()),
+                Some("Fetch/topic Fetch\nrefs/remotes/Fetch/topic\n")
+            );
         }
     }
     Ok(())
