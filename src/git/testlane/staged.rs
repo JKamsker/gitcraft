@@ -134,6 +134,10 @@ pub(crate) fn test_staged(
     command: &str,
     stop: &RunStop,
 ) -> Result<StagedResult, String> {
+    verify(repo, command, stop).map_err(|error| scrub(&error))
+}
+
+fn verify(repo: &Path, command: &str, stop: &RunStop) -> Result<StagedResult, String> {
     let started = Instant::now();
     if stop.stopped() {
         return Err(crate::i18n::text("staged-cancelled").into());
