@@ -8,6 +8,8 @@ use crate::remote;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, Ordering};
 mod allocation;
+mod ownership;
+use ownership::Ownership;
 
 fn run(dir: Option<&Path>, args: &[&str]) -> Result<String, String> {
     let mut safe = vec!["-c", "core.hooksPath=/dev/null"];
@@ -25,6 +27,7 @@ const LABELS: [&str; 4] = ["test", "rehearse", "interaction", "resolve"];
 #[derive(Debug)]
 pub struct Scratch {
     repo: PathBuf,
+    owner: Ownership,
     /// Where it is, in the form the command layer takes (another machine's, encoded).
     pub path: PathBuf,
     removed: bool,
@@ -37,7 +40,10 @@ impl Scratch {
     pub fn add_empty(repo: &Path, label: &str, rev: &str) -> Result<Scratch, String> {
         let root = scratch_root(repo)?;
         sweep_left_over(repo, &root);
-        let path = allocation::reserve(&root, label)?;
+        let allocation = allocation::reserve(&root, label)?;
+        let owner = Ownership::create(&allocation)
+            .inspect_err(|_| allocation::discard_empty(&allocation))?;
+        let path = remote::join(&allocation, "checkout");
         let there = remote::git_path(&path);
         let args = [
             "worktree",
@@ -52,6 +58,10 @@ impl Scratch {
             // A failure is not proof that Git created/owns a worktree. Only
             // release our exclusive empty reservation, never a nonempty directory.
             allocation::discard_empty(&path);
+            // Only finish an empty failed attempt; uncertain nonempty content stays.
+            if !remote::try_is_dir(&path).unwrap_or(true) {
+                let _ = owner.finish(&allocation);
+            }
             crate::i18n::message(
                 "backend-could-not-make-a-scratch-worktree-e-76b327",
                 &[("detail", (e).to_string().into())],
@@ -59,6 +69,7 @@ impl Scratch {
         })?;
         Ok(Scratch {
             repo: repo.to_owned(),
+            owner,
             path,
             removed: false,
             preserved: AtomicBool::new(false),
@@ -68,8 +79,8 @@ impl Scratch {
     /// Retain uncertain resolver work across drop and future stale-worktree sweeps.
     pub(crate) fn preserve(&self) -> Result<(), String> {
         self.preserved.store(true, Ordering::Release);
-        std::fs::write(
-            self.path.with_extension("preserved"),
+        remote::write(
+            &self.path.with_extension("preserved"),
             b"cleanup unconfirmed\n",
         )
         .map_err(|e| e.to_string())
@@ -97,7 +108,7 @@ impl Scratch {
     /// Removes it now, saying why if it couldn't be.
     pub fn remove(mut self) -> Result<(), String> {
         self.removed = true;
-        remove_worktree(&self.repo, &self.path)
+        remove_worktree(&self.repo, &self.path, &self.owner, true)
     }
 
     /// Removes it now, trying `attempts` times `pause` apart while it can't be (a program that
@@ -110,7 +121,7 @@ impl Scratch {
         self.removed = true;
         let mut tried = 1;
         loop {
-            match remove_worktree(&self.repo, &self.path) {
+            match remove_worktree(&self.repo, &self.path, &self.owner, true) {
                 Err(_) if tried < attempts => {
                     tried += 1;
                     std::thread::sleep(pause);
@@ -125,36 +136,43 @@ impl Drop for Scratch {
     fn drop(&mut self) {
         if !self.removed && !self.preserved.load(Ordering::Acquire) {
             self.removed = true;
-            let _ = remove_worktree(&self.repo, &self.path);
+            let _ = remove_worktree(&self.repo, &self.path, &self.owner, true);
         }
     }
 }
 
-/// Removes the worktree at `path` of `repo`, and git's record of it even when its folder is
-/// gone already.
-fn remove_worktree(repo: &Path, path: &Path) -> Result<(), String> {
+/// Remove only a worktree whose allocation marker and registry still match this owner.
+fn remove_worktree(repo: &Path, path: &Path, owner: &Ownership, force: bool) -> Result<(), String> {
     // Cleanup must survive both the run's Cancel button and tab lifetime cancellation.
     crate::tasks::with_cancellation(crate::tasks::Cancellation::default(), || {
-        crate::processes::deadline::cleanup(|| remove_uncancelled(repo, path))
+        crate::processes::deadline::cleanup(|| remove_uncancelled(repo, path, owner, force))
     })
 }
 
-fn remove_uncancelled(repo: &Path, path: &Path) -> Result<(), String> {
+fn remove_uncancelled(
+    repo: &Path,
+    path: &Path,
+    owner: &Ownership,
+    force: bool,
+) -> Result<(), String> {
+    let allocation = path.parent().ok_or("invalid scratch allocation")?;
+    if !owner.matches(allocation) {
+        return Err("scratch ownership could not be verified".into());
+    }
     let there = remote::git_path(path);
-    let removed = run(
-        Some(repo),
-        &["worktree", "remove", "--force", "--force", &there],
-    );
-    let pruned = run(Some(repo), &["worktree", "prune"]);
-    match (removed, pruned) {
-        (Ok(_), _) => Ok(()),
-        (Err(_), Ok(_)) if !is_listed(repo, path) => Ok(()),
-        (Err(e), _) => Err(crate::i18n::message(
+    let mut args = vec!["worktree", "remove"];
+    if force {
+        args.push("--force");
+    }
+    args.push(&there);
+    match run(Some(repo), &args) {
+        Ok(_) => owner.finish(allocation),
+        Err(_) if !is_listed(repo, path) && !remote::try_is_dir(path).unwrap_or(true) => {
+            owner.finish(allocation)
+        }
+        Err(e) => Err(crate::i18n::message(
             "backend-could-not-remove-the-scratch-worktree-there-e-a9a777",
-            &[
-                ("there", (there).to_string().into()),
-                ("detail", (e).to_string().into()),
-            ],
+            &[("there", there.into()), ("detail", e.into())],
         )),
     }
 }
@@ -257,44 +275,40 @@ fn machine_word(name: &str) -> String {
 /// repository's folder of [`SCRATCH_DIR`].
 pub fn is_scratch_path(path: &str) -> bool {
     let path = path.replace('\\', "/");
-    let mut parts = path.trim_end_matches('/').rsplit('/');
+    let path = path
+        .trim_end_matches('/')
+        .strip_suffix("/checkout")
+        .unwrap_or(path.trim_end_matches('/'));
+    let mut parts = path.rsplit('/');
     let (Some(name), Some(_key), Some(dir)) = (parts.next(), parts.next(), parts.next()) else {
         return false;
     };
     dir == SCRATCH_DIR && ScratchName::parse(name).is_some()
 }
 
-/// Removes the scratch worktrees of `repo` (in `root`) left by a gitcraft of this machine that
-/// is no longer running (it crashed, or was killed in the middle of a run). Those of this one,
-/// of one still running, of another machine, and anything not named as gitcraft names them,
-/// stay.
+/// Crash recovery requires matching marker/registry evidence and a dead owner.
+/// Never force removal here: modified/locked worktrees are explicitly preserved.
 fn sweep_left_over(repo: &Path, root: &Path) {
-    let Ok(out) = run(Some(repo), &["worktree", "list", "--porcelain"]) else {
-        return;
-    };
-    // By the folders' names, not the whole path: the same folder can be printed otherwise than
-    // it was given (Windows' short `RUNNER~1` against the long name, the case of a drive).
-    let key = root
-        .file_name()
-        .map(|k| k.to_string_lossy().into_owned())
-        .unwrap_or_default();
-    let me = this_machine();
-    for printed in out.lines().filter_map(|l| l.strip_prefix("worktree ")) {
-        let Some(name) = scratch_name_in(printed, &key) else {
+    for allocation in ownership::candidates(repo, root) {
+        let Some(owner) = Ownership::verified(&allocation) else {
             continue;
         };
-        let path = remote::resolve(repo, printed);
-        if path.with_extension("preserved").exists() {
+        let path = remote::join(&allocation, "checkout");
+        if remote::is_file(&path.with_extension("preserved")) || !owner.dead() {
             continue;
         }
-        if name.machine == me && name.pid != std::process::id() && !process_alive(name.pid) {
-            let _ = remove_worktree(repo, &remote::resolve(repo, printed));
+        if remove_worktree(repo, &path, &owner, false).is_err() {
+            let _ = remote::write(
+                &path.with_extension("preserved"),
+                b"crash recovery refused cleanup\n",
+            );
         }
     }
 }
 
 /// The scratch name of the worktree git prints at `printed`, when it is in the scratch folder
 /// `key` (`…/gitcraft-scratch/<key>/<name>`).
+#[cfg(test)]
 fn scratch_name_in(printed: &str, key: &str) -> Option<ScratchName> {
     let mut parts = printed.trim_end_matches(['/', '\\']).rsplit(['/', '\\']);
     let (name, folder, dir) = (parts.next()?, parts.next()?, parts.next()?);
@@ -307,12 +321,15 @@ fn scratch_name_in(printed: &str, key: &str) -> Option<ScratchName> {
 fn process_alive(pid: u32) -> bool {
     #[cfg(unix)]
     {
-        std::process::Command::new("kill")
-            .args(["-0", &pid.to_string()])
-            .stdout(std::process::Stdio::null())
-            .stderr(std::process::Stdio::null())
-            .status()
-            .is_ok_and(|s| s.success())
+        if pid > i32::MAX as u32 {
+            return false;
+        }
+        let Some(pid) = rustix::process::Pid::from_raw(pid as i32) else {
+            return true;
+        };
+        // Signal zero probes only this recorded owner. Permission/unknown errors
+        // preserve the allocation; only ESRCH establishes death.
+        rustix::process::test_kill_process(pid) != Err(rustix::io::Errno::SRCH)
     }
     #[cfg(windows)]
     {
@@ -354,6 +371,9 @@ mod tests {
         assert!(!is_scratch_path("/home/me/gitcraft-scratch/x/wip"));
         assert!(!is_scratch_path("/home/me/other/k/test-box-1-0"));
         assert!(!is_scratch_path("test-box-1-0"));
+        assert!(is_scratch_path(
+            "/tmp/gitcraft-scratch/0123abcd/test-box-1-0/checkout"
+        ));
     }
 
     #[test]
