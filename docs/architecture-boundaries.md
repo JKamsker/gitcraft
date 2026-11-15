@@ -232,3 +232,29 @@ The report is an index for targeted refactors, not a to-do list:
 - *Cross-feature mutations* show which coordinator fields features write directly
   (`status`, `busy_op`, `dialog`): candidates for narrow coordinator methods or effects.
 - *Exported but unused* items per domain are visibility that can be narrowed for free.
+
+## Declaring an intentional baseline increase
+
+CI compares `baseline.json` in the immutable candidate against its target merge base
+(`HEAD^1` for GitHub's PR merge checkout and our mainline merge commits). It checks
+individual numeric budgets, exception identities and cycle members/edges. Reductions
+cannot offset growth elsewhere. A fresh entry in `ci/arch-fitness/increases.json`
+acknowledges only its listed changes; old declarations cannot authorize later growth.
+Each entry needs a unique key, `changes` (the exact strings printed by the failing gate),
+and nonempty `reason`, `owner`, and `remediation` strings. This is a review declaration,
+not external approval: reviewers approve it with the rest of the PR, without labels.
+
+Run `python3 ci/arch_baseline.py --base origin/dev --revision HEAD` after committing.
+If an increase is intentional, copy each reported identity into a new declaration,
+explain why it is needed and how to reduce it later, then commit and rerun. Keep older
+entries unchanged. Existing PRs (#224, #236, #237) can declare their legitimate budget
+increases this way; there is no retroactive requirement for already merged PRs.
+On concurrent baseline conflicts, merge `origin/dev` normally, combine increments
+(and preserve both declarations), then update your own declaration to the combined
+budget value and rerun the gate. Never rebase published history.
+
+Receiver mutation detection is conservative: any analyzed `&mut self` definition of
+a method name counts, regardless of unrelated shared receivers with that name. Without
+type inference this can flag shared `get`/`join` calls as mutations. The #215 correction
+records eleven such collisions explicitly, plus the existing diff layout `stop` and
+push hook-choice mutations; each exception explains the limitation or intended cleanup.

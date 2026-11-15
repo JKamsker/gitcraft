@@ -138,11 +138,11 @@ impl TabInfo {
                 scan_impl(item, &info.name, &mut receivers, &mut returns);
             }
         }
-        // Receiver types are not resolved, so an unrelated `fn clear(&self)` must not hide
-        // `String::clear`: standard mutators always count, crate methods by their receivers.
+        // Without receiver type inference, any mutable definition is evidence of mutation.
+        // Unrelated shared receivers must never vote that evidence away.
         info.mutating = receivers
             .iter()
-            .filter(|(_, (mutable, shared))| mutable > shared)
+            .filter(|(_, (mutable, _))| *mutable > 0)
             .map(|(name, _)| name.clone())
             .chain(STD_MUTATING.iter().map(|n| (*n).to_owned()))
             .collect();

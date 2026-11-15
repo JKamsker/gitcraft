@@ -22,6 +22,7 @@ AGGREGATE_CHECK = "python3 ci/require_results.py --allow-skipped forges"
 # A required check that is skipped counts as passing, so status jobs must run even
 # after a cancellation: `!cancelled()` would let a cancelled run skip them.
 STATUS_CONDITION = "${{ always() }}"
+BASELINE_CHECK = 'python3 ci/arch_baseline.py --base HEAD^1 --revision HEAD'
 ARCH_TESTS = "cargo test --locked --manifest-path ci/arch-fitness/Cargo.toml"
 ARCH_CHECK = ('cargo run --locked --release --manifest-path ci/arch-fitness/Cargo.toml -- '
               'check --revision HEAD --markdown "$GITHUB_STEP_SUMMARY"')
@@ -137,7 +138,7 @@ def verify_shared_gate(text):
     require(not re.search(rf"^\s*(?:- )?{forbidden}:", text, re.M), "shared gate can skip, soften, or retarget checks")
     command = r"^\s+(?:- )?run: python3 ci/rust_file_size\.py --revision HEAD\s*$"
     require(re.search(command, text, re.M), "shared gate must check the complete immutable candidate")
-    verify_required_commands(text, "check", (SIZE_CHECK, COMPLEXITY_CHECK, TOOLING_CHECK, ARCH_TESTS, ARCH_CHECK))
+    verify_required_commands(text, "check", (SIZE_CHECK, COMPLEXITY_CHECK, TOOLING_CHECK, ARCH_TESTS, ARCH_CHECK, BASELINE_CHECK))
     steps = job_steps(text, "check")
     for command in (ARCH_TESTS, ARCH_CHECK):
         step = next(step for step in steps if step.get("run", (None,))[0] == command)
@@ -309,7 +310,9 @@ class WorkflowGateTests(unittest.TestCase):
                 with self.subTest(workflow=name, field=field), self.assertRaisesRegex(ValueError, "skip, soften, or retarget"):
                     verify_required_commands(changed, job, (command,))
             for field in ("repository: other/project", "ref: other-branch", "path: elsewhere"):
-                changed = text.replace("uses: actions/checkout@v4", f"uses: actions/checkout@v4\n        with:\n          {field}")
+                changed = re.sub(
+                    r"uses: actions/checkout@v4(\n        with:)?",
+                    lambda m: f"uses: actions/checkout@v4\n        with:\n          {field}", text)
                 with self.subTest(workflow=name, checkout=field), self.assertRaisesRegex(ValueError, "retarget"):
                     verify_required_commands(changed, job, (command,))
 

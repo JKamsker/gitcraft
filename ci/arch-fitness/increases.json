@@ -1,0 +1,22 @@
+{
+  "215-conservative-receivers": {
+    "changes": [
+      "repo_tab_mutations/[\"bisect\",\"history\"]",
+      "repo_tab_mutations/[\"bisect\",\"history_index\"]",
+      "repo_tab_mutations/[\"bisect\",\"refs\"]",
+      "repo_tab_mutations/[\"changes\",\"ci\"]",
+      "repo_tab_mutations/[\"changes\",\"commits\"]",
+      "repo_tab_mutations/[\"changes\",\"path\"]",
+      "repo_tab_mutations/[\"changes\",\"stashes\"]",
+      "repo_tab_mutations/[\"diff\",\"authorship\"]",
+      "repo_tab_mutations/[\"diff\",\"commit_changes\"]",
+      "repo_tab_mutations/[\"release\",\"commits\"]",
+      "repo_tab_mutations/[\"review\",\"index\"]",
+      "repo_tab_mutations/[\"rewrite\",\"index\"]",
+      "repo_tab_mutations/[\"sync\",\"skip_hooks\"]"
+    ],
+    "reason": "Checker correction exposes two existing mutations and eleven conservative method-name collisions; no application behavior changes.",
+    "owner": "@JKamsker",
+    "remediation": "Resolve receiver types for collisions; route existing coordination through the owning domain."
+  }
+}

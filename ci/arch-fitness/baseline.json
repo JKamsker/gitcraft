@@ -2088,10 +2088,31 @@
     },
     {
       "domain": "bisect",
+      "field": "history",
+      "reason": "Newly visible after #215 conservative receiver detection: Vec::get is a shared read; unrelated mutable get definitions conservatively collide.",
+      "owner": "@JKamsker",
+      "remediation": "Resolve receiver types to distinguish shared reads."
+    },
+    {
+      "domain": "bisect",
+      "field": "history_index",
+      "reason": "Newly visible after #215 conservative receiver detection: HashMap::get is a shared read; unrelated mutable get definitions conservatively collide.",
+      "owner": "@JKamsker",
+      "remediation": "Resolve receiver types to distinguish shared reads."
+    },
+    {
+      "domain": "bisect",
       "field": "op_started",
       "reason": "Legacy direct mutation at adoption (#209): bisect changes RepoTab.op_started (owned by repo-core) at 5 sites, e.g. src/repo/bisect/mod.rs:194 (write).",
       "owner": "@JKamsker",
       "remediation": "Give repo-core a method or Action for this transition and call it instead of writing the field."
+    },
+    {
+      "domain": "bisect",
+      "field": "refs",
+      "reason": "Newly visible after #215 conservative receiver detection: push_remotes.get is a shared map read; unrelated mutable get definitions conservatively collide.",
+      "owner": "@JKamsker",
+      "remediation": "Resolve receiver types to distinguish shared reads."
     },
     {
       "domain": "bisect",
@@ -2116,6 +2137,13 @@
     },
     {
       "domain": "changes",
+      "field": "ci",
+      "reason": "Newly visible after #215 conservative receiver detection: by_sha.get is a shared map read; unrelated mutable get definitions conservatively collide.",
+      "owner": "@JKamsker",
+      "remediation": "Resolve receiver types to distinguish shared reads."
+    },
+    {
+      "domain": "changes",
       "field": "commit_body",
       "reason": "Legacy direct mutation at adoption (#209): changes changes RepoTab.commit_body (owned by repo-core) at 4 sites, e.g. src/repo/detail/compose/mod.rs:198 (write).",
       "owner": "@JKamsker",
@@ -2127,6 +2155,13 @@
       "reason": "Legacy direct mutation at adoption (#209): changes changes RepoTab.commit_summary (owned by repo-core) at 5 sites, e.g. src/repo/detail/compose/mod.rs:197 (write).",
       "owner": "@JKamsker",
       "remediation": "Give repo-core a method or Action for this transition and call it instead of writing the field."
+    },
+    {
+      "domain": "changes",
+      "field": "commits",
+      "reason": "Newly visible after #215 conservative receiver detection: Vec::get is a shared read; unrelated mutable get definitions conservatively collide.",
+      "owner": "@JKamsker",
+      "remediation": "Resolve receiver types to distinguish shared reads."
     },
     {
       "domain": "changes",
@@ -2235,6 +2270,13 @@
     },
     {
       "domain": "changes",
+      "field": "path",
+      "reason": "Newly visible after #215 conservative receiver detection: PathBuf::join returns a new path; unrelated mutable join definitions conservatively collide.",
+      "owner": "@JKamsker",
+      "remediation": "Resolve receiver types to distinguish shared reads."
+    },
+    {
+      "domain": "changes",
       "field": "pending_goto",
       "reason": "Legacy direct mutation at adoption (#209): changes changes RepoTab.pending_goto (owned by repo-core) at 1 sites, e.g. src/repo/commit_changes.rs:116 (write).",
       "owner": "@JKamsker",
@@ -2274,6 +2316,13 @@
       "reason": "Legacy direct mutation at adoption (#209): changes changes RepoTab.reword (owned by repo-core) at 2 sites, e.g. src/repo/detail/commit.rs:115 (mut_call).",
       "owner": "@JKamsker",
       "remediation": "Give repo-core a method or Action for this transition and call it instead of writing the field."
+    },
+    {
+      "domain": "changes",
+      "field": "stashes",
+      "reason": "Newly visible after #215 conservative receiver detection: Vec::get is a shared read; unrelated mutable get definitions conservatively collide.",
+      "owner": "@JKamsker",
+      "remediation": "Resolve receiver types to distinguish shared reads."
     },
     {
       "domain": "changes",
@@ -2347,6 +2396,13 @@
     },
     {
       "domain": "diff",
+      "field": "authorship",
+      "reason": "Newly visible after #215 conservative receiver detection: map.get is a shared map read; unrelated mutable get definitions conservatively collide.",
+      "owner": "@JKamsker",
+      "remediation": "Resolve receiver types to distinguish shared reads."
+    },
+    {
+      "domain": "diff",
       "field": "busy_op",
       "reason": "Legacy direct mutation at adoption (#209): diff changes RepoTab.busy_op (owned by repo-core) at 3 sites, e.g. src/repo/file_comparison/selection.rs:142 (write).",
       "owner": "@JKamsker",
@@ -2358,6 +2414,13 @@
       "reason": "Legacy direct mutation at adoption (#209): diff changes RepoTab.ci_view (owned by review) at 2 sites, e.g. src/repo/diff_split.rs:116 (write).",
       "owner": "@JKamsker",
       "remediation": "Give review a method or Action for this transition and call it instead of writing the field."
+    },
+    {
+      "domain": "diff",
+      "field": "commit_changes",
+      "reason": "Newly visible after #215 conservative receiver detection: set_diff_beside_graph stops automatic commit following when the layout is explicitly changed; existing real cross-feature mutation previously hidden by unrelated stop methods.",
+      "owner": "@JKamsker",
+      "remediation": "Route this coordination through the owning domain."
     },
     {
       "domain": "diff",
@@ -2872,6 +2935,13 @@
     },
     {
       "domain": "release",
+      "field": "commits",
+      "reason": "Newly visible after #215 conservative receiver detection: Vec::get is a shared read; unrelated mutable get definitions conservatively collide.",
+      "owner": "@JKamsker",
+      "remediation": "Resolve receiver types to distinguish shared reads."
+    },
+    {
+      "domain": "release",
       "field": "dialog",
       "reason": "Legacy direct mutation at adoption (#209): release changes RepoTab.dialog (owned by repo-core) at 1 sites, e.g. src/repo/hotfix/mod.rs:70 (write).",
       "owner": "@JKamsker",
@@ -3037,6 +3107,13 @@
       "reason": "Legacy direct mutation at adoption (#209): review changes RepoTab.hotfix (owned by release) at 1 sites, e.g. src/repo/forge_selection.rs:267 (write).",
       "owner": "@JKamsker",
       "remediation": "Give release a method or Action for this transition and call it instead of writing the field."
+    },
+    {
+      "domain": "review",
+      "field": "index",
+      "reason": "Newly visible after #215 conservative receiver detection: HashMap::get is a shared read; unrelated mutable get definitions conservatively collide.",
+      "owner": "@JKamsker",
+      "remediation": "Resolve receiver types to distinguish shared reads."
     },
     {
       "domain": "review",
@@ -3306,6 +3383,13 @@
     },
     {
       "domain": "rewrite",
+      "field": "index",
+      "reason": "Newly visible after #215 conservative receiver detection: HashMap::get is a shared read; unrelated mutable get definitions conservatively collide.",
+      "owner": "@JKamsker",
+      "remediation": "Resolve receiver types to distinguish shared reads."
+    },
+    {
+      "domain": "rewrite",
       "field": "last_op",
       "reason": "Legacy direct mutation at adoption (#209): rewrite changes RepoTab.last_op (owned by repo-core) at 3 sites, e.g. src/repo/bundles.rs:138 (write).",
       "owner": "@JKamsker",
@@ -3562,6 +3646,13 @@
       "reason": "Legacy direct mutation at adoption (#209): sync changes RepoTab.prs_loaded (owned by repo-core) at 1 sites, e.g. src/repo/offline.rs:132 (write).",
       "owner": "@JKamsker",
       "remediation": "Give repo-core a method or Action for this transition and call it instead of writing the field."
+    },
+    {
+      "domain": "sync",
+      "field": "skip_hooks",
+      "reason": "Newly visible after #215 conservative receiver detection: push_steps consumes the one-shot hook choice during push; existing real cross-feature mutation previously hidden by shared receivers.",
+      "owner": "@JKamsker",
+      "remediation": "Route this coordination through the owning domain."
     },
     {
       "domain": "sync",
