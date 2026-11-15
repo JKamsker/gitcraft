@@ -4,6 +4,7 @@
 
 #[cfg(windows)]
 use crate::app::library::test_support::AssertValue;
+use crate::app::library::test_support::tree;
 use std::time::{Duration, Instant};
 
 use super::model::{MAX_INDEX, Outcome, ScanResult, Source};
@@ -11,13 +12,6 @@ use super::scheduler::{Job, MAX_WORKERS, Scheduler};
 use super::*;
 use crate::app::App;
 use crate::app::repo_scan::Stopped;
-
-fn tree(name: &str) -> PathBuf {
-    let dir = std::env::temp_dir().join(format!("gitcraft-libfs-{name}-{}", std::process::id()));
-    let _ = std::fs::remove_dir_all(&dir);
-    let _ = std::fs::create_dir_all(&dir);
-    dir
-}
 
 fn init(dir: &Path) {
     let _ = std::fs::create_dir_all(dir);
@@ -50,7 +44,8 @@ fn run_all(s: &mut Scheduler, lib: &mut Library) {
 /// spaces and Unicode in its name: one row per checkout, with both roots as its sources.
 #[test]
 fn one_row_per_checkout_however_it_is_reached() {
-    let base = tree("identity");
+    let fixture = tree("identity");
+    let base = fixture.0.clone();
     let real = base.join("my code/Größe 日本");
     init(&real.join("app"));
     init(&real.join("tool"));
@@ -73,7 +68,7 @@ fn one_row_per_checkout_however_it_is_reached() {
         assert_eq!(lib.roots.len(), before);
     }
     run_all(&mut s, &mut lib);
-    let _ = std::fs::remove_dir_all(&base);
+    drop(fixture);
     assert_eq!(lib.entries.len(), 2, "{:?}", lib.entries);
     let sources = if cfg!(unix) { 2 } else { 1 };
     assert!(lib.entries.iter().all(|e| e.sources.len() == sources));
@@ -91,7 +86,8 @@ fn one_row_per_checkout_however_it_is_reached() {
 #[cfg(windows)]
 #[test]
 fn junctions_are_not_followed() {
-    let base = tree("junction");
+    let fixture = tree("junction");
+    let base = fixture.0.clone();
     init(&base.join("real/app"));
     let made = std::process::Command::new("cmd")
         .args(["/C", "mklink", "/J"])
@@ -105,7 +101,7 @@ fn junctions_are_not_followed() {
         ..ROOT_LIMITS
     };
     let found = crate::app::repo_scan::walk(&base, limits, &stop, &mut |_| {});
-    let _ = std::fs::remove_dir_all(&base);
+    drop(fixture);
     if made {
         let found = found.assert_value();
         assert_eq!(found.repos.len(), 1, "{:?}", found.repos);
@@ -116,7 +112,8 @@ fn junctions_are_not_followed() {
 /// what it found before stays when a later scan is cut short sooner.
 #[test]
 fn a_large_tree_stops_within_its_bounds() {
-    let base = tree("large");
+    let fixture = tree("large");
+    let base = fixture.0.clone();
     for a in 0..40 {
         for b in 0..40 {
             let _ = std::fs::create_dir_all(base.join(format!("a{a:02}/b{b:02}")));
@@ -144,7 +141,7 @@ fn a_large_tree_stops_within_its_bounds() {
     job.limits.max_dirs = 2;
     s.queue(1, job);
     run_all(&mut s, &mut lib);
-    let _ = std::fs::remove_dir_all(&base);
+    drop(fixture);
     assert_eq!(lib.count(&source), found);
     assert!(lib.entries.iter().all(|e| e.stale()));
 }

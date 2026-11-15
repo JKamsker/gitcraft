@@ -57,6 +57,29 @@ class ParserTests(unittest.TestCase):
                                     "a::serial": "passed", "a::skipped": "ignored"})
         self.assertEqual(parser.tests[("lib.exe", "a::serial")]["duration"], 2.0)
 
+    def test_recorded_command_can_prefix_a_complete_libtest_result(self):
+        name = "forge::routing_tests::provider_boundary_creation_url_cannot_override_selected_repository_for_reviewers"
+        for suffix, expected in (("ok", "passed"), ("FAILED", "failed")):
+            with self.subTest(suffix=suffix):
+                parser = feed(watchdog.LibtestParser("lib.exe"),
+                              'recorded gh ["run", "rerun", "7test ' + name + ' ... ' + suffix + '\n'
+                              '\", \"--failed\", \"--repo\", \"github.enterprise.test/fork/project\"]\n'
+                              'test app::library::tests::practice_handoff ... FAILED')
+                tests = watchdog.tests_of(parser, Counter({name: 1, "app::library::tests::practice_handoff": 1}), None, 101)
+                outcomes = {test["name"]: test["outcome"] for test in tests}
+                self.assertEqual(outcomes[name], expected)
+                self.assertEqual(outcomes["app::library::tests::practice_handoff"], "failed")
+                self.assertNotIn("not-finished", outcomes.values())
+
+    def test_embedded_non_result_does_not_replace_pending_test(self):
+        parser = feed(watchdog.LibtestParser("lib.exe"), '''
+            test a::pending ...
+            recorded command test fake::name ... arguments
+            ok
+        ''')
+        self.assertEqual(set(parser.tests), {("lib.exe", "a::pending")})
+        self.assertEqual(parser.tests[("lib.exe", "a::pending")]["outcome"], "passed")
+
     def test_panics_are_attributed_only_to_test_named_threads(self):
         parser = feed(watchdog.LibtestParser("lib.exe"), """
             thread 'a::new_style' panicked at src/a.rs:10:5:

@@ -40,7 +40,8 @@ SECRETS = [re.compile(pattern) for pattern in (
     r"gh[pousr]_[A-Za-z0-9]{20,}", r"github_pat_[A-Za-z0-9_]{20,}",
     r"(?i)(authorization:\s*(?:bearer|token|basic)\s+)\S+", r"(?i)(://[^/\s:@]+:)[^@\s/]+@")]
 
-START = re.compile(r"^test (?P<name>.+?) \.\.\. ?(?P<rest>.*)$")
+# A complete result may start inside recorded command output under --nocapture.
+START = re.compile(r"test (?P<name>.+?) \.\.\. ?(?P<rest>.*)$")
 OUTCOME = re.compile(r"^(?P<result>ok|FAILED|ignored(?:, .*)?)$")
 LONG = re.compile(r"^test (?P<name>.+) has been running for over (?P<secs>\d+) seconds$")
 CARGO_RUN = re.compile(r"^\s+Running (?:\S+ )?(?P<source>\S+) \((?P<path>[^)]+)\)$")
@@ -106,14 +107,16 @@ class LibtestParser:
             else:
                 self.panic = (match.group("name"), rest)
             return False
-        match = START.match(line)
+        match = START.search(line)
         if match:
             name, rest = match.group("name"), match.group("rest").strip()
             if OUTCOME.match(rest):
                 self._finish(name, rest, at)
-            else:
+            elif match.start() == 0:
                 self.tests.setdefault(self.key(name), {"outcome": "running"})["started_at"] = at
                 self.pending = name
+            else:
+                return False
             return True
         match = OUTCOME.match(line.strip())
         if match and self.pending is not None:

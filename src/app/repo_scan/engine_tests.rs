@@ -2,16 +2,10 @@
 
 use super::*;
 use crate::app::library::test_support::AssertValue;
+use crate::app::library::test_support::tree;
 use crate::git;
 use std::path::Path;
 use std::time::Duration;
-
-fn tree(name: &str) -> PathBuf {
-    let dir = std::env::temp_dir().join(format!("gitcraft-engine-{name}-{}", std::process::id()));
-    let _ = std::fs::remove_dir_all(&dir);
-    let _ = std::fs::create_dir_all(&dir);
-    dir
-}
 
 fn init(dir: &Path) {
     let _ = std::fs::create_dir_all(dir);
@@ -43,7 +37,8 @@ fn at_depth(root: &Path, depth: usize) -> Found {
 /// The issue's example: two repositories as children, one at depth 2, the root itself one.
 #[test]
 fn depth_decides_what_a_root_finds() {
-    let root = tree("depth");
+    let fixture = tree("depth");
+    let root = fixture.0.clone();
     init(&root.join("one"));
     init(&root.join("two"));
     init(&root.join("group/three"));
@@ -56,13 +51,14 @@ fn depth_decides_what_a_root_finds() {
     init(&root);
     assert_eq!(rel(&root, &at_depth(&root, 0)), [""]);
     assert_eq!(rel(&root, &at_depth(&root, 1)), ["", "one", "two"]);
-    let _ = std::fs::remove_dir_all(&root);
+    drop(fixture);
 }
 
 /// Linked worktrees (a `.git` file) are found; malformed `.git` entries are not.
 #[test]
 fn git_files_and_malformed_git_entries() {
-    let root = tree("gitfile");
+    let fixture = tree("gitfile");
+    let root = fixture.0.clone();
     let main = root.join("main");
     init(&main);
     let _ = git::run(
@@ -104,14 +100,15 @@ fn git_files_and_malformed_git_entries() {
             .assert_value()
             .is_some()
     );
-    let _ = std::fs::remove_dir_all(&root);
+    drop(fixture);
 }
 
 /// A folder of many entries stops the walk at the entry budget, holding no more than the
 /// folders it may look in: an honest partial result.
 #[test]
 fn huge_fan_out_stops_within_its_bounds() {
-    let root = tree("fanout");
+    let fixture = tree("fanout");
+    let root = fixture.0.clone();
     for i in 0..600 {
         let _ = std::fs::create_dir(root.join(format!("d{i:04}")));
     }
@@ -137,14 +134,15 @@ fn huge_fan_out_stops_within_its_bounds() {
     let found = walk(&root, NEARBY_LIMITS, &stop, &mut |_| {}).assert_value();
     assert_eq!(found.stopped, Some(Stopped::Folders));
     assert_eq!(rel(&root, &found), ["d0000"]);
-    let _ = std::fs::remove_dir_all(&root);
+    drop(fixture);
 }
 
 /// The time budget and cancellation end a walk with what it had; repositories are told one by
 /// one as they are found.
 #[test]
 fn budget_cancellation_and_events() {
-    let root = tree("budget");
+    let fixture = tree("budget");
+    let root = fixture.0.clone();
     init(&root.join("a"));
     init(&root.join("b"));
     let stop = AtomicBool::new(false);
@@ -167,7 +165,7 @@ fn budget_cancellation_and_events() {
     stop.store(true, Ordering::Relaxed);
     let found = walk(&root, ROOT_LIMITS, &stop, &mut |_| {}).assert_value();
     assert_eq!(found.stopped, Some(Stopped::Asked));
-    let _ = std::fs::remove_dir_all(&root);
+    drop(fixture);
 }
 
 /// A folder that can't be read is passed over; a root that can't be read is an error.
@@ -175,7 +173,8 @@ fn budget_cancellation_and_events() {
 #[test]
 fn unreadable_folders_are_passed_over() {
     use std::os::unix::fs::PermissionsExt;
-    let root = tree("unreadable");
+    let fixture = tree("unreadable");
+    let root = fixture.0.clone();
     init(&root.join("ok"));
     let locked = root.join("locked");
     let _ = std::fs::create_dir_all(locked.join("inner"));
@@ -190,12 +189,13 @@ fn unreadable_folders_are_passed_over() {
         assert!(e.contains("isn't allowed"), "{e}");
         assert!(found.unreadable, "unreadable children must prevent pruning");
     }
-    let _ = std::fs::remove_dir_all(&root);
+    drop(fixture);
 }
 
 #[test]
 fn exact_limits_are_complete_and_manual_scan_does_not_cap_files() {
-    let root = tree("exact-limits");
+    let fixture = tree("exact-limits");
+    let root = fixture.0.clone();
     init(&root.join("repo"));
     let stop = AtomicBool::new(false);
     let limits = ScanLimits {
@@ -229,31 +229,33 @@ fn exact_limits_are_complete_and_manual_scan_does_not_cap_files() {
         .stopped,
         None
     );
-    std::fs::remove_dir_all(root).assert_value();
+    drop(fixture);
 }
 
 #[test]
 fn gitfiles_cannot_point_at_the_checkout_itself() {
-    let root = tree("self-gitfile");
+    let fixture = tree("self-gitfile");
+    let root = fixture.0.clone();
     std::fs::write(root.join("HEAD"), "ref: refs/heads/main\n").assert_value();
     for target in [".", "./", "sub/.."] {
         std::fs::create_dir_all(root.join("sub")).assert_value();
         std::fs::write(root.join(".git"), format!("gitdir: {target}\n")).assert_value();
         assert!(!is_repo(&root), "{target}");
     }
-    std::fs::remove_dir_all(root).assert_value();
+    drop(fixture);
 }
 
 #[cfg(unix)]
 #[test]
 fn non_utf8_discoveries_do_not_poison_saved_state() {
     use std::os::unix::ffi::OsStringExt;
-    let root = tree("nonutf8");
+    let fixture = tree("nonutf8");
+    let root = fixture.0.clone();
     let bad = root.join(std::ffi::OsString::from_vec(vec![0xff]));
     init(&bad);
     init(&root.join("valid"));
     let found = at_depth(&root, 1);
     assert_eq!(rel(&root, &found), ["valid"]);
     assert!(ron::to_string(&found.repos).is_ok());
-    std::fs::remove_dir_all(root).assert_value();
+    drop(fixture);
 }
