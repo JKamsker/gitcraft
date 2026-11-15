@@ -114,3 +114,32 @@ fn stale_dialog_refreshes_and_clears_selection_and_apply_uses_operation_pipeline
     assert_eq!(repo.git(&["config", "branch.main.remote"])?.trim(), "alice");
     Ok(())
 }
+
+#[test]
+fn every_local_menu_exposes_tracking_directly_including_head() {
+    for (head, upstream, label) in [
+        (true, "", "tracking-set"),
+        (false, "alice/topic", "tracking-change"),
+    ] {
+        let ctx = egui::Context::default();
+        let tab = RepoTab::new_deferred("/recording/tracking-menu".into(), &ctx);
+        let branch = crate::git::Branch {
+            name: "topic".into(),
+            target: "a".repeat(40),
+            is_head: head,
+            upstream: upstream.into(),
+            track: String::new(),
+        };
+        let mut h = Harness::builder().build_ui_state(
+            move |ui, tab: &mut RepoTab| {
+                tab.branch_menu_items(ui, &mut Vec::new(), &branch, true);
+            },
+            tab,
+        );
+        h.run();
+        assert!(
+            h.query_by_label(crate::i18n::text(label)).is_some(),
+            "head={head}"
+        );
+    }
+}
