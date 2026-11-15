@@ -29,6 +29,7 @@ pub(super) fn measure_with(
             .ignored
             .contains(Path::new("target/.rustc_info.json"));
     let mut hash = std::collections::hash_map::DefaultHasher::new();
+    found.fingerprint.hash(&mut hash);
     found.head.hash(&mut hash);
     found.branch.hash(&mut hash);
     found.presence.hash(&mut hash);

@@ -143,3 +143,30 @@ fn nested_repository_stops_measurement() -> Result<(), String> {
     assert!(!found.complete());
     Ok(())
 }
+
+#[test]
+fn detached_missing_upstream_and_rewritten_remote_refs_remain_protected() -> Result<(), String> {
+    let repo = Repo::new("resources-publication")?;
+    let base = repo.commit("base", &[("a", Some("a"))])?;
+    repo.git(&["update-ref", "refs/remotes/origin/topic", &base])?;
+    repo.git(&["checkout", "--detach"])?;
+    let detached = collect(repo.path(), repo.path(), 1, None, None)?;
+    assert!(detached.branch.is_none());
+    assert!(
+        previews(&detached)[1]
+            .blockers
+            .iter()
+            .any(|b| b == crate::i18n::text("worktree-cleanup-blocker-not-merged"))
+    );
+    repo.commit("unpublished", &[("b", Some("b"))])?;
+    let unpublished = collect(repo.path(), repo.path(), 2, None, None)?;
+    assert!(
+        unpublished
+            .blockers
+            .contains(&"resources-unpublished".into())
+    );
+    repo.git(&["update-ref", "-d", "refs/remotes/origin/topic"])?;
+    let missing = collect(repo.path(), repo.path(), 3, None, None)?;
+    assert!(missing.blockers.contains(&"resources-unpublished".into()));
+    Ok(())
+}

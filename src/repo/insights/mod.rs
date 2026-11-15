@@ -220,6 +220,12 @@ pub(crate) enum InsightsAct {
 }
 
 impl RepoTab {
+    pub(in crate::repo) fn invalidate_resource_observations(&mut self) {
+        if let Some(view) = &mut self.insights {
+            view.constellation.stop_resources();
+        }
+    }
+
     pub(super) fn insights_act(&mut self, act: InsightsAct, ctx: &egui::Context) {
         match act {
             InsightsAct::Open(kind) => self.open_insights(kind, ctx),

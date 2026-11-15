@@ -44,6 +44,17 @@ pub(crate) fn collect(
     if wt.main || wt.current || wt.locked.is_some() || wt.bare || wt.prunable.is_some() {
         found.blockers.push("resources-registration-blocked".into());
     }
+    let refs = git_read(
+        repo,
+        &[
+            "for-each-ref",
+            "--format=%(refname) %(objectname) %(upstream)",
+            "refs/heads",
+            "refs/remotes",
+        ],
+    )?;
+    use sha2::{Digest, Sha256};
+    found.fingerprint = format!("{:x}", Sha256::digest(&refs));
     let status = git_read(
         path,
         &[
@@ -64,7 +75,9 @@ pub(crate) fn collect(
         } else {
             found.staged += usize::from(*x != b' ');
             found.unstaged += usize::from(*y != b' ');
-            found.conflicted += usize::from(*x == b'U' || *y == b'U' || x == y);
+            found.conflicted += usize::from(
+                *x == b'U' || *y == b'U' || matches!((*x, *y), (b'A', b'A') | (b'D', b'D')),
+            );
             if matches!(x, b'R' | b'C') || matches!(y, b'R' | b'C') {
                 fields.next();
             }
@@ -132,7 +145,16 @@ pub(crate) fn collect(
             "--untracked-files=all",
         ],
     )?;
-    if after != status || git::resolve(path, "HEAD")? != found.head {
+    let current_refs = git_read(
+        repo,
+        &[
+            "for-each-ref",
+            "--format=%(refname) %(objectname) %(upstream)",
+            "refs/heads",
+            "refs/remotes",
+        ],
+    )?;
+    if after != status || current_refs != refs || git::resolve(path, "HEAD")? != found.head {
         for m in &mut found.measurements {
             m.status = Completeness::Partial("resources-stale".into());
         }

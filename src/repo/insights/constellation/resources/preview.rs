@@ -3,6 +3,12 @@ use crate::git::worktree_resources::{Inventory, Operation, previews};
 use crate::i18n::text;
 pub(super) fn show(ui: &mut egui::Ui, found: &Inventory) {
     ui.label(text("resources-preview-note"));
+    if crate::git::now().saturating_sub(found.collected) > 30 {
+        ui.label(text("resources-stale"));
+        return;
+    }
+    ui.ctx()
+        .request_repaint_after(std::time::Duration::from_secs(1));
     for preview in previews(found) {
         ui.strong(text(match preview.operation {
             Operation::BuildOutputs => "resources-build",
