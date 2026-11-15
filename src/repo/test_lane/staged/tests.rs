@@ -27,8 +27,14 @@ fn staged_panel_exposes_named_command_and_test_button() -> Result<(), String> {
         tab,
     );
     harness.step();
-    harness.get_by_label(crate::i18n::text("staged-test"));
-    harness.get_by_label(crate::i18n::text("staged-command"));
+    harness.get_by_role_and_label(
+        egui::accesskit::Role::Button,
+        crate::i18n::text("staged-test"),
+    );
+    harness.get_by_role_and_label(
+        egui::accesskit::Role::TextInput,
+        crate::i18n::text("staged-command"),
+    );
     Ok(())
 }
 
