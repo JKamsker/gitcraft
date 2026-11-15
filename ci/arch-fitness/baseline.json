@@ -3844,7 +3844,7 @@
     },
     "doctor": {
       "domains": 8,
-      "exported": 40
+      "exported": 41
     },
     "forge": {
       "domains": 5,
@@ -3852,7 +3852,7 @@
     },
     "git": {
       "domains": 12,
-      "exported": 1019
+      "exported": 1025
     },
     "graph": {
       "domains": 18,
@@ -3880,7 +3880,7 @@
     },
     "repo-core": {
       "domains": 24,
-      "symbols": 609,
+      "symbols": 612,
       "exported": 188
     },
     "review": {
