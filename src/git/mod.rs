@@ -96,7 +96,9 @@ pub(crate) use self::unity::tests as unity_tests;
 mod testlane;
 mod worktree;
 pub(crate) mod worktree_cleanup;
+mod worktree_inspection;
 mod worktree_location;
+pub(crate) mod worktree_resources;
 
 pub use self::absorb::*;
 pub use self::attributes::*;

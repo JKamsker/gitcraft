@@ -297,6 +297,7 @@ pub const DISK_ENTRIES: usize = 200_000;
 /// Symbolic links are counted as themselves, not followed; a folder with a `.git` of its own
 /// inside it (another worktree kept there, a submodule, a nested repository) is counted on its
 /// own, not again here.
+#[cfg(test)]
 pub fn disk_usage(dir: &Path, budget: usize) -> Result<Disk, String> {
     let mut disk = Disk::default();
     let mut seen = 0usize;

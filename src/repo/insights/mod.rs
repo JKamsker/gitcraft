@@ -296,6 +296,9 @@ impl RepoTab {
         let view = self
             .insights
             .get_or_insert_with(|| Box::new(InsightsView::new(kind)));
+        if kind != Kind::Constellation {
+            view.constellation.stop_resources();
+        }
         view.kind = kind;
         if pr.is_some() {
             view.pr = pr;

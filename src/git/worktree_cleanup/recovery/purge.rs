@@ -11,6 +11,7 @@ pub(super) use unix::Purge;
 #[cfg(windows)]
 pub(super) use windows::Purge;
 
+#[cfg(any(windows, test))]
 fn boundary<T: Eq>(device: T, child_device: T, attributes: u32) -> Result<(), String> {
     if device != child_device || attributes & 0x400 != 0 {
         return Err("Purge refused a mount boundary or Windows reparse point".into());

@@ -39,7 +39,7 @@ fn color_of(node: &model::Node, t: &Tokens) -> Color32 {
 }
 
 /// What a worktree's folder takes, said in a line.
-fn disk_line(
+pub(super) fn disk_line(
     node: &model::Node,
     disk: Option<&HashMap<String, Result<Disk, String>>>,
     remote: bool,
@@ -64,12 +64,12 @@ fn disk_line(
         ),
         Some(Err(e)) => format!("disk: not measured ({e})"),
         None if disk.is_some() => "disk: not measured (folder missing)".to_owned(),
-        None => "disk: being measured…".to_owned(),
+        None => "disk: not measured; select Measure / Refresh".to_owned(),
     })
 }
 
 /// A node's flags as words, each saying how it is known when it is not observed.
-fn flag_words(node: &model::Node) -> String {
+pub(super) fn flag_words(node: &model::Node) -> String {
     node.flags
         .iter()
         .map(|(f, e)| match e {
@@ -195,57 +195,6 @@ pub(super) fn legend(ui: &mut Ui, t: &Tokens) {
             ),
         ],
     );
-}
-
-/// The table: a row per node, clickable.
-pub(super) fn nodes_table(
-    ui: &mut Ui,
-    m: &Model,
-    selected: Option<usize>,
-    other: Option<usize>,
-    acts: &mut Vec<Action>,
-) {
-    let widths = [100.0, 240.0, 200.0];
-    common::table_row(
-        ui,
-        &widths,
-        &[
-            "Kind".into(),
-            "Name".into(),
-            "States".into(),
-            "Joined to".into(),
-        ],
-        true,
-        false,
-    );
-    egui::ScrollArea::vertical()
-        .id_salt("constellation-table")
-        .auto_shrink([false, false])
-        .show(ui, |ui| {
-            for (i, n) in m.nodes.iter().enumerate() {
-                let links: Vec<String> = m
-                    .links_of(i)
-                    .iter()
-                    .map(|(e, j)| format!("{} {}", e.link.label(), m.nodes[*j].label))
-                    .collect();
-                let resp = common::table_row(
-                    ui,
-                    &widths,
-                    &[
-                        n.kind.label().to_owned(),
-                        n.label.clone(),
-                        flag_words(n),
-                        links.join("; "),
-                    ],
-                    false,
-                    selected == Some(i) || other == Some(i),
-                );
-                if resp.clicked() {
-                    let add = ui.input(|inp| inp.modifiers.command);
-                    acts.push(act(Act::Select { node: i, add }));
-                }
-            }
-        });
 }
 
 /// What the node picked is, what it is joined to, and what opens it.

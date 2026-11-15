@@ -13,7 +13,7 @@ mod recovery;
 use std::path::PathBuf;
 
 pub(crate) use execute::{Outcome, remove};
-pub(crate) use inspect::inspect;
+pub(crate) use inspect::{inspect, resource_blockers};
 
 /// How the branch's work is known to be in its base.
 #[derive(Clone, Debug, PartialEq, Eq)]

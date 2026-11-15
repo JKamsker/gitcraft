@@ -1,8 +1,8 @@
 //! Descriptor-relative traversal. Linux NO_XDEV also rejects same-device bind mounts.
 use rustix::fd::OwnedFd;
-use rustix::fs::{self, AtFlags, Dir, FileType, Mode, OFlags};
+use rustix::fs::{self, AtFlags, Dir, FileType};
 use std::ffi::OsString;
-use std::path::{Component, Path, PathBuf};
+use std::path::{Path, PathBuf};
 
 pub(in super::super) struct Purge {
     root: PathBuf,
@@ -11,45 +11,7 @@ pub(in super::super) struct Purge {
     entry: OwnedFd,
 }
 
-const FLAGS: OFlags = OFlags::RDONLY
-    .union(OFlags::CLOEXEC)
-    .union(OFlags::DIRECTORY)
-    .union(OFlags::NOFOLLOW);
-
-fn open_root(path: &Path) -> Result<OwnedFd, String> {
-    if !path.is_absolute() {
-        return Err("Recovery root must be absolute".into());
-    }
-    let mut fd = fs::open("/", FLAGS, Mode::empty()).map_err(|e| e.to_string())?;
-    for part in path.components() {
-        match part {
-            Component::RootDir => {}
-            Component::Normal(name) => {
-                fd = fs::openat(&fd, name, FLAGS, Mode::empty()).map_err(|e| e.to_string())?
-            }
-            _ => return Err("Invalid recovery ancestry".into()),
-        }
-    }
-    Ok(fd)
-}
-
-fn child(parent: &OwnedFd, name: impl rustix::path::Arg) -> Result<OwnedFd, String> {
-    #[cfg(target_os = "linux")]
-    let fd = fs::openat2(
-        parent,
-        name,
-        FLAGS,
-        Mode::empty(),
-        fs::ResolveFlags::BENEATH | fs::ResolveFlags::NO_SYMLINKS | fs::ResolveFlags::NO_XDEV,
-    );
-    #[cfg(not(target_os = "linux"))]
-    let fd = fs::openat(parent, name, FLAGS, Mode::empty());
-    let fd = fd.map_err(|e| format!("Purge directory boundary: {e}"))?;
-    let parent_stat = fs::fstat(parent).map_err(|e| e.to_string())?;
-    let stat = fs::fstat(&fd).map_err(|e| e.to_string())?;
-    super::boundary(parent_stat.st_dev, stat.st_dev, 0)?;
-    Ok(fd)
-}
+use crate::git::worktree_inspection::unix::{child, open_root};
 
 impl Purge {
     pub fn open(root: &Path, directory: &Path) -> Result<Self, String> {

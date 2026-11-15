@@ -4,6 +4,8 @@
 //! picked (Ctrl or Cmd with the click) compare, or open the collision matrix.
 
 mod picture;
+mod resources;
+mod table;
 #[cfg(test)]
 mod tests;
 
@@ -19,7 +21,7 @@ use crate::insights::constellation::read::{self, Disk};
 use crate::insights::constellation::{self as model, Forge, Kind, Model, Snapshot};
 use crate::repo::{Action, RepoTab};
 use crate::theme::Tokens;
-use picture::{details, legend, nodes_table, to_graph};
+use picture::{details, legend, to_graph};
 
 /// The columns, left to right.
 const COLUMNS: [Kind; 5] = [
@@ -34,6 +36,7 @@ const COLUMNS: [Kind; 5] = [
 #[derive(Default)]
 pub(crate) struct State {
     read: Slot<Snapshot>,
+    resources: resources::State,
     built: Option<Built>,
     /// Worktree folder → what it takes on disk, read after the rest.
     disk: Slot<HashMap<String, Result<Disk, String>>>,
@@ -46,6 +49,10 @@ pub(crate) struct State {
 }
 
 impl State {
+    pub(super) fn stop_resources(&mut self) {
+        self.resources.stop();
+    }
+
     pub(super) fn invalidate_forge(&mut self) {
         // Keep the local snapshot, disk measurements and picks; rebuild before drawing.
         self.forge_read = None;
@@ -71,6 +78,8 @@ pub(crate) enum Act {
     /// Pick a branch to compare the one picked with.
     CompareWith(usize),
     Deselect,
+    Measure(String),
+    StopResources,
 }
 
 fn act(a: Act) -> Action {
@@ -83,17 +92,17 @@ impl RepoTab {
         let Some(view) = self.insights.as_mut() else {
             return;
         };
+        view.constellation.resources.stop();
         let request = view.constellation.read.start();
         let repo = self.path.clone();
         self.insight_then(
             ctx,
             move || read::snapshot(&repo, crate::git::now()),
-            move |tab, result, ctx| {
+            move |tab, result, _ctx| {
                 let Some(view) = tab.insights.as_mut() else {
                     return;
                 };
                 if view.constellation.read.accept(request, result) {
-                    tab.constellation_disk(ctx);
                     tab.constellation_build();
                 }
             },
@@ -223,49 +232,11 @@ impl RepoTab {
         sum
     }
 
-    /// Measures the worktrees' folders in the background (those here; not those on another
-    /// machine).
-    fn constellation_disk(&mut self, ctx: &egui::Context) {
-        let Some(view) = self.insights.as_mut() else {
-            return;
-        };
-        let state = &mut view.constellation;
-        let Some(snapshot) = state.read.ready() else {
-            return;
-        };
-        if snapshot.remote {
+    pub(super) fn constellation_act(&mut self, act: Act, ctx: &egui::Context) {
+        if let Act::Measure(path) = &act {
+            self.constellation_resources(ctx, path.clone());
             return;
         }
-        let folders: Vec<String> = snapshot
-            .worktrees
-            .iter()
-            .filter(|w| w.prunable.is_none())
-            .map(|w| w.path.clone())
-            .collect();
-        let request = state.disk.start();
-        self.insight_then(
-            ctx,
-            move || {
-                folders
-                    .into_iter()
-                    .map(|f| {
-                        let disk = read::disk_usage(std::path::Path::new(&f), read::DISK_ENTRIES);
-                        (f, disk)
-                    })
-                    .collect()
-            },
-            move |tab, sizes, _| {
-                let Some(view) = tab.insights.as_mut() else {
-                    return;
-                };
-                if view.constellation.disk.accept(request, Ok(sizes)) {
-                    tab.constellation_build();
-                }
-            },
-        );
-    }
-
-    pub(super) fn constellation_act(&mut self, act: Act, _ctx: &egui::Context) {
         let Some(view) = self.insights.as_mut() else {
             return;
         };
@@ -296,6 +267,8 @@ impl RepoTab {
                     state.other = Some(node);
                 }
             }
+            Act::Measure(_) => {}
+            Act::StopResources => state.resources.stop(),
             Act::Deselect => {
                 state.selected = None;
                 state.other = None;
@@ -386,7 +359,15 @@ impl RepoTab {
         let width = ui.available_width();
         ui.allocate_ui(vec2(width, room), |ui| {
             if table {
-                nodes_table(ui, &built.model, selected, other, acts);
+                table::nodes_table(
+                    ui,
+                    &built.model,
+                    state.disk.ready(),
+                    state.read.ready().is_some_and(|s| s.remote),
+                    selected,
+                    other,
+                    acts,
+                );
             } else {
                 ui.label(
                     RichText::new(
@@ -415,7 +396,17 @@ impl RepoTab {
             egui::ScrollArea::vertical()
                 .id_salt("constellation-details")
                 .auto_shrink([false, true])
-                .show(ui, |ui| details(ui, built, i, other, acts));
+                .show(ui, |ui| {
+                    details(ui, built, i, other, acts);
+                    if let Some(node) = built
+                        .model
+                        .nodes
+                        .get(i)
+                        .filter(|n| n.kind == Kind::Worktree)
+                    {
+                        resources::rows::show(ui, &mut state.resources, &node.key, acts);
+                    }
+                });
         }
     }
 }
