@@ -167,7 +167,7 @@ pub(super) fn form_fields(ui: &mut Ui, form: &mut CloneForm, t: &Tokens) -> bool
 
 pub(in crate::app) use crate::a11y::singleline_enter;
 
-pub(super) fn home_dir() -> Option<PathBuf> {
+pub(in crate::app) fn home_dir() -> Option<PathBuf> {
     std::env::var_os("USERPROFILE")
         .or_else(|| std::env::var_os("HOME"))
         .map(PathBuf::from)
