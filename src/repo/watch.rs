@@ -6,6 +6,7 @@ use std::path::{Path, PathBuf};
 use std::sync::mpsc::{Sender, channel};
 use std::time::Duration;
 
+mod config;
 use super::RepoTab;
 use super::messages::{Msg, spawn};
 
@@ -89,6 +90,8 @@ fn start_watcher(
         .iter()
         .flat_map(|(own, common)| [own.clone(), common.clone()])
         .collect();
+    let configurations = config::paths(path);
+    let watched_configurations = configurations.clone();
     let root = path.to_owned();
     let handler = move |res: notify::Result<notify::Event>| {
         let Ok(event) = res else { return };
@@ -96,10 +99,22 @@ fn start_watcher(
             return;
         }
         for path in &event.paths {
-            if let Some(change) = fs_change(path, &git_dirs) {
+            let change = if config::contains(&configurations, path) {
+                Some(FsChange::Git)
+            } else if config::under(path, &root) || git_dirs.iter().any(|d| config::under(path, d))
+            {
+                fs_change(path, &git_dirs)
+            } else {
+                None
+            };
+            if let Some(change) = change {
                 saw(&root, path);
                 let _ = tx.send(change);
-                ctx.request_repaint_after(Duration::from_millis(500));
+                if matches!(change, FsChange::Index | FsChange::Git) {
+                    ctx.request_repaint();
+                } else {
+                    ctx.request_repaint_after(Duration::from_millis(500));
+                }
             }
         }
     };
@@ -115,8 +130,14 @@ fn start_watcher(
             // Not all of it: objects are written all the time.
             let _ = watcher.watch(common, NonRecursive);
             let _ = watcher.watch(&common.join("refs"), Recursive);
+            let _ = watcher.watch(&common.join("info"), NonRecursive);
             // Where a repository made with `--ref-format=reftable` keeps them.
             let _ = watcher.watch(&common.join("reftable"), Recursive);
+        }
+    }
+    for file in watched_configurations {
+        if let Some(parent) = file.parent() {
+            let _ = watcher.watch(parent, notify::RecursiveMode::NonRecursive);
         }
     }
     Some(watcher)
@@ -185,6 +206,9 @@ pub(super) fn fs_change(path: &Path, git_dirs: &[PathBuf]) -> Option<FsChange> {
                 && !inside.starts_with(super::timeline::snapshot::ROOT)
                 && inside != "refs/gitcraft")
                 || inside.starts_with("reftable")
+                || inside == "config"
+                || inside == "config.worktree"
+                || inside == "info/attributes"
                 || inside == "HEAD"
                 || inside == "packed-refs"
                 || (inside.ends_with("_HEAD") && inside != "FETCH_HEAD" && inside != "ORIG_HEAD")

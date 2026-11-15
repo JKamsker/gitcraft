@@ -56,6 +56,18 @@ impl RepoTab {
         }
     }
 
+    pub(in crate::repo) fn staged_entry(&mut self, ui: &mut egui::Ui, acts: &mut Vec<Action>) {
+        self.check_staged(ui.ctx());
+        let button =
+            crate::icons::small_button(ui, "flask-conical", crate::i18n::text("staged-test"));
+        egui::Popup::menu(&button).width(360.0).show(|ui| {
+            self.staged_box(ui, acts);
+        });
+        if self.test_lane.staged.result.is_some() {
+            ui.ctx().request_repaint_after(Duration::from_secs(1));
+        }
+    }
+
     pub(in crate::repo) fn staged_box(&mut self, ui: &mut egui::Ui, acts: &mut Vec<Action>) {
         if !self.test_lane.staged.initialized {
             self.test_lane.staged.initialized = true;
@@ -98,7 +110,7 @@ impl RepoTab {
             if ui
                 .add_enabled(
                     !running && !state.command.trim().is_empty() && self.busy_op.is_none(),
-                    egui::Button::new(crate::i18n::text("staged-test")),
+                    egui::Button::new(crate::i18n::text("staged-run")),
                 )
                 .clicked()
             {
@@ -116,7 +128,11 @@ impl RepoTab {
             if state.stale || state.checking {
                 ui.colored_label(
                     ui.visuals().warn_fg_color,
-                    crate::i18n::text("staged-stale"),
+                    crate::i18n::text(if state.checking {
+                        "staged-verifying"
+                    } else {
+                        "staged-stale"
+                    }),
                 );
             }
             match result {

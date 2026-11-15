@@ -81,6 +81,7 @@ ureq = { version = "2", features = ["native-certs"] }
 base64 = "0.22"
 # What a repository's trusted command file read as (Settings → Custom commands).
 sha2 = "0.11"
+unicode-normalization = "0.1"
 # Reading the files of a package published already (a gzip'd tar).
 flate2 = "1"
 vt100 = "0.18"

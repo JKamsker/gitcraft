@@ -4,11 +4,15 @@
 //! however the work ended (dropped, stopped or failed). One left by a gitcraft of this machine
 //! that crashed is removed the next time one is made.
 
+use crate::remote;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 
-use crate::git::run;
-use crate::remote;
+fn run(dir: Option<&Path>, args: &[&str]) -> Result<String, String> {
+    let mut safe = vec!["-c", "core.hooksPath=/dev/null"];
+    safe.extend_from_slice(args);
+    crate::git::run(dir, &safe)
+}
 
 /// The folder, in the temporary folder, that holds them (a folder per repository in it).
 pub const SCRATCH_DIR: &str = "gitcraft-scratch";
@@ -139,7 +143,7 @@ impl Drop for Scratch {
 fn remove_worktree(repo: &Path, path: &Path) -> Result<(), String> {
     // Cleanup must survive both the run's Cancel button and tab lifetime cancellation.
     crate::tasks::with_cancellation(crate::tasks::Cancellation::default(), || {
-        remove_uncancelled(repo, path)
+        crate::processes::deadline::cleanup(|| remove_uncancelled(repo, path))
     })
 }
 

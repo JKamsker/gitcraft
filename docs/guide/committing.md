@@ -25,21 +25,37 @@ The right panel: staging files, hunks or single lines, the commit box, sign-offs
 
 ## Test staged changes
 
-Beside Commit, **Test staged changes** runs the test-lane command against a disposable
+Beside Commit, the **Test staged changes** flask opens a popup with the command, run/cancel
+controls and result. It runs the test-lane command against a disposable
 checkout of the index, including partial staging, additions, deletions, renames and modes.
 Edit the command for this tab before running it. The repository default is the existing
 `test.default.command` setting used by Test commits.
 
 The panel shows the tested tree, command, exit code, elapsed time and last 200 output lines.
 A staging operation or changed command/environment marks the result stale; external changes
-are detected through status refreshes and a background fingerprint check. Results stay in
+are invalidated on index/configuration watcher events and status refreshes, with a
+verifying indication while the background fingerprint check is pending. Results stay in
 this tab only and never become commit-history test notes. Tool or dependency changes outside
 the environment variables and Git configuration require another run.
 
 Only local repositories are supported in this first version. Resolve index conflicts first;
-submodules are refused. Ignored assets, build outputs and untracked helpers are excluded.
+submodules, sparse checkouts and skip-worktree entries are refused. Checkout filters,
+including Git LFS and effective negative filter declarations, are refused before they execute: use a checkout without those filters
+or prepare the required assets explicitly in the command. Symlinks must resolve entirely
+inside the snapshot; escaping links and cycles are refused. The portable path preflight
+rejects case/Unicode collisions, Windows reserved names, invalid components and absolute
+checkout paths longer than 240 UTF-16 units. The materialized files, modes and symlink
+types are checked before execution; symlink fallback files are refused.
+
+Ignored assets, build outputs and untracked helpers are excluded.
 Prepare dependencies inside the snapshot in the test command (for example, `npm ci && npm test`).
-The command runs through Git's shell, stops after 20 minutes, and can be cancelled. Closing
+The copied index is limited to 64 MiB; a snapshot is limited to 10,000 files and an
+estimated 512 MiB of checkout storage (4 KiB allocation units plus directory entries).
+These limits are checked before materialization. Build outputs have no filesystem quota:
+choose commands that bound their generated files and disk use. Preparation and execution
+share one cancellable 20-minute deadline; each cleanup attempt has a separate 30-second
+process budget (at most three attempts).
+The command runs through Git's shell. Closing
 the tab cancels it too. The existing scratch-worktree registry removes the checkout after a
 run and sweeps abandoned checkouts when another scratch checkout is created after a crash.
 

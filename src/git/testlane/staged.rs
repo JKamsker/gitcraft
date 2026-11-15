@@ -3,6 +3,7 @@
 #[cfg(test)]
 use super::run_command;
 use super::{RunStop, Scratch};
+mod preflight;
 use crate::git::{self, Ended};
 use sha2::{Digest, Sha256};
 use std::{
@@ -44,7 +45,9 @@ fn fingerprint_for(repo: &Path, command: &str, index: Option<&[u8]>) -> Result<S
     // identical ls-files --stage rows but different write-tree results.
     hash.update(index.unwrap_or_default());
     hash.update(command.as_bytes());
-    hash.update(git::run_bytes(Some(repo), &["config", "--null", "--list"])?);
+    hash.update(crate::git::command::snapshot_policy::without_hooks(|| {
+        git::run_bytes(Some(repo), &["config", "--null", "--list"])
+    })?);
     let mut env: Vec<_> = std::env::vars_os().collect();
     env.sort();
     for (name, value) in env {
@@ -59,6 +62,9 @@ fn index_bytes(repo: &Path) -> Result<Option<Vec<u8>>, String> {
         Some(repo),
         &["rev-parse", "--path-format=absolute", "--git-path", "index"],
     )?;
+    if std::fs::metadata(index.trim()).is_ok_and(|m| m.len() > 64 * 1024 * 1024) {
+        return Err(crate::i18n::text("staged-budget").into());
+    }
     match std::fs::read(index.trim()) {
         Ok(bytes) => Ok(Some(bytes)),
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(None),
@@ -101,7 +107,12 @@ fn synthetic_revision(repo: &Path, tree: &str) -> Result<String, String> {
 /// The scratch registry supplies RAII removal and next-launch crash recovery. No refs
 /// or files in the source worktree are changed. Tree objects may be added to its ODB.
 fn snapshot(repo: &Path, expected: Option<&[u8]>) -> Result<(Scratch, String), String> {
+    crate::git::command::snapshot_policy::without_hooks(|| snapshot_inner(repo, expected))
+}
+
+fn snapshot_inner(repo: &Path, expected: Option<&[u8]>) -> Result<(Scratch, String), String> {
     local(repo)?;
+    preflight::dense(repo)?;
     let scratch = Scratch::add_empty(repo, "test", &initial_revision(repo)?)?;
     let source = git::run(
         Some(repo),
@@ -134,10 +145,7 @@ fn snapshot(repo: &Path, expected: Option<&[u8]>) -> Result<(Scratch, String), S
     let tree = git::run_env(Some(repo), &["write-tree"], &env)?
         .trim()
         .to_owned();
-    let entries = git::run(Some(repo), &["ls-tree", "-r", &tree])?;
-    if entries.lines().any(|line| line.starts_with("160000 ")) {
-        return Err(crate::i18n::text("staged-submodules").into());
-    }
+    let entries = preflight::manifest(repo, &tree, &scratch.path)?;
     // Replace the copied split index with a standalone scratch index before checkout.
     std::fs::remove_file(target).map_err(|e| e.to_string())?;
     // HEAD must describe the snapshot too: tools that inspect HEAD or reset their
@@ -148,6 +156,12 @@ fn snapshot(repo: &Path, expected: Option<&[u8]>) -> Result<(Scratch, String), S
         &[
             "-c",
             "core.hooksPath=/dev/null",
+            "-c",
+            "core.sparseCheckout=false",
+            "-c",
+            "core.sparseCheckoutCone=false",
+            "-c",
+            "index.sparse=false",
             "checkout",
             "--detach",
             "--force",
@@ -155,6 +169,7 @@ fn snapshot(repo: &Path, expected: Option<&[u8]>) -> Result<(Scratch, String), S
             &revision,
         ],
     )?;
+    preflight::faithful(&scratch.path, &entries)?;
     Ok((scratch, tree))
 }
 
@@ -165,7 +180,14 @@ pub(crate) fn test_staged(
 ) -> Result<StagedResult, String> {
     let lifetime = stop.command_stopper();
     lifetime
-        .with_scope(|| verify(repo, command, stop))
+        .with_scope(|| {
+            crate::git::command::snapshot_policy::without_hooks(|| {
+                crate::processes::deadline::within(
+                    Instant::now() + Duration::from_secs(20 * 60),
+                    || verify(repo, command, stop),
+                )
+            })
+        })
         .map_err(|error| scrub(&error))
 }
 
@@ -220,3 +242,6 @@ fn scrub(text: &str) -> String {
     }
     text
 }
+
+#[cfg(test)]
+mod review_tests;

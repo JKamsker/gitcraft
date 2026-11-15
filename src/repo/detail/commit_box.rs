@@ -172,7 +172,14 @@ impl RepoTab {
         // Only from the message fields, so Ctrl+Enter in the terminal stays the shell's.
         let shortcut = (summary.has_focus() || body.has_focus())
             && keymap::pressed(ui.ctx(), Scope::Repository).contains(&Command::Commit);
-        let resp = widgets::primary_button(ui, &label, can, ui.available_width());
+        let resp = ui
+            .horizontal(|ui| {
+                let width = (ui.available_width() - 36.0).max(1.0);
+                let response = widgets::primary_button(ui, &label, can, width);
+                self.staged_entry(ui, acts);
+                response
+            })
+            .inner;
         if (resp.clicked() || shortcut) && can {
             acts.push(Action::Commit);
         }
@@ -183,7 +190,6 @@ impl RepoTab {
         }
 
         ui.add_space(4.0);
-        self.staged_box(ui, acts);
         self.identity_row(ui, acts);
     }
 

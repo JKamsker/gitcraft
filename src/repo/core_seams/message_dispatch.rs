@@ -31,12 +31,18 @@ impl RepoTab {
         }
         // Changes on disk, debounced. Taken in before the finished work, so that a reload
         // that work starts covers what it wrote itself (see `reload`).
+        let mut snapshot_changed = false;
         if let Some(rx) = &self.fs_rx {
             while let Ok(change) = rx.try_recv() {
+                snapshot_changed = true;
                 self.working_drafts.observe();
                 let was = self.fs_pending.map(|(c, _)| c);
                 self.fs_pending = Some((was.max(Some(change)).unwrap_or(change), Instant::now()));
             }
+        }
+
+        if snapshot_changed {
+            self.invalidate_staged(ctx);
         }
 
         while let Ok(msg) = self.rx.try_recv() {

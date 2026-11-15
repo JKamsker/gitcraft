@@ -29,7 +29,7 @@ fn staged_panel_exposes_named_command_and_test_button() -> Result<(), String> {
     harness.step();
     harness.get_by_role_and_label(
         egui::accesskit::Role::Button,
-        crate::i18n::text("staged-test"),
+        crate::i18n::text("staged-run"),
     );
     harness.get_by_role_and_label(
         egui::accesskit::Role::TextInput,
@@ -61,5 +61,73 @@ fn restaging_invalidates_verdict_and_late_checks_cannot_clear_it() -> Result<(),
     state.generation += 1;
     state.finish_check(0, 1, Ok(original));
     assert!(state.stale, "an older run must not overwrite a newer run");
+    Ok(())
+}
+
+#[test]
+fn watcher_events_invalidate_before_debounce_and_reject_older_freshness() -> Result<(), String> {
+    use crate::repo::watch::FsChange;
+    let repo = Repo::new("staged-review-watcher")?;
+    repo.commit("base", &[])?;
+    let ctx = egui::Context::default();
+    for change in [FsChange::Index, FsChange::Git] {
+        let mut tab = RepoTab::new_deferred(repo.path().into(), &ctx);
+        let result = git::test_staged(repo.path(), "exit 0", &RunStop::default())?;
+        let fingerprint = result.key.fingerprint.clone();
+        tab.test_lane.staged.result = Some(Ok(result));
+        tab.test_lane
+            .staged
+            .finish_check(0, 0, Ok(fingerprint.clone()));
+        assert!(!tab.test_lane.staged.stale);
+        let (tx, rx) = std::sync::mpsc::channel();
+        tab.fs_rx = Some(rx);
+        tx.send(change).map_err(|e| e.to_string())?;
+        tab.poll(&ctx);
+        assert!(tab.test_lane.staged.stale);
+        assert!(tab.test_lane.staged.freshness > 0);
+        tab.test_lane.staged.finish_check(0, 0, Ok(fingerprint));
+        assert!(tab.test_lane.staged.stale);
+    }
+    Ok(())
+}
+
+#[test]
+fn compact_entry_opens_a_keyboard_accessible_command_popup() -> Result<(), String> {
+    use egui_kittest::{Harness, kittest::Queryable};
+    let ctx = egui::Context::default();
+    let mut tab = RepoTab::new_deferred("/nonexistent/staged-popup".into(), &ctx);
+    tab.test_lane.staged.initialized = true;
+    tab.test_lane.staged.command = "exit 0".into();
+    let mut h = Harness::new_ui_state(
+        |ui, (tab, acts): &mut (RepoTab, Vec<Action>)| tab.staged_entry(ui, acts),
+        (tab, Vec::new()),
+    );
+    h.step();
+    h.key_press(egui::Key::Tab);
+    h.step();
+    assert!(
+        h.get_by_label(crate::i18n::text("staged-test"))
+            .is_focused()
+    );
+    h.key_press(egui::Key::Enter);
+    for _ in 0..3 {
+        h.step();
+    }
+    h.get_by_role_and_label(
+        egui::accesskit::Role::TextInput,
+        crate::i18n::text("staged-command"),
+    );
+    h.get_by_role_and_label(
+        egui::accesskit::Role::Button,
+        crate::i18n::text("staged-run"),
+    )
+    .click();
+    h.step();
+    assert!(
+        h.state()
+            .1
+            .iter()
+            .any(|a| matches!(a, Action::TestLane(LaneAct::StagedStart)))
+    );
     Ok(())
 }

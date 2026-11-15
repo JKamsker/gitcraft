@@ -7808,3 +7808,12 @@ staged-tooling = Command or tool missing. Install it locally or prepare dependen
 staged-remote = Staged verification supports local repositories only; SSH/WSL snapshots are not supported yet.
 staged-unmerged = Resolve all unmerged index entries before testing staged changes.
 staged-submodules = Staged verification does not support submodules yet; no working-tree submodule files were copied.
+
+staged-sparse = Sparse checkout and skip-worktree entries are unsupported. Use a full index/checkout before staged verification.
+staged-links = A staged symlink escapes the snapshot, references Git metadata, or has an unsafe/cyclic target. Stage files with targets contained in the snapshot.
+staged-filters = Checkout filters (including Git LFS) are unsupported for staged verification. Stage ordinary file contents without filter attributes; no filter or LFS download was run.
+staged-paths = The staged tree cannot be represented faithfully: conflicting/reserved paths, path longer than 240 UTF-16 units, unsupported names, symlinks, or modes. Rename paths or use a filesystem that preserves the staged types.
+staged-budget = Snapshot exceeds the preparation budget (512 MiB estimated checkout, 10,000 files, 64 MiB index). Reduce the staged tree. Build outputs need limits in your command.
+staged-verifying = Verifying snapshot freshness… previous verdict is not current.
+
+staged-run = Run staged test
