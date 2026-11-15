@@ -26,7 +26,7 @@ pub struct Form {
     error: Option<String>,
 }
 impl Form {
-    pub(in crate::repo) fn new(
+    fn new(
         repo: PathBuf,
         branch: String,
         labels: Arc<BTreeMap<String, crate::ref_labels::Label>>,
@@ -76,15 +76,15 @@ impl Form {
                     };
                     let next = view.plan(selected);
                     let prior = self.view.as_ref().map(|v| v.plan(selected));
-                    if prior.as_ref() == Some(&next) {
-                        if let Ok(tracking::Plan { ops, undo, redo }) = next {
-                            return Some(Outcome::Done(Box::new(Action::UndoableOps {
-                                label: crate::i18n::text("tracking-change").into(),
-                                ops,
-                                refresh: Refresh::All,
-                                undo: Undo::Custom { undo, redo },
-                            })));
-                        }
+                    if prior.as_ref() == Some(&next)
+                        && let Ok(tracking::Plan { ops, undo, redo }) = next
+                    {
+                        return Some(Outcome::Done(Box::new(Action::UndoableOps {
+                            label: crate::i18n::text("tracking-change").into(),
+                            ops,
+                            refresh: Refresh::All,
+                            undo: Undo::Custom { undo, redo },
+                        })));
                     }
                     self.selected = None;
                     self.error = Some(crate::i18n::text("tracking-stale").into());

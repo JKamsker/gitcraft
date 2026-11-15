@@ -50,8 +50,6 @@ impl RepoTab {
         let work = &self.work;
         let staged_support = &self.stash_picks.staged;
         let worktrees = &self.worktrees;
-        let remote_names: Vec<&str> = self.remotes.iter().map(|r| r.name.as_str()).collect();
-        let remote_branches = &self.refs.remotes;
         let idle = self.busy_op.is_none();
         // What a new branch's undo checks out again.
         let previous = self
@@ -210,23 +208,6 @@ impl RepoTab {
                     focus,
                 } => remote::remote(ui, enter, original, name, url, focus),
                 Dialog::Tracking(form) => form.show(ui, idle),
-                Dialog::SetUpstream {
-                    branch,
-                    remote,
-                    name,
-                    undo,
-                    focus,
-                } => upstream::set_upstream(
-                    ui,
-                    enter,
-                    branch,
-                    remote,
-                    name,
-                    undo,
-                    &remote_names,
-                    remote_branches,
-                    focus,
-                ),
                 Dialog::Credentials {
                     url,
                     endpoints,

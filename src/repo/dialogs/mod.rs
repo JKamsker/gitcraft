@@ -25,7 +25,6 @@ mod rehearse;
 mod remote;
 mod stash;
 mod test_commits;
-mod upstream;
 mod window;
 mod worktree;
 
@@ -156,15 +155,7 @@ pub enum Dialog {
         url: String,
         focus: bool,
     },
-    /// The remote branch `branch` tracks: `remote`/`name`. `undo` brings back the one before.
     Tracking(Box<super::tracking::Form>),
-    SetUpstream {
-        branch: String,
-        remote: String,
-        name: String,
-        undo: Vec<Vec<String>>,
-        focus: bool,
-    },
     /// Username and password / token for an HTTPS remote that asked for them.
     Credentials {
         url: String,
