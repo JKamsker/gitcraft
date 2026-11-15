@@ -116,11 +116,13 @@ fn raw_blob_identity_is_verified_for_sha1_and_sha256_before_writing() -> Result<
             std::fs::set_permissions(&object, std::fs::Permissions::from_mode(0o600))
                 .map_err(|e| e.to_string())?;
         }
-        #[cfg(not(unix))]
+        #[cfg(windows)]
         {
             let mut permissions = std::fs::metadata(&object)
                 .map_err(|e| e.to_string())?
                 .permissions();
+            // Windows has a read-only flag, not Unix permission bits.
+            #[allow(clippy::permissions_set_readonly_false)]
             permissions.set_readonly(false);
             std::fs::set_permissions(&object, permissions).map_err(|e| e.to_string())?;
         }
