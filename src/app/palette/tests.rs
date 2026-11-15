@@ -326,7 +326,7 @@ fn the_open_file_with_spaces_and_unicode_is_staged_from_the_palette() {
 }
 
 #[test]
-fn thousands_of_branches_open_and_filter_quickly() {
+fn thousands_of_branches_open_and_filter_quickly() -> Result<(), String> {
     let dir = repo("many");
     let head = git_ok(&dir, &["rev-parse", "HEAD"]);
     // Packed, as a large repository keeps them.
@@ -341,7 +341,7 @@ fn thousands_of_branches_open_and_filter_quickly() {
     let _asking = asking();
     let mut harness = window(&dir);
     open_and_type(&mut harness, "");
-    assert_cached_palette_work(&mut harness);
+    assert_cached_palette_work(&mut harness)?;
     let first_step = listed(&harness).len();
     // Feature commands and themes are bounded; branches belong in the second step.
     assert!(first_step < 200, "{first_step} entries with nothing typed");
@@ -366,8 +366,9 @@ fn thousands_of_branches_open_and_filter_quickly() {
         listed(&harness).first().map(String::as_str),
         Some("team/feature-2999")
     );
-    assert_cached_palette_work(&mut harness);
+    assert_cached_palette_work(&mut harness)?;
     let _ = std::fs::remove_dir_all(&dir);
+    Ok(())
 }
 
 #[test]
@@ -385,8 +386,8 @@ fn what_was_run_lately_survives_a_restart() -> Result<(), serde_json::Error> {
 }
 
 /// Bound catalog construction and ranking work independently of runner load.
-fn assert_cached_palette_work(harness: &mut H<'_>) {
-    let p = palette(harness).unwrap_or_else(|| panic!("palette open"));
+fn assert_cached_palette_work(harness: &mut H<'_>) -> Result<(), String> {
+    let p = palette(harness).ok_or("palette open")?;
     assert_eq!(p.entry_builds, 1, "typing must not rebuild the catalog");
     assert!(p.rank_passes <= 4, "at most one rank per query/step change");
     assert!(
@@ -397,10 +398,11 @@ fn assert_cached_palette_work(harness: &mut H<'_>) {
     for _ in 0..10 {
         harness.step();
     }
-    let p = palette(harness).unwrap_or_else(|| panic!("palette still open"));
+    let p = palette(harness).ok_or("palette still open")?;
     assert_eq!(
         (p.entry_builds, p.rank_passes, p.ranked_entries),
         before,
         "unchanged frames must reuse entries and ranked results"
     );
+    Ok(())
 }
