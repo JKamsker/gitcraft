@@ -1,6 +1,9 @@
 use super::*;
 fn browser() -> Browser {
-    Browser::new(egui::ViewportId::ROOT)
+    let mut browser = Browser::new(egui::ViewportId::ROOT);
+    // UI behavior uses an already-completed empty local catalog, without workers.
+    browser.local = local::Local::ready_for_test();
+    browser
 }
 fn page(next: Option<&str>) -> Page {
     Page {
@@ -87,7 +90,7 @@ fn browser_localized_modal_keeps_keyboard_close_accessible() {
         },
         (browser(), false),
     );
-    harness.run();
+    harness.run_steps(3);
     harness.get_by_label("Browse GitHub");
     harness.get_by_label("Clone a URL");
     crate::i18n::set_language("de");
@@ -95,9 +98,9 @@ fn browser_localized_modal_keeps_keyboard_close_accessible() {
     harness.get_by_label("GitHub durchsuchen");
     harness.get_by_label("URL klonen");
     harness.get_by_label("Schließen").focus();
-    harness.run();
+    harness.run_steps(3);
     harness.key_press(egui::Key::Enter);
-    harness.run();
+    harness.run_steps(3);
     assert!(harness.state().1);
     crate::i18n::set_language("en-US");
 }
@@ -194,9 +197,9 @@ fn browser_clone_handoff_contains_both_transports_without_credentials() {
         },
         (browser, None),
     );
-    harness.run();
+    harness.run_steps(3);
     harness.get_by_label("Clone…").click();
-    harness.run();
+    harness.run_steps(3);
     assert!(
         matches!(&harness.state().1, Some(Intent::Clone { https, ssh }) if https == "https://github.com/owner/repo.git" && ssh == "git@github.com:owner/repo.git")
     );
@@ -242,7 +245,7 @@ fn browser_narrow_layout_keeps_clone_and_close_accessible() {
         },
         browser,
     );
-    harness.run();
+    harness.run_steps(3);
     harness.get_by_label("Clone…");
     harness.get_by_label("Close");
 }

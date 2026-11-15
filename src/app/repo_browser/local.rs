@@ -39,6 +39,13 @@ fn submit<T: Send + 'static>(
     Ok(Job { rx, _scope: scope })
 }
 impl Local {
+    #[cfg(test)]
+    pub(super) fn ready_for_test() -> Self {
+        Self {
+            started: true,
+            ..Default::default()
+        }
+    }
     pub fn new(known: Vec<PathBuf>) -> Self {
         Self {
             known,
@@ -148,6 +155,43 @@ fn revalidate(path: &std::path::Path, hosting: &Hosting) -> Result<PathBuf, Stri
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn local_pending_jobs_stop_repainting_after_replies() -> Result<(), Box<dyn std::error::Error>>
+    {
+        let (read_tx, read_rx) = channel();
+        let (open_tx, open_rx) = channel();
+        let mut local = Local::ready_for_test();
+        local.reading = Some(Job {
+            rx: read_rx,
+            _scope: Default::default(),
+        });
+        local.opening = Some(Job {
+            rx: open_rx,
+            _scope: Default::default(),
+        });
+        let mut harness = egui_kittest::Harness::new_ui_state(
+            |ui, local: &mut Local| {
+                local.tick(ui.ctx());
+            },
+            local,
+        );
+        // Pending jobs deliberately keep repainting; never ask run() to settle here.
+        harness.run_steps(3);
+        assert!(harness.state().reading.is_some());
+        assert!(harness.state().opening.is_some());
+        read_tx.send(Vec::new())?;
+        open_tx.send(Err("recorded stale path".into()))?;
+        harness.run_steps(3);
+        assert!(harness.state().reading.is_none());
+        assert!(harness.state().opening.is_none());
+        assert_eq!(
+            harness.state().error.as_deref(),
+            Some("recorded stale path")
+        );
+        // Both channels answered: the production tick must now settle normally.
+        harness.run();
+        Ok(())
+    }
     fn hosting() -> Hosting {
         Hosting {
             forge: crate::forge::Forge::GitHub,
