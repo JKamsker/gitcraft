@@ -37,7 +37,13 @@ pub(super) fn dense(repo: &Path) -> Result<(), String> {
 }
 
 pub(super) fn manifest(repo: &Path, tree: &str, root: &Path) -> Result<Vec<Entry>, String> {
-    let raw = git::run_bytes(Some(repo), &["ls-tree", "-r", "-z", "-l", tree])?;
+    let raw = git::command::run_inert_objects(
+        repo,
+        &["ls-tree", "-r", "-z", "-l", tree],
+        None,
+        8 * 1024 * 1024,
+        &[0],
+    )?;
     let mut entries = Vec::new();
     for row in raw.split(|b| *b == 0).filter(|r| !r.is_empty()) {
         let row = std::str::from_utf8(row).map_err(|_| fail("staged-paths"))?;

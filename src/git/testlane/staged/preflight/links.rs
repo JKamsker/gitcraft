@@ -18,7 +18,16 @@ pub(super) fn targets(repo: &Path, entries: &[Entry]) -> Result<BTreeMap<String,
         if entry.size > 4096 {
             return Err(fail("staged-links"));
         }
-        let target = git::run_bytes(Some(repo), &["cat-file", "blob", &entry.oid])?;
+        let target = git::command::run_inert_objects(
+            repo,
+            &["cat-file", "blob", &entry.oid],
+            None,
+            4097,
+            &[0],
+        )?;
+        if target.len() as u64 != entry.size {
+            return Err(fail("staged-links"));
+        }
         let target = String::from_utf8(target).map_err(|_| fail("staged-links"))?;
         if target.is_empty() || target.starts_with('/') || target.contains(['\\', ':', '\0']) {
             return Err(fail("staged-links"));

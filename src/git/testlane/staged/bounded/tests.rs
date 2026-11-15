@@ -6,16 +6,19 @@ fn growing_reader_cannot_exceed_limit_and_checks_each_chunk() -> Result<(), Stri
         .ok_or("expected limit")?;
     assert_eq!(error, budget());
     assert_eq!(chunks(std::io::Cursor::new(b"exact"), 5)?, b"exact");
-    struct NeverRead;
-    impl Read for NeverRead {
+    let reads = std::cell::Cell::new(0);
+    struct NeverRead<'a>(&'a std::cell::Cell<usize>);
+    impl Read for NeverRead<'_> {
         fn read(&mut self, _: &mut [u8]) -> std::io::Result<usize> {
-            panic!("an expired operation must not read")
+            self.0.set(self.0.get() + 1);
+            Err(std::io::Error::other("unexpected read"))
         }
     }
-    let reader = NeverRead;
+    let reader = NeverRead(&reads);
     crate::processes::deadline::within(std::time::Instant::now(), || {
         assert!(chunks(reader, 12).is_err());
     });
+    assert_eq!(reads.get(), 0);
     Ok(())
 }
 #[test]

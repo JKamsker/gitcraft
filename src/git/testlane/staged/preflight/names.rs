@@ -20,7 +20,7 @@ pub(super) fn git_alias(component: &str) -> bool {
 mod tests {
     use super::*;
     #[test]
-    fn protected_aliases_match_on_every_host() {
+    fn protected_aliases_match_on_every_host() -> Result<(), String> {
         for name in [
             ".git",
             "GIT~1",
@@ -35,7 +35,7 @@ mod tests {
             .chain(0x206a..=0x206f)
             .chain([0xfeff])
         {
-            let c = char::from_u32(ignored).expect("constant Unicode scalar");
+            let c = char::from_u32(ignored).ok_or("constant Unicode scalar")?;
             for name in [format!("{c}.GiT"), format!(".g{c}it"), format!(".git{c}")] {
                 assert!(git_alias(&name), "{name:?}");
             }
@@ -43,5 +43,6 @@ mod tests {
         for name in ["git", "git~2", ".github", "git~1.txt", ".gitkeep"] {
             assert!(!git_alias(name), "{name}");
         }
+        Ok(())
     }
 }
