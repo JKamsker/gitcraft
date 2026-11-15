@@ -68,3 +68,15 @@ fn actual_directory_entries_must_match_the_requested_spelling_and_membership() -
     assert!(namespace(root.path(), &[entry("Canonical", 1)]).is_err());
     Ok(())
 }
+
+#[test]
+fn every_staged_symlink_is_refused_without_resolving_its_target() {
+    for target_size in [0, 1, 1024] {
+        let mut link = entry("ordinary", target_size);
+        link.mode = "120000".into();
+        assert_eq!(
+            portable(&[link], Path::new("snapshot"), STORAGE),
+            Err(fail("staged-links"))
+        );
+    }
+}

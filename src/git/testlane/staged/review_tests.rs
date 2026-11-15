@@ -117,7 +117,7 @@ fn filters_lfs_and_info_attributes_are_refused_before_they_can_execute() -> Resu
 }
 #[cfg(unix)]
 #[test]
-fn symlink_targets_and_chains_cannot_expose_live_helpers() -> Result<(), String> {
+fn all_symlinks_including_contained_targets_are_refused() -> Result<(), String> {
     use std::os::unix::fs::symlink;
     let repo = Repo::new("staged-review-links")?;
     repo.commit("base", &[("inside", Some("tracked"))])?;
@@ -143,14 +143,9 @@ fn symlink_targets_and_chains_cannot_expose_live_helpers() -> Result<(), String>
     repo.git(&["rm", "-f", "a", "b"])?;
     symlink("inside", repo.path().join("safe")).map_err(|e| e.to_string())?;
     repo.git(&["add", "safe"])?;
-    assert_eq!(
-        test_staged(repo.path(), "test -f safe", &RunStop::default())?
-            .ended
-            .code,
-        Some(0)
-    );
+    refuses(&repo, "staged-links")?;
     repo.git(&["config", "core.symlinks", "false"])?;
-    refuses(&repo, "staged-paths")?;
+    refuses(&repo, "staged-links")?;
     assert_eq!(repo.worktree_count()?, 1);
     Ok(())
 }

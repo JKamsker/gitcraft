@@ -7808,7 +7808,7 @@ staged-unmerged = Vor dem Test alle ungelösten Index-Konflikte auflösen.
 staged-submodules = Snapshot-Tests unterstützen noch keine Submodule; Dateien daraus wurden nicht kopiert.
 
 staged-sparse = Sparse-Checkouts und Skip-Worktree-Einträge werden nicht unterstützt. Vor dem Test einen vollständigen Index/Checkout verwenden.
-staged-links = Ein vorgemerkter Symlink verlässt den Snapshot, verweist auf Git-Metadaten oder hat ein unsicheres/zyklisches Ziel. Nur Ziele innerhalb des Snapshots verwenden.
+staged-links = Vorgemerkte Symlinks werden noch nicht unterstützt. Teste sie im Arbeitsverzeichnis.
 staged-filters = Checkout-Filter (einschließlich Git LFS) werden nicht unterstützt. Reguläre Dateiinhalte ohne Filterattribute vormerken; es wurde kein Filter oder LFS-Download ausgeführt.
 staged-paths = Der vorgemerkte Baum lässt sich nicht originalgetreu abbilden: kollidierende/reservierte Pfade, Pfadlänge über 240 UTF-16-Einheiten, ungeeignete Namen, Symlinks oder Dateimodi. Pfade umbenennen oder ein geeignetes Dateisystem verwenden.
 staged-budget = Snapshot überschreitet das Vorbereitungsbudget (512 MiB geschätzter Checkout, 10.000 Dateien, 64 MiB Index/Info-Attribute). Vorgemerkten Baum verkleinern. Build-Ausgaben im Befehl begrenzen.
@@ -7818,4 +7818,4 @@ staged-run = Vorgemerkten Stand testen
 
 staged-metadata = Index und Info-Attribute müssen reguläre Dateien sein (keine Links, Geräte oder Pipes). Reguläre Git-Metadaten wiederherstellen und erneut versuchen.
 staged-raw = Tests verwenden unveränderte Index-Inhalte, ohne Checkout-Filter, Zeilenenden- oder Zeichenkodierungskonvertierung. Build-Ausgaben im Befehl begrenzen.
-staged-link-budget = Die Symlink-Auflösung überschreitet 1.000.000 Verarbeitungsschritte. Link-Ketten kürzen oder Ziele vereinfachen, bevor vorgemerkte Änderungen getestet werden.
+staged-object = Ein vorgemerkter Blob stimmt nicht mit seiner Objekt-ID überein. Repariere die Objektdatenbank, bevor du vorgemerkte Änderungen testest.

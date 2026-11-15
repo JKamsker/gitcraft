@@ -7810,7 +7810,7 @@ staged-unmerged = Resolve all unmerged index entries before testing staged chang
 staged-submodules = Staged verification does not support submodules yet; no working-tree submodule files were copied.
 
 staged-sparse = Sparse checkout and skip-worktree entries are unsupported. Use a full index/checkout before staged verification.
-staged-links = A staged symlink escapes the snapshot, references Git metadata, or has an unsafe/cyclic target. Stage files with targets contained in the snapshot.
+staged-links = Staged symlinks are not supported yet. Test them in your working tree.
 staged-filters = Checkout filters (including Git LFS) are unsupported for staged verification. Stage ordinary file contents without filter attributes; no filter or LFS download was run.
 staged-paths = The staged tree cannot be represented faithfully: conflicting/reserved paths, path longer than 240 UTF-16 units, unsupported names, symlinks, or modes. Rename paths or use a filesystem that preserves the staged types.
 staged-budget = Snapshot exceeds the preparation budget (512 MiB estimated checkout, 10,000 files, 64 MiB index/info attributes). Reduce the staged tree. Build outputs need limits in your command.
@@ -7820,4 +7820,4 @@ staged-run = Run staged test
 
 staged-metadata = Index and info attributes must be regular files (no links, devices or pipes). Restore ordinary Git metadata and retry.
 staged-raw = Tests use raw indexed bytes, without checkout filters, line-ending or encoding conversion. Build outputs need limits in your command.
-staged-link-budget = Symlink resolution exceeds 1,000,000 traversal steps. Shorten link chains or simplify targets before testing staged changes.
+staged-object = A staged blob does not match its object ID. Repair the repository object store before testing staged changes.

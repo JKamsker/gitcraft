@@ -67,3 +67,58 @@ fn staged_crlf_and_encoding_attributes_do_not_expand_indexed_bytes() -> Result<(
     scratch.remove()?;
     Ok(())
 }
+
+#[test]
+fn raw_blob_identity_is_verified_for_sha1_and_sha256_before_writing() -> Result<(), String> {
+    use std::io::Write;
+    for format in ["sha1", "sha256"] {
+        let repo = tempfile::tempdir().map_err(|e| e.to_string())?;
+        git::run(
+            Some(repo.path()),
+            &["init", "-q", &format!("--object-format={format}")],
+        )?;
+        let stored = git::run_captured(
+            repo.path(),
+            &["hash-object", "-w", "--stdin"],
+            Some(b"good"),
+        )?;
+        assert_eq!(stored.code, Some(0));
+        let oid = stored.stdout.trim().to_owned();
+        assert_eq!(oid.len(), if format == "sha1" { 40 } else { 64 });
+        let entries = [Entry {
+            path: "payload".into(),
+            mode: "100644".into(),
+            oid: oid.clone(),
+            size: 4,
+        }];
+        let valid = tempfile::tempdir().map_err(|e| e.to_string())?;
+        materialize(repo.path(), valid.path(), &entries)?;
+        assert_eq!(
+            std::fs::read(valid.path().join("payload")).map_err(|e| e.to_string())?,
+            b"good"
+        );
+        // A valid zlib stream with the same type/length, stored under the old OID.
+        // cat-file accepts this corruption; materialization must recompute identity.
+        let mut compressed =
+            flate2::write::ZlibEncoder::new(Vec::new(), flate2::Compression::default());
+        compressed
+            .write_all(b"blob 4\0evil")
+            .map_err(|e| e.to_string())?;
+        let compressed = compressed.finish().map_err(|e| e.to_string())?;
+        std::fs::write(
+            repo.path()
+                .join(".git/objects")
+                .join(&oid[..2])
+                .join(&oid[2..]),
+            compressed,
+        )
+        .map_err(|e| e.to_string())?;
+        let refused = tempfile::tempdir().map_err(|e| e.to_string())?;
+        assert_eq!(
+            materialize(repo.path(), refused.path(), &entries),
+            Err(fail("staged-object"))
+        );
+        assert!(!refused.path().join("payload").exists());
+    }
+    Ok(())
+}

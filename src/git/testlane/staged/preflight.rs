@@ -1,11 +1,10 @@
-//! Conservative portable namespace, symlink containment, filter and storage policy.
+//! Conservative portable namespace, file-only, filter and storage policy.
 use crate::git;
 use std::{
     collections::{BTreeMap, BTreeSet},
     path::Path,
 };
 use unicode_normalization::UnicodeNormalization;
-mod links;
 mod materialize;
 mod names;
 const STORAGE: u64 = 512 * 1024 * 1024;
@@ -67,7 +66,6 @@ pub(super) fn manifest(repo: &Path, tree: &str, root: &Path) -> Result<Vec<Entry
     }
     portable(&entries, root, STORAGE)?;
     filters(repo, tree, &entries)?;
-    links::validate(repo, &entries, root)?;
     Ok(entries)
 }
 
@@ -83,7 +81,10 @@ fn portable(entries: &[Entry], root: &Path, budget: u64) -> Result<(), String> {
     let mut footprint = 0u64;
     for entry in entries {
         crate::processes::deadline::check()?;
-        if !["100644", "100755", "120000"].contains(&entry.mode.as_str()) {
+        if entry.mode == "120000" {
+            return Err(fail("staged-links"));
+        }
+        if !["100644", "100755"].contains(&entry.mode.as_str()) {
             return Err(fail("staged-paths"));
         }
         // Count all roots conservatively, including Windows extended-path prefixes.
@@ -228,23 +229,19 @@ fn namespace(root: &Path, entries: &[Entry]) -> Result<(), String> {
     }
 }
 
-/// Validate the resulting namespace/types too: never accept a silent symlink fallback.
+/// Validate the resulting namespace, regular-file types and executable modes.
 pub(super) fn faithful(root: &Path, entries: &[Entry]) -> Result<(), String> {
     for entry in entries {
         crate::processes::deadline::check()?;
         let path = root.join(&entry.path);
         let metadata = std::fs::symlink_metadata(&path).map_err(|_| fail("staged-paths"))?;
-        if (entry.mode == "120000" && !metadata.is_symlink())
-            || (entry.mode != "120000" && !metadata.is_file())
-        {
+        if !metadata.is_file() || metadata.is_symlink() {
             return Err(fail("staged-paths"));
         }
         #[cfg(unix)]
         {
             use std::os::unix::fs::PermissionsExt;
-            if entry.mode != "120000"
-                && ((metadata.permissions().mode() & 0o111 != 0) != (entry.mode == "100755"))
-            {
+            if (metadata.permissions().mode() & 0o111 != 0) != (entry.mode == "100755") {
                 return Err(fail("staged-paths"));
             }
         }
