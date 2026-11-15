@@ -48,6 +48,7 @@ impl Form {
             }
         }
         ui.heading(crate::i18n::text("publish-title"));
+        ui.label(crate::i18n::text("publish-source"));
         ui.label(format!("refs/heads/{}", self.branch));
         if let Some(error) = &self.error {
             ui.label(error);
@@ -55,8 +56,11 @@ impl Form {
         let mut outcome = Outcome::Open;
         if let Some(preview) = &self.preview {
             ui.label(&preview.route.commit);
+            ui.label(crate::i18n::text("publish-remote"));
             ui.label(&preview.route.remote);
+            ui.label(crate::i18n::text("publish-destination"));
             ui.label(&preview.route.destination);
+            ui.label(crate::i18n::text("publish-urls"));
             for url in &preview.route.urls {
                 ui.label(url);
             }
@@ -87,8 +91,9 @@ impl Form {
                             ui.selectable_value(&mut self.remote, remote.clone(), remote);
                         }
                     });
-                ui.label(crate::i18n::text("publish-destination"));
-                ui.text_edit_singleline(&mut self.destination);
+                let label = ui.label(crate::i18n::text("publish-destination"));
+                ui.text_edit_singleline(&mut self.destination)
+                    .labelled_by(label.id);
                 if ui
                     .add_enabled(
                         idle && !self.remote.is_empty() && !self.destination.is_empty(),
@@ -126,6 +131,9 @@ impl Form {
         outcome
     }
 }
+
+#[cfg(test)]
+mod tests;
 
 impl super::RepoTab {
     pub(super) fn publish_item(

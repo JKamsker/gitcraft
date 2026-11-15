@@ -143,15 +143,24 @@ fn merge_pure_reviewed_send_receipt_refuses_changed_exact_push() -> Result<(), S
 #[test]
 fn explicit_publication_sets_tracking_only_after_reviewed_success() -> Result<(), String> {
     let f = Fixture::new()?;
-    let prepared = git::repository_tools::routes::prepare_publication(&f.repo, "main", "origin", "explicit/new")?;
-    let mut plan = scan(&f.repo, prepared.route.publication_operations(), f.profile(), &|| true)?;
-    plan.retain_selection(prepared)?;
-    assert!(plan.tracking);
-    assert_eq!(f.git(&["config", "branch.main.merge"])?, "refs/heads/main");
-    execute(&f.repo, &plan, None)?;
-    assert_eq!(f.git(&["config", "branch.main.remote"])?, "origin");
-    assert_eq!(f.git(&["config", "branch.main.merge"])?, "refs/heads/explicit/new");
-    assert_eq!(git::run(Some(&f.receiver), &["rev-parse", "refs/heads/explicit/new"])?.trim(), f.git(&["rev-parse", "refs/heads/main"])?);
+    f.git(&["config", "branch.autoSetupRebase", "always"])?;
+    for (index, branch) in ["main", "refs/heads/töpíc", "-leading"].into_iter().enumerate() {
+        let source = format!("refs/heads/{branch}");
+        f.git(&["update-ref", &source, "HEAD"])?;
+        f.git(&["config", &format!("branch.{branch}.rebase"), "false"])?;
+        let before = f.git(&["config", "--null", "--list"])?;
+        let destination = format!("explicit/new-{index}");
+        let prepared = git::repository_tools::routes::prepare_publication(&f.repo, branch, "origin", &destination)?;
+        let mut plan = scan(&f.repo, prepared.route.publication_operations(), f.profile(), &|| true)?;
+        plan.retain_selection(prepared)?;
+        assert!(plan.tracking);
+        assert_eq!(f.git(&["config", "--null", "--list"])?, before);
+        execute(&f.repo, &plan, None)?;
+        assert_eq!(f.git(&["config", &format!("branch.{branch}.remote")])?, "origin");
+        assert_eq!(f.git(&["config", &format!("branch.{branch}.merge")])?, format!("refs/heads/{destination}"));
+        assert_eq!(f.git(&["config", &format!("branch.{branch}.rebase")])?, "false");
+        assert_eq!(git::run(Some(&f.receiver), &["rev-parse", &format!("refs/heads/{destination}")])?.trim(), f.git(&["rev-parse", &source])?);
+    }
     Ok(())
 }
 

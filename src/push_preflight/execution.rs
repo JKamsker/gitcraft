@@ -279,7 +279,10 @@ pub(crate) fn execute_controlled_with_guard(
         && plan.destination.starts_with("refs/heads/")
     {
         // Setting an upstream is local metadata; it is never used to choose this push's ref.
-        let branch = plan.branch.trim_start_matches("refs/heads/");
+        let branch = plan
+            .branch
+            .strip_prefix("refs/heads/")
+            .unwrap_or(&plan.branch);
         git::run(
             Some(repo),
             &["config", &format!("branch.{branch}.remote"), &plan.remote],

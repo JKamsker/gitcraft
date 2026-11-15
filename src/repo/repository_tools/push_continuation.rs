@@ -74,6 +74,9 @@ impl RepoTab {
         prepared: routing::PreparedPush,
         ctx: &egui::Context,
     ) {
+        if self.busy_op.is_some() || self.echo_push_pending() {
+            return;
+        }
         let publication = prepared.route.publication_operations();
         self.with_selected_push(prepared, |tab, _| {
             let ops = publication;
