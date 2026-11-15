@@ -26,9 +26,12 @@ const CHUNK_BYTES: usize = 16 * 1024;
 
 /// What the attributes of `paths` (relative to the repository) say about folding them, and
 /// the error that left some of them unread. Paths are asked in a few commands rather than one
-/// per file; between two, `go_on` says whether the answer is still wanted.
+/// per file; between two, `go_on` says whether the answer is still wanted. `source`: a
+/// `--source=<tree-ish>` to read the `.gitattributes` of a revision rather than of the working
+/// tree (Git 2.40 or later).
 pub fn fold_attributes(
     repo: &Path,
+    source: Option<&str>,
     paths: &[String],
     go_on: &dyn Fn() -> bool,
 ) -> (HashMap<String, FoldAttr>, Option<String>) {
@@ -37,7 +40,9 @@ pub fn fold_attributes(
         if !go_on() {
             break;
         }
-        let mut args = vec!["check-attr", "-z", "linguist-generated", "diff", "--"];
+        let mut args = vec!["check-attr"];
+        args.extend(source);
+        args.extend(["-z", "linguist-generated", "diff", "--"]);
         args.extend(chunk.iter().map(String::as_str));
         match run(Some(repo), &args) {
             Ok(out) => found.extend(parse_check_attr(&out)),

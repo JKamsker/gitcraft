@@ -143,6 +143,7 @@ pub(super) type RecordedJob = Box<dyn FnOnce() -> Msg + Send>;
 
 #[cfg(test)]
 thread_local! {
+    static REJECT_RECORDED: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
     static RECORDED_JOBS: std::cell::RefCell<Option<Vec<RecordedJob>>> = const { std::cell::RefCell::new(None) };
 }
 
@@ -165,6 +166,22 @@ pub(in crate::repo) fn record_jobs<T>(work: impl FnOnce() -> T) -> (T, Vec<Recor
     (result, jobs)
 }
 
+/// Record the real failure continuations instead of executing submitted work.
+#[cfg(test)]
+pub(in crate::repo) fn record_rejected_jobs<T>(work: impl FnOnce() -> T) -> (T, Vec<RecordedJob>) {
+    struct Reset;
+    impl Drop for Reset {
+        fn drop(&mut self) {
+            REJECT_RECORDED.with(|slot| slot.set(false));
+        }
+    }
+    REJECT_RECORDED.with(|slot| {
+        assert!(!slot.replace(true));
+    });
+    let _reset = Reset;
+    record_jobs(work)
+}
+
 pub(super) fn spawn_with(
     tx: &JobSender,
     ctx: &egui::Context,
@@ -175,17 +192,21 @@ pub(super) fn spawn_with(
     job: impl FnOnce() -> Msg + Send + 'static,
 ) {
     #[cfg(test)]
-    let job = {
-        let mut job: Option<RecordedJob> = Some(Box::new(job));
+    let (job, failed) = {
+        let mut submission = Some((Box::new(job) as RecordedJob, failed));
         RECORDED_JOBS.with(|slot| {
             if let Some(jobs) = &mut *slot.borrow_mut()
-                && let Some(job) = job.take()
+                && let Some((job, failed)) = submission.take()
             {
-                jobs.push(job);
+                jobs.push(if REJECT_RECORDED.with(std::cell::Cell::get) {
+                    Box::new(move || failed("recorded queue rejection".into()))
+                } else {
+                    job
+                });
             }
         });
-        let Some(job) = job else { return };
-        job
+        let Some(submission) = submission else { return };
+        submission
     };
     let tx = tx.clone();
     let ctx = ctx.clone();
