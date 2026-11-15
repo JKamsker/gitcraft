@@ -1,6 +1,9 @@
 use super::*;
 use crate::git::repository_tools::{guard::Snapshot, routes::PushRoute};
-use egui_kittest::{Harness, kittest::Queryable};
+use egui_kittest::{
+    Harness,
+    kittest::{NodeT, Queryable},
+};
 
 fn form(preview: bool) -> Form {
     let mut form = Form::new(
@@ -91,6 +94,7 @@ fn cancelling_either_stage_is_inert_and_no_remote_explains_the_empty_state() {
     );
     assert!(
         h.get_by_label(crate::i18n::text("publish-preview"))
+            .accesskit_node()
             .is_disabled()
     );
 }
