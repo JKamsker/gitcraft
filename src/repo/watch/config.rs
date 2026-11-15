@@ -2,16 +2,9 @@
 use std::path::{Path, PathBuf};
 pub(super) fn paths(repo: &Path) -> Vec<PathBuf> {
     let mut paths = Vec::new();
-    if let Ok(raw) =
-        crate::git::run_bytes(Some(repo), &["config", "--null", "--list", "--show-origin"])
-    {
-        for pair in raw
-            .split(|b| *b == 0)
-            .collect::<Vec<_>>()
-            .as_chunks::<2>()
-            .0
-        {
-            if let Some(path) = String::from_utf8_lossy(pair[0]).strip_prefix("file:") {
+    if let Ok(raw) = crate::git::run(Some(repo), &["config", "--null", "--list", "--show-origin"]) {
+        for pair in raw.split('\0').collect::<Vec<_>>().as_chunks::<2>().0 {
+            if let Some(path) = pair[0].strip_prefix("file:") {
                 paths.push(repo.join(path));
             }
         }
@@ -77,6 +70,18 @@ pub(super) fn covers(path: &Path, root: &Path) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn real_config_origins_include_spaces_and_are_deduplicated() -> Result<(), String> {
+        let repo = crate::git::fixture::Repo::new("staged-watch-origins")?;
+        let included = repo.path().join("included config ü");
+        std::fs::write(&included, "[test]\n command = example\n").map_err(|e| e.to_string())?;
+        repo.git(&["config", "include.path", &included.to_string_lossy()])?;
+        let files = paths(repo.path());
+        assert!(contains(&files, &included));
+        let local = repo.path().join(".git/config");
+        assert_eq!(files.iter().filter(|p| key(p) == key(&local)).count(), 1);
+        Ok(())
+    }
     #[test]
     fn windows_verbatim_drive_and_unc_forms_have_the_same_identity() {
         assert_eq!(
