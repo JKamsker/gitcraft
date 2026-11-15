@@ -4,7 +4,7 @@
 use std::path::PathBuf;
 use std::sync::Arc;
 
-type Probe = Arc<dyn Fn() -> Option<PathBuf> + Send + Sync>;
+type Probe = Arc<dyn Fn() -> Option<Vec<PathBuf>> + Send + Sync>;
 
 pub(super) fn probe(
     pid: Option<u32>,
@@ -20,10 +20,12 @@ pub(super) fn probe(
             }
             let active = foreground()?;
             let active_birth = birth(active)?;
-            let path = std::fs::read_link(format!("/proc/{active}/cwd")).ok()?;
+            let paths = locations(*pid, active, |pid| {
+                std::fs::read_link(format!("/proc/{pid}/cwd")).ok()
+            })?;
             (birth(*pid).as_ref() == Some(expected)
                 && birth(active).as_ref() == Some(&active_birth))
-            .then_some(path)
+            .then_some(paths)
         })
     }
     #[cfg(not(target_os = "linux"))]
@@ -31,6 +33,20 @@ pub(super) fn probe(
         let _ = (pid, foreground);
         Arc::new(|| None)
     }
+}
+
+#[cfg(target_os = "linux")]
+fn locations(
+    shell: u32,
+    foreground: u32,
+    cwd: impl Fn(u32) -> Option<PathBuf>,
+) -> Option<Vec<PathBuf>> {
+    let mut paths = vec![cwd(shell)?];
+    let active = cwd(foreground)?;
+    if !paths.contains(&active) {
+        paths.push(active);
+    }
+    Some(paths)
 }
 
 #[cfg(target_os = "linux")]
@@ -60,12 +76,28 @@ mod tests {
     }
 
     #[test]
+    fn divergent_shell_and_foreground_locations_are_both_observed() {
+        let observe = |pid| {
+            Some(std::path::PathBuf::from(if pid == 1 {
+                "/worktree/nested"
+            } else {
+                "/elsewhere"
+            }))
+        };
+        assert_eq!(
+            super::locations(1, 2, observe),
+            Some(vec!["/worktree/nested".into(), "/elsewhere".into()])
+        );
+        assert!(super::locations(1, 2, |pid| (pid == 1).then(|| "/worktree".into())).is_none());
+    }
+
+    #[test]
     fn current_owned_process_cwd_is_observed() -> Result<(), Box<dyn std::error::Error>> {
         let probe = super::probe(
             Some(std::process::id()),
             std::sync::Arc::new(|| Some(std::process::id())),
         );
-        assert_eq!(probe(), Some(std::env::current_dir()?));
+        assert_eq!(probe(), Some(vec![std::env::current_dir()?]));
         assert!(super::probe(None, std::sync::Arc::new(|| None))().is_none());
         Ok(())
     }

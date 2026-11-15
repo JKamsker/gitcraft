@@ -76,7 +76,7 @@ pub struct Terminal {
     selection: Option<((u16, u16), (u16, u16))>,
     pub shell: String,
     /// Live, observational cwd probe for cleanup; an unknown location blocks conservatively.
-    pub(crate) location: Arc<dyn Fn() -> Option<PathBuf> + Send + Sync>,
+    pub(crate) location: Arc<dyn Fn() -> Option<Vec<PathBuf>> + Send + Sync>,
 }
 
 impl Terminal {

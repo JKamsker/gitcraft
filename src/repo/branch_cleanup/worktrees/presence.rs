@@ -7,7 +7,7 @@ use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex, MutexGuard, PoisonError};
 
-type Probe = Arc<dyn Fn() -> Option<PathBuf> + Send + Sync>;
+type Probe = Arc<dyn Fn() -> Option<Vec<PathBuf>> + Send + Sync>;
 
 /// A view: its folder as the tab has it, and its terminals.
 struct Open {
@@ -78,11 +78,14 @@ fn reasons(path: &Path, except: Option<u64>, entries: &[Open]) -> Vec<String> {
         views += usize::from(Some(entry.id) != except && same(&entry.path));
         for probe in &entry.terminals {
             match probe() {
-                Some(cwd) => {
-                    let cwd = cwd.canonicalize().unwrap_or(cwd);
-                    terminals += usize::from(cwd.starts_with(&root));
+                Some(paths) if !paths.is_empty() => {
+                    terminals += usize::from(
+                        paths
+                            .into_iter()
+                            .any(|cwd| cwd.canonicalize().unwrap_or(cwd).starts_with(&root)),
+                    );
                 }
-                None => unknown = true,
+                _ => unknown = true,
             }
         }
     }

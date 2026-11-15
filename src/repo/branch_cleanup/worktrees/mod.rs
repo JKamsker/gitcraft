@@ -49,7 +49,7 @@ impl WorktreeCleanup {
     /// How many terminals the tab has open, for the other tabs' cleanup.
     pub fn note_terminals(
         &mut self,
-        paths: Vec<std::sync::Arc<dyn Fn() -> Option<PathBuf> + Send + Sync>>,
+        paths: Vec<std::sync::Arc<dyn Fn() -> Option<Vec<PathBuf>> + Send + Sync>>,
     ) {
         self.presence.terminals(paths);
     }

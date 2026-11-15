@@ -17,6 +17,7 @@ pub(super) fn archived(f: &Fixture, wt: &Path, branch: &str) -> Result<Listed, S
         &Source {
             repository: &repository,
             worktree: wt,
+            read_root: wt,
             branch,
             head: &found.head,
             files: &found.untracked,
@@ -80,6 +81,7 @@ fn a_file_changed_after_the_look_is_not_archived() -> Result<(), String> {
         &Source {
             repository: &repository,
             worktree: &wt,
+            read_root: &wt,
             branch: "done",
             head: &found.head,
             files: &found.untracked,

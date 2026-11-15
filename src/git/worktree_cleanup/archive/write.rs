@@ -15,6 +15,8 @@ use crate::git::worktree_cleanup::{Kind, Untracked};
 pub(crate) struct Source<'a> {
     pub repository: &'a Repository,
     pub worktree: &'a Path,
+    /// Captured filesystem location; metadata retains the original worktree path.
+    pub read_root: &'a Path,
     pub branch: &'a str,
     pub head: &'a str,
     pub files: &'a [Untracked],
@@ -122,7 +124,7 @@ fn write_zip(
         let Kind::Text(expected) = &untracked.kind else {
             return Err(not_text(&untracked.path));
         };
-        let bytes = crate::safe_read::read_inside(source.worktree, &untracked.path, MAX_TEXT)
+        let bytes = crate::safe_read::read_inside(source.read_root, &untracked.path, MAX_TEXT)
             .ok_or_else(|| changed(&untracked.path))?;
         let sha256 = sha256_hex(&bytes);
         if &sha256 != expected || bytes.contains(&0) {

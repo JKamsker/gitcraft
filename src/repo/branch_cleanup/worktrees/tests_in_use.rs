@@ -43,8 +43,8 @@ fn terminal_uses_its_own_worktree_even_when_its_tab_is_elsewhere() {
 
 fn probe(
     path: std::path::PathBuf,
-) -> std::sync::Arc<dyn Fn() -> Option<std::path::PathBuf> + Send + Sync> {
-    std::sync::Arc::new(move || Some(path.clone()))
+) -> std::sync::Arc<dyn Fn() -> Option<Vec<std::path::PathBuf>> + Send + Sync> {
+    std::sync::Arc::new(move || Some(vec![path.clone()]))
 }
 
 #[test]
@@ -55,11 +55,26 @@ fn changed_terminal_cwd_and_nested_directories_are_protected()
     let observed = cwd.clone();
     let mut view = Presence::new(&root.join("tab"));
     view.terminals(vec![std::sync::Arc::new(move || {
-        observed.lock().ok().map(|p| p.clone())
+        observed.lock().ok().map(|p| vec![p.clone()])
     })]);
     assert!(Presence::using(&root.join("worktree"), None).is_empty());
     *cwd.lock().map_err(|e| e.to_string())? = root.join("worktree/nested/subdirectory");
     assert!(!Presence::using(&root.join("worktree"), None).is_empty());
     assert!(Presence::using(&root.join("work"), None).is_empty());
     Ok(())
+}
+
+#[test]
+fn one_terminal_protects_both_shell_and_foreground_worktrees() {
+    let root = std::env::temp_dir().join("224-divergent-terminal");
+    let mut view = Presence::new(&root.join("tab"));
+    let shell = root.join("shell/nested");
+    let active = root.join("foreground/nested");
+    view.terminals(vec![std::sync::Arc::new(move || {
+        Some(vec![shell.clone(), active.clone()])
+    })]);
+    for name in ["shell", "foreground"] {
+        let reasons = view.others(&root.join(name));
+        assert!(reasons.iter().any(|why| why.contains('1')));
+    }
 }

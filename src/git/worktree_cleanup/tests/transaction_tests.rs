@@ -50,12 +50,13 @@ fn late_descriptor_writes_survive_archive_verification_and_cleanup() -> Result {
     }
     let Outcome::Removed {
         recovery,
-        archive: Some(_),
+        archive: Some(archive),
         freed,
     } = outcome
     else {
         return Err(format!("not retained: {outcome:?}").into());
     };
+    assert_eq!(std::path::Path::new(&archive.manifest.worktree), wt);
     writer.write_all(b"after verification\n")?;
     writer.sync_all()?;
     assert_eq!(

@@ -98,7 +98,8 @@ fn finish(
             store,
             &Source {
                 repository: &repository,
-                worktree: &tree,
+                worktree: &target.path,
+                read_root: &tree,
                 branch: &target.branch,
                 head: &now.head,
                 files: &now.untracked,
