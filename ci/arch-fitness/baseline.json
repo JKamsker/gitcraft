@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "note": "Reviewed legacy exceptions and budgets measured when the architecture fitness gate was adopted (#209). CI only reads this file. Remove entries (`ratchet`) as coupling is removed; additions need a reviewed reason. Issue #233 adds four shared pure ref-label API items (Entry, Kind, Label, labels) to ui-kit and one persisted display Preference type to graph; these visibility additions introduce no new domain dependencies. Independent review follow-up for #233 adds one graph Catalog type for the shared caption/details cache; the cache lives in the existing BadgeIndex and adds no coordinator dependency.",
+  "note": "Reviewed legacy exceptions and budgets measured when the architecture fitness gate was adopted (#209). CI only reads this file. Remove entries (`ratchet`) as coupling is removed; additions need a reviewed reason.",
   "forbidden_edges": [
     {
       "from": "agents",
@@ -2088,10 +2088,31 @@
     },
     {
       "domain": "bisect",
+      "field": "history",
+      "reason": "Newly visible after #215 conservative receiver detection: Vec::get is a shared read; unrelated mutable get definitions conservatively collide.",
+      "owner": "@JKamsker",
+      "remediation": "Resolve receiver types to distinguish shared reads."
+    },
+    {
+      "domain": "bisect",
+      "field": "history_index",
+      "reason": "Newly visible after #215 conservative receiver detection: HashMap::get is a shared read; unrelated mutable get definitions conservatively collide.",
+      "owner": "@JKamsker",
+      "remediation": "Resolve receiver types to distinguish shared reads."
+    },
+    {
+      "domain": "bisect",
       "field": "op_started",
       "reason": "Legacy direct mutation at adoption (#209): bisect changes RepoTab.op_started (owned by repo-core) at 5 sites, e.g. src/repo/bisect/mod.rs:194 (write).",
       "owner": "@JKamsker",
       "remediation": "Give repo-core a method or Action for this transition and call it instead of writing the field."
+    },
+    {
+      "domain": "bisect",
+      "field": "refs",
+      "reason": "Newly visible after #215 conservative receiver detection: push_remotes.get is a shared map read; unrelated mutable get definitions conservatively collide.",
+      "owner": "@JKamsker",
+      "remediation": "Resolve receiver types to distinguish shared reads."
     },
     {
       "domain": "bisect",
@@ -2116,6 +2137,13 @@
     },
     {
       "domain": "changes",
+      "field": "ci",
+      "reason": "Newly visible after #215 conservative receiver detection: by_sha.get is a shared map read; unrelated mutable get definitions conservatively collide.",
+      "owner": "@JKamsker",
+      "remediation": "Resolve receiver types to distinguish shared reads."
+    },
+    {
+      "domain": "changes",
       "field": "commit_body",
       "reason": "Legacy direct mutation at adoption (#209): changes changes RepoTab.commit_body (owned by repo-core) at 4 sites, e.g. src/repo/detail/compose/mod.rs:198 (write).",
       "owner": "@JKamsker",
@@ -2127,6 +2155,13 @@
       "reason": "Legacy direct mutation at adoption (#209): changes changes RepoTab.commit_summary (owned by repo-core) at 5 sites, e.g. src/repo/detail/compose/mod.rs:197 (write).",
       "owner": "@JKamsker",
       "remediation": "Give repo-core a method or Action for this transition and call it instead of writing the field."
+    },
+    {
+      "domain": "changes",
+      "field": "commits",
+      "reason": "Newly visible after #215 conservative receiver detection: Vec::get is a shared read; unrelated mutable get definitions conservatively collide.",
+      "owner": "@JKamsker",
+      "remediation": "Resolve receiver types to distinguish shared reads."
     },
     {
       "domain": "changes",
@@ -2235,6 +2270,13 @@
     },
     {
       "domain": "changes",
+      "field": "path",
+      "reason": "Newly visible after #215 conservative receiver detection: PathBuf::join returns a new path; unrelated mutable join definitions conservatively collide.",
+      "owner": "@JKamsker",
+      "remediation": "Resolve receiver types to distinguish shared reads."
+    },
+    {
+      "domain": "changes",
       "field": "pending_goto",
       "reason": "Legacy direct mutation at adoption (#209): changes changes RepoTab.pending_goto (owned by repo-core) at 1 sites, e.g. src/repo/commit_changes.rs:116 (write).",
       "owner": "@JKamsker",
@@ -2274,6 +2316,13 @@
       "reason": "Legacy direct mutation at adoption (#209): changes changes RepoTab.reword (owned by repo-core) at 2 sites, e.g. src/repo/detail/commit.rs:115 (mut_call).",
       "owner": "@JKamsker",
       "remediation": "Give repo-core a method or Action for this transition and call it instead of writing the field."
+    },
+    {
+      "domain": "changes",
+      "field": "stashes",
+      "reason": "Newly visible after #215 conservative receiver detection: Vec::get is a shared read; unrelated mutable get definitions conservatively collide.",
+      "owner": "@JKamsker",
+      "remediation": "Resolve receiver types to distinguish shared reads."
     },
     {
       "domain": "changes",
@@ -2347,6 +2396,13 @@
     },
     {
       "domain": "diff",
+      "field": "authorship",
+      "reason": "Newly visible after #215 conservative receiver detection: map.get is a shared map read; unrelated mutable get definitions conservatively collide.",
+      "owner": "@JKamsker",
+      "remediation": "Resolve receiver types to distinguish shared reads."
+    },
+    {
+      "domain": "diff",
       "field": "busy_op",
       "reason": "Legacy direct mutation at adoption (#209): diff changes RepoTab.busy_op (owned by repo-core) at 3 sites, e.g. src/repo/file_comparison/selection.rs:142 (write).",
       "owner": "@JKamsker",
@@ -2358,6 +2414,13 @@
       "reason": "Legacy direct mutation at adoption (#209): diff changes RepoTab.ci_view (owned by review) at 2 sites, e.g. src/repo/diff_split.rs:116 (write).",
       "owner": "@JKamsker",
       "remediation": "Give review a method or Action for this transition and call it instead of writing the field."
+    },
+    {
+      "domain": "diff",
+      "field": "commit_changes",
+      "reason": "Newly visible after #215 conservative receiver detection: set_diff_beside_graph stops automatic commit following when the layout is explicitly changed; existing real cross-feature mutation previously hidden by unrelated stop methods.",
+      "owner": "@JKamsker",
+      "remediation": "Route this coordination through the owning domain."
     },
     {
       "domain": "diff",
@@ -2872,6 +2935,13 @@
     },
     {
       "domain": "release",
+      "field": "commits",
+      "reason": "Newly visible after #215 conservative receiver detection: Vec::get is a shared read; unrelated mutable get definitions conservatively collide.",
+      "owner": "@JKamsker",
+      "remediation": "Resolve receiver types to distinguish shared reads."
+    },
+    {
+      "domain": "release",
       "field": "dialog",
       "reason": "Legacy direct mutation at adoption (#209): release changes RepoTab.dialog (owned by repo-core) at 1 sites, e.g. src/repo/hotfix/mod.rs:70 (write).",
       "owner": "@JKamsker",
@@ -3037,6 +3107,13 @@
       "reason": "Legacy direct mutation at adoption (#209): review changes RepoTab.hotfix (owned by release) at 1 sites, e.g. src/repo/forge_selection.rs:267 (write).",
       "owner": "@JKamsker",
       "remediation": "Give release a method or Action for this transition and call it instead of writing the field."
+    },
+    {
+      "domain": "review",
+      "field": "index",
+      "reason": "Newly visible after #215 conservative receiver detection: HashMap::get is a shared read; unrelated mutable get definitions conservatively collide.",
+      "owner": "@JKamsker",
+      "remediation": "Resolve receiver types to distinguish shared reads."
     },
     {
       "domain": "review",
@@ -3306,6 +3383,13 @@
     },
     {
       "domain": "rewrite",
+      "field": "index",
+      "reason": "Newly visible after #215 conservative receiver detection: HashMap::get is a shared read; unrelated mutable get definitions conservatively collide.",
+      "owner": "@JKamsker",
+      "remediation": "Resolve receiver types to distinguish shared reads."
+    },
+    {
+      "domain": "rewrite",
       "field": "last_op",
       "reason": "Legacy direct mutation at adoption (#209): rewrite changes RepoTab.last_op (owned by repo-core) at 3 sites, e.g. src/repo/bundles.rs:138 (write).",
       "owner": "@JKamsker",
@@ -3565,6 +3649,13 @@
     },
     {
       "domain": "sync",
+      "field": "skip_hooks",
+      "reason": "Newly visible after #215 conservative receiver detection: push_steps consumes the one-shot hook choice during push; existing real cross-feature mutation previously hidden by shared receivers.",
+      "owner": "@JKamsker",
+      "remediation": "Route this coordination through the owning domain."
+    },
+    {
+      "domain": "sync",
       "field": "status",
       "reason": "Legacy direct mutation at adoption (#209): sync changes RepoTab.status (owned by repo-core) at 21 sites, e.g. src/repo/https_recovery.rs:26 (write).",
       "owner": "@JKamsker",
@@ -3725,23 +3816,23 @@
   "budgets": {
     "agents": {
       "domains": 18,
-      "exported": 200
+      "exported": 258
     },
     "app": {
       "domains": 17,
-      "exported": 58
+      "exported": 107
     },
     "bisect": {
       "domains": 10,
-      "exported": 46
+      "exported": 62
     },
     "changes": {
       "domains": 14,
-      "exported": 88
+      "exported": 116
     },
     "conflicts": {
       "domains": 11,
-      "exported": 88
+      "exported": 113
     },
     "dev": {
       "domains": 0,
@@ -3749,77 +3840,77 @@
     },
     "diff": {
       "domains": 11,
-      "exported": 90
+      "exported": 132
     },
     "doctor": {
       "domains": 8,
-      "exported": 34
+      "exported": 40
     },
     "forge": {
       "domains": 5,
-      "exported": 166
+      "exported": 218
     },
     "git": {
       "domains": 12,
-      "exported": 375
+      "exported": 1019
     },
     "graph": {
       "domains": 18,
-      "exported": 54
+      "exported": 61
     },
     "guidance": {
       "domains": 8,
-      "exported": 44
+      "exported": 48
     },
     "insights": {
       "domains": 15,
-      "exported": 304
+      "exported": 339
     },
     "os": {
       "domains": 4,
-      "exported": 32
+      "exported": 73
     },
     "release": {
       "domains": 9,
-      "exported": 55
+      "exported": 83
     },
     "remote": {
       "domains": 6,
-      "exported": 69
+      "exported": 127
     },
     "repo-core": {
       "domains": 24,
       "symbols": 609,
-      "exported": 91
+      "exported": 188
     },
     "review": {
       "domains": 15,
-      "exported": 71
+      "exported": 117
     },
     "rewrite": {
       "domains": 14,
-      "exported": 89
+      "exported": 130
     },
     "runtime": {
       "domains": 5,
-      "exported": 101
+      "exported": 116
     },
     "settings": {
       "domains": 15,
       "symbols": 179,
-      "exported": 34
+      "exported": 67
     },
     "sidebar": {
       "domains": 19,
-      "exported": 31
+      "exported": 36
     },
     "sync": {
       "domains": 13,
-      "exported": 27
+      "exported": 57
     },
     "terminal": {
       "domains": 9,
-      "exported": 23
+      "exported": 37
     },
     "tooling": {
       "domains": 0,
@@ -3827,15 +3918,15 @@
     },
     "ui-kit": {
       "domains": 4,
-      "exported": 102
+      "exported": 172
     },
     "update": {
       "domains": 2,
-      "exported": 10
+      "exported": 20
     },
     "worktrees": {
       "domains": 5,
-      "exported": 52
+      "exported": 74
     }
   }
 }

@@ -93,7 +93,7 @@ fn imports(inv: &Inventory, res: &Resolver, out: &mut Refs) {
             continue;
         }
         let kind = match (&import.name, &import.vis) {
-            (None, _) => RefKind::Glob,
+            (None, VisSyntax::Private | VisSyntax::SelfModule) => RefKind::Glob,
             (_, VisSyntax::Private | VisSyntax::SelfModule) => RefKind::Use,
             _ => RefKind::ReExport,
         };
