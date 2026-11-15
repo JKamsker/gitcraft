@@ -161,3 +161,27 @@ fn dot_upstream_does_not_highlight_a_colliding_remote_path() -> Result<(), Strin
     assert!(form.selected.is_none());
     Ok(())
 }
+
+#[test]
+fn selection_cannot_change_while_apply_is_being_revalidated() -> Result<(), String> {
+    let (_repo, mut form) = fixture("tracking-picker-verifying")?;
+    let (_tx, rx) = mpsc::channel();
+    form.pending = Some(rx);
+    form.applying = true;
+    form.include_hidden = true;
+    let mut h = Harness::builder().build_ui_state(
+        |ui, form: &mut Form| {
+            let _ = form.show(ui, true);
+        },
+        form,
+    );
+    h.step();
+    h.get_by_label_contains("origin/topic — origin/topic")
+        .click();
+    h.step();
+    assert_eq!(
+        h.state().selected.as_deref(),
+        Some("refs/remotes/alice/topic")
+    );
+    Ok(())
+}
