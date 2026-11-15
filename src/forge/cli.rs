@@ -358,3 +358,5 @@ pub(super) use capped::run_capped;
 mod routing;
 pub(crate) use routing::tool_location;
 use routing::*;
+
+pub(super) mod discovery;

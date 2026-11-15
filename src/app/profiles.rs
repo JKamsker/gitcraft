@@ -193,6 +193,7 @@ impl App {
                 theme: self.theme.clone(),
                 ..ProfileState::default()
             });
+        self.repo_browser = None;
         self.settings.active_profile = id;
         self.library.switch_profile();
         self.settings.set(ctx);

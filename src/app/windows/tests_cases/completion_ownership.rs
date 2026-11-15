@@ -116,3 +116,21 @@ fn hidden_logic_advances_the_patch_queue_without_a_paint_pass() -> Result<(), St
     assert_eq!(app.toasts.len(), before + 1);
     Ok(())
 }
+
+#[test]
+fn clone_completion_without_open_preserves_owner_home_and_remembers_path() -> Result<(), String> {
+    let h = recorded_harness();
+    let ctx = h.ctx.clone();
+    let mut app = h.state().as_ref().ok_or("App")?.app.lock().map_err(|error| error.to_string())?;
+    let child = ViewportId::from_hash_of("clone-no-open-owner");
+    let path = PathBuf::from("/virtual/cloned-without-open");
+    app.tabs = vec![Tab::Home];
+    app.windows.parked.insert(child, Window::new(vec![Tab::Home], ViewportId::ROOT, None));
+    app.recorded_clone_without_open(child, path.clone());
+    app.poll_clone(&ctx);
+    assert!(matches!(app.tabs[0], Tab::Home));
+    assert!(matches!(app.windows.parked[&child].tabs[0], Tab::Home));
+    assert!(app.recent.contains(&path));
+    assert!(app.cloning.is_none());
+    Ok(())
+}

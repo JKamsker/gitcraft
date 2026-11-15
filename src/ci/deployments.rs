@@ -13,7 +13,7 @@ use crate::pull_request::{at, items};
 /// So many of the latest deployments are read.
 pub const MAX_DEPLOYMENTS: usize = 50;
 /// So many deployments' statuses are read (GitHub asks for each one's apart).
-pub const MAX_STATUS_READS: usize = 30;
+const MAX_STATUS_READS: usize = 30;
 /// So many deployments of an environment are looked through for its latest successful one.
 pub const MAX_PER_ENVIRONMENT: usize = 5;
 
