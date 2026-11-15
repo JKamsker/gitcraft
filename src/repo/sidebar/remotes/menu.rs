@@ -170,6 +170,21 @@ impl RepoTab {
         {
             acts.push(Action::PrimaryForge(None));
         }
+        ui.label(crate::i18n::text("ref-label-preferred"));
+        if ui
+            .selectable_label(
+                self.visibility.label_remote.name == remote.name,
+                &remote.name,
+            )
+            .clicked()
+        {
+            acts.push(Action::BranchVisibility(Change::LabelRemote(
+                remote.name.clone(),
+            )));
+        }
+        if ui.button(crate::i18n::text("ref-label-default")).clicked() {
+            acts.push(Action::BranchVisibility(Change::LabelRemote(String::new())));
+        }
         let sidebar_hidden = self.visibility.sidebar_remotes.contains(&remote.name);
         if ui
             .button(if sidebar_hidden {

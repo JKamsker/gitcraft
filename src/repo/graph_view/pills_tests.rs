@@ -78,6 +78,8 @@ fn tab(refs: Refs) -> RepoTab {
 fn remote_pill(label: &str, remote: &str) -> Badge {
     Badge {
         label: label.to_owned(),
+        caption: label.to_owned(),
+        full_ref: format!("refs/remotes/{remote}/{label}"),
         kind: BadgeKind::Branch,
         local: false,
         remotes: vec![remote.to_owned()],
@@ -106,6 +108,8 @@ fn white_pill_labels_meet_aa_for_every_builtin_and_lane_setting() {
                     ] {
                         let badge = Badge {
                             label: "test".to_owned(),
+                            caption: "test".to_owned(),
+                            full_ref: "refs/heads/test".into(),
                             kind,
                             local,
                             remotes: vec![],

@@ -325,7 +325,13 @@ impl RepoTab {
         let refs: Vec<String> = self
             .graph_badges(commit)
             .iter()
-            .map(Badge::spoken)
+            .map(|badge| {
+                format!(
+                    "{} {}",
+                    badge.spoken(),
+                    self.ref_description(&badge.full_ref)
+                )
+            })
             .collect();
         let short = crate::repo::short(&commit.hash);
         labels::commit(short, &commit.summary, &commit.author, &when, &refs)

@@ -20,6 +20,7 @@ impl RepoTab {
     pub(in crate::repo) fn rebuild_graph_labels(&mut self) {
         self.graph_labels.clear();
         self.graph_badge_index = BadgeIndex::new(&self.refs);
+        self.graph_badge_index.captions = self.ref_labels();
         for (i, commit) in self.commits.iter().enumerate() {
             if commit.refs.is_empty() {
                 continue;
@@ -35,7 +36,7 @@ impl RepoTab {
                 let name = if badge.kind == BadgeKind::DetachedHead {
                     crate::i18n::text("repo-core-2699").to_owned()
                 } else {
-                    badge.git_ref()
+                    badge.caption.clone()
                 };
                 self.graph_labels.entry(row.origin).or_insert(name);
             }

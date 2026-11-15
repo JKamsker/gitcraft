@@ -60,12 +60,18 @@ impl RepoTab {
         if !open {
             return;
         }
+        let labels = self.ref_labels();
         for remote in &self.remotes {
             let hidden = self.visibility.sidebar_remotes.contains(&remote.name);
             let primary = self.primary_forge_remote() == Some(remote.name.as_str());
             let branches: Vec<&Branch> = self
                 .remote_branches(&remote.name)
-                .filter(|b| matches(filter, b))
+                .filter(|b| {
+                    matches(filter, b)
+                        || labels
+                            .get(&remote_ref(&b.name))
+                            .is_some_and(|l| l.caption.to_lowercase().contains(filter))
+                })
                 .collect();
             // A collapsible row per remote, open or closed in this repository only.
             let id = egui::Id::new(("remote-open", self.repo_key(), &remote.name));
@@ -187,7 +193,22 @@ impl RepoTab {
                 &|_: &&Branch| false,
                 &|b: &&Branch| ("branch-row", remote_ref(&b.name)),
                 &mut |ui, row, b: &&Branch| {
-                    self.remote_branch_row(ui, acts, &remote.name, b, row, idle);
+                    let full = remote_ref(&b.name);
+                    let caption = labels
+                        .get(&full)
+                        .map(|l| l.caption.as_str())
+                        .unwrap_or(row.name);
+                    self.remote_branch_row(
+                        ui,
+                        acts,
+                        &remote.name,
+                        b,
+                        LeafRow {
+                            name: caption,
+                            ..row
+                        },
+                        idle,
+                    );
                 },
             );
         }
@@ -208,12 +229,10 @@ impl RepoTab {
         let full = remote_ref(&b.name);
         let shown = self.branch_shown(&full, false);
         let r = remote_row(ui, &full, row, has_pr, !shown);
+        widgets::a11y(&r, egui::WidgetType::Button, || self.ref_description(&full));
         let r = self.branch_drag_drop(ui, r, &b.name, true, &b.target, acts);
         acts.extend(visibility::eye(ui, &r, &full, shown));
-        let r = r.on_hover_text(crate::i18n::message(
-            "repo-core-3485",
-            &[("name", b.name.to_string().into())],
-        ));
+        let r = r.on_hover_text(self.ref_description(&full));
         if r.double_clicked() && idle {
             acts.push(Action::CheckoutRemote(b.name.clone()));
         } else if r.clicked() {

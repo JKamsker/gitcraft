@@ -175,7 +175,8 @@
         "gitcraft::vscode_theme",
         "gitcraft::tab_look",
         "gitcraft::keymap",
-        "gitcraft::operation_labels"
+        "gitcraft::operation_labels",
+        "gitcraft::ref_labels"
       ]
     },
     "git": {
@@ -501,6 +502,7 @@
         "gitcraft::repo::messages",
         "gitcraft::repo::lifecycle",
         "gitcraft::repo::load",
+        "gitcraft::repo::ref_presentation",
         "gitcraft::repo::notice",
         "gitcraft::repo::operations",
         "gitcraft::repo::running",

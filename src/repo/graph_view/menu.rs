@@ -47,7 +47,13 @@ impl RepoTab {
         self.graph_badges(commit)
             .into_iter()
             .find(|b| b.kind == BadgeKind::Branch)
-            .map(|b| b.git_ref())
+            .map(|b| {
+                b.full_ref
+                    .strip_prefix("refs/heads/")
+                    .or_else(|| b.full_ref.strip_prefix("refs/remotes/"))
+                    .unwrap_or(&b.full_ref)
+                    .to_owned()
+            })
     }
 
     /// Right-click menu of a commit row.
@@ -131,9 +137,21 @@ impl RepoTab {
                         "dev-integration-ui-branch-heading",
                         &[("branch", branch.to_string().into())],
                     ));
-                    if self.refs.current.as_deref() != Some(branch.as_str()) {
+                    if self
+                        .refs
+                        .current
+                        .as_ref()
+                        .map(|n| format!("refs/heads/{n}"))
+                        .as_deref()
+                        != Some(branch.as_str())
+                    {
                         self.pill_items(ui, branch, &hash, idle, acts);
-                    } else if let Some(b) = self.refs.local.iter().find(|b| b.name == *branch) {
+                    } else if let Some(b) = self
+                        .refs
+                        .local
+                        .iter()
+                        .find(|b| format!("refs/heads/{}", b.name) == *branch)
+                    {
                         self.branch_menu_items(ui, acts, b, idle);
                     }
                 },

@@ -141,7 +141,17 @@ impl RepoTab {
     /// The menu of links to the branch `name` (local, or `remote/branch`), and what the remote
     /// calls it: a local branch goes to the remote branch it tracks, a remote one to its remote.
     pub(in crate::repo) fn branch_link_menu(&self, name: &str) -> Option<(LinkMenu, Target)> {
-        let (remotes, on_remote) = match self.refs.local.iter().find(|b| b.name == name) {
+        let remote_ref = name.strip_prefix("refs/remotes/");
+        let name = name
+            .strip_prefix("refs/heads/")
+            .or(remote_ref)
+            .unwrap_or(name);
+        let (remotes, on_remote) = match self
+            .refs
+            .local
+            .iter()
+            .find(|b| remote_ref.is_none() && b.name == name)
+        {
             Some(b) => {
                 let tracked = links::upstream_remote(&b.upstream, &self.remotes);
                 let remotes = links::candidates(
