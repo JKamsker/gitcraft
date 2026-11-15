@@ -25,6 +25,7 @@ impl RepoTab {
             repo: messages::mutation_key(&path),
         };
         let branch_bands = branch_bands::Preferences::load(_ctx, &path);
+        let worktree_cleanup = crate::repo::branch_cleanup::WorktreeCleanup::new(&path);
         Self {
             path,
             name,
@@ -232,6 +233,7 @@ impl RepoTab {
             postcards: Default::default(),
             growth: None,
             cleanup: None,
+            worktree_cleanup,
             sparse: None,
             atlas: None,
             history_activity: None,

@@ -105,8 +105,16 @@ impl RepoTab {
             state.enter = false;
         }
         let selected = if delta != 0 || enter {
-            let mut ordered: Vec<&T> = if folder.is_some() && Settings::get(ui.ctx()).files_as_tree
-            {
+            let mut ordered: Vec<&T> = if folder.is_some() && {
+                let settings = Settings::get(ui.ctx());
+                if files.first().is_some_and(|f| {
+                    matches!(key(f), DiffKey::Commit { .. } | DiffKey::Remerge { .. })
+                }) {
+                    settings.commit_files_as_tree
+                } else {
+                    settings.files_as_tree
+                }
+            } {
                 let mut nodes = branch_tree::build(files.iter().map(|file| (path(file), file)));
                 branch_tree::compact(&mut nodes);
                 let mut out = Vec::new();

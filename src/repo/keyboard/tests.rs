@@ -228,3 +228,5 @@ fn delay_real_hunk_preparation(
 include!("tests/mutations.rs");
 include!("tests/focus_and_targets.rs");
 include!("tests/async_completion.rs");
+
+mod commit_tree;

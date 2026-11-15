@@ -3,6 +3,7 @@
 
 pub(crate) mod display;
 mod keys;
+mod location;
 mod palette;
 mod shells;
 #[cfg(test)]
@@ -14,7 +15,7 @@ pub(crate) use view::cpu_paint;
 
 use std::io::{Read, Write};
 use std::num::NonZeroU16;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::mpsc::{self, Sender};
 use std::sync::{Arc, Mutex, MutexGuard};
@@ -58,7 +59,7 @@ pub struct Terminal {
     /// input buffer is full (a big paste while a program isn't reading), which must not freeze
     /// the app. Shared with the parser, which answers the shell's cursor-position queries.
     writer: Sender<Vec<u8>>,
-    master: Box<dyn MasterPty + Send>,
+    master: Arc<Mutex<Box<dyn MasterPty + Send>>>,
     child: Box<dyn Child + Send + Sync>,
     exited: Arc<AtomicBool>,
     exit_code: Option<u32>,
@@ -74,6 +75,8 @@ pub struct Terminal {
     /// Selected cells, (row, col) on screen, from where the drag started to where it is.
     selection: Option<((u16, u16), (u16, u16))>,
     pub shell: String,
+    /// Live, observational cwd probe for cleanup; an unknown location blocks conservatively.
+    pub(crate) location: Arc<dyn Fn() -> Option<Vec<PathBuf>> + Send + Sync>,
 }
 
 impl Terminal {
@@ -187,10 +190,26 @@ impl Terminal {
         }
 
         let shell = shell.label.clone();
+        let master = Arc::new(Mutex::new(pair.master));
+        let observed = master.clone();
+        let foreground = Arc::new(move || {
+            #[cfg(unix)]
+            {
+                lock(&observed)
+                    .process_group_leader()
+                    .and_then(|pid| u32::try_from(pid).ok())
+            }
+            #[cfg(not(unix))]
+            {
+                let _ = &observed;
+                None
+            }
+        });
+        let location = location::probe(child.process_id(), foreground);
         Ok(Self {
             parser,
             writer,
-            master: pair.master,
+            master,
             child,
             exited,
             exit_code: None,
@@ -200,6 +219,7 @@ impl Terminal {
             scroll_rest: 0.0,
             selection: None,
             shell,
+            location,
         })
     }
 

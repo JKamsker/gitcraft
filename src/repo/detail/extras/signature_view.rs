@@ -44,7 +44,7 @@ pub(super) fn section(
 }
 
 /// "Valid · SSH · Zoë": the verdict, the kind of key, the signer.
-fn headline(sig: &Signature) -> String {
+pub(super) fn headline(sig: &Signature) -> String {
     let mut parts = vec![sig.verdict.label().to_owned()];
     if let Some(format) = sig.format {
         parts.push(format.label().to_owned());
@@ -55,7 +55,7 @@ fn headline(sig: &Signature) -> String {
     parts.join(" · ")
 }
 
-fn verdict_color(t: &Tokens, verdict: &SignatureVerdict) -> Color32 {
+pub(super) fn verdict_color(t: &Tokens, verdict: &SignatureVerdict) -> Color32 {
     match verdict {
         SignatureVerdict::Valid { trusted: true } => t.success,
         SignatureVerdict::Valid { trusted: false }

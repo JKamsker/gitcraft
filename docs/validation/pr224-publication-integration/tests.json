@@ -1,0 +1,41 @@
+{
+  "source": "00b78c0c0f9e0afb4a22c6d10e0f17bb948a75e0",
+  "profile": "unoptimized test profile, debug info disabled; assertions enabled",
+  "tests": [
+    {
+      "filter": "repo::dialogs",
+      "passed": 52,
+      "ok": true
+    },
+    {
+      "filter": "repo::sidebar",
+      "passed": 30,
+      "ok": true
+    },
+    {
+      "filter": "repo::graph_view",
+      "passed": 91,
+      "ok": true
+    },
+    {
+      "filter": "terminal",
+      "passed": 51,
+      "ok": true
+    },
+    {
+      "filter": "push_preflight",
+      "passed": 72,
+      "ok": true
+    },
+    {
+      "filter": "git::worktree_cleanup",
+      "passed": 41,
+      "ok": true
+    },
+    {
+      "filter": "repo::branch_cleanup::worktrees",
+      "passed": 17,
+      "ok": true
+    }
+  ]
+}

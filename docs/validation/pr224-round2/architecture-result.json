@@ -1,0 +1,10 @@
+{
+  "source": {
+    "revision": "ade2bff9f6e3542cb0455c300747ae41a68c7543",
+    "tree": "34d7b2b1ba51e723649bd9c894744734fdcfc06d"
+  },
+  "check": {
+    "violations": [],
+    "ratchet": []
+  }
+}

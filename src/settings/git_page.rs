@@ -96,6 +96,13 @@ pub(super) fn render(settings: &mut Settings, ui: &mut Ui, f: &Filter) {
             },
         );
     });
+    section(
+        ui,
+        f,
+        "Worktree archives",
+        Some(crate::i18n::text("worktree-cleanup-settings-intro")),
+        |card| settings.worktree_archives_ui(card),
+    );
     section(ui, f, "Diffs", None, |card| settings.diffs_ui(card));
     section(
         ui,

@@ -120,25 +120,20 @@ impl RepoTab {
             .inner
             .on_disabled_hover_text(crate::i18n::text("repo-core-3429"));
         if clean.clicked() {
-            acts.push(Action::SelectStaleBranches);
+            acts.push(Action::Cleanup(crate::repo::dialogs::CleanupAct::Branches));
         }
         let mut order = BranchOrder::load(ui.ctx(), self.repo_key());
-        let on = usize::from(order.by_date);
-        let sort = ui.scope(|ui| {
-            widgets::switch(
-                ui,
-                &[
-                    crate::i18n::text("repo-core-1061"),
-                    crate::i18n::text("repo-core-3430"),
-                ],
-                on,
-            )
-        });
-        sort.response
-            .on_hover_text(crate::i18n::text("repo-core-3431"));
-        if let Some(picked) = sort.inner {
-            order.by_date = picked == 1;
-            order.store(ui.ctx(), self.repo_key());
+        // Laid out right to left: Recent first puts Name on its left, as the words were.
+        let modes = [
+            (true, "history", crate::i18n::text("repo-core-3430")),
+            (false, "arrow-down-a-z", crate::i18n::text("repo-core-1061")),
+        ];
+        for (by_date, icon, name) in modes {
+            let on = order.by_date == by_date;
+            if sort_button(ui, icon, name, on).clicked() && !on {
+                order.by_date = by_date;
+                order.store(ui.ctx(), self.repo_key());
+            }
         }
     }
 
@@ -254,3 +249,30 @@ fn section_buttons(
 fn matches(filter: &str, b: &Branch) -> bool {
     filter.is_empty() || b.name.to_lowercase().contains(filter)
 }
+
+/// A sort order as an icon: its name for screen readers and on hover (with what it does),
+/// selected when in use, and shown so: filled behind, accent icon, underlined.
+fn sort_button(ui: &mut Ui, icon: &str, name: &str, on: bool) -> egui::Response {
+    let t = Tokens::get(ui.ctx());
+    let (rect, resp) = ui.allocate_exact_size(vec2(22.0, 22.0), Sense::click());
+    crate::a11y::a11y_selected(&resp, name, on);
+    if on || resp.hovered() || resp.has_focus() {
+        let fill = if on { t.row_selected } else { t.pressed };
+        ui.painter().rect_filled(rect, t.radius_sm, fill);
+    }
+    let tint = if on {
+        t.accent
+    } else if resp.hovered() {
+        t.text
+    } else {
+        t.icon
+    };
+    icons::paint(ui, rect, icon, 14.0, tint);
+    if on {
+        widgets::active_underline(ui, rect, t.accent);
+    }
+    resp.on_hover_text(format!("{name}\n{}", crate::i18n::text("repo-core-3431")))
+}
+
+#[cfg(test)]
+mod sort_tests;

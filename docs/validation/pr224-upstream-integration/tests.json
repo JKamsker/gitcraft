@@ -1,0 +1,35 @@
+{
+  "source": "7e186611bbfb848d41d9077b8e613fecb4dd1237",
+  "tests": [
+    {
+      "filter": "repo::dialogs",
+      "passed": 52,
+      "ok": true
+    },
+    {
+      "filter": "repo::sidebar",
+      "passed": 30,
+      "ok": true
+    },
+    {
+      "filter": "repo::graph_view",
+      "passed": 91,
+      "ok": true
+    },
+    {
+      "filter": "terminal",
+      "passed": 51,
+      "ok": true
+    },
+    {
+      "filter": "git::worktree_cleanup",
+      "passed": 41,
+      "ok": true
+    },
+    {
+      "filter": "repo::branch_cleanup::worktrees",
+      "passed": 17,
+      "ok": true
+    }
+  ]
+}

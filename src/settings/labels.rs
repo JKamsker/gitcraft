@@ -30,6 +30,7 @@ pub(super) fn display(raw: &str) -> &str {
         "Branch column width" => {
             crate::i18n::text("interaction-settings-label-branch-column-width")
         }
+        "Commit files" => crate::i18n::text("commit-details-files-setting-label"),
         "Changed files" => crate::i18n::text("interaction-settings-label-changed-files"),
         "Changes by agents" => crate::i18n::text("interaction-settings-label-changes-by-agents"),
         "Channel" => crate::i18n::text("interaction-settings-label-channel"),
@@ -149,6 +150,11 @@ pub(super) fn display(raw: &str) -> &str {
         "Repository network" => crate::i18n::text("interaction-accounts-repo-network"),
         "Command palette" => crate::i18n::text("interaction-presentation-palette"),
         "Manual" => crate::i18n::text("interaction-presentation-manual"),
+        "Worktree archives" => crate::i18n::text("worktree-cleanup-settings-label-archives"),
+        "Archive location" => crate::i18n::text("worktree-cleanup-settings-label-location"),
+        "Archive storage limit" => crate::i18n::text("worktree-cleanup-settings-label-limit"),
+        "Restore automatically" => crate::i18n::text("worktree-cleanup-settings-label-auto"),
+        "Archives" => crate::i18n::text("worktree-cleanup-settings-label-list"),
         _ => raw,
     }
 }

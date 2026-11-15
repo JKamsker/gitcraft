@@ -255,7 +255,7 @@
     "changes": [
       "budget/git/exported=1025"
     ],
-    "reason": "Combine #238’s corrected re-export visibility measurement (1019) with the six independently declared #233 tracking API items (+6) during a plain dev merge. Existing declarations are preserved unchanged.",
+    "reason": "Combine #238\u2019s corrected re-export visibility measurement (1019) with the six independently declared #233 tracking API items (+6) during a plain dev merge. Existing declarations are preserved unchanged.",
     "owner": "@JKamsker",
     "remediation": "Consolidate tracking operation dispatch and narrow existing Git re-exports before ratcheting the budget."
   },
@@ -263,7 +263,7 @@
     "changes": [
       "budget/doctor/exported=41"
     ],
-    "reason": "Combine #238’s corrected re-export visibility measurement (40) with the independently declared #233 picker Form (+1) during a plain dev merge. Existing declarations are preserved unchanged.",
+    "reason": "Combine #238\u2019s corrected re-export visibility measurement (40) with the independently declared #233 picker Form (+1) during a plain dev merge. Existing declarations are preserved unchanged.",
     "owner": "@JKamsker",
     "remediation": "Keep picker state private and reduce the Form boundary when dialogs become feature-owned."
   },
@@ -283,6 +283,38 @@
     "owner": "@JKamsker",
     "remediation": "Keep transport, rate-limit parsing and provider adapters forge-scoped; use explicit discovery exports. Narrow unused browser contract types as consumers change, then ratchet this budget."
   },
+  "224-worktree-cleanup-coordinator-symbols": {
+    "changes": [
+      "budget/repo-core/symbols=610"
+    ],
+    "reason": "PR #224 adds the WorktreeCleanup state dependency to the RepoTab coordinator. Combined with #221 and current dev, measured foreign symbols are 610 rather than 609.",
+    "owner": "@JKamsker",
+    "remediation": "Keep cleanup implementation behind its owned state and callbacks; remove unused coordinator imports and ratchet when dependencies shrink."
+  },
+  "224-archive-settings-symbols": {
+    "changes": [
+      "budget/settings/symbols=181"
+    ],
+    "reason": "PR #224 archive settings and commit file-tree preference require two additional cross-domain symbols; the merged checker measures 181 rather than dev's 179.",
+    "owner": "@JKamsker",
+    "remediation": "Keep archive settings storage and page behavior encapsulated; narrow dependencies through the settings boundary and ratchet unused symbols."
+  },
+  "224-sidebar-cleanup-state-export": {
+    "changes": [
+      "budget/sidebar/exported=37"
+    ],
+    "reason": "PR #224 re-exports WorktreeCleanup from branch_cleanup for the RepoTab state field. Corrected effective-visibility measurement is 37 exports rather than dev's 36.",
+    "owner": "@JKamsker",
+    "remediation": "Keep nested cleanup implementation private and expose only the coordinator state contract; narrow or remove that contract if state ownership moves."
+  },
+  "224-239-combined-repo-core-symbols-613": {
+    "changes": [
+      "budget/repo-core/symbols=613"
+    ],
+    "reason": "Plain merge combines dev #239 upstream-picker coordinator dependencies (612 symbols) with PR #224 independent WorktreeCleanup state dependency (+1), for a combined 613. Prior published declarations remain unchanged.",
+    "owner": "@JKamsker",
+    "remediation": "Keep worktree cleanup and tracking implementation encapsulated in their owners; reduce unused coordinator dependencies and ratchet the budget."
+  },
   "233-publication-dialog-api": {
     "changes": [
       "budget/doctor/exported=42"
@@ -298,5 +330,13 @@
     "reason": "Issue #233 PR3 adds one coordinator reference for Dialog to hold the owned publication Form. No new domain edge or direct push continuation is introduced.",
     "owner": "@JKamsker",
     "remediation": "Move dialog composition into the owning feature when the coordinator is decomposed."
+  },
+  "224-243-combined-repo-core-symbols-614": {
+    "changes": [
+      "budget/repo-core/symbols=614"
+    ],
+    "reason": "Plain merge combines dev #243 publication-dialog coordinator dependency (613 symbols) with PR #224 independent WorktreeCleanup state dependency (+1), for a combined 614. All declarations published on either branch remain unchanged.",
+    "owner": "@JKamsker",
+    "remediation": "Keep publication and cleanup implementation in owned feature modules; reduce coordinator symbol dependencies as dialog composition is decomposed and ratchet the budget."
   }
 }

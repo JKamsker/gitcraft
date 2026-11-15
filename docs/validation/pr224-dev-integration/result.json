@@ -1,0 +1,45 @@
+{
+  "source": {
+    "revision": "c828d39e2521334cea924bf06a054390e54433d9",
+    "tree": "0f951623c3a1c111a6eca83340072ee8276f0d88"
+  },
+  "check": {
+    "violations": [],
+    "ratchet": [
+      "agents: fan-out 18/18, exported 244/258",
+      "app: fan-out 17/17, exported 89/107",
+      "changes: fan-out 14/14, exported 100/116",
+      "conflicts: fan-out 11/11, exported 108/113",
+      "git: fan-out 12/12, exported 985/1019",
+      "guidance: fan-out 8/8, exported 47/48",
+      "release: fan-out 9/9, exported 71/83",
+      "remote: fan-out 6/6, exported 115/127",
+      "repo-core: fan-out 24/24, exported 179/188",
+      "review: fan-out 15/15, exported 112/117",
+      "rewrite: fan-out 14/14, exported 119/130",
+      "runtime: fan-out 5/5, exported 110/116",
+      "settings: fan-out 15/15, exported 63/67",
+      "sync: fan-out 13/13, exported 52/57",
+      "ui-kit: fan-out 4/4, exported 154/172",
+      "worktrees: fan-out 5/5, exported 69/74"
+    ]
+  },
+  "measured": {
+    "git": {
+      "exported": 985,
+      "fan_out_symbols": 117
+    },
+    "settings": {
+      "exported": 63,
+      "fan_out_symbols": 181
+    },
+    "repo-core": {
+      "exported": 179,
+      "fan_out_symbols": 610
+    },
+    "sidebar": {
+      "exported": 37,
+      "fan_out_symbols": 151
+    }
+  }
+}

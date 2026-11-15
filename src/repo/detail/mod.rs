@@ -54,6 +54,12 @@ impl RepoTab {
         rev: Option<&str>,
         key: impl Fn(&str) -> DiffKey,
     ) {
+        let settings = Settings::get(ui.ctx());
+        let as_tree = if matches!(key(""), DiffKey::Commit { .. } | DiffKey::Remerge { .. }) {
+            settings.commit_files_as_tree
+        } else {
+            settings.files_as_tree
+        };
         let id = egui::Id::new(("file-folder", self.repo_key(), tree));
         let keyboard_scope = match files.first().map(|f| key(&f.path)) {
             Some(DiffKey::Commit { hash, .. }) => egui::Id::new((tree, hash)),
@@ -124,7 +130,7 @@ impl RepoTab {
             ui.push_id(("file-list", tree, rev), |ui| {
                 reveal = branch_tree::files(
                     ui,
-                    (id, true),
+                    (id, true, as_tree),
                     &group.shown,
                     |f| &f.path,
                     &selected,
@@ -142,7 +148,7 @@ impl RepoTab {
                 if group.header(ui, open_id, Some(stats), holds_open) {
                     reveal = branch_tree::files(
                         ui,
-                        (id.with("folded"), true),
+                        (id.with("folded"), true, as_tree),
                         &group.folded,
                         |f| &f.path,
                         &selected,

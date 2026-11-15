@@ -30,6 +30,7 @@ mod terminal_page;
 mod themes;
 mod tips_row;
 mod view_preferences;
+mod worktree_archives;
 
 use egui::Ui;
 use serde::{Deserialize, Serialize};
@@ -44,6 +45,7 @@ pub(crate) use page_kind::Page;
 pub use profile_page::{ProfileRequest, SettingsView, paint_badge};
 pub use profiles::UserProfile;
 pub use themes::{ThemePick, theme_menu};
+pub use worktree_archives::WorktreeArchives;
 
 /// A name and email to commit with, applied per repository from its commit box.
 #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
@@ -115,6 +117,8 @@ pub struct Settings {
     pub button_layout: crate::app_buttons::ButtonLayout,
     /// Changed files in a tree of their folders rather than a flat list.
     pub files_as_tree: bool,
+    /// Show commit files as a tree, independently of working changes.
+    pub commit_files_as_tree: bool,
     /// Diffs side by side rather than unified.
     pub diff_split: bool,
     pub diff_wrap: bool,
@@ -170,6 +174,8 @@ pub struct Settings {
     pub portable_credential_store: bool,
     /// A local branch with no commit for this many days is marked stale; 0 marks none.
     pub stale_branch_days: u32,
+    /// Where cleaned-up worktrees' untracked files are archived, and how much they may take.
+    pub worktree_archives: WorktreeArchives,
     /// Saved as `profiles` by the versions before profiles were what they are now.
     #[serde(rename = "profiles")]
     pub identities: Vec<SavedIdentity>,
@@ -234,6 +240,7 @@ impl Default for Settings {
             history_map: Default::default(),
             button_layout: Default::default(),
             files_as_tree: true,
+            commit_files_as_tree: true,
             diff_split: false,
             diff_wrap: false,
             diff_whole_file: false,
@@ -260,6 +267,7 @@ impl Default for Settings {
             keep_submodules: false,
             portable_credential_store: false,
             stale_branch_days: 90,
+            worktree_archives: Default::default(),
             identities: Vec::new(),
             user_profiles: vec![UserProfile::default()],
             active_profile: UserProfile::default().id,

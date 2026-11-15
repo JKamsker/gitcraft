@@ -168,7 +168,7 @@ impl Terminal {
             // The cells it held have moved, and may be past the new edge (vt100 then
             // subtracts past zero copying it).
             self.selection = None;
-            let _ = self.master.resize(PtySize {
+            let _ = lock(&self.master).resize(PtySize {
                 rows,
                 cols,
                 pixel_width: 0,

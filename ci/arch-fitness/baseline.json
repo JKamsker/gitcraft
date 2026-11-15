@@ -3880,7 +3880,7 @@
     },
     "repo-core": {
       "domains": 24,
-      "symbols": 613,
+      "symbols": 614,
       "exported": 188
     },
     "review": {
@@ -3897,12 +3897,12 @@
     },
     "settings": {
       "domains": 15,
-      "symbols": 179,
+      "symbols": 181,
       "exported": 67
     },
     "sidebar": {
       "domains": 19,
-      "exported": 36
+      "exported": 37
     },
     "sync": {
       "domains": 13,

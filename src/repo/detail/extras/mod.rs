@@ -4,6 +4,7 @@
 
 mod backlinks_view;
 mod contained_view;
+mod more;
 mod notes_view;
 mod section;
 mod signature_view;
@@ -481,11 +482,8 @@ impl Extras {
         if self.hash.as_deref() != Some(hash) {
             return;
         }
-        ui.add_space(8.0);
-        signature_view::section(ui, self.signature.as_ref(), cmds);
-        contained_view::section(ui, self.contained.as_ref(), cmds);
-        notes_view::section(ui, &mut self.notes, remotes, idle, cmds);
-        backlinks_view::section(ui, self.backlinks.as_ref(), cmds);
+        ui.add_space(4.0);
+        more::show(self, ui, remotes, idle, cmds);
     }
 }
 

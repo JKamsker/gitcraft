@@ -18,6 +18,7 @@ macro_rules! icons {
 const SOURCES: &[(&str, &str)] = icons![
     "archive",
     "arrow-down",
+    "arrow-down-a-z",
     "arrow-down-to-line",
     "arrow-down-up",
     "arrow-left",

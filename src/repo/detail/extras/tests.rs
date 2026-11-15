@@ -229,7 +229,13 @@ fn the_sections_draw_in_every_state() {
         let mut cmds = Vec::new();
         for _ in 0..2 {
             ctx.run_ui(egui::RawInput::default(), |ui| {
-                for title in ["Signature", "Contained in", "Notes", "Backlinks"] {
+                for title in [
+                    "More details",
+                    "Signature",
+                    "Contained in",
+                    "Notes",
+                    "Backlinks",
+                ] {
                     let id = egui::Id::new(("commit-extras-open", title));
                     ui.data_mut(|d| d.insert_persisted(id, open));
                 }

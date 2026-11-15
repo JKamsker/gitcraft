@@ -8,6 +8,7 @@ impl RepoTab {
         self.atlas_window(ctx);
         self.sparse_window(ctx, acts);
         self.cleanup_window(ctx);
+        self.worktree_cleanup_window(ctx);
         self.growth_window(ctx);
         self.postcard_window(ctx);
         if let Some(Dialog::Stash(d)) = &mut self.dialog {
