@@ -1,0 +1,251 @@
+{
+  "head": "438053a9bf2fb0fb850ee059091445b278be9470",
+  "steps": [
+    {
+      "name": "format",
+      "command": [
+        "nice",
+        "-n",
+        "19",
+        "cargo",
+        "+stable",
+        "fmt",
+        "--check"
+      ],
+      "exit": 0
+    },
+    {
+      "name": "size",
+      "command": [
+        "python3",
+        "ci/rust_file_size.py",
+        "--revision",
+        "HEAD"
+      ],
+      "exit": 0
+    },
+    {
+      "name": "complexity",
+      "command": [
+        "python3",
+        "ci/complexity_policy.py",
+        "--revision",
+        "HEAD"
+      ],
+      "exit": 0
+    },
+    {
+      "name": "architecture",
+      "command": [
+        "nice",
+        "-n",
+        "19",
+        "cargo",
+        "+stable",
+        "run",
+        "--release",
+        "--manifest-path",
+        "ci/arch-fitness/Cargo.toml",
+        "--",
+        "check",
+        "--revision",
+        "HEAD"
+      ],
+      "exit": 0
+    },
+    {
+      "name": "growth",
+      "command": [
+        "python3",
+        "ci/arch_baseline.py",
+        "--base",
+        "origin/dev",
+        "--revision",
+        "HEAD"
+      ],
+      "exit": 0
+    },
+    {
+      "name": "clippy",
+      "command": [
+        "nice",
+        "-n",
+        "19",
+        "cargo",
+        "+stable",
+        "clippy",
+        "--locked",
+        "--all-targets",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "exit": 0
+    },
+    {
+      "name": "tests-worktree_resources",
+      "command": [
+        "nice",
+        "-n",
+        "19",
+        "cargo",
+        "+stable",
+        "test",
+        "--locked",
+        "--lib",
+        "worktree_resources"
+      ],
+      "exit": 0
+    },
+    {
+      "name": "tests-constellation",
+      "command": [
+        "nice",
+        "-n",
+        "19",
+        "cargo",
+        "+stable",
+        "test",
+        "--locked",
+        "--lib",
+        "constellation"
+      ],
+      "exit": 0
+    },
+    {
+      "name": "tests-repo-insights",
+      "command": [
+        "nice",
+        "-n",
+        "19",
+        "cargo",
+        "+stable",
+        "test",
+        "--locked",
+        "--lib",
+        "repo::insights"
+      ],
+      "exit": 0
+    },
+    {
+      "name": "tests-git-worktree_cleanup",
+      "command": [
+        "nice",
+        "-n",
+        "19",
+        "cargo",
+        "+stable",
+        "test",
+        "--locked",
+        "--lib",
+        "git::worktree_cleanup"
+      ],
+      "exit": 0
+    },
+    {
+      "name": "tests-repo-branch_cleanup",
+      "command": [
+        "nice",
+        "-n",
+        "19",
+        "cargo",
+        "+stable",
+        "test",
+        "--locked",
+        "--lib",
+        "repo::branch_cleanup"
+      ],
+      "exit": 0
+    },
+    {
+      "name": "tests-terminal",
+      "command": [
+        "nice",
+        "-n",
+        "19",
+        "cargo",
+        "+stable",
+        "test",
+        "--locked",
+        "--lib",
+        "terminal"
+      ],
+      "exit": 0
+    },
+    {
+      "name": "tests-a11y-tests-repo_view",
+      "command": [
+        "nice",
+        "-n",
+        "19",
+        "cargo",
+        "+stable",
+        "test",
+        "--locked",
+        "--lib",
+        "a11y::tests::repo_view"
+      ],
+      "exit": 0
+    },
+    {
+      "name": "tests-palette",
+      "command": [
+        "nice",
+        "-n",
+        "19",
+        "cargo",
+        "+stable",
+        "test",
+        "--locked",
+        "--lib",
+        "palette"
+      ],
+      "exit": 0
+    },
+    {
+      "name": "tests-repo-layout",
+      "command": [
+        "nice",
+        "-n",
+        "19",
+        "cargo",
+        "+stable",
+        "test",
+        "--locked",
+        "--lib",
+        "repo::layout"
+      ],
+      "exit": 0
+    },
+    {
+      "name": "tests-repo-tests",
+      "command": [
+        "nice",
+        "-n",
+        "19",
+        "cargo",
+        "+stable",
+        "test",
+        "--locked",
+        "--lib",
+        "repo::tests"
+      ],
+      "exit": 0
+    },
+    {
+      "name": "tests-i18n-",
+      "command": [
+        "nice",
+        "-n",
+        "19",
+        "cargo",
+        "+stable",
+        "test",
+        "--locked",
+        "--lib",
+        "i18n::"
+      ],
+      "exit": 0
+    }
+  ]
+}
