@@ -166,7 +166,7 @@ impl Form {
                         let (c, caption) = choices[index];
                         ui.push_id(&c.full, |ui| {
                             ui.allocate_ui(egui::vec2(ui.available_width(), height), |ui| {
-                            ui.style_mut().wrap_mode = Some(egui::TextWrapMode::Truncate);
+                                ui.style_mut().wrap_mode = Some(egui::TextWrapMode::Truncate);
                                 if group != c.remote {
                                     ui.strong(&c.remote);
                                     group.clone_from(&c.remote);
