@@ -3,6 +3,7 @@ interaction-manual-feature-repositories-tabs-01
 interaction-manual-feature-repositories-tabs-02
 interaction-manual-feature-repositories-tabs-03
 interaction-manual-feature-repositories-tabs-04
+interaction-manual-feature-repositories-tabs-24
 interaction-manual-feature-repositories-tabs-05
 interaction-manual-feature-repositories-tabs-06
 interaction-manual-feature-repositories-tabs-07

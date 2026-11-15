@@ -21,6 +21,8 @@ pub enum ProfileRequest {
     Duplicate,
     Delete(u64),
     Theme(ThemeId),
+    /// The profile's repository roots dialog (the app's library).
+    RepositoryRoots,
 }
 
 /// What the settings page needs of the app, and what its Profile page asks the app to do.
@@ -156,6 +158,19 @@ impl Settings {
                         }
                     });
                 });
+                card.row_hint(
+                    "Repository roots",
+                    crate::i18n::text("interaction-library-settings-hint"),
+                    "repositories roots library scan folders nearby siblings",
+                    |ui| {
+                        if ui
+                            .button(crate::i18n::text("interaction-library-manage"))
+                            .clicked()
+                        {
+                            request = Some(ProfileRequest::RepositoryRoots);
+                        }
+                    },
+                );
                 card.row("Name", "rename title", |ui| {
                     ui.add(
                         layout::field(&mut self.profile_mut().name)

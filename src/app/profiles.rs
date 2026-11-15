@@ -194,6 +194,7 @@ impl App {
                 ..ProfileState::default()
             });
         self.settings.active_profile = id;
+        self.library.switch_profile();
         self.settings.set(ctx);
         // The tabs opened next read the new profile's author themselves; a later change to it
         // is noticed against what it is now.
@@ -264,6 +265,7 @@ impl App {
         self.setup.forget_profile(id);
         self.settings.user_profiles.retain(|p| p.id != id);
         self.profile_states.remove(&id);
+        self.library.forget_profile(id);
         settings::profiles::forget(id);
         self.settings.set(ctx);
     }
@@ -277,6 +279,7 @@ impl App {
             ProfileRequest::Duplicate => self.new_profile(true, ctx),
             ProfileRequest::Delete(id) => self.delete_profile(id, ctx),
             ProfileRequest::Theme(id) => self.set_theme(ctx, id),
+            ProfileRequest::RepositoryRoots => self.library_open = true,
         }
     }
 

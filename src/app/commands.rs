@@ -60,7 +60,10 @@ impl App {
             || self.setup.open
             || self.manual_open
             || self.repo_scan.is_some()
-            || (crate::a11y::keyboard_taken(ctx) && !home_filter::search_has_focus(ctx));
+            || self.library_open
+            || (crate::a11y::keyboard_taken(ctx)
+                && !home_filter::search_has_focus(ctx)
+                && !ctx.memory(|m| m.has_focus(library::search_id())));
         let focused =
             ctx.input(|i| i.focused || i.raw.viewports.values().any(|v| v.focused == Some(true)));
         let capturing = keymap::editor::capturing(ctx);

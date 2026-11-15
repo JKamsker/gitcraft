@@ -21,6 +21,7 @@ mod home_filter;
 mod home_recent;
 mod inbox;
 mod launch;
+mod library;
 mod links;
 mod my_work;
 mod os_shell;
@@ -104,6 +105,8 @@ struct Saved {
     workspaces: crate::across::workspaces::Workspaces,
     /// Repositories found on a machine by "Where's my work?".
     found_repos: Vec<PathBuf>,
+    /// Each profile's repository library: its roots, nearby folders and what they found.
+    library: library::Libraries,
     /// What was seen of each pull request (by URL) when it was opened from the inbox.
     inbox_seen: BTreeMap<String, crate::forge::inbox::Seen>,
     windows: Vec<windows::SavedWindow>,
@@ -209,6 +212,10 @@ pub struct App {
     patches: dropped::PatchQueue,
     /// _Scan a folder for repositories_, while its dialog is open.
     repo_scan: Option<repo_scan::RepoScan>,
+    /// The repository library of each profile, and its background scans.
+    library: library::LibraryState,
+    /// The _Repository roots_ dialog is open.
+    library_open: bool,
     workspaces: crate::across::workspaces::Workspaces,
     /// How the workspaces' repositories stand, as last looked at.
     workspaces_view: workspaces::WorkspacesView,

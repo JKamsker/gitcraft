@@ -31,6 +31,7 @@ impl eframe::App for App {
             last_opened: self.last_opened.clone(),
             workspaces: self.workspaces.clone(),
             found_repos: self.found_repos.clone(),
+            library: self.library.saved().clone(),
             inbox_seen: self.inbox_seen.clone(),
             windows: detached,
         };
