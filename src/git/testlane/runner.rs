@@ -190,14 +190,29 @@ pub fn run_command(
     command: &str,
     stopper: &Stopper,
 ) -> Result<(git::Ended, Vec<String>), String> {
+    run_command_timed(dir, command, stopper, None)
+}
+
+pub(in crate::git) fn run_command_timed(
+    dir: &Path,
+    command: &str,
+    stopper: &Stopper,
+    timeout: Option<std::time::Duration>,
+) -> Result<(git::Ended, Vec<String>), String> {
     let alias = command_alias(command);
     let mut lines = VecDeque::new();
-    let ended = git::stream(dir, &["-c", &alias, "gitcraft-test"], stopper, |line| {
-        if lines.len() >= KEPT_LINES {
-            lines.pop_front();
-        }
-        lines.push_back(line);
-    })?;
+    let ended = git::stream_timed(
+        dir,
+        &["-c", &alias, "gitcraft-test"],
+        stopper,
+        timeout,
+        |line| {
+            if lines.len() >= KEPT_LINES {
+                lines.pop_front();
+            }
+            lines.push_back(line);
+        },
+    )?;
     Ok((ended, lines.into()))
 }
 

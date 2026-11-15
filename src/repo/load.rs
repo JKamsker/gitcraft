@@ -247,6 +247,7 @@ impl RepoTab {
         self.read_bisect(ctx);
         self.clear_parallel_leftovers();
         self.read_test_lane(ctx);
+        self.invalidate_staged(ctx);
     }
 
     /// Discovery refines repository identity; mutation scheduling remains separate.
@@ -314,6 +315,7 @@ impl RepoTab {
                 self.folding
                     .saw_status(&work, &self.refs.head, Instant::now());
                 self.work = work;
+                self.invalidate_staged(ctx);
                 self.status_changed_file_view(ctx);
                 self.stash_picks.keep_changed(&self.work);
                 if wip_row_changed {

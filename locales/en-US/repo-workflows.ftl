@@ -7793,3 +7793,18 @@ purpose-open-insight = Open in { $insight }
 
 purpose-rename-confirm = Rename
 purpose-rename-cancel = Cancel
+
+# Index snapshot verification (#189)
+staged-command = Staged test command
+staged-test = Test staged changes
+staged-stop = Cancel staged test
+staged-isolation = Only staged files are included. Ignored assets and dependencies must be prepared by this command inside the snapshot. Runs locally; SSH/WSL and submodules are unsupported.
+staged-running = Testing staged snapshot…
+staged-stale = Stale / freshness unverified — run again for the current index and environment.
+staged-result = Tree { $tree } · exit { $code } · { $seconds } s
+staged-output = Staged test output (last 200 lines)
+staged-cancelled = Staged test cancelled.
+staged-tooling = Command or tool missing. Install it locally or prepare dependencies in the snapshot command.
+staged-remote = Staged verification supports local repositories only; SSH/WSL snapshots are not supported yet.
+staged-unmerged = Resolve all unmerged index entries before testing staged changes.
+staged-submodules = Staged verification does not support submodules yet; no working-tree submodule files were copied.

@@ -34,6 +34,16 @@ pub fn stream(
     dir: &Path,
     args: &[&str],
     stopper: &Stopper,
+    line: impl FnMut(String),
+) -> Result<Ended, String> {
+    stream_timed(dir, args, stopper, None, line)
+}
+
+pub(in crate::git) fn stream_timed(
+    dir: &Path,
+    args: &[&str],
+    stopper: &Stopper,
+    timeout: Option<Duration>,
     mut line: impl FnMut(String),
 ) -> Result<Ended, String> {
     if stopper.stopped() {
@@ -48,6 +58,7 @@ pub fn stream(
     let full = sent.clone();
     let mut options = crate::processes::Options {
         background: true,
+        timeout,
         drain_for: DRAIN,
         cancelled: Some(Box::new(move || stopping.stopped() || full.full())),
         ..Default::default()

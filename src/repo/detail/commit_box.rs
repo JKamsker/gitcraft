@@ -183,6 +183,7 @@ impl RepoTab {
         }
 
         ui.add_space(4.0);
+        self.staged_box(ui, acts);
         self.identity_row(ui, acts);
     }
 

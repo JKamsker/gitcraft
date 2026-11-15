@@ -6,6 +6,8 @@ pub(crate) mod fixture;
 mod notes;
 mod runner;
 mod scratch;
+mod staged;
+pub(crate) use staged::{StagedResult, staged_fingerprint, test_staged};
 #[cfg(test)]
 mod tests;
 

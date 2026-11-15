@@ -7791,3 +7791,18 @@ purpose-open-insight = In { $insight } öffnen
 
 purpose-rename-confirm = Umbenennen
 purpose-rename-cancel = Abbrechen
+
+# Index snapshot verification (#189)
+staged-command = Testbefehl für vorgemerkte Änderungen
+staged-test = Vorgemerkte Änderungen testen
+staged-stop = Test abbrechen
+staged-isolation = Nur vorgemerkte Dateien werden übernommen. Ignorierte Dateien und Abhängigkeiten muss der Befehl im Snapshot vorbereiten. Nur lokal; SSH/WSL und Submodule werden nicht unterstützt.
+staged-running = Vorgemerkten Snapshot testen…
+staged-stale = Veraltet / Aktualität ungeprüft — für aktuellen Index und Umgebung erneut ausführen.
+staged-result = Baum { $tree } · Exit { $code } · { $seconds } s
+staged-output = Testausgabe (letzte 200 Zeilen)
+staged-cancelled = Test abgebrochen.
+staged-tooling = Befehl oder Werkzeug fehlt. Lokal installieren oder Abhängigkeiten im Snapshot-Befehl vorbereiten.
+staged-remote = Snapshot-Tests unterstützen derzeit nur lokale Repositorys; SSH/WSL werden noch nicht unterstützt.
+staged-unmerged = Vor dem Test alle ungelösten Index-Konflikte auflösen.
+staged-submodules = Snapshot-Tests unterstützen noch keine Submodule; Dateien daraus wurden nicht kopiert.

@@ -33,6 +33,7 @@ impl RepoTab {
         let Some(action) = self.prepare_repo_action(action, ctx) else {
             return;
         };
+        self.staged_before_action(&action, ctx);
         let plain = OpKind::plain();
         match action {
             Action::KeyboardStep(step) => self.keyboard_step(step),

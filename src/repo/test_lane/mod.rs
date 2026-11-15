@@ -6,6 +6,7 @@
 mod read_error;
 use read_error::*;
 mod worker;
+mod staged;
 use crate::repo::messages::Continuation as ToTab;
 pub(crate) use worker::REMOTE_WORKERS;
 use worker::*;
@@ -37,6 +38,8 @@ pub(crate) const DEFAULT_WORKERS: usize = 2;
 /// What the views ask of the lane.
 #[derive(Clone, Debug)]
 pub(crate) enum LaneAct {
+    StagedStart,
+    StagedStop,
     /// Test the commits of `range` with `command`.
     Start(StartTests),
     /// Stop the run going on.
@@ -85,6 +88,7 @@ pub(super) struct Kept {
 /// The tab's lane.
 #[derive(Default)]
 pub(crate) struct TestLane {
+    staged: staged::Staged,
     /// It shows (from the settings, as of the last frame).
     pub(super) visible: bool,
     /// The repository's test command, as last read.
@@ -189,6 +193,8 @@ impl TestLane {
 impl RepoTab {
     pub(super) fn test_lane_act(&mut self, act: LaneAct, ctx: &egui::Context) {
         match act {
+            LaneAct::StagedStart => self.staged_start(ctx),
+            LaneAct::StagedStop => self.staged_stop(),
             LaneAct::Start(start) => self.start_tests(start, ctx),
             LaneAct::Stop => {
                 if let Some(run) = &self.test_lane.run {
