@@ -2,17 +2,15 @@
 use std::path::Path;
 
 pub(in crate::git) fn same_registered_path(a: &Path, b: &Path) -> bool {
-    // Reuse recovery capture's existing-directory identity check first.
-    if crate::remote::same_dir(a, b) {
-        return true;
-    }
     #[cfg(windows)]
     {
-        windows_key(&resolved_ancestor(a).to_string_lossy())
-            == windows_key(&resolved_ancestor(b).to_string_lossy())
+        // Reuse recovery capture's existing-directory identity check first.
+        crate::remote::same_dir(a, b)
+            || windows_key(&resolved_ancestor(a).to_string_lossy())
+                == windows_key(&resolved_ancestor(b).to_string_lossy())
     }
     #[cfg(not(windows))]
-    false
+    crate::remote::same_dir(a, b)
 }
 
 /// Missing registrations still have existing parents: resolve short names there,
