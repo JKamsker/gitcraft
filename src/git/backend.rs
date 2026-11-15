@@ -449,3 +449,6 @@ mod tests;
 
 #[cfg(all(test, unix))]
 mod executable_context_tests;
+
+#[cfg(all(test, feature = "native-git"))]
+mod ref_catalog_tests;

@@ -152,13 +152,19 @@ impl RepoTab {
         let (old, new) = (a.max(b), a.min(b));
         let end = |row: usize| {
             let c = self.commits.get(row)?;
-            let label = self
+            let badge = self
                 .graph_badges(c)
                 .into_iter()
-                .find(|b| b.kind != BadgeKind::DetachedHead)
-                .map(|b| b.label)
+                .find(|b| b.kind != BadgeKind::DetachedHead);
+            let label = badge
+                .as_ref()
+                .map(|b| b.caption.clone())
                 .unwrap_or_else(|| crate::repo::short(&c.hash).to_owned());
-            Some((c.hash.clone(), label))
+            let identity = badge
+                .filter(|b| b.kind == BadgeKind::Branch)
+                .map(|b| b.full_ref)
+                .unwrap_or_else(|| c.hash.clone());
+            Some((identity, label))
         };
         let (base, base_label) = end(old)?;
         let (target, target_label) = if self.is_wip(new) {

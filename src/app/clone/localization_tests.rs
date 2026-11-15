@@ -285,6 +285,8 @@ fn enter_on_clone_cancel_closes_without_submitting() {
 fn actual_clone_fields_translate_options_without_rewriting_url_path_or_credentials() {
     crate::i18n::set_language("de");
     let form = CloneForm {
+        source: None,
+        open_after: true,
         options: Default::default(),
         depth: "0010".into(),
         sparse_folders: "src/日本語\ndocs".into(),

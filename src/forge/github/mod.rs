@@ -3,6 +3,7 @@
 //! user ([`issues`]).
 
 mod details;
+pub(super) mod discovery;
 mod issues;
 mod list;
 mod post;

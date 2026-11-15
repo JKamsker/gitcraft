@@ -118,7 +118,9 @@ impl RepoTab {
         let from_snapshot = std::mem::take(&mut self.snapshot_shown);
         let refs_moved = loaded.refs != self.refs || from_snapshot;
         self.refs = loaded.refs;
+        self.invalidate_ref_labels();
         self.graph_badge_index = super::graph_view::BadgeIndex::new(&self.refs);
+        self.graph_badge_index.captions = self.ref_labels();
         self.has_more = loaded.history.len() >= loaded.requested;
         let namespace_changed = self
             .history_filter
@@ -195,7 +197,6 @@ impl RepoTab {
         self.check_fence(ctx);
         self.read_stacks(ctx);
         self.load_authorship(ctx);
-        self.take_visibility(loaded.log_from, ctx);
         self.take_order(loaded.order, ctx);
         // Stash numbers shift when one is pushed or dropped; follow the commit.
         let viewed = self
@@ -217,6 +218,7 @@ impl RepoTab {
             self.invalidate_https_challenge();
         }
         self.remotes = loaded.remotes;
+        self.take_visibility(loaded.log_from, ctx);
         self.forge_remotes = loaded.forge_remotes;
         self.take_forge_catalog(remotes_changed, loaded.forge_generation, ctx);
         self.gerrit = loaded.gerrit;

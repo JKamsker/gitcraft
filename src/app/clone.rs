@@ -1,6 +1,9 @@
 //! Cloning: the dialog, the clone in the background, and asking for credentials.
 
+mod completion;
+mod destination;
 mod fields;
+mod source;
 pub(in crate::app) use fields::*;
 
 use std::path::{Path, PathBuf};
@@ -43,6 +46,8 @@ fn pick_clone_folder() -> Option<PathBuf> {
 }
 
 pub(super) struct CloneForm {
+    source: Option<source::CloneSource>,
+    open_after: bool,
     options: git::CloneOptions,
     depth: String,
     sparse_folders: String,
@@ -62,6 +67,7 @@ pub(super) struct CloneForm {
 /// A clone running in the background.
 pub(super) struct Cloning {
     owner: egui::ViewportId,
+    open_after: bool,
     pub(super) dest: PathBuf,
     rx: Receiver<Result<PathBuf, String>>,
     /// Its progress, and how to cancel it.
@@ -83,6 +89,8 @@ impl App {
             .map(|p| p.display().to_string())
             .unwrap_or_default();
         self.clone_form = Some(CloneForm {
+            source: None,
+            open_after: true,
             options: Default::default(),
             depth: String::new(),
             sparse_folders: String::new(),
@@ -206,16 +214,6 @@ impl App {
             return;
         }
         let dest = PathBuf::from(form.parent.trim()).join(form.name.trim());
-        // Elsewhere, git there refuses a folder that isn't empty, and says so.
-        let occupied = !crate::remote::is_remote(&dest)
-            && dest.exists()
-            && std::fs::read_dir(&dest)
-                .map(|mut d| d.next().is_some())
-                .unwrap_or(true);
-        if occupied {
-            form.error = Some(format!("{} already exists and isn't empty", dest.display()));
-            return;
-        }
         form.options.depth = if form.depth.trim().is_empty() {
             None
         } else {
@@ -267,125 +265,29 @@ impl App {
         let control = git::OpControl::new(move || repaint.request_repaint());
         let following = Arc::clone(&control);
         crate::connections::spawn(move || {
-            let result =
-                git::clone_with_options(&url, &dest2, creds.as_ref(), &options, &following)
-                    .and_then(|()| {
-                        if crate::remote::is_remote(&dest2) {
-                            Ok(dest2.clone())
-                        } else {
-                            repo_root(&dest2)
-                        }
-                    });
+            let result = destination::check(&dest2)
+                .and_then(|()| {
+                    git::clone_with_options(&url, &dest2, creds.as_ref(), &options, &following)
+                })
+                .and_then(|()| {
+                    if crate::remote::is_remote(&dest2) {
+                        Ok(dest2.clone())
+                    } else {
+                        repo_root(&dest2)
+                    }
+                });
             let _ = tx.send(result);
             ctx2.request_repaint();
         });
         self.cloning = Some(Cloning {
             owner: self.windows.current,
+            open_after: form.open_after,
             dest,
             rx,
             control,
         });
         self.cloning_form = self.clone_form.take();
         self.error = None;
-    }
-
-    pub(super) fn poll_clone(&mut self, ctx: &egui::Context) {
-        let Some(cloning) = &self.cloning else {
-            return;
-        };
-        let Ok(result) = cloning.rx.try_recv() else {
-            return;
-        };
-        let dest = cloning.dest.clone();
-        let owner = cloning.owner;
-        let cancelled = cloning.control.is_cancelled();
-        self.cloning = None;
-        self.in_window(owner, |app| app.finish_clone(dest, cancelled, result, ctx));
-    }
-
-    fn finish_clone(
-        &mut self,
-        dest: PathBuf,
-        cancelled: bool,
-        result: Result<PathBuf, String>,
-        ctx: &egui::Context,
-    ) {
-        match result {
-            Err(_) if cancelled => {
-                self.clone_failed = false;
-                self.error = Some(format!("Clone into {}: cancelled", dest.display()).into());
-            }
-            // On another machine, it opens once reached again, the credentials along.
-            Ok(_) if crate::remote::is_remote(&dest) => {
-                let creds = self
-                    .cloning_form
-                    .take()
-                    .filter(|f| f.auth)
-                    .and_then(|form| {
-                        git::Credentials::for_url(
-                            form.url.trim(),
-                            form.username.trim().to_owned(),
-                            form.password,
-                        )
-                        .ok()
-                    });
-                self.connect(dest, creds, ctx);
-            }
-            Ok(root) => {
-                // Show it in a start page tab if one is active, otherwise in a new tab.
-                self.open_root(root.clone(), ctx);
-                // The credentials that cloned it also fetch and push in its tab, and in no
-                // other: when it couldn't be opened, the active tab is another repository's.
-                if let Some(form) = self.cloning_form.take().filter(|f| f.auth)
-                    && let Ok(creds) = git::Credentials::for_url(
-                        form.url.trim(),
-                        form.username.trim().to_owned(),
-                        form.password,
-                    )
-                {
-                    self.credentials_for(&root, creds);
-                }
-            }
-            // Back to the form, asking for credentials.
-            Err(e) if git::is_auth_error(&e) => match self.cloning_form.take() {
-                Some(mut form) => {
-                    form.error = Some(if form.auth {
-                        "Those credentials were refused.".to_owned()
-                    } else {
-                        "This repository needs you to sign in.".to_owned()
-                    });
-                    form.auth = true;
-                    form.password.clear();
-                    self.clone_form = Some(form);
-                }
-                None => self.error = Some(format!("Clone failed: {e}").into()),
-            },
-            Err(e) => {
-                self.clone_failed = true;
-                self.error = Some(format!("Clone failed: {e}").into());
-            }
-        }
-        self.cloning_form = None;
-    }
-
-    #[cfg(test)]
-    pub(super) fn recorded_clone_completion(&mut self, owner: egui::ViewportId, root: PathBuf) {
-        self.start_clone();
-        if let Some(form) = &mut self.clone_form {
-            form.auth = true;
-            form.url = "https://example.invalid/recorded/repository.git".into();
-            form.username = "recorded-user".into();
-            form.password = "recorded-secret".into();
-        }
-        self.cloning_form = self.clone_form.take();
-        let (tx, rx) = channel();
-        let _ = tx.send(Ok(root.clone()));
-        self.cloning = Some(Cloning {
-            owner,
-            dest: root,
-            rx,
-            control: git::OpControl::new(|| {}),
-        });
     }
 }
 

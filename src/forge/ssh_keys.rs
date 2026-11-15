@@ -357,6 +357,7 @@ esac
                         Err(e) => return Err(e.to_string()),
                     }
                 };
+                stream.set_nonblocking(false).map_err(|e| e.to_string())?;
                 stream
                     .set_read_timeout(Some(Duration::from_secs(2)))
                     .map_err(|e| e.to_string())?;

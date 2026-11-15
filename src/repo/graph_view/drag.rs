@@ -31,7 +31,12 @@ impl PillHit {
 
     pub(super) fn of(badge: &Badge, rect: Rect, hash: &str) -> Self {
         let branch = (badge.kind == BadgeKind::Branch).then(|| DragBranch {
-            name: badge.git_ref(),
+            name: badge
+                .full_ref
+                .strip_prefix("refs/heads/")
+                .or_else(|| badge.full_ref.strip_prefix("refs/remotes/"))
+                .unwrap_or(&badge.full_ref)
+                .to_owned(),
             remote: !badge.local,
             tip: hash.to_owned(),
         });

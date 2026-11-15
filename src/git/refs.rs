@@ -40,6 +40,9 @@ impl Branch {
 #[derive(Clone, Debug, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct Refs {
     pub local: Vec<Branch>,
+    /// Symbolic remote pointers are decorations, not selectable branch refs.
+    #[serde(default)]
+    pub symbolic: std::collections::BTreeSet<String>,
     /// Local branch → push remote, including `pushRemote` and `remote.pushDefault`.
     pub push_remotes: HashMap<String, String>,
     /// Remote name → branches of that remote.
@@ -64,7 +67,7 @@ pub(super) fn refs_cli(repo: &Path) -> Result<Refs, String> {
     // Names are the full ones less `refs/heads/`… and not `%(refname:short)`, which makes a
     // branch `heads/x` when a tag is called `x` too (checking that out detaches HEAD).
     let format = format!(
-        "%(refname){FS}%(objectname){FS}%(HEAD){FS}%(upstream:short){FS}%(upstream:track){FS}%(*objectname){FS}%(push:remotename)"
+        "%(refname){FS}%(objectname){FS}%(HEAD){FS}%(upstream:short){FS}%(upstream:track){FS}%(*objectname){FS}%(push:remotename){FS}%(symref)"
     );
     let out = run(
         Some(repo),
@@ -82,7 +85,17 @@ pub(super) fn refs_cli(repo: &Path) -> Result<Refs, String> {
     let mut refs = Refs::default();
     for line in out.lines() {
         let f: Vec<&str> = line.split(FS).collect();
-        let [full, oid, head, upstream, track, peeled, push_remote] = f[..] else {
+        let [
+            full,
+            oid,
+            head,
+            upstream,
+            track,
+            peeled,
+            push_remote,
+            symref,
+        ] = f[..]
+        else {
             continue;
         };
         let short = ["refs/heads/", "refs/remotes/", "refs/tags/"]
@@ -109,7 +122,8 @@ pub(super) fn refs_cli(repo: &Path) -> Result<Refs, String> {
             }
             refs.local.push(branch);
         } else if let Some(rest) = full.strip_prefix("refs/remotes/") {
-            if rest.ends_with("/HEAD") {
+            if !symref.is_empty() {
+                refs.symbolic.insert(full.to_owned());
                 continue;
             }
             let remote = remote_of(rest, &remote_names).to_owned();
