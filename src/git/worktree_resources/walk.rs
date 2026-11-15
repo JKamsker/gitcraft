@@ -142,7 +142,11 @@ impl Walk<'_> {
             match FileType::from_raw_mode(stat.st_mode) {
                 FileType::Directory => {
                     let dir = child(fd, name)?;
-                    if fs::statat(&dir, ".git", AtFlags::SYMLINK_NOFOLLOW).is_ok() {
+                    if fs::statat(&dir, ".git", AtFlags::SYMLINK_NOFOLLOW).is_ok()
+                        || ["HEAD", "objects", "refs"]
+                            .iter()
+                            .all(|name| fs::statat(&dir, *name, AtFlags::SYMLINK_NOFOLLOW).is_ok())
+                    {
                         return Err("resources-nested".into());
                     }
                     self.directory(&dir, &path, depth + 1)?;

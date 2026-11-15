@@ -141,6 +141,10 @@ fn nested_repository_stops_measurement() -> Result<(), String> {
     std::fs::write(nested.join("secret"), "keep").map_err(|e| e.to_string())?;
     let found = collect(repo.path(), repo.path(), 1, None, None)?;
     assert!(!found.complete());
+    std::fs::remove_dir(nested.join(".git")).map_err(|e| e.to_string())?;
+    repo.git(&["init", "--bare", nested.to_str().ok_or("path")?])?;
+    let bare_nested = collect(repo.path(), repo.path(), 2, None, None)?;
+    assert!(!bare_nested.complete());
     Ok(())
 }
 
