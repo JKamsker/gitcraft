@@ -139,3 +139,31 @@ fn merge_pure_reviewed_send_receipt_refuses_changed_exact_push() -> Result<(), S
     }
     Ok(())
 }
+
+#[test]
+fn explicit_publication_sets_tracking_only_after_reviewed_success() -> Result<(), String> {
+    let f = Fixture::new()?;
+    let prepared = git::repository_tools::routes::prepare_publication(&f.repo, "main", "origin", "explicit/new")?;
+    let mut plan = scan(&f.repo, prepared.route.publication_operations(), f.profile(), &|| true)?;
+    plan.retain_selection(prepared)?;
+    assert!(plan.tracking);
+    assert_eq!(f.git(&["config", "branch.main.merge"])?, "refs/heads/main");
+    execute(&f.repo, &plan, None)?;
+    assert_eq!(f.git(&["config", "branch.main.remote"])?, "origin");
+    assert_eq!(f.git(&["config", "branch.main.merge"])?, "refs/heads/explicit/new");
+    assert_eq!(git::run(Some(&f.receiver), &["rev-parse", "refs/heads/explicit/new"])?.trim(), f.git(&["rev-parse", "refs/heads/main"])?);
+    Ok(())
+}
+
+#[test]
+fn stale_explicit_publication_refuses_without_changing_tracking() -> Result<(), String> {
+    let f = Fixture::new()?;
+    let prepared = git::repository_tools::routes::prepare_publication(&f.repo, "main", "origin", "explicit/stale")?;
+    let mut plan = scan(&f.repo, prepared.route.publication_operations(), f.profile(), &|| true)?;
+    plan.retain_selection(prepared)?;
+    f.git(&["config", "remote.origin.pushurl", "https://changed.invalid/repo"])?;
+    assert!(execute(&f.repo, &plan, None).is_err());
+    assert_eq!(f.git(&["config", "branch.main.merge"])?, "refs/heads/main");
+    assert!(git::run(Some(&f.receiver), &["for-each-ref", "refs/heads/explicit/"])?.is_empty());
+    Ok(())
+}

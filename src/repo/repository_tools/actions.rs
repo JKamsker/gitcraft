@@ -39,6 +39,7 @@ impl RepoTab {
             effects::Effect::Branch(branch, force) => {
                 self.prepare_branch_review(branch, force, ctx)
             }
+            effects::Effect::ReviewedPublication(plan) => self.review_publication_push(plan, ctx),
             effects::Effect::PreparePublication(manager) => self.prepare_publication(manager, ctx),
             effects::Effect::Publish(manager, retry) => self.publish_group(manager, retry, ctx),
             effects::Effect::Preview(editor) => self.remote_config_preview(editor, ctx),

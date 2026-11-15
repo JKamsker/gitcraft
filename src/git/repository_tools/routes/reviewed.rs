@@ -34,6 +34,17 @@ impl From<&Force> for PreparedPush {
 }
 
 impl PushRoute {
+    pub(crate) fn publication_operations(&self) -> Vec<Vec<String>> {
+        let mut ops = self.operations();
+        if let Some(push) = ops.last_mut() {
+            push.insert(1, "--set-upstream".into());
+            if let Some(spec) = push.last_mut() {
+                *spec = format!("refs/heads/{}:{}", self.branch, self.destination);
+            }
+        }
+        ops
+    }
+
     pub(crate) fn operations(&self) -> Vec<Vec<String>> {
         let mut push = vec!["push".into(), "--porcelain".into()];
         if let Some(lease) = &self.lease {

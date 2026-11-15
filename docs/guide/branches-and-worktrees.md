@@ -133,3 +133,5 @@ The left panel: local and remote branches, stacked branches, worktrees, submodul
 ## Tags
 
 - Tags: create (light or annotated, optionally pushed), push, delete locally or on the remote.
+
+Use **Publish branch…** in a local branch menu to publish to a chosen remote and destination branch. **Preview publication** shows the source commit, full destination ref and effective push URLs without fetching or pushing. **Push and set upstream** continues through the normal push checklist, including protection, authentication and conflict handling. Cancel leaves tracking unchanged; only a successful reviewed push sets the upstream. Gerrit review submission remains separate.

@@ -227,4 +227,5 @@ mod prompt_session;
 
 mod ref_presentation;
 
+mod publish;
 mod tracking;

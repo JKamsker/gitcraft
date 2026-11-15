@@ -69,6 +69,25 @@ impl RepoTab {
         });
     }
 
+    pub(super) fn review_publication_push(
+        &mut self,
+        prepared: routing::PreparedPush,
+        ctx: &egui::Context,
+    ) {
+        let publication = prepared.route.publication_operations();
+        self.with_selected_push(prepared, |tab, _| {
+            let ops = publication;
+            tab.run_ops_ex(
+                crate::i18n::text("publish-confirm"),
+                ops,
+                crate::repo::Refresh::All,
+                crate::repo::OpKind::plain(),
+                false,
+                ctx,
+            );
+        });
+    }
+
     /// The sole handback boundary accepts a root gate, never an endpoint sender.
     /// begin_push_preflight consumes the constraint synchronously in run_ops_ex.
     fn with_selected_push(

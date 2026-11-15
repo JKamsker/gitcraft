@@ -479,7 +479,8 @@
         "gitcraft::repo::cleanup",
         "gitcraft::repo::error_help",
         "gitcraft::repo::activity",
-        "gitcraft::repo::tracking"
+        "gitcraft::repo::tracking",
+        "gitcraft::repo::publish"
       ]
     },
     "update": {
