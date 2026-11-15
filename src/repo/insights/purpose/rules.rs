@@ -1,0 +1,443 @@
+//! The rules that say what a unit is for: the repository's own (`.gitcraft/review-groups` at
+//! the base), then built-in ones on paths, file types, markers in the lines and the repeated
+//! edits found. Each placement says which rule made it.
+
+use super::glob;
+use super::units::{Body, Unit, Whole};
+
+/// What a change is for, in the order a reviewer is offered them.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
+pub(in crate::repo::insights) enum Purpose {
+    Api,
+    Migrations,
+    Logic,
+    Repeated,
+    Tests,
+    Config,
+    Docs,
+    Formatting,
+    Moves,
+    Assets,
+    Generated,
+    Other,
+}
+
+impl Purpose {
+    pub(in crate::repo::insights) fn title(self) -> &'static str {
+        match self {
+            Purpose::Api => crate::i18n::text("purpose-26"),
+            Purpose::Migrations => crate::i18n::text("purpose-27"),
+            Purpose::Logic => crate::i18n::text("purpose-28"),
+            Purpose::Repeated => crate::i18n::text("purpose-29"),
+            Purpose::Tests => crate::i18n::text("purpose-30"),
+            Purpose::Config => crate::i18n::text("purpose-31"),
+            Purpose::Docs => crate::i18n::text("purpose-32"),
+            Purpose::Formatting => crate::i18n::text("purpose-33"),
+            Purpose::Moves => crate::i18n::text("purpose-34"),
+            Purpose::Assets => crate::i18n::text("purpose-35"),
+            Purpose::Generated => crate::i18n::text("purpose-36"),
+            Purpose::Other => crate::i18n::text("purpose-37"),
+        }
+    }
+
+    /// The word a rules file names it by.
+    fn word(self) -> &'static str {
+        match self {
+            Purpose::Api => "api",
+            Purpose::Migrations => "migrations",
+            Purpose::Logic => "logic",
+            Purpose::Repeated => "repeated",
+            Purpose::Tests => "tests",
+            Purpose::Config => "config",
+            Purpose::Docs => "docs",
+            Purpose::Formatting => "formatting",
+            Purpose::Moves => "moves",
+            Purpose::Assets => "assets",
+            Purpose::Generated => "generated",
+            Purpose::Other => "other",
+        }
+    }
+
+    const NAMED: [Purpose; 10] = [
+        Purpose::Api,
+        Purpose::Migrations,
+        Purpose::Logic,
+        Purpose::Tests,
+        Purpose::Config,
+        Purpose::Docs,
+        Purpose::Formatting,
+        Purpose::Moves,
+        Purpose::Assets,
+        Purpose::Generated,
+    ];
+}
+
+/// Where a rule of the repository puts what it matches.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(in crate::repo::insights) enum Target {
+    Purpose(Purpose),
+    /// A group of its own, by name (a feature across folders, say).
+    Named(String),
+}
+
+/// A rule of the repository's rules file.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(in crate::repo::insights) struct Rule {
+    pub(in crate::repo::insights) target: Target,
+    pub(in crate::repo::insights) patterns: Vec<String>,
+    /// Its line, as written, to say why.
+    pub(in crate::repo::insights) line: usize,
+}
+
+/// The most of a rules file read, in bytes: a larger one is not used.
+pub(in crate::repo::insights) const MAX_FILE: u64 = 64 * 1024;
+/// The longest pattern used, and the most patterns, in bytes all told.
+const MAX_PATTERN: usize = 200;
+const MAX_PATTERNS: usize = 4096;
+/// The most matching done for one reading, in cells (see [`glob::cost`]): what is left once
+/// it is spent is placed by the built-in rules, and said.
+const MAX_WORK: usize = 200_000_000;
+
+/// Reads a rules file: `purpose: pattern…` or `group Name: pattern…` per line, `#` comments.
+/// Lines that aren't understood are said, not skipped silently; so are patterns too long, and
+/// those beyond [`MAX_PATTERNS`] bytes of them.
+pub(in crate::repo::insights) fn parse(text: &str) -> (Vec<Rule>, Vec<String>) {
+    let mut rules = Vec::new();
+    let mut errors = Vec::new();
+    let mut total = 0;
+    for (i, raw) in text.lines().enumerate() {
+        let line = raw.split('#').next().unwrap_or("").trim();
+        if line.is_empty() {
+            continue;
+        }
+        let Some((head, raw_patterns)) = line.split_once(':') else {
+            errors.push(crate::i18n::message(
+                "purpose-diagnostic-1",
+                &[
+                    ("number", (i + 1).to_string().into()),
+                    ("line", (line).to_string().into()),
+                ],
+            ));
+            continue;
+        };
+        let mut patterns: Vec<String> = Vec::new();
+        for p in raw_patterns.split_whitespace() {
+            if p.len() > MAX_PATTERN {
+                errors.push(crate::i18n::message(
+                    "purpose-diagnostic-2",
+                    &[
+                        ("number", (i + 1).to_string().into()),
+                        ("limit", (MAX_PATTERN).to_string().into()),
+                    ],
+                ));
+            } else if total + p.len() > MAX_PATTERNS {
+                errors.push(crate::i18n::message(
+                    "purpose-diagnostic-3",
+                    &[
+                        ("number", (i + 1).to_string().into()),
+                        ("limit", (MAX_PATTERNS).to_string().into()),
+                    ],
+                ));
+                break;
+            } else {
+                total += p.len();
+                patterns.push(p.to_owned());
+            }
+        }
+        let head = head.trim();
+        let target = match head.strip_prefix("group ") {
+            Some(name) if !name.trim().is_empty() => Target::Named(name.trim().to_owned()),
+            _ => match Purpose::NAMED.iter().find(|p| p.word() == head) {
+                Some(&p) => Target::Purpose(p),
+                None => {
+                    errors.push(crate::i18n::message(
+                        "purpose-diagnostic-4",
+                        &[
+                            ("number", (i + 1).to_string().into()),
+                            ("head", (head).to_string().into()),
+                        ],
+                    ));
+                    continue;
+                }
+            },
+        };
+        if patterns.is_empty() {
+            errors.push(crate::i18n::message(
+                "purpose-diagnostic-5",
+                &[("number", (i + 1).to_string().into())],
+            ));
+            continue;
+        }
+        rules.push(Rule {
+            target,
+            patterns,
+            line: i + 1,
+        });
+    }
+    (rules, errors)
+}
+
+/// Where the rules put a unit, and why.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(in crate::repo::insights) struct Placement {
+    pub(in crate::repo::insights) target: Target,
+    pub(in crate::repo::insights) why: String,
+}
+
+fn put(purpose: Purpose, why: impl Into<String>) -> Placement {
+    Placement {
+        target: Target::Purpose(purpose),
+        why: why.into(),
+    }
+}
+
+/// Folders and names of tests.
+const TEST_DIRS: [&str; 6] = [
+    "tests/",
+    "test/",
+    "__tests__/",
+    "spec/",
+    "testdata/",
+    "e2e/",
+];
+const TEST_NAMES: [&str; 7] = [
+    "_test.", "_tests.", ".test.", ".spec.", "_spec.", "Test.", "Tests.",
+];
+const DOC_EXT: [&str; 5] = [".md", ".rst", ".adoc", ".txt", ".ftl"];
+const DOC_NAMES: [&str; 5] = ["README", "CHANGELOG", "LICENSE", "CONTRIBUTING", "NOTICE"];
+const CONFIG_EXT: [&str; 9] = [
+    ".toml", ".yml", ".yaml", ".json", ".ini", ".cfg", ".conf", ".gradle", ".cmake",
+];
+const CONFIG_NAMES: [&str; 8] = [
+    "Makefile",
+    "Dockerfile",
+    "build.rs",
+    "CMakeLists.txt",
+    ".gitignore",
+    ".gitattributes",
+    ".editorconfig",
+    "Justfile",
+];
+const API_PATHS: [&str; 6] = [
+    "api/",
+    "proto/",
+    "openapi",
+    "schema/",
+    "include/",
+    "contracts/",
+];
+const API_EXT: [&str; 4] = [".proto", ".graphql", ".d.ts", ".thrift"];
+const SOURCE_EXT: [&str; 22] = [
+    ".rs", ".py", ".js", ".mjs", ".ts", ".tsx", ".jsx", ".go", ".java", ".kt", ".swift", ".c",
+    ".cc", ".cpp", ".h", ".hpp", ".cs", ".rb", ".php", ".scala", ".sh", ".lua",
+];
+const GENERATED_DIRS: [&str; 5] = [
+    "vendor/",
+    "third_party/",
+    "node_modules/",
+    "dist/",
+    "generated/",
+];
+const GENERATED_NAMES: [&str; 4] = [".generated.", ".pb.go", "_pb2.py", ".g.dart"];
+
+fn in_dir(path: &str, dirs: &[&str]) -> Option<String> {
+    dirs.iter()
+        .find(|d| path.starts_with(*d) || path.contains(&format!("/{d}")))
+        .map(|d| crate::i18n::message("purpose-detail-19", &[("d", (d).to_string().into())]))
+}
+
+/// The repository's rules and what they match: worked out with the units, off the UI thread.
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub(in crate::repo::insights) struct Ruled {
+    pub(in crate::repo::insights) rules: Vec<Rule>,
+    /// Lines not understood, patterns not used, matching left undone.
+    pub(in crate::repo::insights) errors: Vec<String>,
+    /// For each unit, the rule and the pattern of it that matched its path.
+    pub(in crate::repo::insights) hits: Vec<Option<(usize, usize)>>,
+}
+
+/// What the rules file `config` says of each of `paths`, each path matched once.
+pub(in crate::repo::insights) fn rule<'a>(
+    config: Option<&str>,
+    paths: impl IntoIterator<Item = &'a str>,
+) -> Ruled {
+    let (rules, mut errors) = config.map(parse).unwrap_or_default();
+    let mut work = 0usize;
+    let mut done: std::collections::HashMap<&str, Option<(usize, usize)>> = Default::default();
+    let mut out_of_work = false;
+    let mut hits = Vec::new();
+    for path in paths {
+        let hit = match done.get(path) {
+            Some(hit) => *hit,
+            None if out_of_work => None,
+            None => {
+                let mut hit = None;
+                'rules: for (r, rule) in rules.iter().enumerate() {
+                    for (p, pattern) in rule.patterns.iter().enumerate() {
+                        work += glob::cost(pattern, path);
+                        if work > MAX_WORK {
+                            out_of_work = true;
+                            break 'rules;
+                        }
+                        if glob::matches(pattern, path) {
+                            hit = Some((r, p));
+                            break 'rules;
+                        }
+                    }
+                }
+                if !out_of_work {
+                    done.insert(path, hit);
+                }
+                hit
+            }
+        };
+        hits.push(hit);
+    }
+    if out_of_work {
+        errors.push(crate::i18n::message(
+            "purpose-diagnostic-6",
+            &[("file", (super::units::CONFIG).to_string().into())],
+        ));
+    }
+    Ruled {
+        rules,
+        errors,
+        hits,
+    }
+}
+
+/// Where the rules put `unit`; `hit`: the repository's rule that matched it, and the pattern.
+/// `generated`: why the file folding rules fold its file, if they do (`linguist-generated`, a
+/// lockfile, a minified file, a pattern of the settings).
+pub(in crate::repo::insights) fn place(
+    unit: &Unit,
+    hit: Option<(&Rule, &str)>,
+    generated: Option<&str>,
+) -> Placement {
+    let path = unit.path.as_str();
+    if let Some((rule, p)) = hit {
+        return Placement {
+            target: rule.target.clone(),
+            why: crate::i18n::message(
+                "purpose-diagnostic-7",
+                &[
+                    ("pattern", (p).to_string().into()),
+                    ("line", (rule.line).to_string().into()),
+                    ("file", (super::units::CONFIG).to_string().into()),
+                ],
+            ),
+        };
+    }
+    let name = path.rsplit('/').next().unwrap_or(path);
+    if let Some(reason) = generated {
+        return put(
+            Purpose::Generated,
+            crate::i18n::message(
+                "purpose-diagnostic-8",
+                &[("reason", (reason).to_string().into())],
+            ),
+        );
+    }
+    if let Some(why) = in_dir(path, &GENERATED_DIRS) {
+        return put(Purpose::Generated, why);
+    }
+    if let Some(n) = GENERATED_NAMES.iter().find(|n| name.contains(*n)) {
+        return put(
+            Purpose::Generated,
+            crate::i18n::message("purpose-detail-20", &[("n", (n).to_string().into())]),
+        );
+    }
+    if let Body::File(Whole::NoLines) = unit.body {
+        return match &unit.old_path {
+            Some(old) => put(
+                Purpose::Moves,
+                crate::i18n::message("purpose-detail-21", &[("old", (old).to_string().into())]),
+            ),
+            None => put(Purpose::Other, crate::i18n::text("purpose-detail-9")),
+        };
+    }
+    if unit.markers.layout {
+        return put(Purpose::Formatting, crate::i18n::text("purpose-detail-10"));
+    }
+    if let Some((_, deviates)) = unit.repeated {
+        return put(
+            Purpose::Repeated,
+            if deviates {
+                crate::i18n::text("purpose-detail-11")
+            } else {
+                crate::i18n::text("purpose-detail-12")
+            },
+        );
+    }
+    by_path(unit, path, name)
+}
+
+fn by_path(unit: &Unit, path: &str, name: &str) -> Placement {
+    if let Some(why) = in_dir(path, &TEST_DIRS) {
+        return put(Purpose::Tests, why);
+    }
+    if let Some(n) = TEST_NAMES.iter().find(|n| name.contains(*n)) {
+        return put(
+            Purpose::Tests,
+            crate::i18n::message("purpose-detail-20", &[("n", (n).to_string().into())]),
+        );
+    }
+    if name.starts_with("test_") || name == "tests.rs" {
+        return put(Purpose::Tests, crate::i18n::text("purpose-detail-13"));
+    }
+    if let Some(why) = in_dir(path, &["migrations/", "migrate/"]) {
+        return put(Purpose::Migrations, why);
+    }
+    if name.ends_with(".sql") {
+        return put(Purpose::Migrations, crate::i18n::text("purpose-detail-14"));
+    }
+    if let Some(e) = API_EXT.iter().find(|e| name.ends_with(*e)) {
+        return put(
+            Purpose::Api,
+            crate::i18n::message("purpose-detail-22", &[("e", (e).to_string().into())]),
+        );
+    }
+    if let Some(why) = in_dir(path, &API_PATHS) {
+        return put(Purpose::Api, why);
+    }
+    if DOC_NAMES.iter().any(|n| name.starts_with(n)) || in_dir(path, &["docs/", "doc/"]).is_some() {
+        return put(Purpose::Docs, crate::i18n::text("purpose-detail-15"));
+    }
+    if let Some(e) = DOC_EXT.iter().find(|e| name.ends_with(*e)) {
+        return put(
+            Purpose::Docs,
+            crate::i18n::message("purpose-detail-22", &[("e", (e).to_string().into())]),
+        );
+    }
+    if CONFIG_NAMES.contains(&name) || path.starts_with(".github/") || path.starts_with("ci/") {
+        return put(Purpose::Config, crate::i18n::text("purpose-detail-16"));
+    }
+    if let Some(e) = CONFIG_EXT.iter().find(|e| name.ends_with(*e)) {
+        return put(
+            Purpose::Config,
+            crate::i18n::message("purpose-detail-22", &[("e", (e).to_string().into())]),
+        );
+    }
+    if let Some(ext) = SOURCE_EXT.iter().find(|e| name.ends_with(*e)) {
+        if let Some(t) = &unit.markers.test {
+            return put(
+                Purpose::Tests,
+                crate::i18n::message("purpose-detail-23", &[("t", (t).to_string().into())]),
+            );
+        }
+        if let Some(a) = &unit.markers.api {
+            return put(
+                Purpose::Api,
+                crate::i18n::message("purpose-detail-24", &[("a", (a).to_string().into())]),
+            );
+        }
+        return put(
+            Purpose::Logic,
+            crate::i18n::message("purpose-detail-25", &[("ext", (ext).to_string().into())]),
+        );
+    }
+    if let Body::File(Whole::Binary) = unit.body {
+        return put(Purpose::Assets, crate::i18n::text("purpose-detail-17"));
+    }
+    put(Purpose::Other, crate::i18n::text("purpose-detail-18"))
+}
