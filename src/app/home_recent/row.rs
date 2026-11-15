@@ -25,7 +25,7 @@ pub(in crate::app) fn share_room(room: f32, name: f32, dot: f32, status: f32) ->
 }
 
 /// `text` on one line, cut with "…" to fit `max` wide.
-pub(super) fn elided(
+pub(in crate::app) fn elided(
     ui: &Ui,
     text: String,
     font: egui::FontId,
@@ -138,7 +138,7 @@ pub(super) fn recent_row(ui: &mut Ui, path: &Path, info: &RowInfo) -> (Option<Ro
 
 /// The name, the dot of uncommitted changes, then the branch (or what is wrong), from `at` to
 /// `max_x`: each cut with "…" rather than overlapping what follows.
-pub(super) fn first_line(
+pub(in crate::app) fn first_line(
     ui: &Ui,
     p: &egui::Painter,
     path: &Path,
