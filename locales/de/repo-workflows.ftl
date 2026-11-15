@@ -7818,3 +7818,4 @@ staged-run = Vorgemerkten Stand testen
 
 staged-metadata = Index und Info-Attribute müssen reguläre Dateien sein (keine Links, Geräte oder Pipes). Reguläre Git-Metadaten wiederherstellen und erneut versuchen.
 staged-raw = Tests verwenden unveränderte Index-Inhalte, ohne Checkout-Filter, Zeilenenden- oder Zeichenkodierungskonvertierung. Build-Ausgaben im Befehl begrenzen.
+staged-link-budget = Die Symlink-Auflösung überschreitet 1.000.000 Verarbeitungsschritte. Link-Ketten kürzen oder Ziele vereinfachen, bevor vorgemerkte Änderungen getestet werden.

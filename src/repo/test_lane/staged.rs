@@ -161,7 +161,9 @@ impl RepoTab {
                             ),
                         ],
                     ));
-                    if result.ended.stopped {
+                    if let Some(error) = &result.error {
+                        ui.colored_label(ui.visuals().error_fg_color, error);
+                    } else if result.ended.stopped {
                         ui.label(crate::i18n::text("staged-cancelled"));
                     }
                     if result.ended.code == Some(127) {

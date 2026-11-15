@@ -24,6 +24,7 @@ pub(crate) struct StagedResult {
     pub command: String,
     pub ended: Ended,
     pub lines: Vec<String>,
+    pub error: Option<String>,
     pub elapsed: Duration,
 }
 
@@ -112,11 +113,14 @@ fn synthetic_revision(repo: &Path, tree: &str) -> Result<String, String> {
 
 /// The scratch registry supplies RAII removal and next-launch crash recovery. No refs
 /// or files in the source worktree are changed. Tree objects may be added to its ODB.
-fn snapshot(repo: &Path, expected: Option<&[u8]>) -> Result<(Scratch, String), String> {
+fn snapshot(repo: &Path, expected: Option<Option<&[u8]>>) -> Result<(Scratch, String), String> {
     crate::git::command::snapshot_policy::without_hooks(|| snapshot_inner(repo, expected))
 }
 
-fn snapshot_inner(repo: &Path, expected: Option<&[u8]>) -> Result<(Scratch, String), String> {
+fn snapshot_inner(
+    repo: &Path,
+    expected: Option<Option<&[u8]>>,
+) -> Result<(Scratch, String), String> {
     local(repo)?;
     preflight::dense(repo)?;
     let scratch = Scratch::add_empty(repo, "test", &initial_revision(repo)?)?;
@@ -130,7 +134,7 @@ fn snapshot_inner(repo: &Path, expected: Option<&[u8]>) -> Result<(Scratch, Stri
     )?;
     let target = target.trim();
     let copied = read_bounded(Path::new(source.trim()))?;
-    if expected.is_some() && copied.as_deref() != expected {
+    if expected.is_some_and(|expected| copied.as_deref() != expected) {
         return Err(crate::i18n::text("staged-stale").into());
     }
     if let Some(bytes) = copied {
@@ -204,7 +208,7 @@ fn verify(repo: &Path, command: &str, stop: &RunStop) -> Result<StagedResult, St
     local(repo)?;
     let expected = index_bytes(repo)?;
     let fingerprint = fingerprint_for(repo, command, expected.as_deref())?;
-    let (scratch, tree) = snapshot(repo, expected.as_deref())?;
+    let (scratch, tree) = snapshot(repo, Some(expected.as_deref()))?;
     // A concurrent staging operation must never label a mixed/new snapshot as this run.
     if staged_fingerprint(repo, command)? != fingerprint {
         return Err(crate::i18n::text("staged-stale").into());
@@ -217,12 +221,14 @@ fn verify(repo: &Path, command: &str, stop: &RunStop) -> Result<StagedResult, St
     );
     let cleanup = scratch.remove_retrying(3, Duration::from_millis(50));
     cleanup?;
-    let (ended, lines) = ran?;
+    let (ended, lines) = ran;
+    let (ended, error) = command_end(ended);
     Ok(StagedResult {
         key: StagedKey { tree, fingerprint },
         command: scrub(command),
         ended,
         lines: lines.into_iter().map(|s| scrub(&s)).collect(),
+        error,
         elapsed: started.elapsed(),
     })
 }
@@ -250,3 +256,19 @@ fn scrub(text: &str) -> String {
 
 #[cfg(test)]
 mod review_tests;
+
+fn command_end(ended: Result<Ended, String>) -> (Ended, Option<String>) {
+    match ended {
+        Ok(ended) => (ended, None),
+        Err(error) => (
+            Ended {
+                code: None,
+                stopped: true,
+            },
+            Some(scrub(&error)),
+        ),
+    }
+}
+
+#[cfg(test)]
+mod extra_review_tests;

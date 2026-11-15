@@ -145,7 +145,7 @@ fn capture_rejects_a_replaced_index_even_if_it_changes_back_later() -> Result<()
     let original = std::fs::read(repo.path().join(".git/index")).map_err(|e| e.to_string())?;
     std::fs::write(repo.path().join("file"), "new").map_err(|e| e.to_string())?;
     repo.git(&["add", "file"])?;
-    assert!(snapshot(repo.path(), Some(&original)).is_err());
+    assert!(snapshot(repo.path(), Some(Some(&original))).is_err());
     assert_eq!(repo.worktree_count()?, 1);
     Ok(())
 }

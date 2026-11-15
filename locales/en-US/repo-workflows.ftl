@@ -7820,3 +7820,4 @@ staged-run = Run staged test
 
 staged-metadata = Index and info attributes must be regular files (no links, devices or pipes). Restore ordinary Git metadata and retry.
 staged-raw = Tests use raw indexed bytes, without checkout filters, line-ending or encoding conversion. Build outputs need limits in your command.
+staged-link-budget = Symlink resolution exceeds 1,000,000 traversal steps. Shorten link chains or simplify targets before testing staged changes.

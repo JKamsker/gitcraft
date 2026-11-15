@@ -40,6 +40,19 @@ pub(super) fn targets(repo: &Path, entries: &[Entry]) -> Result<BTreeMap<String,
 pub(super) fn resolve(
     links: &BTreeMap<String, String>,
 ) -> Result<BTreeMap<String, String>, String> {
+    resolve_bounded(links, 1_000_000)
+}
+fn step(remaining: &mut usize) -> Result<(), String> {
+    crate::processes::deadline::check()?;
+    *remaining = remaining
+        .checked_sub(1)
+        .ok_or_else(|| fail("staged-link-budget"))?;
+    Ok(())
+}
+fn resolve_bounded(
+    links: &BTreeMap<String, String>,
+    mut remaining: usize,
+) -> Result<BTreeMap<String, String>, String> {
     let mut result = BTreeMap::new();
     for path in links.keys() {
         let mut pending: std::collections::VecDeque<_> =
@@ -47,6 +60,7 @@ pub(super) fn resolve(
         let mut resolved = Vec::new();
         let mut expanded = BTreeSet::new();
         while let Some(part) = pending.pop_front() {
+            step(&mut remaining)?;
             match part.as_str() {
                 "" | "." => continue,
                 ".." => {
@@ -67,6 +81,7 @@ pub(super) fn resolve(
                 }
                 resolved.pop();
                 for part in target.split('/').rev() {
+                    step(&mut remaining)?;
                     pending.push_front(part.into());
                 }
             }
@@ -115,6 +130,23 @@ fn support(repo: &Path, entries: &[Entry], root: &Path) -> Result<(), String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn expansion_budget_bounds_queued_components_and_observes_cancellation() {
+        let links = BTreeMap::from([
+            ("A".into(), format!("b/{}", "./".repeat(500))),
+            ("B".into(), "file".into()),
+        ]);
+        assert_eq!(
+            resolve_bounded(&links, 32).err(),
+            Some(fail("staged-link-budget"))
+        );
+        let cancel = crate::tasks::Cancellation::default();
+        cancel.cancel();
+        crate::tasks::with_cancellation(cancel, || assert!(resolve(&links).is_err()));
+        crate::processes::deadline::within(std::time::Instant::now(), || {
+            assert!(resolve(&links).is_err());
+        });
+    }
     #[test]
     fn links_cannot_resolve_through_git_directory_aliases_on_any_host() {
         for target in [
