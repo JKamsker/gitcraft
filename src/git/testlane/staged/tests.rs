@@ -178,3 +178,40 @@ fn cancellation_of_owned_snapshot_command_cleans_checkout() -> Result<(), String
     assert_eq!(repo.scratch_left(), 0);
     Ok(())
 }
+
+#[test]
+fn synthetic_cancellation_tokens_cover_preparation_without_affecting_other_runs() {
+    let parent = crate::tasks::Cancellation::default();
+    let unrelated = git::Stopper::default();
+    crate::tasks::with_cancellation(parent.clone(), || {
+        let run = RunStop::default();
+        let preparation = run.command_stopper();
+        preparation.with_scope(|| {
+            let process = git::Stopper::scoped();
+            run.stop();
+            assert!(preparation.stopped());
+            assert!(process.stopped());
+        });
+        let tab_run = RunStop::default();
+        let preparation = tab_run.command_stopper();
+        parent.cancel();
+        assert!(preparation.stopped());
+    });
+    assert!(!unrelated.stopped());
+}
+
+#[test]
+fn cancelled_tab_scope_still_removes_its_snapshot() -> Result<(), String> {
+    let repo = Repo::new("staged-tab-cleanup")?;
+    repo.commit("base", &[])?;
+    let parent = crate::tasks::Cancellation::default();
+    crate::tasks::with_cancellation(parent.clone(), || -> Result<(), String> {
+        let (scratch, _) = snapshot(repo.path(), None)?;
+        parent.cancel();
+        drop(scratch);
+        Ok(())
+    })?;
+    assert_eq!(repo.worktree_count()?, 1);
+    assert_eq!(repo.scratch_left(), 0);
+    Ok(())
+}
