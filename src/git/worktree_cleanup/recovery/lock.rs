@@ -53,3 +53,20 @@ pub(super) fn acquire(root: &Path, directory: &Path) -> Result<File, String> {
         .map_err(|e| format!("Recovery operation already running or lock unavailable: {e:?}"))?;
     Ok(file)
 }
+
+#[cfg(all(test, unix))]
+mod tests {
+    /// Model an inherited open-file description without spawning or signalling a process.
+    #[test]
+    fn owner_drop_releases_operation_even_with_a_duplicated_descriptor()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let temp = tempfile::tempdir()?;
+        let item = temp.path().join("tree-duplicate");
+        let held = super::acquire(temp.path(), &item)?;
+        let inherited = held.try_clone()?;
+        drop(held);
+        assert!(super::acquire(temp.path(), &item).is_ok());
+        drop(inherited);
+        Ok(())
+    }
+}
