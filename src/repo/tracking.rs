@@ -1,6 +1,7 @@
 //! Owned, asynchronous upstream picker; presentation never fetches or publishes.
-use super::{Action, Dialog, Outcome, Refresh, RepoTab, Undo};
 use crate::git::repository_tools::tracking::{self, View};
+use crate::repo::dialogs::Outcome;
+use crate::repo::{Action, Dialog, Refresh, RepoTab, Undo};
 use std::{
     collections::{BTreeMap, BTreeSet},
     path::PathBuf,
@@ -99,7 +100,7 @@ impl Form {
         }
         None
     }
-    pub(super) fn show(&mut self, ui: &mut egui::Ui, idle: bool) -> Outcome {
+    pub(in crate::repo) fn show(&mut self, ui: &mut egui::Ui, idle: bool) -> Outcome {
         if let Some(outcome) = self.settle() {
             return outcome;
         }
@@ -224,7 +225,11 @@ impl RepoTab {
             self.path.clone(),
             branch.to_owned(),
             self.ref_labels(),
-            self.visibility.sidebar_remotes.clone(),
+            self.visibility
+                .sidebar_remotes
+                .union(&self.visibility.graph_remotes)
+                .cloned()
+                .collect(),
         )))
     }
 }

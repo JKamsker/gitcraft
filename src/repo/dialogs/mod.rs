@@ -25,7 +25,6 @@ mod rehearse;
 mod remote;
 mod stash;
 mod test_commits;
-mod tracking;
 mod upstream;
 mod window;
 mod worktree;
@@ -158,7 +157,7 @@ pub enum Dialog {
         focus: bool,
     },
     /// The remote branch `branch` tracks: `remote`/`name`. `undo` brings back the one before.
-    Tracking(Box<tracking::Form>),
+    Tracking(Box<super::tracking::Form>),
     SetUpstream {
         branch: String,
         remote: String,
@@ -239,7 +238,7 @@ pub(crate) struct Instead {
     pub(super) described: Vec<String>,
 }
 
-pub(super) enum Outcome {
+pub(in crate::repo) enum Outcome {
     Open,
     Cancel,
     Done(Box<Action>),
