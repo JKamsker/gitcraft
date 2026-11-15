@@ -92,7 +92,7 @@ impl Form {
                     self.selected = view
                         .choices
                         .iter()
-                        .find(|c| c.path == view.current)
+                        .find(|c| c.full == view.current_full)
                         .map(|c| c.full.clone());
                 }
                 self.view = Some(view);
@@ -124,7 +124,8 @@ impl Form {
                 "{}: {current}",
                 crate::i18n::text("tracking-current")
             ));
-            if !view.current.is_empty() && !view.choices.iter().any(|c| c.path == view.current) {
+            if !view.current.is_empty() && !view.choices.iter().any(|c| c.full == view.current_full)
+            {
                 ui.label(crate::i18n::text("tracking-unavailable"));
             }
             ui.add(

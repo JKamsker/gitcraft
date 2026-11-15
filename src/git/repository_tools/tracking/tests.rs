@@ -117,7 +117,11 @@ fn dot_tracking_and_missing_upstream_can_be_unset_and_restored() -> Result<(), S
         repo.git(&["config", "branch.main.remote", remote])?;
         repo.git(&["config", "branch.main.merge", merge])?;
         let prior = values(repo.path(), "main")?;
-        let plan = read(repo.path(), "main")?.plan(None)?;
+        let view = read(repo.path(), "main")?;
+        if remote == "." {
+            assert_eq!(view.current_full, "refs/heads/origin/topic");
+        }
+        let plan = view.plan(None)?;
         run(&repo, &plan.ops)?;
         run(&repo, &plan.undo)?;
         assert_eq!(values(repo.path(), "main")?, prior);

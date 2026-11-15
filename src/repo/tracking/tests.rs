@@ -143,3 +143,21 @@ fn every_local_menu_exposes_tracking_directly_including_head() {
         );
     }
 }
+
+#[test]
+fn dot_upstream_does_not_highlight_a_colliding_remote_path() -> Result<(), String> {
+    let (repo, mut form) = fixture("tracking-picker-dot")?;
+    repo.git(&["branch", "origin/topic"])?;
+    repo.git(&[
+        "branch",
+        "--set-upstream-to=refs/heads/origin/topic",
+        "main",
+    ])?;
+    let (tx, rx) = mpsc::channel();
+    tx.send(tracking::read(repo.path(), "main"))
+        .map_err(|e| e.to_string())?;
+    form.pending = Some(rx);
+    assert!(form.settle().is_none());
+    assert!(form.selected.is_none());
+    Ok(())
+}

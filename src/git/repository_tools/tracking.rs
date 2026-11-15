@@ -20,6 +20,7 @@ pub(crate) struct Choice {
 pub(crate) struct View {
     pub branch: String,
     pub current: String,
+    pub current_full: String,
     pub choices: Vec<Choice>,
     oid: String,
     prior: Values,
@@ -61,13 +62,8 @@ fn source(spec: &str, full: &str) -> Option<String> {
         (to == full).then(|| from.to_owned())
     }
 }
-pub(crate) fn read(repo: &Path, branch: &str) -> Result<View, String> {
-    crate::git::run(
-        Some(repo),
-        &["check-ref-format", &format!("refs/heads/{branch}")],
-    )?;
-    let before = config(repo)?;
-    let catalog = text(
+fn catalog_snapshot(repo: &Path) -> Result<String, String> {
+    text(
         repo,
         &[
             "for-each-ref",
@@ -75,7 +71,15 @@ pub(crate) fn read(repo: &Path, branch: &str) -> Result<View, String> {
             "refs/heads/",
             "refs/remotes/",
         ],
+    )
+}
+pub(crate) fn read(repo: &Path, branch: &str) -> Result<View, String> {
+    crate::git::run(
+        Some(repo),
+        &["check-ref-format", &format!("refs/heads/{branch}")],
     )?;
+    let before = config(repo)?;
+    let catalog = catalog_snapshot(repo)?;
     let refs = crate::git::refs(repo)?;
     let local = refs
         .local
@@ -102,24 +106,24 @@ pub(crate) fn read(repo: &Path, branch: &str) -> Result<View, String> {
             }
         }
     }
+    let current_full = text(
+        repo,
+        &[
+            "for-each-ref",
+            "--format=%(upstream)",
+            &format!("refs/heads/{branch}"),
+        ],
+    )?
+    .trim()
+    .to_owned();
     let prior = values(repo, branch)?;
-    if before != config(repo)?
-        || catalog
-            != text(
-                repo,
-                &[
-                    "for-each-ref",
-                    "--format=%(refname)%00%(objectname)%00%(symref)",
-                    "refs/heads/",
-                    "refs/remotes/",
-                ],
-            )?
-    {
+    if before != config(repo)? || catalog != catalog_snapshot(repo)? {
         return Err(crate::i18n::text("tracking-stale").into());
     }
     Ok(View {
         branch: branch.into(),
         current: local.upstream.clone(),
+        current_full,
         oid: local.target.clone(),
         prior,
         config: before,
