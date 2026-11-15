@@ -63,7 +63,7 @@ impl RepoTab {
         // including when select() returns early for the current row.
         if self.diff.as_ref().is_some_and(|view| {
             self.commit_changes.graph_with_diff(&view.key)
-                || matches!(&view.key, DiffKey::Commit { hash, .. } if hash != &selected_hash)
+                || matches!(&view.key, DiffKey::Commit { hash, .. } | DiffKey::Remerge { hash, .. } if hash != &selected_hash)
         }) {
             self.diff = None;
         }
