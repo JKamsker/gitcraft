@@ -179,7 +179,10 @@ impl RepoTab {
             pr: branch
                 && (badge.local
                     || badge.remotes.first().map(String::as_str) == self.primary_forge_remote())
-                && self.prs.iter().any(|p| p.branch == badge.label),
+                && self
+                    .prs
+                    .iter()
+                    .any(|p| !p.from_fork && p.branch == badge.label),
             ci: self
                 .ci_status(hash)
                 .filter(|_| branch)

@@ -8,7 +8,6 @@ use paint::*;
 use egui::{Align2, Color32, CornerRadius, FontId, Painter, Pos2, Rect, Response, Sense, Stroke};
 use egui::{Ui, pos2, vec2};
 
-use super::badge::Badge;
 use super::{AVATAR_D, ROW_GAP, ROW_H, ROW_PITCH};
 use crate::a11y::labels;
 use crate::git::{self, Commit};

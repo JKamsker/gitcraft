@@ -79,7 +79,7 @@ fn area_d_menu_matrix_repositions_and_keeps_submenus_reachable() -> Result<(), S
                             ui.data_mut(|d| {
                                 d.insert_temp(
                                     super::pill_menu_id(&"a".repeat(40)),
-                                    Some("fork/a-long-feature-branch".to_owned()),
+                                    Some("refs/remotes/fork/a-long-feature-branch".to_owned()),
                                 )
                             });
                             tab.commit_menu(&row, 1, true, acts);
