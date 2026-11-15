@@ -15,7 +15,9 @@ review data and checked against current code. One raw-byte documentation comment
 was already addressed in `4c20f01b`; the other nine findings were fixed. All 10
 threads received individual replies, listed below. No suggested external reviewer
 commands were executed. This shared worktree-ownership and failure-reporting fix
-set is returned for independent review before CI/merge.
+set is returned for another independent review before merge. Per the latest task
+instruction, the validated final publication enables CI for its exact head; older
+head runs must not be watched or rerun.
 
 - Scratch attempts reserve an exclusive random destination, retrying collisions.
   Local creation is explicitly nonrecursive (0700 on Unix); remote creation uses
@@ -89,7 +91,8 @@ The target is removed at handoff; no system tools changed.
   resource limits override its all-package Clippy/compile-all defaults; equivalent
   touched-crate gates and the affected groups below ran manually. No full application,
   Windows or forge-server suite ran. No CI dispatch, rerun or wait occurred during
-  implementation; CI and merge follow independent review of the final candidate.
+  implementation. After local validation, the latest task instruction requests CI
+  for the final published head. Independent review remains required before merge.
 
 Wider command (repo::direct_tests is a directory; its actual owner modules are selected):
 
