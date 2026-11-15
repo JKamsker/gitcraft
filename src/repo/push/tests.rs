@@ -1,6 +1,8 @@
 //! Pushes refused for real: two clones of a bare repository, one pushing behind the other's
 //! back, and what the check, the lease, Sync's pull and a first push make of it.
 
+use crate::repo::hang_diagnostics as diag;
+
 use std::path::{Path, PathBuf};
 
 use super::check::{self, Checked, Question, Rejection, Shape, Target};
@@ -21,11 +23,12 @@ struct World {
 
 impl Drop for World {
     fn drop(&mut self) {
-        let _ = std::fs::remove_dir_all(&self.root);
+        diag::remove_fixture(&self.root);
     }
 }
 
 fn run(dir: &Path, args: &[&str]) -> Result<String, String> {
+    let _git = diag::stage(format_args!("fixture git {args:?}"));
     git::run(Some(dir), args).map_err(|e| format!("git {args:?} in {}: {e}", dir.display()))
 }
 
@@ -34,6 +37,7 @@ fn path(p: &Path) -> String {
 }
 
 fn world(name: &str) -> Result<World, String> {
+    let _setup = diag::stage(format_args!("create push fixture {name}"));
     let root = std::env::temp_dir().join(format!("gitcraft-push-{name}-{}", std::process::id()));
     let _ = std::fs::remove_dir_all(&root);
     std::fs::create_dir_all(&root).map_err(|e| e.to_string())?;
