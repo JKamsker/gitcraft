@@ -108,32 +108,17 @@ impl RepoTab {
                 }
                 self.pr_since_items(ui, acts, pr);
                 self.pr_worktree_button(ui, acts, pr.number, &pr.branch, &pr.sha, idle, true);
+                let checkout = self.pr_checkout_action(pr);
                 if crate::menu_item::MenuItem::new(crate::i18n::message(
                     "repo-core-3455",
                     &[("branch", pr.branch.to_string().into())],
                 ))
                 .icon("log-in")
-                .enabled(idle)
+                .enabled(idle && checkout.is_some())
                 .show(ui)
                 .clicked()
                 {
-                    if self.refs.local.iter().any(|b| b.name == pr.branch) {
-                        acts.push(Action::Checkout(pr.branch.clone()));
-                    } else if let Some(b) = self.pr_remote_branch(pr) {
-                        acts.push(Action::CheckoutRemote(b.name.clone()));
-                    } else {
-                        let Some(remote) =
-                            self.primary_forge_remote().map(str::to_owned).or_else(|| {
-                                self.hosting
-                                    .is_none()
-                                    .then(|| self.default_remote())
-                                    .flatten()
-                            })
-                        else {
-                            return;
-                        };
-                        acts.push(Action::CheckoutRemote(format!("{remote}/{}", pr.branch)));
-                    }
+                    acts.extend(checkout);
                 }
                 self.fork_items(ui, acts, pr.number, idle, false);
                 if crate::menu_item::MenuItem::new(crate::i18n::text("repo-core-3456"))
@@ -145,4 +130,26 @@ impl RepoTab {
                 }
             });
     }
+    /// A contributor's branch name is never a local or base-repository checkout target.
+    fn pr_checkout_action(&self, pr: &PullRequest) -> Option<Action> {
+        if pr.from_fork {
+            return crate::pull_request::is_oid(&pr.sha).then(|| Action::Checkout(pr.sha.clone()));
+        }
+        if self.refs.local.iter().any(|b| b.name == pr.branch) {
+            return Some(Action::Checkout(pr.branch.clone()));
+        }
+        if let Some(branch) = self.pr_remote_branch(pr) {
+            return Some(Action::CheckoutRemote(branch.name.clone()));
+        }
+        let remote = self.primary_forge_remote().map(str::to_owned).or_else(|| {
+            self.hosting
+                .is_none()
+                .then(|| self.default_remote())
+                .flatten()
+        })?;
+        Some(Action::CheckoutRemote(format!("{remote}/{}", pr.branch)))
+    }
 }
+
+#[cfg(test)]
+mod tests;

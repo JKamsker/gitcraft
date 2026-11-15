@@ -104,7 +104,11 @@ pub(super) fn tooltip(pr: &PullRequest, hosting: Option<&Hosting>, moved: bool) 
             ""
         },
         pr.author,
-        if pr.draft { "Draft" } else { "Open" },
+        crate::i18n::text(if pr.draft {
+            "repo-workflows-pr_view-header-ebf12ef4"
+        } else {
+            "repo-workflows-pr_view-header-ed077f3d"
+        }),
         route(pr, hosting),
         pr.url
     )

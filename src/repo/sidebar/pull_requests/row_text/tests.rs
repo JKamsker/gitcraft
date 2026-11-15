@@ -130,3 +130,26 @@ fn selected_base_and_deleted_fork_routes_never_infer_owner_from_author() {
         egui::Shape::Text(t) if t.galley.text() == "unknown:feature → owner/repo:main" && !t.galley.elided)));
     output.drop_without_applying_deltas();
 }
+
+#[test]
+fn tooltip_status_follows_language_for_draft_and_open_prs() {
+    let ctx = egui::Context::default();
+    let (tab, mut pr) = fixture(&ctx);
+    for (language, draft, open) in [
+        ("en-US", "Draft", "Open"),
+        ("de", "Entwurf", "Offen"),
+        ("en-US", "Draft", "Open"),
+    ] {
+        crate::i18n::set_language(language);
+        for (is_draft, expected) in [(true, draft), (false, open)] {
+            pr.draft = is_draft;
+            assert_eq!(
+                tooltip(&pr, tab.hosting.as_ref(), false),
+                format!(
+                    "contributor · {expected} · contributor/fork:feature → owner/repo:main\n{}",
+                    pr.url
+                )
+            );
+        }
+    }
+}
