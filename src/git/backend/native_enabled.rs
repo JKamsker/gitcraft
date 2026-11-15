@@ -141,6 +141,7 @@ pub(super) fn refs_bounded(path: &Path, visit_budget: usize) -> Result<super::su
         };
         let short = &full[prefix.len()..];
         if prefix == "refs/remotes/" && reference.try_id().is_none() {
+            out.symbolic.insert(full.to_owned());
             continue;
         }
         if prefix == "refs/heads/"

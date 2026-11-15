@@ -40,6 +40,9 @@ impl Branch {
 #[derive(Clone, Debug, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct Refs {
     pub local: Vec<Branch>,
+    /// Symbolic remote pointers are decorations, not selectable branch refs.
+    #[serde(default)]
+    pub symbolic: std::collections::BTreeSet<String>,
     /// Local branch → push remote, including `pushRemote` and `remote.pushDefault`.
     pub push_remotes: HashMap<String, String>,
     /// Remote name → branches of that remote.
@@ -120,6 +123,7 @@ pub(super) fn refs_cli(repo: &Path) -> Result<Refs, String> {
             refs.local.push(branch);
         } else if let Some(rest) = full.strip_prefix("refs/remotes/") {
             if !symref.is_empty() {
+                refs.symbolic.insert(full.to_owned());
                 continue;
             }
             let remote = remote_of(rest, &remote_names).to_owned();

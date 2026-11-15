@@ -132,6 +132,7 @@ pub(in crate::repo) struct BadgeIndex {
     local: HashSet<String>,
     heads: HashSet<String>,
     current: Option<String>,
+    symbolic: std::collections::BTreeSet<String>,
     names: Vec<String>,
     remote_branches: HashMap<String, String>,
     pub(in crate::repo) captions: std::collections::BTreeMap<String, crate::ref_labels::Label>,
@@ -157,6 +158,7 @@ impl BadgeIndex {
             .collect();
         Self {
             heads,
+            symbolic: refs.symbolic.clone(),
             current: refs.current.clone(),
             local,
             names,
@@ -282,7 +284,14 @@ impl BadgeIndex {
                 Some(rest) => remote_of(rest, true),
                 None => remote_of(d, false),
             } {
-                // `origin/HEAD` only says which branch the remote defaults to.
+                // Symbolic defaults can have arbitrary names. A real branch ending in
+                // HEAD remains selectable when present in the fetched catalog.
+                if self
+                    .symbolic
+                    .contains(&format!("refs/remotes/{remote}/{name}"))
+                {
+                    continue;
+                }
                 if name == "HEAD" && !remote_branches.contains_key(&format!("{remote}/{name}")) {
                     continue;
                 }

@@ -52,3 +52,19 @@ fn full_ref_identity_survives_local_remote_and_tag_name_collisions() {
         .collect()
     );
 }
+
+#[test]
+fn symbolic_decorations_are_excluded_without_hiding_real_head_paths() {
+    let refs = Refs {
+        remotes: vec![(
+            "origin".into(),
+            vec![super::tests::branch("origin/nested/HEAD")],
+        )],
+        symbolic: ["refs/remotes/origin/default".into()].into_iter().collect(),
+        ..Default::default()
+    };
+    let got =
+        BadgeIndex::new(&refs).badges(&["origin/default".into(), "origin/nested/HEAD".into()]);
+    assert_eq!(got.len(), 1);
+    assert_eq!(got[0].full_ref, "refs/remotes/origin/nested/HEAD");
+}
