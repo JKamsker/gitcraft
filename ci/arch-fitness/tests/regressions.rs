@@ -181,3 +181,43 @@ fn visible_globs_are_cross_domain_reexports_but_private_globs_are_not() {
         );
     }
 }
+
+#[test]
+fn inherited_trait_mutators_are_mutation_evidence() {
+    for method in ["fn inherited(&mut self) {}", "fn inherited(&mut self);"] {
+        let source = format!(
+            "{} trait Mutator {{ {method} }} impl Mutator for State {{}}",
+            tab_act("self.status.inherited();")
+        );
+        let a = analysis(&tree(&[("src/alpha.rs", &source)]));
+        assert!(
+            a.repo_tab
+                .cross_mutations
+                .iter()
+                .any(|m| m.field == "status")
+        );
+    }
+}
+
+#[test]
+fn reexport_visibility_increases_budget_once_per_definition() {
+    for export in [
+        "pub(crate) use hidden::*;",
+        "pub(crate) use hidden::A; pub(crate) use hidden::A as Again;",
+        "mod bridge { pub(super) use super::hidden::*; } pub(crate) use bridge::*;",
+        "pub(crate) use hidden::nested as exposed;",
+    ] {
+        let hidden =
+            "pub struct State; mod hidden { pub struct A; pub mod nested { pub struct B; } }";
+        let original = tree(&[("src/alpha.rs", hidden)]);
+        let source = format!("{hidden} {export}");
+        let changed = tree(&[("src/alpha.rs", &source)]);
+        let before = analysis(&original).domains["alpha"].exported;
+        let after = analysis(&changed).domains["alpha"].exported;
+        let expected = if export.contains("hidden::*") { 2 } else { 1 };
+        assert_eq!(after, before + expected, "{export}");
+        assert!(
+            rules(&outcome(&changed, &adopted(&original))).contains(&"visibility-budget".into())
+        );
+    }
+}

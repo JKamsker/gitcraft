@@ -75,6 +75,10 @@ class GitCandidateTests(unittest.TestCase):
             git("add", ".")
             git("commit", "-qm", "undeclared increase")
             self.assertEqual(gate.main(["--root", folder, "--base", base]), 1)
+            git("commit", "--allow-empty", "-qm", "second commit in same push")
+            from unittest.mock import patch
+            with patch.dict("os.environ", {"EVENT_NAME": "push", "BEFORE_SHA": base, "REF_TYPE": "branch"}):
+                self.assertEqual(gate.main(["--root", folder, "--event-range"]), 1)
             # Editing the working baseline or declaration cannot authorize a committed increase.
             declaration = {"feature": {"changes": ["budget/a/exported=2"], "reason": "API", "owner": "o", "remediation": "narrow"}}
             (root / gate.APPROVALS).write_text(json.dumps(declaration))
@@ -93,3 +97,22 @@ class GitCandidateTests(unittest.TestCase):
             advanced = git("rev-parse", "HEAD")
             self.assertEqual(gate.main(["--root", folder, "--base", advanced, "--revision", candidate]), 0)
             self.assertEqual(gate.main(["--root", folder, "--base", "missing-revision"]), 1)
+
+
+class EventRangeTests(unittest.TestCase):
+    def test_push_uses_entire_event_range(self):
+        from unittest.mock import patch
+        with patch.object(gate, "commit", side_effect=lambda root, rev: rev):
+            self.assertEqual(gate.event_base("root", "HEAD", "push", "a" * 40), "a" * 40)
+            self.assertEqual(gate.event_base("root", "HEAD", "pull_request", ""), "HEAD^1")
+            self.assertEqual(gate.event_base("root", "HEAD", "push", "0" * 40, "tag"), "HEAD^1")
+
+    def test_missing_new_or_invalid_push_base_fails_closed(self):
+        from unittest.mock import patch
+        import subprocess
+        for before in ["", "0" * 40, "not-a-sha"]:
+            with self.subTest(before=before), self.assertRaises(ValueError):
+                gate.event_base("root", "HEAD", "push", before)
+        with patch.object(gate, "commit", side_effect=subprocess.CalledProcessError(128, "git")):
+            with self.assertRaises(subprocess.CalledProcessError):
+                gate.event_base("root", "HEAD", "push", "a" * 40)

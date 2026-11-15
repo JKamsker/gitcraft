@@ -2,6 +2,8 @@
 """Check baseline growth against a Git base; declarations are committed, never PR labels."""
 import argparse
 import json
+import os
+import re
 from pathlib import Path
 import subprocess
 import sys
@@ -73,14 +75,33 @@ def read(root, revision, path, optional=False):
     return json.loads(subprocess.check_output(["git", "show", f"{revision}:{path}"], cwd=root))
 
 
+def commit(root, revision):
+    return subprocess.check_output(["git", "rev-parse", "--verify", f"{revision}^{{commit}}"],
+                                   cwd=root, text=True, stderr=subprocess.PIPE).strip()
+
+
+def event_base(root, revision, event, before, ref_type="branch"):
+    if event == "push" and ref_type != "tag":
+        if not re.fullmatch(r"[0-9a-fA-F]{40}|[0-9a-fA-F]{64}", before) or not before.strip("0"):
+            raise ValueError("push before SHA missing or all-zero (new branch); cannot establish baseline range")
+        # Compare the full push, even if before is not an ancestor after a force push.
+        return commit(root, before)
+    return commit(root, f"{revision}^1")
+
+
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--base", required=True, help="target revision (compared via merge-base)")
+    selection = parser.add_mutually_exclusive_group(required=True)
+    selection.add_argument("--base", help="target revision (compared via merge-base)")
+    selection.add_argument("--event-range", action="store_true", help="CI event range from EVENT_NAME and BEFORE_SHA")
     parser.add_argument("--revision", default="HEAD")
     parser.add_argument("--root", type=Path, default=Path.cwd())
     args = parser.parse_args(argv)
     try:
-        base = subprocess.check_output(["git", "merge-base", args.base, args.revision], cwd=args.root, text=True).strip()
+        if args.event_range:
+            base = event_base(args.root, args.revision, os.environ.get("EVENT_NAME", ""), os.environ.get("BEFORE_SHA", ""), os.environ.get("REF_TYPE", "branch"))
+        else:
+            base = subprocess.check_output(["git", "merge-base", args.base, args.revision], cwd=args.root, text=True).strip()
         validate(read(args.root, base, BASELINE), read(args.root, args.revision, BASELINE),
                  read(args.root, base, APPROVALS, True), read(args.root, args.revision, APPROVALS, True))
         print(f"Architecture baseline growth: declared or absent (base {base}).")

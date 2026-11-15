@@ -22,7 +22,7 @@ AGGREGATE_CHECK = "python3 ci/require_results.py --allow-skipped forges"
 # A required check that is skipped counts as passing, so status jobs must run even
 # after a cancellation: `!cancelled()` would let a cancelled run skip them.
 STATUS_CONDITION = "${{ always() }}"
-BASELINE_CHECK = 'python3 ci/arch_baseline.py --base HEAD^1 --revision HEAD'
+BASELINE_CHECK = 'python3 ci/arch_baseline.py --event-range --revision HEAD'
 ARCH_TESTS = "cargo test --locked --manifest-path ci/arch-fitness/Cargo.toml"
 ARCH_CHECK = ('cargo run --locked --release --manifest-path ci/arch-fitness/Cargo.toml -- '
               'check --revision HEAD --markdown "$GITHUB_STEP_SUMMARY"')
@@ -115,7 +115,14 @@ def verify_required_commands(text, job, commands):
         matches = [step for step in steps if step.get("run", (None,))[0] == command]
         require(len(matches) == 1, f"required exact command missing or duplicated: {command}")
         step = matches[0]
-        require(not ({"if", "continue-on-error", "working-directory", "shell", "env"} & step.keys()),
+        forbidden = {"if", "continue-on-error", "working-directory", "shell", "env"}
+        if command == BASELINE_CHECK:
+            forbidden.remove("env")
+            env = nested(step, "env", 10)
+            require(env == {"EVENT_NAME": ("${{ github.event_name }}", ""),
+                            "BEFORE_SHA": ("${{ github.event.before }}", ""),
+                            "REF_TYPE": ("${{ github.ref_type }}", "")}, "baseline range environment changed")
+        require(not (forbidden & step.keys()),
                 f"required command can skip, soften, or retarget checks: {command}")
         require(not step["run"][1].strip(), f"required command has trailing content: {command}")
         if command == CLIPPY_CHECK:

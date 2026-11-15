@@ -135,7 +135,7 @@ impl TabInfo {
         }
         for chunk in bodies.iter().flatten() {
             for item in &chunk.items {
-                scan_impl(item, &info.name, &mut receivers, &mut returns);
+                scan_methods(item, &info.name, &mut receivers, &mut returns);
             }
         }
         // Without receiver type inference, any mutable definition is evidence of mutation.
@@ -178,34 +178,51 @@ fn count_return(map: &mut BTreeMap<String, (usize, usize)>, name: &str, tab: boo
     }
 }
 
-fn scan_impl(
+fn scan_methods(
     item: &syn::Item,
     tab: &str,
     receivers: &mut BTreeMap<String, (usize, usize)>,
     returns: &mut BTreeMap<String, (usize, usize)>,
 ) {
-    let syn::Item::Impl(imp) = item else {
-        return;
-    };
-    let self_is_tab = syntax::type_ident(&imp.self_ty).as_deref() == Some(tab);
-    for impl_item in &imp.items {
-        let syn::ImplItem::Fn(f) = impl_item else {
-            continue;
-        };
-        let name = f.sig.ident.to_string();
-        let ret = syntax::return_ident(&f.sig.output);
-        let returns_tab =
-            ret.as_deref() == Some(tab) || (self_is_tab && ret.as_deref() == Some("Self"));
-        count_return(returns, &name, returns_tab);
-        if let Some(receiver) = f.sig.receiver() {
-            let mutable =
-                matches!(&*receiver.ty, syn::Type::Reference(r) if r.mutability.is_some());
-            let entry = receivers.entry(name).or_default();
-            if mutable {
-                entry.0 += 1;
-            } else {
-                entry.1 += 1;
+    match item {
+        syn::Item::Impl(imp) => {
+            let self_is_tab = syntax::type_ident(&imp.self_ty).as_deref() == Some(tab);
+            for item in &imp.items {
+                if let syn::ImplItem::Fn(f) = item {
+                    scan_signature(&f.sig, tab, self_is_tab, receivers, returns);
+                }
             }
+        }
+        syn::Item::Trait(tr) => {
+            for item in &tr.items {
+                if let syn::TraitItem::Fn(f) = item {
+                    scan_signature(&f.sig, tab, false, receivers, returns);
+                }
+            }
+        }
+        _ => {}
+    }
+}
+
+fn scan_signature(
+    sig: &syn::Signature,
+    tab: &str,
+    self_is_tab: bool,
+    receivers: &mut BTreeMap<String, (usize, usize)>,
+    returns: &mut BTreeMap<String, (usize, usize)>,
+) {
+    let name = sig.ident.to_string();
+    let ret = syntax::return_ident(&sig.output);
+    let returns_tab =
+        ret.as_deref() == Some(tab) || (self_is_tab && ret.as_deref() == Some("Self"));
+    count_return(returns, &name, returns_tab);
+    if let Some(receiver) = sig.receiver() {
+        let mutable = matches!(&*receiver.ty, syn::Type::Reference(r) if r.mutability.is_some());
+        let entry = receivers.entry(name).or_default();
+        if mutable {
+            entry.0 += 1;
+        } else {
+            entry.1 += 1;
         }
     }
 }

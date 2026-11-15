@@ -6,7 +6,7 @@ use serde::Serialize;
 
 use crate::collect::{self, Root};
 use crate::domains::{self, Edge};
-use crate::model::{Gap, Inventory, ItemKind, ModId, Scope};
+use crate::model::{Gap, Inventory, ItemKind, ModId};
 use crate::policy::Policy;
 use crate::refs::{self, RefKind, Stats};
 use crate::resolve::{Def, Resolver};
@@ -221,34 +221,6 @@ pub fn analyze(
     }
 }
 
-/// The deepest module an item is visible within, after enclosing modules' visibility, and
-/// whether it is `pub` all the way to its crate root (and so visible to dependent crates).
-fn effective_root(
-    inv: &Inventory,
-    res: &Resolver,
-    module: ModId,
-    vis: &crate::model::VisSyntax,
-) -> (ModId, bool) {
-    let root_of = |m: ModId, scope: Scope| match scope {
-        Scope::Module(s) => s,
-        _ => inv.crates[inv.modules[m].krate].root,
-    };
-    let scope = res.scope(module, vis);
-    let mut public = scope == Scope::Public;
-    let mut deepest = root_of(module, scope);
-    let mut at = module;
-    while let Some(parent) = inv.modules[at].parent {
-        let scope = res.scope(parent, &inv.modules[at].vis);
-        public &= scope == Scope::Public;
-        let limit = root_of(parent, scope);
-        if inv.is_ancestor(deepest, limit) {
-            deepest = limit;
-        }
-        at = parent;
-    }
-    (deepest, public)
-}
-
 type Unused<'a> = (&'a BTreeSet<Def>, &'a mut BTreeMap<String, Vec<String>>);
 
 fn domain_reports(
@@ -261,18 +233,7 @@ fn domain_reports(
     unused: Unused,
 ) -> BTreeMap<String, Domain> {
     let (used, unused) = unused;
-    // Domains present in each module's subtree; modules are numbered parents first.
-    let mut below: Vec<BTreeSet<&str>> = domains
-        .iter()
-        .map(|d| BTreeSet::from([d.as_str()]))
-        .collect();
-    for m in (0..inv.modules.len()).rev() {
-        if let Some(parent) = inv.modules[m].parent {
-            let child = below[m].clone();
-            below[parent].extend(child);
-        }
-    }
-    let dependents = domains::dependent_domains(inv, domains);
+    let exported = crate::visibility::exported(inv, res, domains);
     let mut out: BTreeMap<String, Domain> = BTreeMap::new();
     let entry = |out: &mut BTreeMap<String, Domain>, d: &str| -> Domain {
         out.remove(d).unwrap_or_else(|| Domain {
@@ -319,10 +280,7 @@ fn domain_reports(
             continue;
         }
         let domain = &domains[item.module];
-        let (root, public) = effective_root(inv, res, item.module, &item.vis);
-        let krate = inv.modules[item.module].krate;
-        let exported = below[root].iter().any(|d| d != domain)
-            || (public && dependents[krate].iter().any(|d| d != domain));
+        let exported = exported.contains(&id);
         if exported && !used.contains(&Def::Item(id)) {
             let list = unused.entry(domain.clone()).or_default();
             if list.len() < 10 {

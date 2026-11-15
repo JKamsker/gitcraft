@@ -18,5 +18,213 @@
     "reason": "Checker correction exposes two existing mutations and eleven conservative method-name collisions; no application behavior changes.",
     "owner": "@JKamsker",
     "remediation": "Resolve receiver types for collisions; route existing coordination through the owning domain."
+  },
+  "215-reexport-visibility-agents": {
+    "changes": [
+      "budget/agents/exported=258"
+    ],
+    "reason": "Existing agents definitions exposed through named/glob re-exports and module aliases were omitted by the declaration-only visibility calculation. Corrected measurement 200 -> 258; application source unchanged.",
+    "owner": "@JKamsker",
+    "remediation": "Narrow or remove existing re-export bindings at the domain boundary, then ratchet the budget."
+  },
+  "215-reexport-visibility-app": {
+    "changes": [
+      "budget/app/exported=107"
+    ],
+    "reason": "Existing app definitions exposed through named/glob re-exports and module aliases were omitted by the declaration-only visibility calculation. Corrected measurement 58 -> 107; application source unchanged.",
+    "owner": "@JKamsker",
+    "remediation": "Narrow or remove existing re-export bindings at the domain boundary, then ratchet the budget."
+  },
+  "215-reexport-visibility-bisect": {
+    "changes": [
+      "budget/bisect/exported=62"
+    ],
+    "reason": "Existing bisect definitions exposed through named/glob re-exports and module aliases were omitted by the declaration-only visibility calculation. Corrected measurement 46 -> 62; application source unchanged.",
+    "owner": "@JKamsker",
+    "remediation": "Narrow or remove existing re-export bindings at the domain boundary, then ratchet the budget."
+  },
+  "215-reexport-visibility-changes": {
+    "changes": [
+      "budget/changes/exported=116"
+    ],
+    "reason": "Existing changes definitions exposed through named/glob re-exports and module aliases were omitted by the declaration-only visibility calculation. Corrected measurement 88 -> 116; application source unchanged.",
+    "owner": "@JKamsker",
+    "remediation": "Narrow or remove existing re-export bindings at the domain boundary, then ratchet the budget."
+  },
+  "215-reexport-visibility-conflicts": {
+    "changes": [
+      "budget/conflicts/exported=113"
+    ],
+    "reason": "Existing conflicts definitions exposed through named/glob re-exports and module aliases were omitted by the declaration-only visibility calculation. Corrected measurement 88 -> 113; application source unchanged.",
+    "owner": "@JKamsker",
+    "remediation": "Narrow or remove existing re-export bindings at the domain boundary, then ratchet the budget."
+  },
+  "215-reexport-visibility-diff": {
+    "changes": [
+      "budget/diff/exported=132"
+    ],
+    "reason": "Existing diff definitions exposed through named/glob re-exports and module aliases were omitted by the declaration-only visibility calculation. Corrected measurement 90 -> 132; application source unchanged.",
+    "owner": "@JKamsker",
+    "remediation": "Narrow or remove existing re-export bindings at the domain boundary, then ratchet the budget."
+  },
+  "215-reexport-visibility-doctor": {
+    "changes": [
+      "budget/doctor/exported=40"
+    ],
+    "reason": "Existing doctor definitions exposed through named/glob re-exports and module aliases were omitted by the declaration-only visibility calculation. Corrected measurement 34 -> 40; application source unchanged.",
+    "owner": "@JKamsker",
+    "remediation": "Narrow or remove existing re-export bindings at the domain boundary, then ratchet the budget."
+  },
+  "215-reexport-visibility-forge": {
+    "changes": [
+      "budget/forge/exported=218"
+    ],
+    "reason": "Existing forge definitions exposed through named/glob re-exports and module aliases were omitted by the declaration-only visibility calculation. Corrected measurement 166 -> 218; application source unchanged.",
+    "owner": "@JKamsker",
+    "remediation": "Narrow or remove existing re-export bindings at the domain boundary, then ratchet the budget."
+  },
+  "215-reexport-visibility-git": {
+    "changes": [
+      "budget/git/exported=1019"
+    ],
+    "reason": "Existing git definitions exposed through named/glob re-exports and module aliases were omitted by the declaration-only visibility calculation. Corrected measurement 375 -> 1019; application source unchanged.",
+    "owner": "@JKamsker",
+    "remediation": "Narrow or remove existing re-export bindings at the domain boundary, then ratchet the budget."
+  },
+  "215-reexport-visibility-graph": {
+    "changes": [
+      "budget/graph/exported=59"
+    ],
+    "reason": "Existing graph definitions exposed through named/glob re-exports and module aliases were omitted by the declaration-only visibility calculation. Corrected measurement 52 -> 59; application source unchanged.",
+    "owner": "@JKamsker",
+    "remediation": "Narrow or remove existing re-export bindings at the domain boundary, then ratchet the budget."
+  },
+  "215-reexport-visibility-guidance": {
+    "changes": [
+      "budget/guidance/exported=48"
+    ],
+    "reason": "Existing guidance definitions exposed through named/glob re-exports and module aliases were omitted by the declaration-only visibility calculation. Corrected measurement 44 -> 48; application source unchanged.",
+    "owner": "@JKamsker",
+    "remediation": "Narrow or remove existing re-export bindings at the domain boundary, then ratchet the budget."
+  },
+  "215-reexport-visibility-insights": {
+    "changes": [
+      "budget/insights/exported=339"
+    ],
+    "reason": "Existing insights definitions exposed through named/glob re-exports and module aliases were omitted by the declaration-only visibility calculation. Corrected measurement 304 -> 339; application source unchanged.",
+    "owner": "@JKamsker",
+    "remediation": "Narrow or remove existing re-export bindings at the domain boundary, then ratchet the budget."
+  },
+  "215-reexport-visibility-os": {
+    "changes": [
+      "budget/os/exported=73"
+    ],
+    "reason": "Existing os definitions exposed through named/glob re-exports and module aliases were omitted by the declaration-only visibility calculation. Corrected measurement 32 -> 73; application source unchanged.",
+    "owner": "@JKamsker",
+    "remediation": "Narrow or remove existing re-export bindings at the domain boundary, then ratchet the budget."
+  },
+  "215-reexport-visibility-release": {
+    "changes": [
+      "budget/release/exported=83"
+    ],
+    "reason": "Existing release definitions exposed through named/glob re-exports and module aliases were omitted by the declaration-only visibility calculation. Corrected measurement 55 -> 83; application source unchanged.",
+    "owner": "@JKamsker",
+    "remediation": "Narrow or remove existing re-export bindings at the domain boundary, then ratchet the budget."
+  },
+  "215-reexport-visibility-remote": {
+    "changes": [
+      "budget/remote/exported=127"
+    ],
+    "reason": "Existing remote definitions exposed through named/glob re-exports and module aliases were omitted by the declaration-only visibility calculation. Corrected measurement 69 -> 127; application source unchanged.",
+    "owner": "@JKamsker",
+    "remediation": "Narrow or remove existing re-export bindings at the domain boundary, then ratchet the budget."
+  },
+  "215-reexport-visibility-repo-core": {
+    "changes": [
+      "budget/repo-core/exported=188"
+    ],
+    "reason": "Existing repo-core definitions exposed through named/glob re-exports and module aliases were omitted by the declaration-only visibility calculation. Corrected measurement 91 -> 188; application source unchanged.",
+    "owner": "@JKamsker",
+    "remediation": "Narrow or remove existing re-export bindings at the domain boundary, then ratchet the budget."
+  },
+  "215-reexport-visibility-review": {
+    "changes": [
+      "budget/review/exported=117"
+    ],
+    "reason": "Existing review definitions exposed through named/glob re-exports and module aliases were omitted by the declaration-only visibility calculation. Corrected measurement 71 -> 117; application source unchanged.",
+    "owner": "@JKamsker",
+    "remediation": "Narrow or remove existing re-export bindings at the domain boundary, then ratchet the budget."
+  },
+  "215-reexport-visibility-rewrite": {
+    "changes": [
+      "budget/rewrite/exported=130"
+    ],
+    "reason": "Existing rewrite definitions exposed through named/glob re-exports and module aliases were omitted by the declaration-only visibility calculation. Corrected measurement 89 -> 130; application source unchanged.",
+    "owner": "@JKamsker",
+    "remediation": "Narrow or remove existing re-export bindings at the domain boundary, then ratchet the budget."
+  },
+  "215-reexport-visibility-runtime": {
+    "changes": [
+      "budget/runtime/exported=116"
+    ],
+    "reason": "Existing runtime definitions exposed through named/glob re-exports and module aliases were omitted by the declaration-only visibility calculation. Corrected measurement 101 -> 116; application source unchanged.",
+    "owner": "@JKamsker",
+    "remediation": "Narrow or remove existing re-export bindings at the domain boundary, then ratchet the budget."
+  },
+  "215-reexport-visibility-settings": {
+    "changes": [
+      "budget/settings/exported=67"
+    ],
+    "reason": "Existing settings definitions exposed through named/glob re-exports and module aliases were omitted by the declaration-only visibility calculation. Corrected measurement 34 -> 67; application source unchanged.",
+    "owner": "@JKamsker",
+    "remediation": "Narrow or remove existing re-export bindings at the domain boundary, then ratchet the budget."
+  },
+  "215-reexport-visibility-sidebar": {
+    "changes": [
+      "budget/sidebar/exported=36"
+    ],
+    "reason": "Existing sidebar definitions exposed through named/glob re-exports and module aliases were omitted by the declaration-only visibility calculation. Corrected measurement 31 -> 36; application source unchanged.",
+    "owner": "@JKamsker",
+    "remediation": "Narrow or remove existing re-export bindings at the domain boundary, then ratchet the budget."
+  },
+  "215-reexport-visibility-sync": {
+    "changes": [
+      "budget/sync/exported=57"
+    ],
+    "reason": "Existing sync definitions exposed through named/glob re-exports and module aliases were omitted by the declaration-only visibility calculation. Corrected measurement 27 -> 57; application source unchanged.",
+    "owner": "@JKamsker",
+    "remediation": "Narrow or remove existing re-export bindings at the domain boundary, then ratchet the budget."
+  },
+  "215-reexport-visibility-terminal": {
+    "changes": [
+      "budget/terminal/exported=37"
+    ],
+    "reason": "Existing terminal definitions exposed through named/glob re-exports and module aliases were omitted by the declaration-only visibility calculation. Corrected measurement 23 -> 37; application source unchanged.",
+    "owner": "@JKamsker",
+    "remediation": "Narrow or remove existing re-export bindings at the domain boundary, then ratchet the budget."
+  },
+  "215-reexport-visibility-ui-kit": {
+    "changes": [
+      "budget/ui-kit/exported=168"
+    ],
+    "reason": "Existing ui-kit definitions exposed through named/glob re-exports and module aliases were omitted by the declaration-only visibility calculation. Corrected measurement 98 -> 168; application source unchanged.",
+    "owner": "@JKamsker",
+    "remediation": "Narrow or remove existing re-export bindings at the domain boundary, then ratchet the budget."
+  },
+  "215-reexport-visibility-update": {
+    "changes": [
+      "budget/update/exported=20"
+    ],
+    "reason": "Existing update definitions exposed through named/glob re-exports and module aliases were omitted by the declaration-only visibility calculation. Corrected measurement 10 -> 20; application source unchanged.",
+    "owner": "@JKamsker",
+    "remediation": "Narrow or remove existing re-export bindings at the domain boundary, then ratchet the budget."
+  },
+  "215-reexport-visibility-worktrees": {
+    "changes": [
+      "budget/worktrees/exported=74"
+    ],
+    "reason": "Existing worktrees definitions exposed through named/glob re-exports and module aliases were omitted by the declaration-only visibility calculation. Corrected measurement 52 -> 74; application source unchanged.",
+    "owner": "@JKamsker",
+    "remediation": "Narrow or remove existing re-export bindings at the domain boundary, then ratchet the budget."
   }
 }

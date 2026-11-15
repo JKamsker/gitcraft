@@ -51,3 +51,5 @@ pub fn run(
     let outcome = check(&analysis, policy, baseline);
     (analysis, outcome)
 }
+
+mod visibility;

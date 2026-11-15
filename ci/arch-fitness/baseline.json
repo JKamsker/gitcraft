@@ -3816,23 +3816,23 @@
   "budgets": {
     "agents": {
       "domains": 18,
-      "exported": 200
+      "exported": 258
     },
     "app": {
       "domains": 17,
-      "exported": 58
+      "exported": 107
     },
     "bisect": {
       "domains": 10,
-      "exported": 46
+      "exported": 62
     },
     "changes": {
       "domains": 14,
-      "exported": 88
+      "exported": 116
     },
     "conflicts": {
       "domains": 11,
-      "exported": 88
+      "exported": 113
     },
     "dev": {
       "domains": 0,
@@ -3840,77 +3840,77 @@
     },
     "diff": {
       "domains": 11,
-      "exported": 90
+      "exported": 132
     },
     "doctor": {
       "domains": 8,
-      "exported": 34
+      "exported": 40
     },
     "forge": {
       "domains": 5,
-      "exported": 166
+      "exported": 218
     },
     "git": {
       "domains": 12,
-      "exported": 375
+      "exported": 1019
     },
     "graph": {
       "domains": 18,
-      "exported": 52
+      "exported": 59
     },
     "guidance": {
       "domains": 8,
-      "exported": 44
+      "exported": 48
     },
     "insights": {
       "domains": 15,
-      "exported": 304
+      "exported": 339
     },
     "os": {
       "domains": 4,
-      "exported": 32
+      "exported": 73
     },
     "release": {
       "domains": 9,
-      "exported": 55
+      "exported": 83
     },
     "remote": {
       "domains": 6,
-      "exported": 69
+      "exported": 127
     },
     "repo-core": {
       "domains": 24,
       "symbols": 609,
-      "exported": 91
+      "exported": 188
     },
     "review": {
       "domains": 15,
-      "exported": 71
+      "exported": 117
     },
     "rewrite": {
       "domains": 14,
-      "exported": 89
+      "exported": 130
     },
     "runtime": {
       "domains": 5,
-      "exported": 101
+      "exported": 116
     },
     "settings": {
       "domains": 15,
       "symbols": 179,
-      "exported": 34
+      "exported": 67
     },
     "sidebar": {
       "domains": 19,
-      "exported": 31
+      "exported": 36
     },
     "sync": {
       "domains": 13,
-      "exported": 27
+      "exported": 57
     },
     "terminal": {
       "domains": 9,
-      "exported": 23
+      "exported": 37
     },
     "tooling": {
       "domains": 0,
@@ -3918,15 +3918,15 @@
     },
     "ui-kit": {
       "domains": 4,
-      "exported": 98
+      "exported": 168
     },
     "update": {
       "domains": 2,
-      "exported": 10
+      "exported": 20
     },
     "worktrees": {
       "domains": 5,
-      "exported": 52
+      "exported": 74
     }
   }
 }
