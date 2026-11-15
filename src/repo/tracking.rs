@@ -136,51 +136,63 @@ impl Form {
                 crate::i18n::text("tracking-hidden"),
             );
             let query = self.query.to_lowercase();
-            let mut count = 0;
-            egui::ScrollArea::vertical()
-                .max_height(280.0)
-                .show(ui, |ui| {
+            let choices: Vec<_> = view
+                .choices
+                .iter()
+                .filter_map(|c| {
+                    if !self.include_hidden && self.hidden.contains(&c.remote) {
+                        return None;
+                    }
+                    let caption = self
+                        .labels
+                        .get(&c.full)
+                        .map_or(c.path.as_str(), |l| &l.caption);
+                    format!("{} {} {caption}", c.path, c.remote)
+                        .to_lowercase()
+                        .contains(&query)
+                        .then_some((c, caption))
+                })
+                .collect();
+            let count = choices.len();
+            let height = ui.text_style_height(&egui::TextStyle::Body) * 3.0
+                + ui.spacing().item_spacing.y * 2.0;
+            egui::ScrollArea::vertical().max_height(280.0).show_rows(
+                ui,
+                height,
+                count,
+                |ui, rows| {
                     let mut group = String::new();
-                    for c in &view.choices {
-                        if !self.include_hidden && self.hidden.contains(&c.remote) {
-                            continue;
-                        }
-                        let caption = self
-                            .labels
-                            .get(&c.full)
-                            .map_or(c.path.as_str(), |l| &l.caption);
-                        if !format!("{} {} {caption}", c.path, c.remote)
-                            .to_lowercase()
-                            .contains(&query)
-                        {
-                            continue;
-                        }
-                        count += 1;
-                        if group != c.remote {
-                            ui.strong(&c.remote);
-                            group.clone_from(&c.remote);
-                        }
+                    for index in rows {
+                        let (c, caption) = choices[index];
                         ui.push_id(&c.full, |ui| {
-                            if ui
-                                .selectable_label(
-                                    self.selected.as_ref() == Some(&c.full),
-                                    format!("{caption} — {}", c.path),
-                                )
-                                .on_hover_text(format!("{}\n{}", c.full, c.url))
-                                .clicked()
-                            {
-                                self.selected = Some(c.full.clone());
-                            }
-                            ui.small(&c.url);
+                            ui.allocate_ui(egui::vec2(ui.available_width(), height), |ui| {
+                            ui.style_mut().wrap_mode = Some(egui::TextWrapMode::Truncate);
+                                if group != c.remote {
+                                    ui.strong(&c.remote);
+                                    group.clone_from(&c.remote);
+                                }
+                                if ui
+                                    .selectable_label(
+                                        self.selected.as_ref() == Some(&c.full),
+                                        format!("{caption} — {}", c.path),
+                                    )
+                                    .on_hover_text(format!("{}\n{}", c.full, c.url))
+                                    .clicked()
+                                {
+                                    self.selected = Some(c.full.clone());
+                                }
+                                ui.small(&c.url);
+                            });
                         });
                     }
-                });
+                },
+            );
             if count == 0 {
                 ui.label(crate::i18n::text("tracking-empty"));
             }
         }
         let mut outcome = Outcome::Open;
-        ui.horizontal(|ui| {
+        ui.horizontal_wrapped(|ui| {
             let ready = idle && self.pending.is_none() && self.view.is_some();
             if ui
                 .add_enabled(
