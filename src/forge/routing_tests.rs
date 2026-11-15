@@ -13,6 +13,9 @@ fn hosting(forge: Forge, host: &str) -> Hosting {
         web: format!("https://{host}"),
     }
 }
+const GITHUB_EMPTY_LIST: &str = r#"{"data":{"repository":{"pullRequests":{
+    "nodes":[],"pageInfo":{"hasNextPage":false,"endCursor":null}
+}}}}"#;
 fn ok(s: &str) -> Result<String, String> {
     Ok(s.into())
 }
@@ -102,7 +105,7 @@ fn provider_boundary_github_every_provider_action_uses_selected_repo_and_host()
         let h = hosting(Forge::GitHub, host);
         let p = github::GitHub;
         let dir = std::env::temp_dir();
-        capture(&h, vec![ok("[]")], || {
+        capture(&h, vec![ok(GITHUB_EMPTY_LIST)], || {
             p.list(&dir, &h)?;
 
             Ok(())

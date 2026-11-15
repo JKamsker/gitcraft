@@ -35,6 +35,12 @@ impl RepoTab {
             13.0,
             if pr.draft { t.text_faint } else { t.success },
         );
+        let moved = self.pr_moved_since_seen(pr);
+        if moved {
+            // Keep the changed-since-seen cue visible without consuming subtitle space.
+            ui.painter()
+                .circle_filled(pos2(rect.left() + 41.0, y - 8.0), 2.5, t.warning);
+        }
         let ci = self.ci_status(&pr.sha);
         // The build status on the right, and the texts up to it.
         let text_right = if ci.is_some() {
@@ -46,44 +52,7 @@ impl RepoTab {
             rect.min,
             pos2(text_right, rect.bottom()),
         ));
-        p.text(
-            pos2(rect.left() + 48.0, y - 7.0),
-            Align2::LEFT_CENTER,
-            format!("#{} {}", pr.number, pr.title),
-            egui::FontId::proportional(12.5),
-            t.text,
-        );
-        let moved = self.pr_moved_since_seen(pr);
-        // First, where a long branch name can't cut it off.
-        let sub = format!(
-            "{}{} · {}{}",
-            if moved {
-                crate::i18n::text("repo-core-3449")
-            } else {
-                ""
-            },
-            pr.branch,
-            pr.author,
-            if pr.draft {
-                crate::i18n::text("repo-core-3450")
-            } else {
-                ""
-            }
-        );
-        let sub = p.text(
-            pos2(rect.left() + 48.0, y + 8.0),
-            Align2::LEFT_CENTER,
-            sub,
-            egui::FontId::proportional(11.0),
-            t.text_faint,
-        );
-        let badges = crate::repo::forks::paint_badges(
-            self,
-            &p,
-            pos2(sub.right() + 8.0, y + 8.0),
-            pr.number,
-            &pr.sha,
-        );
+        let badges = super::row_text::paint(self, &p, rect, text_right, pr);
         if let Some(status) = ci {
             let center = pos2(rect.right() - 14.0, y);
             acts.extend(ci_status::dot(ui, r.id.with("ci"), center, &pr.sha, status));
@@ -94,6 +63,7 @@ impl RepoTab {
         let seen_on_open = (!has_view && !moved).then_some(Action::Versions(
             crate::repo::versions::VersionsAct::PrSeen(pr.number),
         ));
+        let r = r.on_hover_text(super::row_text::tooltip(pr, self.hosting.as_ref(), moved));
         let r = r.on_hover_text(if has_view {
             crate::i18n::message("repo-core-3451", &[("url", pr.url.to_string().into())])
         } else {
@@ -138,32 +108,17 @@ impl RepoTab {
                 }
                 self.pr_since_items(ui, acts, pr);
                 self.pr_worktree_button(ui, acts, pr.number, &pr.branch, &pr.sha, idle, true);
+                let checkout = self.pr_checkout_action(pr);
                 if crate::menu_item::MenuItem::new(crate::i18n::message(
                     "repo-core-3455",
                     &[("branch", pr.branch.to_string().into())],
                 ))
                 .icon("log-in")
-                .enabled(idle)
+                .enabled(idle && checkout.is_some())
                 .show(ui)
                 .clicked()
                 {
-                    if self.refs.local.iter().any(|b| b.name == pr.branch) {
-                        acts.push(Action::Checkout(pr.branch.clone()));
-                    } else if let Some(b) = self.pr_remote_branch(pr) {
-                        acts.push(Action::CheckoutRemote(b.name.clone()));
-                    } else {
-                        let Some(remote) =
-                            self.primary_forge_remote().map(str::to_owned).or_else(|| {
-                                self.hosting
-                                    .is_none()
-                                    .then(|| self.default_remote())
-                                    .flatten()
-                            })
-                        else {
-                            return;
-                        };
-                        acts.push(Action::CheckoutRemote(format!("{remote}/{}", pr.branch)));
-                    }
+                    acts.extend(checkout);
                 }
                 self.fork_items(ui, acts, pr.number, idle, false);
                 if crate::menu_item::MenuItem::new(crate::i18n::text("repo-core-3456"))
@@ -175,4 +130,27 @@ impl RepoTab {
                 }
             });
     }
+
+    /// A contributor's branch name is never a local or base-repository checkout target.
+    fn pr_checkout_action(&self, pr: &PullRequest) -> Option<Action> {
+        if pr.from_fork {
+            return crate::pull_request::is_oid(&pr.sha).then(|| Action::Checkout(pr.sha.clone()));
+        }
+        if self.refs.local.iter().any(|b| b.name == pr.branch) {
+            return Some(Action::Checkout(pr.branch.clone()));
+        }
+        if let Some(branch) = self.pr_remote_branch(pr) {
+            return Some(Action::CheckoutRemote(branch.name.clone()));
+        }
+        let remote = self.primary_forge_remote().map(str::to_owned).or_else(|| {
+            self.hosting
+                .is_none()
+                .then(|| self.default_remote())
+                .flatten()
+        })?;
+        Some(Action::CheckoutRemote(format!("{remote}/{}", pr.branch)))
+    }
 }
+
+#[cfg(test)]
+mod tests;

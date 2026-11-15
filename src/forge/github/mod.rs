@@ -5,6 +5,7 @@
 mod details;
 pub(crate) mod discovery;
 mod issues;
+mod list;
 mod post;
 mod threads;
 
@@ -65,21 +66,7 @@ impl Provider for GitHub {
     }
 
     fn list(&self, repo: &Path, hosting: &Hosting) -> Result<Vec<PullRequest>, String> {
-        let out = gh(
-            repo,
-            hosting,
-            &[
-                "pr",
-                "list",
-                "--state",
-                "open",
-                "--limit",
-                "100",
-                "--json",
-                "number,title,headRefName,baseRefName,baseRefOid,headRefOid,author,url,isDraft,isCrossRepository",
-            ],
-        )?;
-        parse_list(&out)
+        list::fetch(repo, hosting)
     }
 
     fn merged(&self, repo: &Path, hosting: &Hosting) -> Result<Vec<MergedPullRequest>, String> {
@@ -368,6 +355,7 @@ fn parse_list(json: &str) -> Result<Vec<PullRequest>, String> {
             branch: at(item, "/headRefName").to_owned(),
             base: at(item, "/baseRefName").to_owned(),
             base_oid: at(item, "/baseRefOid").to_owned(),
+            head_repo: None,
             from_fork: item
                 .get("isCrossRepository")
                 .and_then(Value::as_bool)
@@ -426,41 +414,6 @@ mod tests {
         let restored: PullRequest = serde_json::from_value(old_cache).map_err(|e| e.to_string())?;
         assert!(restored.base_oid.is_empty());
         assert!(parse_list("oops").is_err());
-        Ok(())
-    }
-}
-
-#[cfg(test)]
-mod routing_tests {
-    use super::*;
-    #[test]
-    fn provider_boundary_selected_fork_is_explicit_for_github_lists() -> Result<(), String> {
-        let dir = std::env::temp_dir();
-        let hosting = Hosting {
-            forge: super::super::Forge::GitHub,
-            host: "github.com".into(),
-            path: "fork/project".into(),
-            web: "https://github.com".into(),
-        };
-        let calls = cli::recording::run(vec![Ok("[]".into())], || {
-            assert!(GitHub.list(&dir, &hosting)?.is_empty());
-            Ok(())
-        })?;
-        assert_eq!(calls.len(), 1);
-        assert!(
-            calls[0]
-                .args
-                .iter()
-                .any(|a| a.split(',').any(|f| f == "baseRefOid"))
-        );
-        assert!(
-            calls[0]
-                .args
-                .windows(2)
-                .any(|p| p == ["--repo", "github.com/fork/project"]),
-            "selected fork absent from prepared command: {:?}",
-            calls[0]
-        );
         Ok(())
     }
 }
