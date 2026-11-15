@@ -86,7 +86,10 @@ mod tests {
                     Err(error) => return Err(error),
                 }
             };
+            // Windows can inherit the listener's nonblocking mode on accept.
+            stream.set_nonblocking(false)?;
             stream.set_read_timeout(Some(Duration::from_secs(3)))?;
+            stream.set_write_timeout(Some(Duration::from_secs(3)))?;
             let mut request = Vec::new();
             let mut byte = [0];
             while !request.ends_with(b"\r\n\r\n") && request.len() < 8192 {
