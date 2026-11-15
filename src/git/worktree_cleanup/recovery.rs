@@ -1,5 +1,7 @@
 //! Whole-tree recovery. Cleanup renames; only an explicit purge deletes content. The
 //! worktree's private Git metadata (including its index) is retained beside the tree.
+mod purge;
+
 use std::path::{Path, PathBuf};
 
 use serde::{Deserialize, Serialize};
@@ -175,10 +177,33 @@ impl Store {
         Ok(())
     }
 
-    /// Only called after a separate explicit confirmation. std's remove_dir_all does not
-    /// follow symlinks, including links inside the retained tree.
+    /// Only called after a separate explicit confirmation. Traversal is anchored to held
+    /// directory handles; mount boundaries/reparse points are refused.
     pub fn purge_recovery(repo: &Path, directory: &Path) -> Result<(), String> {
-        record(repo, directory)?;
-        std::fs::remove_dir_all(directory).map_err(|e| e.to_string())
+        purge_after_validation(repo, directory, || {})
     }
 }
+
+fn purge_after_validation(
+    repo: &Path,
+    directory: &Path,
+    after: impl FnOnce(),
+) -> Result<(), String> {
+    let held = purge::Purge::open(&root(repo)?, directory)?;
+    record(repo, directory)?;
+    eprintln!(
+        "gitcraft confirmed recovery purge requested: {}",
+        directory.display()
+    );
+    after();
+    let result = held.remove();
+    eprintln!(
+        "gitcraft recovery purge result for {}: {result:?}",
+        directory.display()
+    );
+    result
+}
+
+#[cfg(test)]
+#[path = "tests/purge_tests.rs"]
+mod tests;
