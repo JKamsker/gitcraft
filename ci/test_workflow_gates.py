@@ -90,10 +90,16 @@ def job_steps(text, job):
             f"required job {job} can skip, soften, or retarget checks")
     require("defaults" not in top, "workflow defaults can retarget required checks")
     for owner, indent, allowed in ((top, 2, {"CARGO_TERM_COLOR"}),
-                                    (fields, 6, {"VERSION", "PKG"})):
+                                    (fields, 6, {"VERSION", "PKG", "CARGO_PROFILE_DEV_DEBUG", "CARGO_INCREMENTAL"}
+                                     if job == "windows-build" else {"VERSION", "PKG"})):
         if "env" in owner:
             variables = nested(owner, "env", indent)
             require(variables.keys() <= allowed, "ancestor environment can override required checks")
+    if job == "windows-build":
+        variables = nested(fields, "env", 6)
+        require(variables == {"CARGO_PROFILE_DEV_DEBUG": ("line-tables-only", ""),
+                              "CARGO_INCREMENTAL": ("'0'", "")},
+                "Windows build must retain line tables and disable incremental compilation")
     require("steps" in fields and not fields["steps"][0], f"missing steps for {job}")
     blocks = re.split(r"(?m)^      - ", fields["steps"][1])
     require(not any(line.strip() and not line.lstrip().startswith("#")
@@ -216,10 +222,10 @@ class WorkflowGateTests(unittest.TestCase):
         cls.shared = (workflows / "rust-file-size.yml").read_text(encoding="utf-8")
         cls.callers = {name: (workflows / name).read_text(encoding="utf-8")
                        for name in ("ci.yml", "release.yml")}
-        # Release lints nothing itself: it publishes only after CI (lint, windows-build)
+        # Release lints nothing itself: it publishes only after CI (lint, windows-clippy)
         # passed for the same commit (ci/test_workflow_policy.py).
         cls.clippy = [(name, (workflows / name).read_text(encoding="utf-8"), job)
-                      for name, job in (("ci.yml", "lint"), ("windows-tests.yml", "windows-build"))]
+                      for name, job in (("ci.yml", "lint"), ("ci.yml", "windows-clippy"))]
 
     def test_shared_gate_checks_the_full_immutable_candidate(self):
         verify_shared_gate(self.shared)
@@ -404,7 +410,7 @@ class WorkflowGateTests(unittest.TestCase):
 
     def test_every_ci_job_is_required_by_the_aggregate(self):
         ci = self.callers["ci.yml"]
-        for job in ("lint", "test", "windows-tests", "package-smoke", "forges"):
+        for job in ("lint", "test", "windows-clippy", "windows-tests", "package-smoke", "forges"):
             changed = re.sub(rf"(    needs: \[[^\]]*?)\b{job}, ", r"\1", ci, count=1)
             changed = re.sub(rf"(    needs: \[[^\]]*?), {job}\]", r"\1]", changed, count=1)
             self.assertNotEqual(changed, ci, job)

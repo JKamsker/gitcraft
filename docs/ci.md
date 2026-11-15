@@ -12,7 +12,7 @@ pull requests (the merge commit), merge-queue candidates (`merge_group`), pushes
 
 | Stage | Jobs |
 | --- | --- |
-| Fast preflight | `rust-file-size / check` (tooling tests, file-size, complexity-policy, and architecture fitness gates), `lint` (rustfmt, strict Clippy for every package) |
+| Fast preflight | `rust-file-size / check` (tooling tests, file-size, complexity-policy, and architecture fitness gates), `lint` (rustfmt, strict Clippy for every package), `windows-clippy` (strict Windows Clippy for every package, parallel with the test build) |
 | Correctness matrix | `test (ubuntu-22.04)`, `test (ubuntu-latest)`, the Windows build plus ten complete, disjoint shards (`windows-tests.yml`) aggregated as `test (windows-latest)` |
 | Release smoke | `package-version` computes a dev prerelease version the way Release does. `package-smoke` builds the Windows zip and installer, the tarball, AppImage, `.deb` and `.rpm` through `package.yml`, the workflow Release builds with. |
 | Live services | `forges`: real Forgejo and Gitea, run for changes to `src/forge/`, `ci/forge-server.sh`, `Cargo.lock` or `ci.yml` (`ci/changed_paths.py`), nightly, and by hand |
@@ -117,3 +117,31 @@ stalled once (run 43430908730) with no child process left in its Job Object. Its
 cause is not proven. The test now closes its first tab before it changes the
 repository, as the app would, and traces its stages (`[hang-stage …]`), so a
 repeat names the step it stopped in.
+
+### Windows build latency
+
+Windows Clippy runs in parallel with the test build, and remains a mandatory
+`CI result` dependency. The test build uses `CARGO_PROFILE_DEV_DEBUG=line-tables-only`:
+assertions, overflow checks, test selection and optimization levels stay unchanged.
+Function names and source lines remain available for backtraces and the watchdog's
+owned-child minidumps; full type/local-variable debug information is omitted.
+The build still uploads PDBs. `windows-build-timings` holds Cargo's per-target
+compiler timings, including failed builds where Cargo produced a report.
+
+The test and Clippy caches have separate versioned keys. Only dev push CI writes
+them; PRs restore the dev cache without saving isolated PR caches. The new test
+key avoids reusing the previous immutable cache which reported a hit yet rebuilt
+dependencies. Incremental compilation remains disabled, as rust-toolchain already
+configured it. A first run with the new key is a cold build.
+
+The ten shards remain complete and disjoint. `repo-g-m` now runs the serial
+`standalone::` group and the three previously isolated core tests, in the same
+separate processes and with the same watchdog budgets. This shifts about 136s
+from the longest baseline core shard to the lightest available shard without
+adding runners or running formerly isolated tests concurrently.
+
+No verification is deferred to nightly: both Ubuntu runners, the full Windows
+suite, both packaging smoke platforms and the conditional forge matrix still run
+before merge. The existing nightly runs the same full contract; release still
+requires `CI result` for its exact commit. Docs-only changes also retain the full
+suite (the `changes` job selects only the forge lane).

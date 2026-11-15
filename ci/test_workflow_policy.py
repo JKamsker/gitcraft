@@ -129,6 +129,16 @@ class CiJobTests(unittest.TestCase):
         self.assertEqual(scalar(self.jobs["windows-test-result"], "name"), "test (windows-latest)")
         self.assertEqual(scalar(self.jobs["ci-result"], "name"), await_ci.REQUIRED_JOB)
 
+    def test_windows_clippy_is_native_required_and_parallel_with_the_build(self):
+        clippy = self.jobs["windows-clippy"]
+        self.assertEqual(scalar(clippy, "runs-on"), "windows-latest")
+        self.assertEqual(dependencies(clippy), {"rust-file-size"})
+        self.assertEqual(dependencies(self.jobs["windows-tests"]), {"rust-file-size"})
+        self.assertIn("windows-clippy", dependencies(self.jobs["ci-result"]))
+        self.assertNotIn("if", clippy)
+        self.assertNotIn("continue-on-error", clippy)
+        self.assertNotIn("ci/clippy_packages.py", read("windows-tests.yml"))
+
     def test_pull_requests_run_the_release_packaging_with_a_prerelease_version(self):
         smoke, version = self.jobs["package-smoke"], self.jobs["package-version"]
         self.assertEqual(scalar(smoke, "uses"), "./.github/workflows/package.yml")
