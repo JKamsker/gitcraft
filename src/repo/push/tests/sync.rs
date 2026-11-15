@@ -1,7 +1,7 @@
 /// Sync's push waits for what started after its pull (updating the submodules), then runs.
 #[test]
 fn syncs_push_waits_for_the_submodule_update_after_the_pull() {
-    let ctx = egui::Context::default();
+    let ctx = diag::context();
     let mut tab = crate::repo::RepoTab::new_deferred("/nonexistent/sync-chain".into(), &ctx);
     let push = Attempt {
         label: "Sync: push".to_owned(),
@@ -39,7 +39,7 @@ fn syncs_push_waits_for_the_submodule_update_after_the_pull() {
 /// A failed pull stops Sync: nothing is pushed, and the status says so.
 #[test]
 fn a_failed_sync_pull_pushes_nothing() {
-    let ctx = egui::Context::default();
+    let ctx = diag::context();
     let mut tab = crate::repo::RepoTab::new_deferred("/nonexistent/sync-stop".into(), &ctx);
     let push = Attempt {
         label: "Sync: push".to_owned(),

@@ -162,12 +162,14 @@ pub(crate) fn bounded<T: Send + 'static>(
 pub(crate) struct Owned<T> {
     label: &'static str,
     value: Option<T>,
+    dispose: Option<fn(T)>,
 }
 
 pub(crate) fn owned<T>(label: &'static str, value: T) -> Owned<T> {
     Owned {
         label,
         value: Some(value),
+        dispose: None,
     }
 }
 
@@ -186,6 +188,63 @@ impl<T> std::ops::DerefMut for Owned<T> {
 }
 impl<T> Drop for Owned<T> {
     fn drop(&mut self) {
-        run(format_args!("{}", self.label), || drop(self.value.take()));
+        run(format_args!("{}", self.label), || {
+            if let Some(value) = self.value.take() {
+                match self.dispose {
+                    Some(dispose) => dispose(value),
+                    None => drop(value),
+                }
+            }
+        });
+    }
+}
+
+/// Cancels and drains only this tab's jobs, including on assertion/early-return paths.
+/// A returned cleanup error is diagnostic, never a replacement for the test's result.
+pub(crate) fn live_tab(tab: super::RepoTab) -> Owned<super::RepoTab> {
+    let mut owned = owned("close tab and wait for jobs/watchers", tab);
+    owned.dispose = Some(|tab| {
+        if let Err(error) = tab.close_and_wait(Duration::from_secs(10)) {
+            eprintln!("[test-cleanup warning] {error}");
+        }
+    });
+    owned
+}
+
+/// Context-local settings only: no global profile application or settings persistence.
+pub(crate) fn context() -> egui::Context {
+    let ctx = egui::Context::default();
+    crate::settings::Settings::default().put_for_test(&ctx);
+    ctx
+}
+
+/// Best-effort fixture teardown. Windows sharing violations may outlive tab cancellation
+/// briefly (including antivirus handles); retained fixtures must not fail assertions.
+pub(crate) fn remove_fixture(path: &std::path::Path) {
+    let _cleanup = stage(format_args!("remove fixture {}", path.display()));
+    for delay in [0, 20, 40, 80, 160, 320, 640] {
+        std::thread::sleep(Duration::from_millis(delay));
+        match std::fs::remove_dir_all(path) {
+            Ok(()) => return,
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => return,
+            Err(error) => {
+                if !(cfg!(windows) && matches!(error.raw_os_error(), Some(32 | 33))) || delay == 640
+                {
+                    eprintln!(
+                        "[test-cleanup warning] retaining {}: {error}",
+                        path.display()
+                    );
+                    return;
+                }
+            }
+        }
+    }
+}
+
+/// Removes a fixture after later-declared live tabs are drained, even during unwinding.
+pub(crate) struct FixtureRoot(pub(crate) std::path::PathBuf);
+impl Drop for FixtureRoot {
+    fn drop(&mut self) {
+        remove_fixture(&self.0);
     }
 }
