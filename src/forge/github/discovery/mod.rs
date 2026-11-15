@@ -62,3 +62,18 @@ pub(crate) fn repositories(
     }
     response::page(raw, query, &endpoint)
 }
+
+/// Verify identity through the same typed status path as repository pages.
+pub(in crate::forge) fn verify_identity(raw: Response, user: &str) -> Result<(), DiscoveryError> {
+    response::status(&raw)?;
+    let value: serde_json::Value =
+        serde_json::from_slice(&raw.body).map_err(|_| DiscoveryError::Malformed)?;
+    if !value
+        .get("login")
+        .and_then(|v| v.as_str())
+        .is_some_and(|login| login.eq_ignore_ascii_case(user))
+    {
+        return Err(DiscoveryError::AuthRefused);
+    }
+    Ok(())
+}

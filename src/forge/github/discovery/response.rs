@@ -71,33 +71,7 @@ fn repository(value: serde_json::Value, public: bool) -> Result<Repository, Disc
     })
 }
 pub(super) fn page(raw: Response, query: &Query, endpoint: &str) -> Result<Page, DiscoveryError> {
-    let number = |name| raw.header(name).and_then(|v| v.parse::<u64>().ok());
-    let rate = RateLimit {
-        remaining: number("x-ratelimit-remaining"),
-        reset: number("x-ratelimit-reset"),
-        retry_after: number("retry-after"),
-    };
-    match raw.status {
-        200 => {}
-        401 => return Err(DiscoveryError::AuthRefused),
-        403 | 429
-            if raw.status == 429 || rate.remaining == Some(0) || rate.retry_after.is_some() =>
-        {
-            let now = std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap_or_default()
-                .as_secs();
-            return Err(DiscoveryError::RateLimited {
-                retry_at: rate
-                    .retry_after
-                    .map(|delay| now.saturating_add(delay))
-                    .or(rate.reset),
-            });
-        }
-        403 => return Err(DiscoveryError::Forbidden),
-        404 => return Err(DiscoveryError::NotFound),
-        _ => return Err(DiscoveryError::Transport),
-    }
+    let rate = status(&raw)?;
     if raw.body.len() > BODY_LIMIT {
         return Err(DiscoveryError::Malformed);
     }
@@ -153,4 +127,35 @@ pub(super) fn page(raw: Response, query: &Query, endpoint: &str) -> Result<Page,
         incomplete,
         rate,
     })
+}
+
+pub(super) fn status(raw: &Response) -> Result<RateLimit, DiscoveryError> {
+    let number = |name| raw.header(name).and_then(|v| v.parse::<u64>().ok());
+    let rate = RateLimit {
+        remaining: number("x-ratelimit-remaining"),
+        reset: number("x-ratelimit-reset"),
+        retry_after: number("retry-after"),
+    };
+    match raw.status {
+        200 => {}
+        401 => return Err(DiscoveryError::AuthRefused),
+        403 | 429
+            if raw.status == 429 || rate.remaining == Some(0) || rate.retry_after.is_some() =>
+        {
+            let now = std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap_or_default()
+                .as_secs();
+            return Err(DiscoveryError::RateLimited {
+                retry_at: rate
+                    .retry_after
+                    .map(|delay| now.saturating_add(delay))
+                    .or(rate.reset),
+            });
+        }
+        403 => return Err(DiscoveryError::Forbidden),
+        404 => return Err(DiscoveryError::NotFound),
+        _ => return Err(DiscoveryError::Transport),
+    }
+    Ok(rate)
 }

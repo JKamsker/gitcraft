@@ -201,3 +201,48 @@ fn browser_clone_handoff_contains_both_transports_without_credentials() {
         matches!(&harness.state().1, Some(Intent::Clone { https, ssh }) if https == "https://github.com/owner/repo.git" && ssh == "git@github.com:owner/repo.git")
     );
 }
+
+#[test]
+fn browser_rate_limit_keeps_loaded_private_rows() {
+    let mut browser = browser();
+    browser.repositories.push(repository());
+    browser.loaded = true;
+    browser.next = Some("page2".into());
+    browser.apply(Err(DiscoveryError::RateLimited {
+        retry_at: Some(123),
+    }));
+    assert_eq!(browser.repositories.len(), 1);
+    assert_eq!(browser.next.as_deref(), Some("page2"));
+}
+#[test]
+fn browser_rejected_submission_releases_loading_and_retains_rows() {
+    let mut browser = browser();
+    browser.repositories.push(repository());
+    browser.next = Some("page2".into());
+    browser.request_with(
+        Query::SearchRepositories("repo".into()),
+        true,
+        &egui::Context::default(),
+        |_, _| Err("queue rejected".into()),
+    );
+    assert!(browser.pending.is_none());
+    assert_eq!(browser.error, Some(DiscoveryError::QueueUnavailable));
+    assert_eq!(browser.repositories.len(), 1);
+    assert!(!browser.seen_pages.contains("page2"));
+}
+#[test]
+fn browser_narrow_layout_keeps_clone_and_close_accessible() {
+    use egui_kittest::{Harness, kittest::Queryable};
+    crate::i18n::set_language("en-US");
+    let mut browser = browser();
+    browser.repositories.push(repository());
+    let mut harness = Harness::builder().with_size([360.0, 640.0]).build_ui_state(
+        |ui, state: &mut Browser| {
+            state.show(ui.ctx());
+        },
+        browser,
+    );
+    harness.run();
+    harness.get_by_label("Clone…");
+    harness.get_by_label("Close");
+}

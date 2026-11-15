@@ -197,3 +197,42 @@ mod tests {
         );
     }
 }
+
+#[cfg(test)]
+#[test]
+fn browser_finds_library_only_checkout_without_starting_a_scan()
+-> Result<(), Box<dyn std::error::Error>> {
+    let folder = tempfile::tempdir()?;
+    crate::git::init(folder.path())?;
+    let config = folder.path().join(".git/config");
+    let mut contents = std::fs::read_to_string(&config)?;
+    contents.push_str("\n[remote \"upstream\"]\nurl = git@github.com:owner/library-only.git\n");
+    std::fs::write(config, contents)?;
+    let ctx = egui::Context::default();
+    let cc = eframe::CreationContext::_new_kittest(ctx);
+    let mut app =
+        super::super::App::launched_using(&cc, None, || Ok("git version recorded".into()));
+    app.recent.clear();
+    app.tabs = vec![crate::app::Tab::Home];
+    app.workspaces = Default::default();
+    let profile = app.settings.active_profile;
+    let libraries = serde_json::from_value(
+        serde_json::json!({ profile.to_string(): { "entries": [{ "path": folder.path(), "sources": [], "unconfirmed": [] }] } }),
+    )?;
+    app.library = crate::app::library::LibraryState::new(libraries);
+    app.start_repo_browser();
+    let browser = app.repo_browser.take().ok_or("browser missing")?;
+    assert_eq!(browser.local.known, vec![folder.path().to_path_buf()]);
+    let catalog = inspect(browser.local.known);
+    let hosting = Hosting {
+        forge: crate::forge::Forge::GitHub,
+        host: "github.com".into(),
+        path: "owner/library-only".into(),
+        web: "https://github.com".into(),
+    };
+    assert_eq!(
+        matches(&catalog, &hosting),
+        vec![folder.path().to_path_buf()]
+    );
+    Ok(())
+}

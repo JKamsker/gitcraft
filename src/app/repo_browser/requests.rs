@@ -4,6 +4,19 @@ use std::sync::mpsc::{TryRecvError, channel};
 
 impl Browser {
     pub(super) fn request(&mut self, query: Query, more: bool, ctx: &egui::Context) {
+        self.request_with(query, more, ctx, |cancel, work| {
+            crate::tasks::pool()?
+                .submit(cancel, crate::tasks::Priority::Interactive, None, work)
+                .map_err(str::to_owned)
+        });
+    }
+    pub(super) fn request_with(
+        &mut self,
+        query: Query,
+        more: bool,
+        ctx: &egui::Context,
+        submit: impl FnOnce(crate::tasks::Cancellation, Box<dyn FnOnce() + Send>) -> Result<(), String>,
+    ) {
         if !self.session.valid() {
             self.invalidate();
         }
@@ -43,19 +56,14 @@ impl Browser {
         let repaint = ctx.clone();
         let scope = crate::tasks::Scope::default();
         let (tx, rx) = channel();
-        let result = crate::tasks::pool().and_then(|pool| {
-            pool.submit(
-                scope.0.clone(),
-                crate::tasks::Priority::Interactive,
-                None,
-                Box::new(move || {
-                    let result = session.repositories(&returned.query, next.as_deref());
-                    let _ = tx.send((returned, result));
-                    repaint.request_repaint();
-                }),
-            )
-            .map_err(str::to_owned)
-        });
+        let result = submit(
+            scope.0.clone(),
+            Box::new(move || {
+                let result = session.repositories(&returned.query, next.as_deref());
+                let _ = tx.send((returned, result));
+                repaint.request_repaint();
+            }),
+        );
         match result {
             Ok(()) => {
                 self.pending = Some(Pending {

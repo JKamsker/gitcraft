@@ -39,7 +39,12 @@ fn discovery_verifies_selected_identity_and_never_switches_global_account()
         user: "selected-user".into(),
         config_dir: String::new(),
     };
-    let command = discovery_command(&account)?;
+    let verify = |command| {
+        read_private(command)
+            .and_then(|json| verify_user_output("gh", &account, &json))
+            .map(|_| ())
+    };
+    let command = discovery_command(&account, verify, |error| error)?;
     let env: std::collections::HashMap<_, _> = command.get_envs().collect();
     assert_eq!(
         env.get(std::ffi::OsStr::new("GH_TOKEN")),
@@ -51,6 +56,37 @@ fn discovery_verifies_selected_identity_and_never_switches_global_account()
         user: "another-user".into(),
         ..account
     };
-    assert!(discovery_command(&wrong).is_err());
+    assert!(
+        discovery_command(
+            &wrong,
+            |command| read_private(command)
+                .and_then(|json| verify_user_output("gh", &wrong, &json))
+                .map(|_| ()),
+            |error| error
+        )
+        .is_err()
+    );
     Ok(())
+}
+
+#[test]
+fn discovery_session_is_invalid_after_actual_a_b_a_transition() {
+    let original = current();
+    struct RestoreContext(Context);
+    impl Drop for RestoreContext {
+        fn drop(&mut self) {
+            set(self.0.clone());
+        }
+    }
+    let _restore = RestoreContext(original.clone());
+    let mut a = original.clone();
+    a.choices.github.user = "discovery-session-a".into();
+    let mut b = a.clone();
+    b.choices.github.user = "discovery-session-b".into();
+    set(a.clone());
+    let session = crate::forge::discovery::DiscoverySession::current();
+    assert!(session.valid());
+    set(b);
+    set(a);
+    assert!(!session.valid());
 }

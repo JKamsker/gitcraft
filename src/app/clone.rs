@@ -1,6 +1,7 @@
 //! Cloning: the dialog, the clone in the background, and asking for credentials.
 
 mod completion;
+mod destination;
 mod fields;
 mod source;
 pub(in crate::app) use fields::*;
@@ -213,16 +214,6 @@ impl App {
             return;
         }
         let dest = PathBuf::from(form.parent.trim()).join(form.name.trim());
-        // Elsewhere, git there refuses a folder that isn't empty, and says so.
-        let occupied = !crate::remote::is_remote(&dest)
-            && dest.exists()
-            && std::fs::read_dir(&dest)
-                .map(|mut d| d.next().is_some())
-                .unwrap_or(true);
-        if occupied {
-            form.error = Some(format!("{} already exists and isn't empty", dest.display()));
-            return;
-        }
         form.options.depth = if form.depth.trim().is_empty() {
             None
         } else {
@@ -274,15 +265,17 @@ impl App {
         let control = git::OpControl::new(move || repaint.request_repaint());
         let following = Arc::clone(&control);
         crate::connections::spawn(move || {
-            let result =
-                git::clone_with_options(&url, &dest2, creds.as_ref(), &options, &following)
-                    .and_then(|()| {
-                        if crate::remote::is_remote(&dest2) {
-                            Ok(dest2.clone())
-                        } else {
-                            repo_root(&dest2)
-                        }
-                    });
+            let result = destination::check(&dest2)
+                .and_then(|()| {
+                    git::clone_with_options(&url, &dest2, creds.as_ref(), &options, &following)
+                })
+                .and_then(|()| {
+                    if crate::remote::is_remote(&dest2) {
+                        Ok(dest2.clone())
+                    } else {
+                        repo_root(&dest2)
+                    }
+                });
             let _ = tx.send(result);
             ctx2.request_repaint();
         });

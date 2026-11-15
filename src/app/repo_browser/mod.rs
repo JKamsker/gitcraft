@@ -105,6 +105,13 @@ impl App {
             .into_iter()
             .chain(self.recent.iter().cloned())
             .chain(self.workspaces.all_repos())
+            .chain(
+                self.library
+                    .saved()
+                    .get(&self.settings.active_profile)
+                    .into_iter()
+                    .flat_map(|library| library.entries.iter().map(|entry| entry.path.clone())),
+            )
             .collect();
         let mut browser = Browser::new(self.windows.current);
         browser.local = local::Local::new(known);

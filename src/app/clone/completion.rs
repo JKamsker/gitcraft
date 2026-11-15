@@ -5,8 +5,12 @@ impl App {
         let Some(cloning) = &self.cloning else {
             return;
         };
-        let Ok(result) = cloning.rx.try_recv() else {
-            return;
+        let result = match cloning.rx.try_recv() {
+            Ok(result) => result,
+            Err(std::sync::mpsc::TryRecvError::Empty) => return,
+            Err(std::sync::mpsc::TryRecvError::Disconnected) => {
+                Err("Clone worker disconnected. Please try again.".into())
+            }
         };
         let dest = cloning.dest.clone();
         let owner = cloning.owner;
@@ -82,6 +86,11 @@ impl App {
             Err(e) => {
                 self.clone_failed = true;
                 self.error = Some(format!("Clone failed: {e}").into());
+                if let Some(mut form) = self.cloning_form.take() {
+                    form.error = Some(e);
+                    form.password.clear();
+                    self.clone_form = Some(form);
+                }
             }
         }
         self.cloning_form = None;
@@ -121,5 +130,71 @@ impl App {
         if let Some(cloning) = &mut self.cloning {
             cloning.open_after = false;
         }
+    }
+}
+
+#[cfg(test)]
+mod review_tests {
+    use super::*;
+    fn app() -> App {
+        let ctx = egui::Context::default();
+        let cc = eframe::CreationContext::_new_kittest(ctx);
+        App::launched_using(&cc, None, || Ok("git version recorded".into()))
+    }
+    #[test]
+    fn clone_disconnected_worker_retires_operation_and_restores_form() {
+        let mut app = app();
+        app.recorded_clone_completion(egui::ViewportId::ROOT, PathBuf::from("/virtual/clone"));
+        let (tx, rx) = channel();
+        drop(tx);
+        if let Some(cloning) = &mut app.cloning {
+            cloning.rx = rx;
+        }
+        app.poll_clone(&egui::Context::default());
+        assert!(app.cloning.is_none());
+        assert!(
+            app.clone_form
+                .as_ref()
+                .and_then(|form| form.error.as_deref())
+                .is_some_and(|error| error.contains("disconnected"))
+        );
+        assert!(app.cloning_form.is_none());
+    }
+    #[test]
+    fn clone_submission_reports_occupied_destination_asynchronously()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let folder = tempfile::tempdir()?;
+        let destination = folder.path().join("occupied");
+        std::fs::create_dir(&destination)?;
+        std::fs::write(destination.join("keep"), "unchanged")?;
+        let mut app = app();
+        app.start_clone();
+        let form = app.clone_form.as_mut().ok_or("clone form")?;
+        form.parent = folder.path().to_string_lossy().into_owned();
+        form.name = "occupied".into();
+        form.url = "https://github.com/owner/repo.git".into();
+        app.submit_clone(&egui::Context::default());
+        assert!(app.clone_form.is_none());
+        let running = app.cloning.as_ref().ok_or("worker not started")?;
+        let result = running.rx.recv_timeout(std::time::Duration::from_secs(5))?;
+        assert!(
+            result
+                .as_ref()
+                .err()
+                .is_some_and(|error| error.contains("isn't empty"))
+        );
+        let (tx, rx) = channel();
+        tx.send(result)?;
+        if let Some(cloning) = &mut app.cloning {
+            cloning.rx = rx;
+        }
+        app.poll_clone(&egui::Context::default());
+        assert!(app.cloning.is_none());
+        assert!(app.clone_form.is_some());
+        assert_eq!(
+            std::fs::read_to_string(destination.join("keep"))?,
+            "unchanged"
+        );
+        Ok(())
     }
 }
