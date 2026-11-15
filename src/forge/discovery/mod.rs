@@ -1,6 +1,7 @@
 //! Repository discovery is independent of any local checkout or repository provider.
 mod model;
-pub(crate) use model::*;
+pub(in crate::forge) use model::RateLimit;
+pub(crate) use model::{DiscoveryError, Owner, Page, Query, Repository, Visibility};
 mod public_http;
 pub(super) use public_http::*;
 

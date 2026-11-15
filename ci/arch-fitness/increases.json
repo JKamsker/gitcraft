@@ -274,5 +274,13 @@
     "reason": "The updated #238 checker measures 223 forge exports on untouched origin/dev a84d2e4f after #236, against its retained budget of 218. The same 223 are measured on the merged #233 candidate. A separate check of origin/dev confirms this five-item incoming increase; no forge application code is changed here.",
     "owner": "@JKamsker",
     "remediation": "Narrow discovery model/session exports and existing forge re-export boundaries, then ratchet the measured budget."
+  },
+  "231-discovery-effective-visibility": {
+    "changes": [
+      "budget/forge/exported=222"
+    ],
+    "reason": "After #236 merged alongside the #238 effective-visibility checker, forge measured 223 against 218. Narrowing the GitHub adapter to forge and replacing the discovery model glob with explicit UI exports confines RateLimit to forge and reduces the measurement to 222. The remaining query, repository/owner/visibility, page/error, session and discovery capability definitions form the app repository browser contract and must cross the forge boundary. This declares only the remaining four-item measured increase.",
+    "owner": "@JKamsker",
+    "remediation": "Keep transport, rate-limit parsing and provider adapters forge-scoped; use explicit discovery exports. Narrow unused browser contract types as consumers change, then ratchet this budget."
   }
 }
