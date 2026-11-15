@@ -1,4 +1,3 @@
-#![allow(dead_code)] // Discovery capability is wired into Home in the next commit unit.
 //! Repository-independent gh API read retaining status and headers even on HTTP errors.
 use crate::forge::discovery::{BODY_LIMIT, DiscoveryError, Response};
 

@@ -87,6 +87,7 @@ impl App {
             error: None,
             error_card: None,
             focus: focus::State::default(),
+            repo_browser: None,
             clone_form: None,
             practice_open: false,
             setup: Default::default(),

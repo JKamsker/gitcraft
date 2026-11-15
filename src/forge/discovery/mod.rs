@@ -1,4 +1,3 @@
-#![allow(dead_code)] // Discovery capability is wired into Home in the next commit unit.
 //! Repository discovery is independent of any local checkout or repository provider.
 mod model;
 pub(crate) use model::*;

@@ -111,6 +111,7 @@ impl App {
     /// doesn't take it).
     fn dialog_open(&self) -> bool {
         self.clone_form.is_some()
+            || self.repo_browser.is_some()
             || self.remote_form.is_some()
             || self.askpass_open()
             || self.palette.is_some()

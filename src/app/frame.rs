@@ -15,6 +15,7 @@ impl App {
                     || self.setup.open
                     || self.manual_open
                     || self.clone_form.is_some()
+                    || self.repo_browser.is_some()
                     || self.remote_form.is_some()
                     || self.teleport.is_some()
                     || self.repo_scan.is_some()
@@ -181,6 +182,7 @@ impl App {
                 r.popouts_ui(&ctx, i == self.active);
             }
         }
+        self.repo_browser_dialog(&ctx);
         self.clone_dialog(&ctx);
         self.remote_dialog(&ctx);
         self.teleport_dialog(&ctx);

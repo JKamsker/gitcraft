@@ -193,6 +193,7 @@ impl App {
                 theme: self.theme.clone(),
                 ..ProfileState::default()
             });
+        self.repo_browser = None;
         self.settings.active_profile = id;
         self.settings.set(ctx);
         // The tabs opened next read the new profile's author themselves; a later change to it

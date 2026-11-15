@@ -36,6 +36,7 @@ impl App {
 
     pub(in crate::app) fn window_has_dialog(&self) -> bool {
         self.clone_form.is_some()
+            || self.repo_browser.is_some()
             || self.practice_open
             || self.remote_form.is_some()
             || self.teleport.is_some()
@@ -71,6 +72,7 @@ impl App {
             self.in_window(owner, |app| {
                 app.poll_teleport(ctx);
                 app.poll_repo_scan();
+                app.poll_repo_browser();
                 app.poll_my_work(ctx);
             });
         }

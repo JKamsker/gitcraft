@@ -1,4 +1,3 @@
-#![allow(dead_code)] // Discovery capability is wired into Home in the next commit unit.
 //! GitHub discovery; account lists use gh, public queries always use anonymous HTTP.
 mod endpoints;
 mod response;
