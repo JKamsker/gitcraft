@@ -72,6 +72,7 @@ mod tests {
         repo.git(&["remote", "add", "origin", &host.to_string_lossy()])?;
         repo.git(&["config", "branch.main.remote", "."])?;
         repo.git(&["config", "branch.main.merge", "refs/heads/main"])?;
+        repo.git(&["update-ref", "refs/remotes/origin/main", "refs/heads/main"])?;
         repo.git(&[
             "symbolic-ref",
             "refs/remotes/origin/HEAD",
