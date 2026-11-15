@@ -7,6 +7,7 @@ include!("tests/identity.rs");
 include!("tests/ports.rs");
 include!("tests/content.rs");
 include!("tests/publication.rs");
+include!("tests/publication_tracking.rs");
 include!("tests/repairs.rs");
 include!("tests/lfs.rs");
 include!("tests/routing.rs");

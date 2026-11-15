@@ -30,6 +30,12 @@ pub(in crate::repo) fn dialog(
     ui.set_width(640.0);
     ui.heading(crate::i18n::text("repo-core-3132"));
     ui.label(route_caption(plan));
+    if plan.selection().is_some_and(|s| s.targets_known_default()) {
+        ui.colored_label(
+            crate::theme::Tokens::get(ui.ctx()).warning,
+            crate::i18n::text("publish-default-warning"),
+        );
+    }
     if plan.deleting {
         ui.colored_label(
             crate::theme::Tokens::get(ui.ctx()).warning,

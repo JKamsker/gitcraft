@@ -3317,6 +3317,7 @@ tracking-reserved-head = Tracking for a branch literally named HEAD cannot be ch
 tracking-ambiguous = Some fetched refs match multiple remotes and cannot be selected. Give each remote a separate fetch destination, then refresh.
 publish-title = Publish branch…
 publish-source = Local source
+publish-default-warning = This destination is the remote’s known default branch. Publishing here updates the shared base branch.
 publish-urls = Effective push URLs
 publish-remote = Remote
 publish-destination = Destination branch

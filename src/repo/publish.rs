@@ -60,6 +60,12 @@ impl Form {
             ui.label(&preview.route.remote);
             ui.label(crate::i18n::text("publish-destination"));
             ui.label(&preview.route.destination);
+            if preview.targets_known_default() {
+                ui.colored_label(
+                    crate::theme::Tokens::get(ui.ctx()).warning,
+                    crate::i18n::text("publish-default-warning"),
+                );
+            }
             ui.label(crate::i18n::text("publish-urls"));
             for url in &preview.route.urls {
                 ui.label(url);

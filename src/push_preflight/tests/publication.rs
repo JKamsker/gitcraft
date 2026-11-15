@@ -158,7 +158,7 @@ fn explicit_publication_sets_tracking_only_after_reviewed_success() -> Result<()
         execute(&f.repo, &plan, None)?;
         assert_eq!(f.git(&["config", &format!("branch.{branch}.remote")])?, "origin");
         assert_eq!(f.git(&["config", &format!("branch.{branch}.merge")])?, format!("refs/heads/{destination}"));
-        assert_eq!(f.git(&["config", &format!("branch.{branch}.rebase")])?, "false");
+        assert_eq!(f.git(&["config", &format!("branch.{branch}.rebase")])?, "true");
         assert_eq!(git::run(Some(&f.receiver), &["rev-parse", &format!("refs/heads/{destination}")])?.trim(), f.git(&["rev-parse", &source])?);
     }
     Ok(())
@@ -166,14 +166,21 @@ fn explicit_publication_sets_tracking_only_after_reviewed_success() -> Result<()
 
 #[test]
 fn stale_explicit_publication_refuses_without_changing_tracking() -> Result<(), String> {
-    let f = Fixture::new()?;
-    let prepared = git::repository_tools::routes::prepare_publication(&f.repo, "main", "origin", "explicit/stale")?;
-    let mut plan = scan(&f.repo, prepared.route.publication_operations(), f.profile(), &|| true)?;
-    plan.retain_selection(prepared)?;
-    f.git(&["config", "remote.origin.pushurl", "https://changed.invalid/repo"])?;
-    assert!(execute(&f.repo, &plan, None).is_err());
-    assert_eq!(f.git(&["config", "branch.main.merge"])?, "refs/heads/main");
-    assert!(git::run(Some(&f.receiver), &["for-each-ref", "refs/heads/explicit/"])?.is_empty());
+    for change in ["url", "rename", "source"] {
+        let f = Fixture::new()?;
+        let prepared = git::repository_tools::routes::prepare_publication(&f.repo, "main", "origin", "explicit/stale")?;
+        let mut plan = scan(&f.repo, prepared.route.publication_operations(), f.profile(), &|| true)?;
+        plan.retain_selection(prepared)?;
+        match change {
+            "url" => { f.git(&["config", "remote.origin.pushurl", "https://changed.invalid/repo"])?; }
+            "rename" => { f.git(&["remote", "rename", "origin", "renamed"])?; }
+            _ => { f.commit("moved", "moved", "Source moved")?; }
+        }
+        let before = f.git(&["config", "--null", "--list"])?;
+        assert!(execute(&f.repo, &plan, None).is_err(), "{change}");
+        assert_eq!(f.git(&["config", "--null", "--list"])?, before);
+        assert!(git::run(Some(&f.receiver), &["for-each-ref", "refs/heads/explicit/"])?.is_empty());
+    }
     Ok(())
 }
 

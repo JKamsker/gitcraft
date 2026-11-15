@@ -3320,6 +3320,7 @@ tracking-reserved-head = Der Upstream eines Branches mit dem wörtlichen Namen H
 tracking-ambiguous = Einige abgerufene Referenzen passen zu mehreren Remotes und sind nicht auswählbar. Jedem Remote ein eigenes Abrufziel zuweisen und dann aktualisieren.
 publish-title = Branch veröffentlichen…
 publish-source = Lokale Quelle
+publish-default-warning = Dieses Ziel ist der bekannte Standardbranch des Remotes. Die Veröffentlichung aktualisiert den gemeinsamen Basisbranch.
 publish-urls = Effektive Push-URLs
 publish-remote = Remote
 publish-destination = Zielbranch

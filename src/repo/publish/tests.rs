@@ -47,7 +47,22 @@ fn preview_confirm_only_hands_the_exact_selection_to_root_review() -> Result<(),
         ] {
             assert!(h.query_by_label(label).is_some());
         }
-        h.get_by_label(crate::i18n::text("publish-confirm")).click();
+        for _ in 0..8 {
+            if h.get_by_label(crate::i18n::text("publish-confirm"))
+                .accesskit_node()
+                .is_focused()
+            {
+                break;
+            }
+            h.key_press(egui::Key::Tab);
+            h.run();
+        }
+        assert!(
+            h.get_by_label(crate::i18n::text("publish-confirm"))
+                .accesskit_node()
+                .is_focused()
+        );
+        h.key_press(egui::Key::Enter);
         h.run();
     });
     assert!(jobs.is_empty());
@@ -61,6 +76,45 @@ fn preview_confirm_only_hands_the_exact_selection_to_root_review() -> Result<(),
     assert_eq!(prepared.route.remote, "alice");
     assert_eq!(prepared.route.destination, "refs/heads/release/töpíc");
     assert!(prepared.route.lease.is_none());
+    Ok(())
+}
+
+#[test]
+fn known_default_warning_appears_in_both_preview_and_checklist_without_commands()
+-> Result<(), String> {
+    for known in [false, true] {
+        let mut form = form(true);
+        let prepared = form.preview.as_mut().ok_or("Expected preview")?;
+        if known {
+            prepared.snapshot.refs = format!(
+                "refs/remotes/alice/HEAD\0{}\0refs/remotes/alice/release/töpíc\n",
+                prepared.route.commit
+            );
+        }
+        let mut plan =
+            crate::push_preflight::selected_continuation_recording::plan(&prepared.route);
+        plan.retain_selection(prepared.clone())?;
+        let mut preview = Harness::builder().build_ui_state(
+            |ui, form: &mut Form| {
+                let _ = form.show(ui, true);
+            },
+            form,
+        );
+        let mut checklist = Harness::builder().build_ui_state(
+            |ui, state: &mut (crate::push_preflight::Plan, bool)| {
+                let _ = crate::repo::push_preflight::dialog(ui, &mut state.0, &mut state.1);
+            },
+            (plan, false),
+        );
+        let (_, jobs) = crate::repo::messages::record_jobs(|| {
+            preview.run();
+            checklist.run();
+        });
+        let warning = crate::i18n::text("publish-default-warning");
+        assert_eq!(preview.query_by_label(warning).is_some(), known);
+        assert_eq!(checklist.query_by_label(warning).is_some(), known);
+        assert!(jobs.is_empty());
+    }
     Ok(())
 }
 

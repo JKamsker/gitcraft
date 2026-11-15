@@ -17,6 +17,21 @@ pub(crate) struct PreparedPush {
     pub route: PushRoute,
 }
 
+impl PreparedPush {
+    /// Only a locally known symbolic remote HEAD establishes a default branch.
+    pub(crate) fn targets_known_default(&self) -> bool {
+        let Some(branch) = self.route.destination.strip_prefix("refs/heads/") else {
+            return false;
+        };
+        let head = format!("refs/remotes/{}/HEAD", self.route.remote);
+        let target = format!("refs/remotes/{}/{branch}", self.route.remote);
+        self.snapshot.refs.lines().any(|line| {
+            let mut fields = line.split('\0');
+            fields.next() == Some(head.as_str()) && fields.nth(1) == Some(target.as_str())
+        })
+    }
+}
+
 impl From<&Force> for PreparedPush {
     fn from(plan: &Force) -> Self {
         Self {
@@ -68,6 +83,40 @@ impl PushRoute {
 #[cfg(test)]
 mod continuation_recording {
     use super::*;
+
+    #[test]
+    fn known_default_requires_the_selected_remotes_exact_symbolic_head() {
+        let mut prepared = PreparedPush {
+            snapshot: Snapshot::recording(),
+            route: PushRoute {
+                branch: "topic".into(),
+                commit: "a".repeat(40),
+                remote: "alice/team".into(),
+                destination: "refs/heads/release/töpíc".into(),
+                urls: vec![],
+                lease: None,
+            },
+        };
+        for (name, target, expected) in [
+            ("alice/team", "alice/team/release/töpíc", true),
+            ("origin", "origin/release/töpíc", false),
+            ("alice/team", "alice/team/topic", false),
+            ("alice/team", "", false),
+        ] {
+            prepared.snapshot.refs = format!(
+                "refs/remotes/{name}/HEAD\0{}\0{}\n",
+                prepared.route.commit,
+                if target.is_empty() {
+                    String::new()
+                } else {
+                    format!("refs/remotes/{target}")
+                }
+            );
+            assert_eq!(prepared.targets_known_default(), expected);
+        }
+        prepared.snapshot.refs.clear();
+        assert!(!prepared.targets_known_default());
+    }
 
     #[test]
     fn plain_and_force_actions_keep_the_selected_push_host_oid_and_lease() {
