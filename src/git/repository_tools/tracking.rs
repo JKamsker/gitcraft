@@ -228,6 +228,19 @@ pub(crate) fn execute(
     };
     let result = (|| -> Result<(), String> {
         if let Some(full) = &r.target {
+            // Git appends rather than replaces ambiguous multi-value tracking keys.
+            if r.expected.remote.len() > 1 || r.expected.merge.len() > 1 {
+                super::remote_config::set_values(
+                    &runner,
+                    &format!("branch.{}.remote", r.branch),
+                    &[],
+                )?;
+                super::remote_config::set_values(
+                    &runner,
+                    &format!("branch.{}.merge", r.branch),
+                    &[],
+                )?;
+            }
             runner.run(&[
                 "branch",
                 &format!("--set-upstream-to={full}"),
