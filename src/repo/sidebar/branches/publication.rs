@@ -29,38 +29,6 @@ impl RepoTab {
             ));
         }
         self.force_push_item(ui, acts, b, idle);
-        if let Some(remote) = self.default_remote()
-            && crate::menu_item::MenuItem::new(crate::i18n::text("repo-core-3409"))
-                .icon("git-branch")
-                .enabled(idle)
-                .show(ui)
-                .clicked()
-        {
-            let (remote, name) = self
-                .split_upstream(&b.upstream)
-                .map(|(r, n)| (r, n.to_owned()))
-                .unwrap_or((remote, b.name.clone()));
-            let undo = if b.upstream.is_empty() {
-                ops(&[&["branch", "--unset-upstream", &b.name]])
-            } else {
-                self.track_ops(&b.name, &b.upstream)
-            };
-            acts.push(Action::Dialog(Dialog::set_upstream(
-                &b.name, remote, &name, undo,
-            )));
-        }
-        if !b.upstream.is_empty()
-            && crate::menu_item::MenuItem::new(crate::i18n::message(
-                "repo-core-0348",
-                &[("upstream", b.upstream.to_string().into())],
-            ))
-            .icon("git-branch")
-            .enabled(idle)
-            .show(ui)
-            .clicked()
-        {
-            acts.push(self.unset_upstream_action(b));
-        }
         let Some(forge) = self.forge() else { return };
         match self.prs.iter().find(|p| p.branch == b.name) {
             Some(pr) => {

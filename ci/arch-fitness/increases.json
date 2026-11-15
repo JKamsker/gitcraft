@@ -227,6 +227,54 @@
     "owner": "@JKamsker",
     "remediation": "Narrow or remove existing re-export bindings at the domain boundary, then ratchet the budget."
   },
+  "233-tracking-backend-api": {
+    "changes": [
+      "budget/git/exported=381"
+    ],
+    "reason": "Issue #233 PR2 adds six shared backend items: fetched Choice, View, Plan, read, execute and the operation marker. They bind fetched full refs to revalidated local tracking changes and exact undo. No new domain dependency is introduced.",
+    "owner": "@JKamsker",
+    "remediation": "Consolidate the marker and execution adapter into one backend entrypoint when operation envelopes are typed; keep metadata helpers private."
+  },
+  "233-tracking-dialog-api": {
+    "changes": [
+      "budget/doctor/exported=35"
+    ],
+    "reason": "Issue #233 PR2 exposes one owned upstream picker Form to the existing Dialog coordinator. Picker state and asynchronous snapshots stay in the tracking feature.",
+    "owner": "@JKamsker",
+    "remediation": "Keep state private and reduce this export when Dialog composition becomes feature-owned."
+  },
+  "233-tracking-dispatch": {
+    "changes": [
+      "budget/repo-core/symbols=612"
+    ],
+    "reason": "Issue #233 PR2 adds three coordinator references for the existing operation pipeline to dispatch the tracking marker and for Dialog to hold the owned Form. The picker uses existing domain dependencies.",
+    "owner": "@JKamsker",
+    "remediation": "Consolidate tracking marker dispatch behind a typed operation boundary and keep all picker logic in its owning feature."
+  },
+  "233-tracking-merge-238-git-exported": {
+    "changes": [
+      "budget/git/exported=1025"
+    ],
+    "reason": "Combine #238\u2019s corrected re-export visibility measurement (1019) with the six independently declared #233 tracking API items (+6) during a plain dev merge. Existing declarations are preserved unchanged.",
+    "owner": "@JKamsker",
+    "remediation": "Consolidate tracking operation dispatch and narrow existing Git re-exports before ratcheting the budget."
+  },
+  "233-tracking-merge-238-doctor-exported": {
+    "changes": [
+      "budget/doctor/exported=41"
+    ],
+    "reason": "Combine #238\u2019s corrected re-export visibility measurement (40) with the independently declared #233 picker Form (+1) during a plain dev merge. Existing declarations are preserved unchanged.",
+    "owner": "@JKamsker",
+    "remediation": "Keep picker state private and reduce the Form boundary when dialogs become feature-owned."
+  },
+  "233-merge-236-forge-export-budget": {
+    "changes": [
+      "budget/forge/exported=223"
+    ],
+    "reason": "The updated #238 checker measures 223 forge exports on untouched origin/dev a84d2e4f after #236, against its retained budget of 218. The same 223 are measured on the merged #233 candidate. A separate check of origin/dev confirms this five-item incoming increase; no forge application code is changed here.",
+    "owner": "@JKamsker",
+    "remediation": "Narrow discovery model/session exports and existing forge re-export boundaries, then ratchet the measured budget."
+  },
   "231-discovery-effective-visibility": {
     "changes": [
       "budget/forge/exported=222"
@@ -258,5 +306,13 @@
     "reason": "PR #224 re-exports WorktreeCleanup from branch_cleanup for the RepoTab state field. Corrected effective-visibility measurement is 37 exports rather than dev's 36.",
     "owner": "@JKamsker",
     "remediation": "Keep nested cleanup implementation private and expose only the coordinator state contract; narrow or remove that contract if state ownership moves."
+  },
+  "224-239-combined-repo-core-symbols-613": {
+    "changes": [
+      "budget/repo-core/symbols=613"
+    ],
+    "reason": "Plain merge combines dev #239 upstream-picker coordinator dependencies (612 symbols) with PR #224 independent WorktreeCleanup state dependency (+1), for a combined 613. Prior published declarations remain unchanged.",
+    "owner": "@JKamsker",
+    "remediation": "Keep worktree cleanup and tracking implementation encapsulated in their owners; reduce unused coordinator dependencies and ratchet the budget."
   }
 }

@@ -140,24 +140,6 @@ impl RepoTab {
         ))
     }
 
-    /// Makes `b` track nothing, undoably.
-    pub(super) fn unset_upstream_action(&self, b: &Branch) -> Action {
-        let unset = vec![
-            "branch".to_owned(),
-            "--unset-upstream".to_owned(),
-            b.name.clone(),
-        ];
-        Action::UndoableOps {
-            label: format!("Stop tracking {}", b.upstream),
-            ops: vec![unset.clone()],
-            refresh: Refresh::All,
-            undo: Undo::Custom {
-                undo: self.track_ops(&b.name, &b.upstream),
-                redo: vec![unset],
-            },
-        }
-    }
-
     /// Makes `branch` track `upstream` (`origin/main`) through its config, which works even
     /// when the remote branch is gone (`git branch -u` refuses then).
     pub(super) fn track_ops(&self, branch: &str, upstream: &str) -> Vec<Vec<String>> {
