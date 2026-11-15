@@ -113,6 +113,7 @@ fn synthetic_revision(repo: &Path, tree: &str) -> Result<String, String> {
 
 /// The scratch registry supplies RAII removal and next-launch crash recovery. No refs
 /// or files in the source worktree are changed. Tree objects may be added to its ODB.
+// Outer None is an unchecked test helper; Some(None) explicitly requires no index.
 fn snapshot(repo: &Path, expected: Option<Option<&[u8]>>) -> Result<(Scratch, String), String> {
     crate::git::command::snapshot_policy::without_hooks(|| snapshot_inner(repo, expected))
 }

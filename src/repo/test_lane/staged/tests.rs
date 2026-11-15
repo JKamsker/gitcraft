@@ -167,6 +167,7 @@ fn checkout_variants_invalidate_before_any_work_is_dispatched() {
         Action::CheckoutRemote("origin/main".into()),
         Action::CarryCheckout(Box::new(crate::repo::checkout_blocked::BlockedCheckout {
             label: "carry".into(),
+            blockers: Default::default(),
             ops: Vec::new(),
             undo: crate::repo::Undo::None,
         })),

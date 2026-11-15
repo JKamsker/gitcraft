@@ -7,7 +7,7 @@ use std::{collections::VecDeque, path::Path};
 /// (so none is needed on PATH, on Windows either). What git sets for an alias run in a linked
 /// worktree (`GIT_DIR`…) is unset: a test suite that makes repositories of its own would
 /// otherwise have them all be this one.
-pub fn command_alias(command: &str) -> String {
+pub(super) fn command_alias(command: &str) -> String {
     format!(
         "alias.gitcraft-test=!unset GIT_DIR GIT_WORK_TREE GIT_PREFIX GIT_INDEX_FILE \
          GIT_CONFIG_PARAMETERS GIT_OPTIONAL_LOCKS; {command}"

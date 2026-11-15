@@ -173,8 +173,10 @@ pub fn parse_jobs(out: &str) -> Vec<TestJob> {
 }
 
 mod command;
+#[cfg(test)]
+use command::command_alias;
+pub use command::run_command;
 pub(in crate::git) use command::run_command_timed;
-pub use command::{command_alias, run_command};
 
 /// The verdict of a command that ended so: exit 0 is good, anything else bad (as git-test
 /// reads it); `None` when it was stopped.
