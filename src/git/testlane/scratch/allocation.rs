@@ -41,6 +41,7 @@ fn claim(path: &Path) -> Result<bool, String> {
         return directory_command(path, "mkdir").map(|code| code == 0);
     }
     let mut builder = std::fs::DirBuilder::new();
+    builder.recursive(false);
     #[cfg(unix)]
     {
         use std::os::unix::fs::DirBuilderExt;
