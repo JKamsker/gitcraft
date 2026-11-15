@@ -105,7 +105,7 @@ pub(super) fn artifact(path: &Path) -> bool {
 }
 
 /// A Cargo-generated observation marker is protected, not an artifact itself.
-#[cfg(any(target_os = "linux", test))]
+#[cfg(target_os = "linux")]
 pub(super) fn marker(path: &Path) -> bool {
     path == Path::new("target/.rustc_info.json")
 }
