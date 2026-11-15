@@ -102,6 +102,12 @@ fn reasons(path: &Path, except: Option<u64>, entries: &[Open]) -> Vec<String> {
     why
 }
 
+impl Drop for Presence {
+    fn drop(&mut self) {
+        open().retain(|e| e.id != self.id);
+    }
+}
+
 #[cfg(test)]
 mod tests {
     #[test]
@@ -113,11 +119,5 @@ mod tests {
             terminals: vec![std::sync::Arc::new(|| None)],
         };
         assert!(!super::reasons(&root.join("worktree"), None, &[entry]).is_empty());
-    }
-}
-
-impl Drop for Presence {
-    fn drop(&mut self) {
-        open().retain(|e| e.id != self.id);
     }
 }
