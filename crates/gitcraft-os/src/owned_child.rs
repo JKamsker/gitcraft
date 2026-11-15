@@ -342,12 +342,16 @@ mod recording_tests {
             ..Default::default()
         };
         let mut terminal = None;
-        let error = finish(&mut terminal, &mut backend).unwrap_err().to_string();
+        let error = finish(&mut terminal, &mut backend)
+            .expect_err("stop and reap were refused")
+            .to_string();
         assert!(
             error.contains("owned group/job stop:") && error.contains("target/anchor reap refused")
         );
         assert_eq!(
-            finish(&mut terminal, &mut backend).unwrap_err().to_string(),
+            finish(&mut terminal, &mut backend)
+                .expect_err("retirement retains its original failure")
+                .to_string(),
             error
         );
         assert_eq!(backend.events.len(), 2);
