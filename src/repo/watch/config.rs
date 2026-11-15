@@ -28,7 +28,7 @@ pub(super) fn paths(repo: &Path) -> Vec<PathBuf> {
             paths.push(PathBuf::from(file));
         }
     }
-    if let Some(profile) = crate::git::profile_config() {
+    if let Some(profile) = crate::connections::current().git_config {
         paths.push(profile);
     }
     paths
