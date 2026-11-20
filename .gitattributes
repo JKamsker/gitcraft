@@ -1,2 +1,4 @@
 # Unix scripts are embedded and sent to Unix hosts from Windows builds too.
 *.sh text eol=lf
+# Persisted-record fixtures are compared byte for byte with what gitcraft writes (#193).
+src/repo/operation_plan/fixtures/** text eol=lf

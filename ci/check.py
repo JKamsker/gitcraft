@@ -8,8 +8,9 @@
 
 The gates are the exact commands CI runs: formatting, the tooling tests, the Rust
 file-size and complexity-policy checks of the committed tree (`--revision HEAD`,
-so commit first), and strict all-target Clippy for every package. Cargo runs at
-the lowest OS priority. Windows shards: after `python ci/windows-test-build.py`,
+so commit first), the pure operation-plan compiles, and strict all-target Clippy
+for every package. Cargo and rustc run at the lowest OS priority. Windows shards:
+after `python ci/windows-test-build.py`,
 `python ci/test-shards.py --check-only` and `python ci/test-shards.py <shard>`
 run the CI shards natively. It stops at the first failure.
 """
@@ -23,12 +24,19 @@ import sys
 WINDOWS = sys.platform == "win32"
 PYTHON = "python" if WINDOWS else "python3"
 
+# Pure operation-plan slices that check_plan.py/check_grammar.py compile with bare rustc (#193).
+PLAN_CHECKER = "src/repo/operation_plan/check_plan.py"
+GRAMMAR_CHECKER = "src/repo/operation_plan/check_grammar.py"
+COMPILES = ("ci/clippy_packages.py", PLAN_CHECKER, GRAMMAR_CHECKER)
+
 # The same commands as .github/workflows (ci/test_workflow_gates.py pins them).
 GATES = (
     ("formatting", ["cargo", "fmt", "--check"]),
     ("tooling tests", [PYTHON, "-m", "unittest", "discover", "-s", "ci", "-p", "test_*.py"]),
     ("Rust file size", [PYTHON, "ci/rust_file_size.py", "--revision", "HEAD"]),
     ("complexity policy", [PYTHON, "ci/complexity_policy.py", "--revision", "HEAD"]),
+    ("operation plan", [PYTHON, PLAN_CHECKER]),
+    ("operation grammar", [PYTHON, GRAMMAR_CHECKER, "src/git/global_options.rs"]),
     ("clippy and complexity gate", [PYTHON, "ci/clippy_packages.py"]),
 )
 
@@ -45,8 +53,8 @@ def plan(tests=(), full=False):
 
 
 def low_priority(command):
-    """Cargo (also via the Clippy gate) and the compilers it starts yield to interactive work (AGENTS.md)."""
-    if command[0] != "cargo" and command[1:2] != ["ci/clippy_packages.py"]:
+    """Cargo, rustc (also via the Clippy gate and plan checkers) and their children yield (AGENTS.md)."""
+    if command[0] != "cargo" and (command[1:2] or [""])[0] not in COMPILES:
         return command, {}
     if WINDOWS:
         return command, {"creationflags": 0x40}  # IDLE_PRIORITY_CLASS, inherited by rustc

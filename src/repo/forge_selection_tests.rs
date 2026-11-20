@@ -70,7 +70,7 @@ fn selecting_fork_isolates_pr_numbers_ci_and_all_late_hosting_continuations() {
     let asked = Instant::now();
     tab.prs_loaded = Some(asked);
     let _ = old.send(Msg::Prs(asked, Ok(vec![pr(7, "Vancete")])));
-    let _ = old.send(Msg::CiActed("old CI result".into(), Ok(())));
+    let _ = old.send(Msg::CiActed(0, "old CI result".into(), Ok(())));
     let _ = old.send(Msg::Then(Box::new(|tab, _| {
         tab.prs = vec![pr(7, "Vancete")];
         tab.status = Some(crate::repo::Notice::plain((
@@ -108,7 +108,7 @@ fn a_late_reload_chooses_the_current_preference_and_url_change_drops_old_results
     tab.forge_remotes[1].1 = hosting("changed");
     tab.take_forge_selection(true, &ctx);
     assert_eq!(tab.hosting, Some(hosting("changed")));
-    let _ = old.send(Msg::CiActed("previous URL".into(), Ok(())));
+    let _ = old.send(Msg::CiActed(0, "previous URL".into(), Ok(())));
     tab.poll(&ctx);
     assert!(tab.status.is_none());
     tab.remotes.remove(1);
@@ -157,7 +157,7 @@ fn another_tab_rebinds_before_delivering_old_results_and_does_not_overwrite_a_ne
     let mut second = tab(&ctx);
     let old = second.forge_sender();
     first.set_primary_forge(Some("fork".into()), &ctx);
-    let _ = old.send(Msg::CiActed("from old source".into(), Ok(())));
+    let _ = old.send(Msg::CiActed(0, "from old source".into(), Ok(())));
     second.poll(&ctx);
     assert_eq!(second.hosting, first.hosting);
     assert!(second.status.is_none());
@@ -235,7 +235,7 @@ fn unrelated_remote_edits_and_same_repository_renames_do_not_strand_a_posting_re
     tab.remotes[0].name = "renamed".into();
     tab.forge_remotes[0].0 = "renamed".into();
     tab.take_forge_selection(true, &ctx);
-    let _ = sender.send(Msg::CiActed("stale refresh after rename".into(), Ok(())));
+    let _ = sender.send(Msg::CiActed(0, "stale refresh after rename".into(), Ok(())));
     let _ = sender.send(Msg::PrPosted {
         hosting: Box::new(hosting("Vancete")),
         number: 7,

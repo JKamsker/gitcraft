@@ -69,6 +69,8 @@ pub enum Dialog {
     },
     ContentRecovery,
     RepositoryTools(Box<super::repository_tools::State>),
+    /// The executable bit or the letter case of a tracked file (see `file_metadata`).
+    FileMetadata(Box<super::detail::file_metadata::FileMetaForm>),
     GerritReview {
         remote: String,
         head: String,

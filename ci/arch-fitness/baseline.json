@@ -3821,7 +3821,7 @@
     },
     "changes": {
       "domains": 14,
-      "exported": 99
+      "exported": 100
     },
     "conflicts": {
       "domains": 11,
@@ -3845,7 +3845,7 @@
     },
     "git": {
       "domains": 12,
-      "exported": 1002
+      "exported": 1008
     },
     "graph": {
       "domains": 18,
@@ -3873,7 +3873,7 @@
     },
     "repo-core": {
       "domains": 24,
-      "symbols": 613,
+      "symbols": 614,
       "exported": 179
     },
     "review": {

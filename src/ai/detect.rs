@@ -1,27 +1,49 @@
 //! Which AI tools are installed on a repository's machine: here, in WSL or over SSH. Asked
 //! there, the way the tool itself would be run (see [`super::run`]).
+//!
+//! The look only finds programs; it runs none of them. `gh copilot --help` used to stand in for
+//! "Copilot is there", but since gh 2.86 `copilot` is a command of gh's own: gh prints its help
+//! whether the Copilot CLI is installed or not, gh 2.104 starts a telemetry process for each
+//! call, and the first real `gh copilot` downloads the Copilot CLI (in CI) or asks to (on a
+//! terminal). So Copilot counts as installed when `gh` is on the PATH and the Copilot CLI is
+//! where `gh copilot` looks for it: `copilot` on the PATH, or the copy gh downloads into its
+//! data folder (`$XDG_DATA_HOME/gh`, else `%LOCALAPPDATA%\GitHub CLI` on Windows and
+//! `~/.local/share/gh` elsewhere), as `copilot/copilot`.
 
+use std::borrow::Cow;
 use std::path::Path;
 use std::time::Duration;
 
 use super::run::{self, Cancel, CommandLine, Job};
 use super::settings::AiTool;
 
-/// How long the look may take (`gh copilot --help` starts a program).
+/// How long the look may take. It only searches the PATH and checks two files, so this is far
+/// more than it needs.
 const LOOK_FOR: Duration = Duration::from_secs(30);
 
 /// What `sh` runs to look: a word for each tool found.
+///
+/// Copilot: this assumes gh 2.86 or newer, whose built-in `copilot` command runs the Copilot
+/// CLI. An older gh beside a `copilot` from npm is taken for Copilot, and `gh copilot -p … -s`
+/// then fails with gh's "unknown command"; finding that out would mean running gh.
 const SH: &str = "\
 command -v claude >/dev/null 2>&1 && echo claude
 command -v codex >/dev/null 2>&1 && echo codex
-command -v gh >/dev/null 2>&1 && gh copilot --help >/dev/null 2>&1 </dev/null && echo copilot
+command -v gh >/dev/null 2>&1 && { command -v copilot >/dev/null 2>&1 || \
+{ c=\"${XDG_DATA_HOME:-$HOME/.local/share}/gh/copilot/copilot\"; [ -f \"$c\" ] && [ -x \"$c\" ]; }; \
+} && echo copilot
 true";
 
-/// The same for `cmd` (Windows).
-/// `$PATH:`: only the PATH, never the folder it runs in.
+/// The same for `cmd` (Windows), with the same assumption about gh's version.
+/// `$PATH:`: only the PATH, never the folder it runs in. `if not exist "…\"`: a file, not a
+/// folder of that name.
 const CMD: &str = "(where $PATH:claude >nul 2>nul && echo claude) & \
 (where $PATH:codex >nul 2>nul && echo codex) & \
-(where $PATH:gh >nul 2>nul && gh copilot --help >nul 2>nul <nul && echo copilot) & ver >nul";
+(where $PATH:gh >nul 2>nul && (where $PATH:copilot >nul 2>nul && echo copilot || \
+if defined XDG_DATA_HOME (if exist \"%XDG_DATA_HOME%\\gh\\copilot\\copilot.exe\" \
+if not exist \"%XDG_DATA_HOME%\\gh\\copilot\\copilot.exe\\\" echo copilot) \
+else if exist \"%LOCALAPPDATA%\\GitHub CLI\\copilot\\copilot.exe\" \
+if not exist \"%LOCALAPPDATA%\\GitHub CLI\\copilot\\copilot.exe\\\" echo copilot)) & ver >nul";
 
 /// Where looking for the tools of a machine stands.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
@@ -64,20 +86,32 @@ pub fn parse(out: &str) -> Vec<AiTool> {
 /// The tools installed on the machine `repo` is on (a custom command is never looked for: it
 /// is whatever the user wrote). Blocking: from a background thread.
 pub fn installed(repo: &Path) -> Result<Vec<AiTool>, String> {
-    let look = CommandLine::Script {
+    look(&look_from(repo), &look_script())
+}
+
+/// The look, for each shell.
+fn look_script() -> CommandLine {
+    CommandLine::Script {
         sh: SH.to_owned(),
         cmd: CMD.to_owned(),
-    };
-    // Here, from a folder of no repository's: nothing of the repository's is taken for a tool.
-    let neutral = std::env::temp_dir();
-    let folder = if crate::remote::is_remote(repo) {
-        repo
+    }
+}
+
+/// Where the look runs for `repo`: on another machine, in its folder there; here, in a folder
+/// of no repository's, so nothing of the repository's is taken for a tool.
+fn look_from(repo: &Path) -> Cow<'_, Path> {
+    if crate::remote::is_remote(repo) {
+        Cow::Borrowed(repo)
     } else {
-        neutral.as_path()
-    };
+        Cow::Owned(std::env::temp_dir())
+    }
+}
+
+/// Runs `look` from `folder` (here, or on the machine it names) and reads what it found.
+fn look(folder: &Path, look: &CommandLine) -> Result<Vec<AiTool>, String> {
     let out = run::run(&Job {
         repo: folder,
-        command: &look,
+        command: look,
         input: &[],
         timeout: LOOK_FOR,
         cancel: &Cancel::new(),
@@ -87,69 +121,5 @@ pub fn installed(repo: &Path) -> Result<Vec<AiTool>, String> {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn found_tools_are_read() {
-        assert_eq!(
-            parse("copilot\r\nclaude\n"),
-            [AiTool::Claude, AiTool::Copilot]
-        );
-        assert!(parse("").is_empty());
-        assert!(parse("claudex codexy").is_empty());
-    }
-
-    /// On a machine whose PATH has a fake `claude` and `gh` (with copilot) but no `codex`, the
-    /// look finds those two.
-    #[cfg(unix)]
-    #[test]
-    fn the_tools_on_the_path_are_found() -> Result<(), String> {
-        use std::os::unix::fs::PermissionsExt;
-        let dir = std::env::temp_dir().join(format!("gitcraft-ai-detect-{}", std::process::id()));
-        let bin = dir.join("bin");
-        let _ = std::fs::remove_dir_all(&dir);
-        std::fs::create_dir_all(&bin).map_err(|e| e.to_string())?;
-        for (name, body) in [
-            ("claude", "exit 0"),
-            // `gh copilot --help` works.
-            ("gh", "[ \"$1\" = copilot ] && exit 0; exit 1"),
-        ] {
-            let path = bin.join(name);
-            std::fs::write(&path, format!("#!/bin/sh\n{body}\n")).map_err(|e| e.to_string())?;
-            std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o755))
-                .map_err(|e| e.to_string())?;
-        }
-        // Only that folder and the system's, so a real codex on this machine isn't found.
-        let look = CommandLine::Script {
-            sh: format!("PATH='{}:/usr/bin:/bin'\n{SH}", bin.display()),
-            cmd: String::new(),
-        };
-        let out = run::run(&Job {
-            repo: &dir,
-            command: &look,
-            input: &[],
-            timeout: LOOK_FOR,
-            cancel: &Cancel::new(),
-        });
-        let _ = std::fs::remove_dir_all(&dir);
-        let found = parse(&out.map_err(|e| e.message())?);
-        assert_eq!(found, [AiTool::Claude, AiTool::Copilot]);
-        Ok(())
-    }
-
-    #[test]
-    fn tools_here_are_looked_for_outside_the_repository() {
-        // Its folder isn't where the look runs: one that is gone doesn't matter.
-        let found = installed(Path::new("/nonexistent/gitcraft-ai-detect"));
-        assert!(found.is_ok(), "{found:?}");
-    }
-
-    /// On Windows, `where` with `$PATH:` and cmd's `NoDefaultCurrentDirectoryInExePath` keep
-    /// a repository's own `claude.cmd` from being found or run.
-    #[test]
-    fn the_windows_look_searches_only_the_path() {
-        assert_eq!(CMD.matches("where $PATH:").count(), 3);
-        assert!(!CMD.contains("where claude"));
-    }
-}
+#[path = "detect_tests.rs"]
+mod tests;

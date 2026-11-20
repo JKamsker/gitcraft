@@ -20,18 +20,15 @@ pub(in crate::repo) fn check_expected(
     control: Option<&Arc<git::OpControl>>,
 ) -> Result<(), String> {
     let plan = model::Plan::decode(ops);
-    for op in ops {
-        if let [mark, base, head] = op.as_slice()
-            && mark == crate::gerrit::CHECK
-        {
-            check_stack_captured(base, head, control, |args| {
-                if let Some(control) = control {
-                    git::run_watched(Some(path), args, None, true, control)
-                } else {
-                    git::run(Some(path), args)
-                }
-            })?;
-        }
+    // Exactly the `[CHECK, base, head]` steps, in saved order.
+    for (base, head) in plan.gerrit_stacks() {
+        check_stack_captured(base, head, control, |args| {
+            if let Some(control) = control {
+                git::run_watched(Some(path), args, None, true, control)
+            } else {
+                git::run(Some(path), args)
+            }
+        })?;
     }
     for (rev, tree) in plan.trees() {
         let now = git::run(

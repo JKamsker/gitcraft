@@ -309,12 +309,7 @@ impl RepoTab {
             let w = &self.work;
             return labels::changes(w.conflicted.len(), w.staged.len(), w.unstaged.len());
         }
-        if let Some(parked) = self
-            .resolver
-            .parked
-            .iter()
-            .find(|p| commit.hash.strip_prefix("\u{0}parked:") == Some(p.id.as_str()))
-        {
+        if let Some(parked) = self.parked_of(&commit.hash) {
             return self.parked_label(parked);
         }
         let when = git::relative_time(commit.time, now);

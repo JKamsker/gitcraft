@@ -354,5 +354,29 @@
     "reason": "#205 review: gitcraft::dir_sync now returns a typed outcome (Flushed::Done/Unsupported, Failure with open/flush stage) and offers sync_once beside the retrying sync, replacing unopenable_for_flush. Callers in the conflicts domain need the types to skip unsupported filesystems (SMB, 9P) and to tell a failed open from a refused flush. 115 -> 117.",
     "owner": "@JKamsker",
     "remediation": "Narrow the listed exported-but-unused runtime items (diagnostics, network, portable) and ratchet the budget."
+  },
+  "173-file-metadata-backend-api": {
+    "changes": [
+      "budget/git/exported=1008"
+    ],
+    "reason": "Issue #173 item 13 adds six shared backend items in git::file_metadata: Snapshot, Plan, snapshot, executable_plan, case_rename_plan and save_executable_patch. They read a tracked file's index entry and folder, and plan the executable-bit edit (a mode-only patch applied to the index) and the case-only two-step rename with exact inverse commands. The patch writer, path quoting and temporary-name choice stay private.",
+    "owner": "@JKamsker",
+    "remediation": "Fold snapshot reading and both planners behind one typed edit entry point if more metadata edits arrive, and ratchet the budget."
+  },
+  "173-file-metadata-dialog-api": {
+    "changes": [
+      "budget/changes/exported=100"
+    ],
+    "reason": "Issue #173 item 13 exposes one owned FileMetaForm from the changes feature to the existing Dialog coordinator, as the #233 tracking and publication pickers do. Its read, plan and view stay private to repo::detail::file_metadata.",
+    "owner": "@JKamsker",
+    "remediation": "Let the Dialog coordinator hold feature forms behind one shared interface when dialog composition is decomposed, then ratchet the budget."
+  },
+  "173-file-metadata-dialog-dispatch": {
+    "changes": [
+      "budget/repo-core/symbols=614"
+    ],
+    "reason": "Issue #173 item 13 adds one coordinator reference: Dialog::FileMetadata holds the owned FileMetaForm. Execution uses the existing UndoableOps action, so the Action enum and apply dispatcher do not grow. No new domain edge or RepoTab mutation is introduced.",
+    "owner": "@JKamsker",
+    "remediation": "Reduce coordinator symbol dependencies as dialog composition is decomposed and ratchet the budget."
   }
 }

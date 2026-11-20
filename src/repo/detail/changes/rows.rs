@@ -146,6 +146,7 @@ impl RepoTab {
                 |ui, acts| {
                     self.lock_menu_items(ui, &f.path, None, acts);
                     self.storage_menu_items(ui, &f.path, None, acts);
+                    self.file_metadata_menu_items(ui, f, acts);
                     stash(ui, acts);
                 },
             );

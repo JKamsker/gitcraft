@@ -29,7 +29,11 @@ fn recording_local_rewrite_precedes_exact_tip_review_and_has_separate_undo() -> 
         "the mixed-operation scanner restriction remains intact"
     );
     assert!(!crate::push_preflight::has_push(&local));
-    assert!(local.iter().any(|step| guard::is_guard(step)));
+    assert!(
+        local
+            .iter()
+            .any(|step| matches!(guard::guard_of(step), Some((_, [_]))))
+    );
     assert_eq!(
         local.last(),
         Some(&vec![
