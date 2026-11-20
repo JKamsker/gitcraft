@@ -140,10 +140,7 @@ impl RepoTab {
         view.storyboard.invalidate();
         view.loading = true;
         let (path, number, hosting) = (self.path.clone(), view.number, self.hosting.clone());
-        // A post waiting for this page to be read again waits for the newest read of it.
-        if let Some(draft) = self.pr_drafts.get_mut(&number).filter(|d| d.settling.is_some()) {
-            draft.settling = Some(request);
-        }
+        self.pr_read_again(number, request);
         let failed = move |e| Msg::PrDetails(request, Box::new(Err(e)));
         super::messages::spawn_or(&self.forge_sender(), ctx, failed, move || {
             let details = match hosting

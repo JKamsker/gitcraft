@@ -93,6 +93,15 @@ impl RepoTab {
         }
     }
 
+    /// A post waiting for the page of `number` to be read again waits for its newest read.
+    pub(in crate::repo) fn pr_read_again(&mut self, number: u64, request: u64) {
+        if let Some(draft) = self.pr_drafts.get_mut(&number)
+            && draft.settling.is_some()
+        {
+            draft.settling = Some(request);
+        }
+    }
+
     /// Does what the page, the review box or a thread asked for.
     pub(in crate::repo) fn pr_act(&mut self, act: PrAct, ctx: &egui::Context) {
         match act {

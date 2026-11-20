@@ -68,7 +68,11 @@ fn a_follow_up_read_answered_after_the_page_changed_settles_its_draft() -> Resul
                 "closed" => tab.close_pr(),
                 _ => drop(record_jobs(|| tab.open_pr(8, &ctx))),
             }
-            let answer = if ok { Ok(details()) } else { Err("gone".into()) };
+            let answer = if ok {
+                Ok(details())
+            } else {
+                Err("gone".into())
+            };
             let (_, jobs) =
                 record_jobs(|| tab.handle(Msg::PrDetails(request, Box::new(answer)), &ctx));
             assert!(jobs.is_empty(), "no files are read for a page not shown");
@@ -86,7 +90,10 @@ fn files_answered_after_the_page_closed_settle_their_draft() -> Result<(), Strin
     let (_, jobs) =
         record_jobs(|| tab.handle(Msg::PrDetails(request, Box::new(Ok(details()))), &ctx));
     assert_eq!(read_request(jobs)?, request, "the files follow the details");
-    assert!(tab.pr_drafts[&7].posting, "settled only once the files come");
+    assert!(
+        tab.pr_drafts[&7].posting,
+        "settled only once the files come"
+    );
     tab.close_pr();
     tab.handle(Msg::PrFiles(request, Ok(files())), &ctx);
     assert!(settled(&tab));
@@ -126,9 +133,15 @@ fn only_a_post_still_being_sent_blocks_changing_the_primary_forge() -> Result<()
     tab.pr_drafts.entry(7).or_default().posting = true;
     assert!(tab.forge_change_blocked());
     tab.close_pr();
-    assert!(tab.forge_change_blocked(), "leaving the page does not end the post");
+    assert!(
+        tab.forge_change_blocked(),
+        "leaving the page does not end the post"
+    );
     tab.pr_posted(7, Posted::Comment, Ok(()), &ctx);
-    assert!(settled(&tab), "answered with the page closed, nothing is read again");
+    assert!(
+        settled(&tab),
+        "answered with the page closed, nothing is read again"
+    );
     // Sent with the page open: what is left is reading it again, which a forge change ends.
     posted(&mut tab, &ctx)?;
     assert!(tab.pr_drafts[&7].posting, "nothing is sent by the old page");

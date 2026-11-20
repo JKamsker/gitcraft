@@ -45,8 +45,14 @@ fn a_search_still_being_read_is_asked_again_after_a_refresh() -> Result<(), Stri
         // A slower query is typed and sent, and the window loses and regains the focus.
         let slow = start(&mut tab, &ctx, "slow query")?;
         refresh(&mut tab, &ctx, f5);
-        assert!(slow.cancel.is_cancelled(), "the old read is still cancelled");
-        let again = tab.search.request().ok_or("the search was not asked again")?;
+        assert!(
+            slow.cancel.is_cancelled(),
+            "the old read is still cancelled"
+        );
+        let again = tab
+            .search
+            .request()
+            .ok_or("the search was not asked again")?;
         assert!(!Arc::ptr_eq(&slow, &again));
         assert!(!again.cancel.is_cancelled());
         assert_eq!(again.query, "slow query");
