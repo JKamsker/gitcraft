@@ -32,9 +32,13 @@ fn harness(form: FileMetaForm, idle: bool) -> Harness<'static, State> {
     )
 }
 
-/// Paints frames until the dialog has no read in flight (a few seconds at most).
+/// How long a read of a few Git commands may take on a loaded test machine.
+const READ_DEADLINE: std::time::Duration = std::time::Duration::from_secs(60);
+
+/// Paints frames until the dialog has no read in flight, returning as soon as it lands.
 fn settled(h: &mut Harness<'static, State>) -> Result<(), String> {
-    for _ in 0..500 {
+    let deadline = std::time::Instant::now() + READ_DEADLINE;
+    while std::time::Instant::now() < deadline {
         h.run_steps(1);
         if h.state().0.pending.is_none() {
             h.run_steps(1);
