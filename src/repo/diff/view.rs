@@ -175,6 +175,8 @@ impl RepoTab {
                 auto_opened = Some(mark);
             }
         }
+        super::coverage::request(view, data, settings.diff_coverage, acts);
+        super::coverage::banner(ui, &view.coverage, settings.diff_coverage);
         if let Some(open) = &view.moved {
             super::moved_view::panel(ui, &t, data, open, acts);
         }
@@ -199,6 +201,7 @@ impl RepoTab {
         let mut rows = Rows::new(ui, view, data, review.as_ref(), pickable, split)
             .with_find(&self.find, reveal);
         rows.links = links.as_ref();
+        rows.coverage = view.coverage.shown(settings.diff_coverage);
         let sel = rows.show(ui, &path, acts);
         let text_started = rows.text_started;
         let (clicked, offset, jumped, seen) = (rows.clicked, rows.offset, rows.jumped, rows.seen);

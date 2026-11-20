@@ -63,6 +63,8 @@ pub(super) struct Rows<'a> {
     /// The changed lines that can be clicked: they take the right-click over them, so they
     /// open the lines' menu too.
     picks: Vec<egui::Response>,
+    /// The test coverage marks of the changed lines, when they are on.
+    pub(super) coverage: Option<&'a super::coverage::Gutter>,
 }
 
 impl<'a> Rows<'a> {
@@ -110,6 +112,7 @@ impl<'a> Rows<'a> {
             seen: Seen::default(),
             links: None,
             picks: Vec::new(),
+            coverage: None,
         }
     }
 

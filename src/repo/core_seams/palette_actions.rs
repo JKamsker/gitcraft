@@ -13,6 +13,7 @@ impl RepoTab {
             Action::DvcPull,
         )];
         items.extend(crate::repo::file_comparison::palette::items());
+        items.push(crate::repo::diff::coverage::palette_item());
         items.extend(crate::repo::push::palette::items(
             ctx,
             self.gerrit.is_some(),

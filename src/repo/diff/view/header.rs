@@ -324,6 +324,9 @@ impl RepoTab {
                             // A diff of some lines only (`git log -L`) shows them whole, with
                             // whitespace: those options don't apply to it.
                             wrap_control(ui, acts);
+                            if super::super::coverage::applies(&view.key) {
+                                super::super::coverage::control(ui, &t, acts);
+                            }
                             if view.lines.is_none() {
                                 view_options(ui, &t, (split, ignore_ws, whole_file), acts);
                                 ui.add_space(4.0);

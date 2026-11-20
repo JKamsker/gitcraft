@@ -92,6 +92,14 @@ impl Rows<'_> {
         if let Some(who) = data.authors.get(i).copied().flatten() {
             crate::repo::authorship_view::stripe(ui.painter(), &self.t, rect, who, 4.0);
         }
+        if matches!(side, Side::Unified | Side::New)
+            && let Some(mark) = self
+                .coverage
+                .and_then(|g| super::super::coverage::mark_of(g, data, i))
+        {
+            let right = rect.left() + gutter_width(side);
+            super::super::coverage::paint_mark(ui, rect, right, mark, i);
+        }
         if self.view.keyboard_hunk == Some(i) && self.data.lines[i].kind == Kind::Hunk {
             ui.painter().with_clip_rect(ui.clip_rect()).rect_stroke(
                 rect.shrink(1.0),
