@@ -53,10 +53,8 @@ struct Machine {
 
 impl Machine {
     fn new(name: &str) -> Result<Self, String> {
-        let root = std::env::temp_dir().join(format!(
-            "gitcraft-ai-detect-{}-{name}",
-            std::process::id()
-        ));
+        let root =
+            std::env::temp_dir().join(format!("gitcraft-ai-detect-{}-{name}", std::process::id()));
         let _ = std::fs::remove_dir_all(&root);
         std::fs::create_dir_all(root.join("bin")).map_err(|e| e.to_string())?;
         std::fs::create_dir_all(root.join("home")).map_err(|e| e.to_string())?;
@@ -113,7 +111,10 @@ impl Machine {
         let system = std::env::var("SystemRoot").unwrap_or_else(|_| r"C:\Windows".to_owned());
         let mut cmd = run::shell_here(&look_script());
         cmd.current_dir(&self.root)
-            .env("PATH", format!("{};{system}\\System32", self.bin().display()))
+            .env(
+                "PATH",
+                format!("{};{system}\\System32", self.bin().display()),
+            )
             .env("LOCALAPPDATA", self.home().join("local"))
             .env_remove("XDG_DATA_HOME");
         let options = crate::processes::Options {
