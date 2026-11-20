@@ -83,7 +83,7 @@ pub(super) fn listing(repo: &Path) -> Result<Listing, String> {
     for id in ids {
         let _lease = locking::acquire(repo, &id)?;
         let parked = match manifest(repo, &id)? {
-            Manifest::Archive(parked) => parked,
+            Manifest::Archive(parked) => *parked,
             Manifest::Incomplete(dir) => {
                 found.incomplete.push((id, dir));
                 continue;
@@ -103,7 +103,7 @@ pub(super) fn listing(repo: &Path) -> Result<Listing, String> {
 }
 
 pub(super) enum Manifest {
-    Archive(Parked),
+    Archive(Box<Parked>),
     /// An active reservation whose manifest is missing or torn while its last receipt is
     /// still Archiving (or it has none): the worktree was never cleared.
     Incomplete(PathBuf),
@@ -168,5 +168,5 @@ pub(super) fn manifest(repo: &Path, id: &str) -> Result<Manifest, String> {
     if parked.id != id {
         return Err(format!("Recovery manifest identity mismatch: {id}"));
     }
-    Ok(Manifest::Archive(parked))
+    Ok(Manifest::Archive(Box::new(parked)))
 }

@@ -342,6 +342,7 @@ fn forget_locked(repo: &Path, id: &str) {
 }
 
 /// Active parked merges and retained completed recovery archives for `repo`, oldest first.
+#[allow(dead_code)] // The UI reads [`list_all`]; tests and the recording harness use this.
 pub fn list(repo: &Path) -> Result<Vec<Parked>, String> {
     discovery::listing(repo).map(|found| found.parked)
 }
