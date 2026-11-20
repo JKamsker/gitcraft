@@ -1,5 +1,8 @@
 //! Isolated, process-free harness. All Git calls are fake; archive/restore code is production.
 #![allow(dead_code, unused_imports)]
+// The production std-only directory flush, shared with the application (not a fake).
+#[path = "../../../dir_sync.rs"]
+mod dir_sync;
 mod fake_git;
 mod resolver;
 use fake_git as git;
