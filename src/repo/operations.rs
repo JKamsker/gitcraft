@@ -52,6 +52,12 @@ mod preconditions;
 #[allow(unused_imports)]
 pub(crate) use preconditions::*;
 #[cfg(test)]
+#[path = "operation_plan/legacy_fixture_tests.rs"]
+mod legacy_fixtures;
+#[cfg(test)]
+#[path = "operation_plan/sentinel_inventory_tests.rs"]
+mod sentinel_inventory;
+#[cfg(test)]
 #[path = "operation_plan/tests.rs"]
 mod tests;
 
