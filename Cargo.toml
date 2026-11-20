@@ -145,6 +145,14 @@ unwrap_used = "deny"
 expect_used = "deny"
 panic = "deny"
 
+# Line tables only (as Windows CI already builds tests): backtraces keep function names and source
+# lines, while full type/local-variable info, which made up over half of target/, is left out.
+# Measured on Windows, `cargo test --no-run` from cold: 619s → 444s; one-file rebuild 64s → 40s;
+# target/ after both 20.6 GB → 10.4 GB. To step through locals in a debugger, build with
+# `CARGO_PROFILE_DEV_DEBUG=full`.
+[profile.dev]
+debug = "line-tables-only"
+
 [profile.dev.package."*"]
 opt-level = 2
 
