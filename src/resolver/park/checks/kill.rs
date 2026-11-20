@@ -185,7 +185,7 @@ fn restart(f: &Fixture, action: &str, parked: Option<&Parked>, at: &str) -> &'st
         assert_eq!(action, "park", "{at}");
         live_original(f);
         // Reported as incomplete (the user is told where), then forgotten on request.
-        let found = list_all(&f.0).unwrap();
+        let found = discovery::listing(&f.0).unwrap();
         let reservation = folder(&f.0, "test-id").unwrap();
         assert_eq!(
             found.incomplete,
@@ -193,7 +193,7 @@ fn restart(f: &Fixture, action: &str, parked: Option<&Parked>, at: &str) -> &'st
             "{at}"
         );
         forget(&f.0, "test-id");
-        assert_eq!(list_all(&f.0).unwrap(), Listing::default(), "{at}");
+        assert_eq!(list_all(&f.0).unwrap(), (Vec::new(), Vec::new()), "{at}");
         let pinned = run(
             &f.0,
             &[

@@ -24,7 +24,7 @@ mod discovery;
 mod effects;
 #[path = "park/locking.rs"]
 mod locking;
-pub use discovery::{Listing, recovery_location};
+pub use discovery::recovery_location;
 #[path = "park/bytes.rs"]
 mod bytes;
 #[path = "park/durability.rs"]
@@ -343,14 +343,19 @@ fn forget_locked(repo: &Path, id: &str) {
 
 /// Active parked merges and retained completed recovery archives for `repo`, oldest first.
 #[allow(dead_code)] // The UI reads [`list_all`]; tests and the recording harness use this.
-pub fn list(repo: &Path) -> Result<Vec<Parked>, String> {
+pub(super) fn list(repo: &Path) -> Result<Vec<Parked>, String> {
     discovery::listing(repo).map(|found| found.parked)
 }
 
-/// [`list`], and the reservations of put-asides that never completed (to report, and
-/// [`forget`] on the user's say).
-pub fn list_all(repo: &Path) -> Result<Listing, String> {
-    discovery::listing(repo)
+/// [`list`], and the ids and folders of reservations of put-asides that never completed
+/// (to report, and [`forget`] on the user's say; see `discovery::Listing`). One export for
+/// the tab.
+#[expect(
+    clippy::type_complexity,
+    reason = "a named result type would be one more export of the conflicts domain (arch-fitness visibility budget)"
+)]
+pub fn list_all(repo: &Path) -> Result<(Vec<Parked>, Vec<(String, PathBuf)>), String> {
+    discovery::listing(repo).map(|found| (found.parked, found.incomplete))
 }
 
 /// Drops `parked` without bringing it back, its files kept on a branch of their own (named

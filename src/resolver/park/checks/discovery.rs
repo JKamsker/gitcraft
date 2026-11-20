@@ -102,8 +102,10 @@ fn a_torn_manifest_while_archiving_hides_no_other_archive() {
     }
     // Reported, so the user can be told, and removable with forget, alone.
     let found = list_all(&f.0).unwrap();
-    assert_eq!(found.parked, vec![p.clone()]);
-    assert_eq!(found.incomplete, vec![("torn-id".to_owned(), torn.clone())]);
+    assert_eq!(
+        found,
+        (vec![p.clone()], vec![("torn-id".to_owned(), torn.clone())])
+    );
     let notes = effects::NOTES.with(|n| n.borrow().clone());
     assert!(
         notes
@@ -128,10 +130,9 @@ fn a_torn_manifest_while_archiving_hides_no_other_archive() {
     );
     // Archiving again: reported again, and forget removes it and nothing else.
     journal::record(&torn, journal::Phase::Archiving).unwrap();
-    assert_eq!(list_all(&f.0).unwrap().incomplete.len(), 1);
+    assert_eq!(list_all(&f.0).unwrap().1.len(), 1);
     forget(&f.0, "torn-id");
     assert!(!torn.exists());
-    let found = list_all(&f.0).unwrap();
-    assert_eq!((found.parked, found.incomplete), (vec![p], Vec::new()));
+    assert_eq!(list_all(&f.0).unwrap(), (vec![p], Vec::new()));
     f.proof();
 }

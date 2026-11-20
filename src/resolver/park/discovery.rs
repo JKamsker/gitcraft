@@ -60,16 +60,16 @@ pub(super) fn identities(repo: &Path) -> Result<std::collections::BTreeSet<Strin
     Ok(ids)
 }
 
-/// What [`list`](super::list) finds: archives, and reservations of put-asides that never
+/// What [`list_all`](super::list_all) finds: archives, and reservations of put-asides that never
 /// completed.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
-pub struct Listing {
-    pub parked: Vec<Parked>,
+pub(super) struct Listing {
+    pub(super) parked: Vec<Parked>,
     /// Ids and folders of reservations interrupted before their manifest was published (or
     /// with one torn while still archiving). Their worktree was never cleared, so nothing of
     /// them is lost; [`forget`](super::forget) removes one and its ref. Never removed
     /// automatically.
-    pub incomplete: Vec<(String, PathBuf)>,
+    pub(super) incomplete: Vec<(String, PathBuf)>,
 }
 
 /// Active parked merges, retained completed recovery archives (oldest first) and

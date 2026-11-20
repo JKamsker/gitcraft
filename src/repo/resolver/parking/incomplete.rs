@@ -1,5 +1,4 @@
-//! Reservations of put-asides that never completed (see
-//! [`crate::resolver::park::Listing::incomplete`]): a put-aside interrupted before its archive
+//! Reservations of put-asides that never completed (see [`park::list_all`]): a put-aside interrupted before its archive
 //! was whole. The worktree was never cleared for them, so the merge is still there and
 //! nothing is lost, but their folder and ref stay until the user removes them. They are
 //! never removed automatically: the user is told once, each time the set changes.
@@ -36,14 +35,12 @@ fn notice(count: usize, id: &str, dir: &Path) -> String {
 mod tests {
     use super::*;
 
-    fn listing(ids: &[&str]) -> park::Listing {
-        park::Listing {
-            incomplete: ids
-                .iter()
-                .map(|id| ((*id).to_owned(), PathBuf::from(format!("parked/{id}"))))
-                .collect(),
-            ..park::Listing::default()
-        }
+    fn listing(ids: &[&str]) -> Found {
+        let incomplete = ids
+            .iter()
+            .map(|id| ((*id).to_owned(), PathBuf::from(format!("parked/{id}"))))
+            .collect();
+        (Vec::new(), incomplete)
     }
 
     #[test]
