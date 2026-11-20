@@ -100,3 +100,29 @@ stack dumps can contain stack memory; treat them as diagnostic artifacts. Dump
 failure is recorded and never converts a timeout to success. No extra GitHub CI
 retry or longer test budget is introduced. Native Windows resolution remains
 unproven until these diagnostics and repeated Windows runs establish it.
+
+## File-comparison staging timeouts (#211)
+
+dev run 44774004162 (repo-d-f, attempt 1) failed three staging tests with
+`process timed out and was stopped. Recovery: ...gitcraft-index-recovery-1388-{0,1,2}`
+at +127.9s, +148.1s and +168.2s: exactly 20 seconds apart. PR run 44763643286
+(git-a-m) failed `guarded_patch_...` the same way. The recovery path places each
+error inside `index_transaction::apply`, after the index lock was taken.
+
+That transaction took about nineteen Windows access-policy snapshots plus one policy
+copy, each a PowerShell process compiling the policy type with Add-Type under a
+20-second bound. In tests these helpers are serialized process-wide
+(`windows_metadata/fixture_resources.rs`), so when one helper overran its bound the
+next one started only then, and overran 20 seconds later: the observed spacing.
+Locally (32 threads, unloaded) one staging test started 38 helpers (0.3-0.7s each,
+24s for the test); three parallel file_comparison runs started 759 helpers, waited
+up to 11.5s for the helper lock and kept every staging test over 60 seconds.
+
+`gitcraft_os::windows_policy` now runs the same protocol in-process (named-stream
+refusal, full scope with the ERROR_PRIVILEGE_NOT_HELD basic retry, canonical
+descriptor bound to its scope, explicit protection on copy, target and source
+verified afterwards). No PowerShell process is started for access metadata outside
+tests. The helper remains the reference: `native_equivalence_tests` check that
+native snapshots are byte-identical to the helper's for inherited, explicitly
+granted and low-integrity-labelled files, that native and helper copies give the
+same policy, and that both refuse named data streams. The 20-second bounds are unchanged.

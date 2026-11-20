@@ -39,6 +39,12 @@ mod receipt_retirement;
 pub use receipt_retirement::retire_private_receipt;
 mod private;
 pub use private::{create_private_directory, detach_controller, random_bytes};
+mod security_descriptor;
+pub use security_descriptor::{DESCRIPTOR_LIMIT, DescriptorError};
+#[cfg(windows)]
+mod windows_policy;
+#[cfg(windows)]
+pub use windows_policy::{PolicyError, copy_file_policy, file_policy_snapshot};
 mod bounded_input;
 pub use bounded_input::BoundedInput;
 mod controller_reaper;
