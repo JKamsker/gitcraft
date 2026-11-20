@@ -15,6 +15,9 @@ SHARED = "./.github/workflows/rust-file-size.yml"
 IDENTIFIER = r"[A-Za-z_][A-Za-z0-9_-]*"
 COMPLEXITY_CHECK = "python3 ci/complexity_policy.py --revision HEAD"
 SIZE_CHECK = "python3 ci/rust_file_size.py --revision HEAD"
+# Pure operation-plan slices compiled with bare rustc (#193).
+PLAN_CHECK = "python3 src/repo/operation_plan/check_plan.py"
+GRAMMAR_CHECK = "python3 src/repo/operation_plan/check_grammar.py src/git/global_options.rs"
 TOOLING_CHECK = "python3 -m unittest discover -s ci -p 'test_*.py' -v"
 CLIPPY_CHECK = "python ci/clippy_packages.py"
 AGGREGATE = "ci-result"
@@ -151,7 +154,8 @@ def verify_shared_gate(text):
     require(not re.search(rf"^\s*(?:- )?{forbidden}:", text, re.M), "shared gate can skip, soften, or retarget checks")
     command = r"^\s+(?:- )?run: python3 ci/rust_file_size\.py --revision HEAD\s*$"
     require(re.search(command, text, re.M), "shared gate must check the complete immutable candidate")
-    verify_required_commands(text, "check", (SIZE_CHECK, COMPLEXITY_CHECK, TOOLING_CHECK, ARCH_TESTS, ARCH_CHECK, BASELINE_CHECK))
+    verify_required_commands(text, "check", (SIZE_CHECK, COMPLEXITY_CHECK, TOOLING_CHECK, ARCH_TESTS, ARCH_CHECK,
+                                             BASELINE_CHECK, PLAN_CHECK, GRAMMAR_CHECK))
     steps = job_steps(text, "check")
     for command in (ARCH_TESTS, ARCH_CHECK):
         step = next(step for step in steps if step.get("run", (None,))[0] == command)
@@ -254,6 +258,8 @@ class WorkflowGateTests(unittest.TestCase):
         yield "shared-tooling", self.shared, "check", TOOLING_CHECK
         yield "shared-architecture-tests", self.shared, "check", ARCH_TESTS
         yield "shared-architecture", self.shared, "check", ARCH_CHECK
+        yield "shared-operation-plan", self.shared, "check", PLAN_CHECK
+        yield "shared-operation-grammar", self.shared, "check", GRAMMAR_CHECK
         for name, text, job in self.clippy:
             yield name, text, job, CLIPPY_CHECK
 
@@ -271,6 +277,9 @@ class WorkflowGateTests(unittest.TestCase):
                          ARCH_CHECK.replace("--revision HEAD", "--revision HEAD~1"),
                          ARCH_CHECK.replace("--revision HEAD ", ""),
                          ARCH_CHECK.replace("check ", "check --baseline elsewhere.json ")),
+            PLAN_CHECK: (PLAN_CHECK.replace("check_plan", "check_grammar"), "python3 -c pass"),
+            GRAMMAR_CHECK: (GRAMMAR_CHECK.replace("src/git/global_options.rs", "/dev/null"),
+                            GRAMMAR_CHECK.replace(" src/git/global_options.rs", "")),
             CLIPPY_CHECK: ("cargo clippy --locked --all-targets -- -D warnings",
                           CLIPPY_CHECK + " --root elsewhere",
                           CLIPPY_CHECK + " --package app"),

@@ -270,6 +270,9 @@ impl RepoTab {
                                 .truncate(),
                             )
                             .on_hover_text(source);
+                            if let Some(Ok(data)) = &view.data {
+                                super::super::file_meta::show(ui, &data.file_meta);
+                            }
                         });
                     });
                 });

@@ -131,6 +131,7 @@ impl RepoTab {
                         Outcome::Open
                     }
                 }
+                Dialog::FileMetadata(form) => form.show(ui, idle),
                 Dialog::Behaviour(form) => form.show(ui),
                 Dialog::LinkedMachines(form) => form.show(ui),
                 Dialog::BundleLoading(_) => {
