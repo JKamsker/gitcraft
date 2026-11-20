@@ -124,6 +124,9 @@ pub struct Settings {
     pub diff_wrap: bool,
     /// Diffs show the whole file, not just the lines around the changes.
     pub diff_whole_file: bool,
+    /// Diffs mark each changed line covered, uncovered or unknown, as the repository's test
+    /// coverage report says (when it is of the revision shown).
+    pub diff_coverage: bool,
     /// Diffs of commits and of the working tree show below the graph, not in its place.
     pub diff_beside_graph: bool,
     /// The diff algorithm chosen for each file type (see [`crate::git::file_type`]); a type
@@ -244,6 +247,7 @@ impl Default for Settings {
             diff_split: false,
             diff_wrap: false,
             diff_whole_file: false,
+            diff_coverage: false,
             diff_beside_graph: false,
             diff_algorithms: Default::default(),
             fold_generated: true,

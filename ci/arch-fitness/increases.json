@@ -386,5 +386,29 @@
     "reason": "Issue #211: Windows file access-policy snapshots and copies move from a PowerShell helper (whose 20-second bound timed out in CI staging transactions) into gitcraft-os, which owns the unsafe Win32 calls. gitcraft's standalone::windows_metadata needs exactly four items: PolicyError (to localize failures), file_policy_snapshot and copy_file_policy (production), and file_policy_snapshot_in_scope (comparison with the reviewed PowerShell reference in tests). The descriptor, stream and reparse-tag parsers stay crate-private.",
     "owner": "@JKamsker",
     "remediation": "Narrow the pre-existing unused os exports the checker lists (for example BUNDLE_*_BYTES, file_identity, retire_private_receipt), or fold file_policy_snapshot_in_scope into a test-support feature, then ratchet the budget."
+  },
+  "173-diff-coverage-gutter-diff-types": {
+    "changes": [
+      "budget/diff/exported=137"
+    ],
+    "reason": "Issue #173 item 8 shows coverage in the diff gutter. The diff owns and paints five shared types: CoverageAct (the Action payload), Overlay (DiffView state), Gutter, Mark and Trust. Insights fills Gutter, Mark and Trust from its coverage reading, so diff never depends on insights (that edge would close a cycle with the baselined insights -> diff). Painting, the banner, the header switch and the text helpers stay private to repo::diff::coverage.",
+    "owner": "@JKamsker",
+    "remediation": "When the diff gains a generic gutter-annotation interface, express coverage marks through it and ratchet the budget."
+  },
+  "173-diff-coverage-gutter-insights-api": {
+    "changes": [
+      "budget/insights/exported=340"
+    ],
+    "reason": "Issue #173 item 8 reuses the coverage map's report reading and sidecar judging for the diff gutter instead of forking them: three items in insights::coverage (Side, LinesCoverage, of_lines) read one file's lines for repo::insights. The shared report reading (report.rs) stays pub(super).",
+    "owner": "@JKamsker",
+    "remediation": "Fold of_lines and analyze behind one coverage query type if more callers appear, then ratchet the budget."
+  },
+  "173-diff-coverage-gutter-dispatch": {
+    "changes": [
+      "budget/repo-core/symbols=616"
+    ],
+    "reason": "Issue #173 item 8 adds two coordinator references: Action::DiffCoverage carries diff::coverage::CoverageAct, and DiffView holds diff::coverage::Overlay. apply forwards the action to the insights reader in one arm. No new domain edge and no new RepoTab mutation pair is introduced.",
+    "owner": "@JKamsker",
+    "remediation": "Reduce coordinator symbol dependencies as DiffView state moves behind feature-owned types, then ratchet the budget."
   }
 }

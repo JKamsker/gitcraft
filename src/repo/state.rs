@@ -123,6 +123,8 @@ pub(crate) struct DiffView {
     pub(super) repairing: bool,
     /// A scroll offset to go to on the next frame.
     pub(super) scroll_to: Option<f32>,
+    /// The test coverage marks of its changed lines, once read (see [`diff::coverage`]).
+    pub(super) coverage: diff::coverage::Overlay,
 }
 
 /// The index of line `n` of the old side (`old`) or the new one among `lines`, or of the line
@@ -191,6 +193,7 @@ impl DiffView {
             algorithm: None,
             repairing: false,
             scroll_to: None,
+            coverage: Default::default(),
         }
     }
 

@@ -134,7 +134,7 @@ impl Action {
             Self::Fetch => Command::Fetch,
             Self::Pull => Command::Pull,
             Self::Push => Command::Push,
-            Self::Terminal(TerminalAct::Toggle) => Command::Terminal,
+            Self::Terminal(crate::repo::terminals::TerminalAct::Toggle) => Command::Terminal,
             Self::Commit => Command::Commit,
             Self::Reload => Command::Reload,
             Self::Dialog(Dialog::Stash(_)) => Command::Stash,

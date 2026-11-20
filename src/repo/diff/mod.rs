@@ -8,6 +8,7 @@ mod algorithm;
 mod algorithm_tests;
 mod binary;
 pub(super) mod context;
+pub(in crate::repo) mod coverage;
 pub(in crate::repo) mod encrypted;
 mod file_meta;
 mod fold_view;
