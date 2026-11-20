@@ -449,3 +449,7 @@ mod recording_kill;
 #[cfg(recovery_recording)]
 #[path = "park/checks/kill_cases.rs"]
 mod recording_kill_cases;
+
+#[cfg(recovery_recording)]
+#[path = "park/checks/kill_child.rs"]
+mod recording_kill_child;

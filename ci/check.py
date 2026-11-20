@@ -4,6 +4,7 @@
     python3 ci/check.py                         # gates + compile every test target
     python3 ci/check.py --test repo::stack      # gates + those tests (repeatable)
     python3 ci/check.py --full                  # gates + the whole Linux/macOS test suite
+    python3 ci/check.py --recovery              # also the parking recovery harness (slow)
     python3 ci/check.py --dry-run               # print the commands only
 
 The gates are the exact commands CI runs: formatting, the tooling tests, the Rust
@@ -41,7 +42,15 @@ GATES = (
 )
 
 
-def plan(tests=(), full=False):
+# The parking recovery harness (#205): its own Cargo package, built with a cfg of its own and
+# run by CI's `recovery-recording` job on Linux and Windows. A few minutes, so opt-in here.
+RECOVERY_MANIFEST = "src/resolver/park/checks/Cargo.toml"
+RECOVERY = ("recovery recording harness",
+            ["cargo", "test", "--locked", "--manifest-path", RECOVERY_MANIFEST, "--", "--nocapture"])
+RECOVERY_ENV = {"RUSTFLAGS": "--cfg recovery_recording"}
+
+
+def plan(tests=(), full=False, recovery=False):
     steps = list(GATES)
     if full:
         steps.append(("all tests", ["cargo", "test", "--locked"]))
@@ -49,7 +58,14 @@ def plan(tests=(), full=False):
         steps += [(f"tests: {name}", ["cargo", "test", "--locked", name]) for name in tests]
     else:
         steps.append(("compile every test target", ["cargo", "test", "--locked", "--no-run"]))
+    if recovery:
+        steps.append(RECOVERY)
     return steps
+
+
+def environment(name):
+    """Extra variables for a step: only the recovery harness needs any."""
+    return RECOVERY_ENV if name == RECOVERY[0] else {}
 
 
 def low_priority(command):
@@ -71,17 +87,22 @@ def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--test", action="append", default=[], help="a libtest filter to run (repeatable)")
     parser.add_argument("--full", action="store_true", help="run the whole test suite")
+    parser.add_argument("--recovery", action="store_true",
+                        help="also run the parking recovery harness, as CI's recovery-recording job does")
     parser.add_argument("--dry-run", action="store_true")
     args = parser.parse_args(argv)
-    steps = plan(args.test, args.full)
+    steps = plan(args.test, args.full, args.recovery)
     if args.dry_run:
         for name, command in steps:
-            print(f"{name}: {shlex.join(command)}")
+            prefix = "".join(f"{key}={shlex.quote(value)} " for key, value in environment(name).items())
+            print(f"{name}: {prefix}{shlex.join(command)}")
         return 0
     if dirty():
         print("note: uncommitted changes; the size and policy gates check the committed HEAD, as CI does.")
     for name, command in steps:
         command, extra = low_priority(command)
+        if environment(name):
+            extra["env"] = {**os.environ, **environment(name)}
         print(f"==> {name}: {shlex.join(command)}", flush=True)
         status = subprocess.run(command, **extra).returncode
         if status:

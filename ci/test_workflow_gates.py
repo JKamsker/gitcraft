@@ -419,7 +419,7 @@ class WorkflowGateTests(unittest.TestCase):
 
     def test_every_ci_job_is_required_by_the_aggregate(self):
         ci = self.callers["ci.yml"]
-        for job in ("lint", "test", "windows-clippy", "windows-tests", "package-smoke", "forges"):
+        for job in ("lint", "test", "recovery-recording", "windows-clippy", "windows-tests", "package-smoke", "forges"):
             changed = re.sub(rf"(    needs: \[[^\]]*?)\b{job}, ", r"\1", ci, count=1)
             changed = re.sub(rf"(    needs: \[[^\]]*?), {job}\]", r"\1]", changed, count=1)
             self.assertNotEqual(changed, ci, job)

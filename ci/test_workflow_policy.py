@@ -12,6 +12,7 @@ import unittest
 
 sys.path.insert(0, str(Path(__file__).parent))
 import await_ci  # noqa: E402
+import check  # noqa: E402
 from test_workflow_gates import dependencies, mapping, nested  # noqa: E402
 
 WORKFLOWS = Path(__file__).resolve().parents[1] / ".github/workflows"
@@ -138,6 +139,32 @@ class CiJobTests(unittest.TestCase):
         self.assertNotIn("if", clippy)
         self.assertNotIn("continue-on-error", clippy)
         self.assertNotIn("ci/clippy_packages.py", read("windows-tests.yml"))
+
+    def test_the_recovery_harness_runs_natively_on_linux_and_windows_and_is_required(self):
+        job = self.jobs["recovery-recording"]
+        matrix = nested(nested(job, "strategy", 6), "matrix", 8)
+        self.assertEqual(scalar(matrix, "os"), "[ubuntu-latest, windows-latest]")
+        self.assertEqual(scalar(job, "runs-on"), "${{ matrix.os }}")
+        self.assertEqual(dependencies(job), {"rust-file-size"})
+        self.assertIn("recovery-recording", dependencies(self.jobs["ci-result"]))
+        self.assertNotIn("if", job)
+        self.assertNotIn("continue-on-error", job)
+        # The cfg selects the recording Git boundaries; the harness builds nothing else.
+        self.assertEqual(nested(job, "env", 6), {"RUSTFLAGS": ("--cfg recovery_recording", "")})
+        steps = job["steps"][1]
+        command = " ".join(check.RECOVERY[1])
+        self.assertIn(f"run: cargo test --locked --manifest-path {check.RECOVERY_MANIFEST} --no-run\n", steps)
+        run = steps[steps.index("python ci/libtest_watchdog.py --name recovery-recording"):]
+        self.assertIn(f"--deadline 1080 --stall 600 --\n          {command}\n", run)
+        self.assertNotIn("--skip", steps)
+        self.assertIn("timeout-minutes: 20", steps)  # above the watchdog's 18-minute deadline
+        # Its own target directory and cache: the cfg never thrashes the main crate's.
+        self.assertIn("workspaces: src/resolver/park/checks -> target", steps)
+        self.assertIn("shared-key: recovery-recording-v1", steps)
+        upload = steps[steps.index("- name: Upload test reports"):]
+        self.assertIn("if: always()", upload)
+        self.assertIn("path: ci-reports/", upload)
+        self.assertIn("test-report-recovery-recording-${{ matrix.os }}-attempt-${{ github.run_attempt }}", upload)
 
     def test_pull_requests_run_the_release_packaging_with_a_prerelease_version(self):
         smoke, version = self.jobs["package-smoke"], self.jobs["package-version"]

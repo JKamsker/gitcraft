@@ -1,4 +1,4 @@
-# Parking recovery: durability audit (#205, slice 1)
+# Parking recovery: durability audit (#205)
 
 Scope: the merged implementation of `src/resolver/park.rs` and `src/resolver/park/`
 (PR #200), plus the agent-run record in
@@ -43,9 +43,9 @@ not flushed. It becomes durable through the `sync_dir` calls that follow it.
 | P4 | `archive::keep`: index | `<id>/index` + `durable-v1/<h>.json` | file, then evidence (atomic), then evidence ancestors | evidence only |
 | P5 | `keep`: `trees`, `commit-tree`, `update-ref refs/gitcraft/parked/<id>` | loose objects, ref, a temporary index | Git's choice: by default **not** loose objects, **not** refs | Git's choice |
 | P6 | `keep`: raw files, state files | `raw/<path>`, `MERGE_HEAD`… (+ evidence each) | each file and its evidence; `raw/` subdirectories not yet | evidence only |
-| P7 | `keep`: manifest | `parked.json`, with `std::fs::write` | **not yet** | **no** (written in place) |
+| P7 | `keep`: manifest | `parked.json`, with `atomic_write` (since slice 3; before: `std::fs::write` in place) | the temp file, then its directory | `parked.pending` → `parked.json` |
 | P8 | `unchanged`, `in_the_way` (reads only). On error: `forget_locked` | — | — | — |
-| P9 | `sync_tree(dir)`, `sync_ancestors(dir)` | — | every unproven file (so `parked.json` now), every archive directory, all ancestors | — |
+| P9 | `sync_tree(dir)`, `sync_ancestors(dir)` | — | every unproven file (`parked.json` again), every archive directory, all ancestors | — |
 | P10 | `record(Archived)`, `unchanged`, `record(Clearing)` | receipts 1, 2 | as P3 | as P3 |
 | P11 | `git reset --hard -q HEAD` | live worktree, index, removes `MERGE_HEAD`… | Git does not flush worktree files. Index only with `core.fsync=index` | Git's choice |
 | P12 | `clean_baseline` → `atomic_write(clean-baseline.json)`, `sync_tree`, `record(Parked)` | baseline, receipt 3 | yes | yes |
@@ -68,15 +68,19 @@ a stop at each point:
   (`_ => Ok(true)`) lists it, even though the worktree was never cleared. Bring back is
   then refused by `blocker_clean`, because the merge state files are still live
   (`busy_with`). Drop to branch works and creates the branch from the snapshot.
-  **[code; not exercised by a real kill]**
-- **After P7, before P9 (power loss):** `parked.json` was never flushed. It can be
-  missing, empty or torn, depending on the filesystem. When it is missing, the case is the
-  same as P4–P6. When it is present but not valid JSON, `manifest` returns `Err("Invalid
-  recovery manifest …")`, and `list` propagates that error, so every archive of the
-  repository disappears from the list until someone removes the broken one by hand. The
-  worktree is still untouched. **[gap G2: `parked.json` is not written atomically, and a
-  torn manifest at `Archiving` fails the whole list instead of being treated as an
-  incomplete reservation]**
+  **[code; real kills at `archive-manifest-written`, `archive-reachable`, `phase:Archived` and `phase:Clearing`, `checks/kill.rs`]**
+- **Inside P7 (kill after the temp file is flushed, before the rename):** `parked.pending`
+  exists, `parked.json` does not. Same as P4–P6. **[code; real kill, `checks/kill.rs`]**
+- **After P7, before P9 (power loss):** `parked.json` was published by a flushed temp file,
+  a rename and a directory flush, so it is either absent (same as P4–P6) or complete.
+  **[G2 fixed in slice 3]** Before that, it was written in place and could be torn; a torn
+  manifest made `manifest` return `Err("Invalid recovery manifest …")` and `list` fail for
+  every archive of the repository. Archives written that way can still exist, so
+  `manifest` now treats an unreadable manifest whose last receipt is `Archiving` as an
+  incomplete reservation: not listed, left on disk untouched, with a diagnostic note. The
+  worktree was never cleared at `Archiving`, so nothing is hidden that is not still live.
+  Past `Archiving`, or with no receipts at all (a legacy archive whose worktree may have been
+  cleared), it still fails closed. **[code; `checks/discovery.rs`]**
 - **After P9, before P10:** everything archived is durable, but the latest receipt is still
   `Archiving`. Same as "after P7, process kill".
 - **P10 (`Archived` or `Clearing` durable) and during P11:** the archive is complete and
@@ -267,15 +271,47 @@ restart.
   archive directory, fail on Windows. The operation then returns an error and keeps the
   archive. **[code: errors propagate; not a crash concern]**
 
+## Kill and restart (slice 3)
+
+`checks/kill.rs` runs each case as a real owned child process of the test binary, aborted
+with `std::process::abort` right after the named effect; `checks/kill_child.rs` holds the
+child and its spawn. The parent waits for that one child, then restarts through production
+`list`, `bring_back`, `drop_to_branch` and `forget`. For every case: tracked, untracked and
+ignored files, the index and `MERGE_HEAD` are byte-exact, live or in a discoverable archive;
+`list` gives the same answer twice; an `index.lock` the child left is neither adopted nor
+removed; after the archive is dropped to a branch, listing and dropping again change no
+byte under the fixture. **[observed: Windows 11 26200 NTFS, local runs; CI runs it on Linux and Windows in the `recovery recording` job]**
+
+| Killed after | Restart finds |
+|---|---|
+| P2 `archive-reserved`, P3 `phase:Archiving`, P4 `archive-index-copied`, P5 `update-ref refs/gitcraft/parked/…`, P6 last `archive-metadata-copied` and a `raw` copy, P7 manifest temp flushed | Nothing listed; live worktree untouched; explicit `forget` removes the reservation and ref (G1 stays: nothing removes them automatically) |
+| P7 `archive-manifest-written`, P9 `archive-reachable`, P10 `phase:Archived`, `phase:Clearing` | Listed; bring back refused (merge still in progress); drop to branch keeps it |
+| P11 `git reset`, P12 `phase:Parked` | Listed; brought back byte-exact |
+| R1 evidence, R2 `phase:Restoring`, R5 `restore-plan-durable`, R6b `destination-temp-durable` / `destination-published`, last `restore-copy-applied`, R7 `live-restore-synced`, R8 `phase:Restored` / `phase:Cleanup` | Brought back byte-exact (resumed against the plan where one is durable) |
+| R4 `git read-tree` (no plan yet), R6a `index-lock-synced` | Bring back refused with the archive's path (`Interrupted recovery at …`); drop to branch keeps it |
+| C1 recovery ref, C3 `archive-moved`, C5 original ref removed; D1 `phase:Dropping`, D2 branch ref, `archive-moved`, original ref removed | Finished on restart; recovery ref and archive kept, original ref gone |
+
+`checks/kill_cases.rs` adds two cases after a kill. A foreign file placed where the archive
+would move (C1–C2) makes `list` (after a restore), bring back and drop refuse with
+`Recovery archive collision: <path>`, leaving both the foreign file and the archive
+byte-exact; once the user moves it away, recovery completes. A receipt of an unknown version
+after a kill at R2 makes `list`, bring back and drop refuse with an error naming the receipt,
+writing nothing; a torn legacy final receipt is kept as `.torn`, read as `Uncertain`, and
+recovery completes.
 ## What is not proven
 
 - That any flush reaches stable media. That depends on the device and controller honouring
   cache flushes, and no power was cut for this audit.
 - The on-disk effect of `FlushFileBuffers` on an NTFS directory. Only its success and its
   access requirements were observed.
-- Real process termination at the boundaries. The recording harness stops through errors
-  and panics, and RAII still runs (see `checks/RESULTS.md`). A kill-and-restart harness is a
-  later slice of #205.
+- Real process termination anywhere but at an effect boundary. Since slice 3, `checks/kill.rs`
+  aborts an owned child process (`std::process::abort`: no unwinding, no destructors, no
+  explicit unlock) at one boundary of every transition above (31 boundaries: P2–P12,
+  R1–R8, C1–C5, D1–D2) and restarts through production entry points **[observed: Windows 11
+  26200 NTFS; CI runs it on Linux and Windows]**. A kill inside a syscall (a half-done `write` or `rename`) is not
+  produced, and Git is the recording fake, so a kill inside a real `git reset` or
+  `read-tree` is not either. A process kill also keeps everything already handed to the OS;
+  it says nothing about what a power cut keeps.
 - Torn writes inside a sector, and reordering of writes that were not flushed. The analysis
   above assumes the worst case, any subset of unflushed writes, only for the items marked.
 - How Git itself behaves when interrupted (checkout, read-tree, reset, update-ref) beyond

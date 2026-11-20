@@ -1,7 +1,8 @@
 //! Real kills followed by ambiguous ownership or a damaged journal (#205, slice 3): restart
 //! refuses destructive cleanup, writes nothing it does not own, keeps the archive
 //! discoverable and says where it is.
-use super::recording_kill::{At, boundary, fixture, kill, live_original, tree, untouched};
+use super::recording_kill::{boundary, first, fixture, live_original, tree, untouched};
+use super::recording_kill_child::kill;
 use super::recording_regressions::refs_clean;
 use super::*;
 
@@ -19,12 +20,7 @@ fn archive_bytes(dir: &Path) -> Vec<Vec<u8>> {
 #[test]
 fn after_a_kill_before_the_move_a_foreign_destination_is_refused_and_both_are_kept() {
     for action in ["restore", "drop"] {
-        let at = At(
-            action,
-            "git:update-ref refs/gitcraft/parked-recovery/",
-            false,
-            None,
-        );
+        let at = first(action, "git:update-ref refs/gitcraft/parked-recovery/");
         let (stop, _) = boundary(&at);
         let (f, parked) = fixture(action);
         let p = parked.unwrap();
@@ -73,7 +69,7 @@ fn after_a_kill_before_the_move_a_foreign_destination_is_refused_and_both_are_ke
 /// unknown version, or a legacy receipt torn mid-write.
 #[test]
 fn after_a_kill_a_corrupt_journal_keeps_the_archive_and_names_it() {
-    let at = At("restore", "phase:Restoring", false, None);
+    let at = first("restore", "phase:Restoring");
     let (stop, _) = boundary(&at);
     for torn in [false, true] {
         let (f, parked) = fixture("restore");

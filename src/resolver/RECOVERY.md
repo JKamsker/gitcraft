@@ -84,7 +84,7 @@ before continuing. Never delete a different ref or use recursive wildcard cleanu
 Run the isolated safe harness with:
 
 ```
-RUSTFLAGS='--cfg recovery_recording' cargo test --offline \
+RUSTFLAGS='--cfg recovery_recording' cargo test --locked \
   --manifest-path src/resolver/park/checks/Cargo.toml -- --nocapture
 ```
 
@@ -98,11 +98,24 @@ legacy receipts and unknown versions. Effects are recorded where they execute;
 these tests do not infer behavior from a parallel phase model. Existing synthetic
 receipt tests remain supplementary and were not run as application integration tests.
 
+CI runs it on Linux and native Windows (job `recovery recording`, part of `CI result`);
+`python3 ci/check.py --recovery` runs it locally.
+
 The abrupt recording mode panics past production error handlers, so explicit
 failure cleanup cannot mask the recorded stop. Rust RAII still releases handles
-(including archive locks); no process is killed, and this does not reproduce
-arbitrary termination inside a syscall. This is error/interruption evidence,
-not power-loss or process-kill evidence.
+(including archive locks). Real process termination is covered separately
+(`checks/kill.rs`, `checks/kill_cases.rs`): the test binary re-executes itself as an owned
+child that runs production park, bring_back or drop and calls `std::process::abort` at one
+boundary of each audited transition (31 boundaries; no unwinding, destructors or explicit
+unlock). The parent waits for that child handle only (no signals, no PID search), then
+restarts through production list, bring_back, drop_to_branch and forget. It asserts exact
+bytes of tracked, untracked and ignored files, index and merge metadata (live, or in a
+discoverable archive), that an index lock left by the child is never adopted or removed,
+that replaying recovery changes no byte under the fixture, that a foreign recovery
+destination is refused with both copies kept, and that a damaged journal keeps the archive
+discoverable with an error naming the receipt. Git is still the recording fake and the
+kill lands only at effect boundaries, never inside a syscall; this is process-kill
+evidence, not power-loss evidence.
 Directory flushes run on Unix (`fsync` of a read-only descriptor) and on Windows
 (`FlushFileBuffers` on a directory handle with `FILE_ADD_FILE`, or else
 `FILE_ADD_SUBDIRECTORY`, access; a read-only handle is refused), via `src/dir_sync.rs`.
@@ -133,8 +146,5 @@ mutations: byte preconditions do not provide an OS-wide transaction or exclude a
 concurrent editor between checking and writing. Path/type changes fail closed.
 The copy plan stores additional byte images on disk and is not space bounded.
 
-No real process tests, full application builds, CI, pushes or PR operations were
-performed for this repair. Integration must run combined builds/regressions,
-platform checks, full-tree size enforcement, and independent adversarial review on
-the immutable final candidate. Existing agent cleanup/ownership protections are
-unchanged; this slice only fixes invalid visibility on the Drop trait method.
+Existing agent cleanup/ownership protections are unchanged.
+
