@@ -11,7 +11,6 @@ mod constructors;
 mod custom;
 #[cfg(test)]
 mod enter_tests;
-mod file_metadata;
 mod fold;
 mod gerrit;
 mod interaction;
@@ -71,7 +70,7 @@ pub enum Dialog {
     ContentRecovery,
     RepositoryTools(Box<super::repository_tools::State>),
     /// The executable bit or the letter case of a tracked file (see `file_metadata`).
-    FileMetadata(Box<file_metadata::FileMetaForm>),
+    FileMetadata(Box<super::detail::file_metadata::FileMetaForm>),
     GerritReview {
         remote: String,
         head: String,

@@ -44,6 +44,8 @@ pub(crate) struct Plan {
     /// Shown before and after: modes for the executable bit, paths for a rename.
     pub(crate) from: String,
     pub(crate) to: String,
+    /// The executable bit is set after the edit (an executable-bit edit that sets it).
+    pub(crate) executable: bool,
 }
 
 /// Reads what planning an edit of `path` needs. `siblings`: also list its folder (for a
@@ -147,7 +149,7 @@ fn executable_modes(snapshot: &Snapshot) -> Result<(&str, &'static str), String>
 /// A patch that changes nothing of `path` but its mode, `from` → `to`. `git apply --cached`
 /// sets the mode of whatever blob the index holds when it runs, so neither the edit nor its
 /// undo or redo ever puts back contents staged at another time.
-pub(crate) fn mode_patch(path: &str, from: &str, to: &str) -> String {
+fn mode_patch(path: &str, from: &str, to: &str) -> String {
     let (old, new) = (quote(&format!("a/{path}")), quote(&format!("b/{path}")));
     format!("diff --git {old} {new}\nold mode {from}\nnew mode {to}\n")
 }
@@ -202,12 +204,8 @@ pub(crate) fn executable_plan(snapshot: &Snapshot, patch: &str) -> Result<Plan, 
         undo: vec![apply(true)],
         from: from.to_owned(),
         to: to.to_owned(),
+        executable: to == EXECUTABLE,
     })
-}
-
-/// Whether `mode` is the executable regular-file mode.
-pub(crate) fn is_executable(mode: &str) -> bool {
-    mode == EXECUTABLE
 }
 
 /// Renames the file to `name` (in the same folder), which differs from its name only in
@@ -252,6 +250,7 @@ pub(crate) fn case_rename_plan(snapshot: &Snapshot, name: &str) -> Result<Plan, 
         undo: vec![mv(&to, &via), mv(&via, &from)],
         from,
         to,
+        executable: false,
     })
 }
 

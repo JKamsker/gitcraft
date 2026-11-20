@@ -78,7 +78,7 @@ fn executable_bit_toggles_only_the_index_mode_and_keeps_unstaged_edits() -> Resu
     run_all(&repo, &plan.ops)?;
     repo.git(&["commit", "-q", "-m", "executable"])?;
     let clear = executable(&repo, path)?;
-    assert!(is_executable(&clear.from));
+    assert!(plan.executable && !clear.executable);
     run_all(&repo, &clear.ops)?;
     assert_eq!(mode_of(&repo, path)?, "100644");
     assert_eq!(read(&repo, path)?, edited);

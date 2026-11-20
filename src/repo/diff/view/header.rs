@@ -248,7 +248,6 @@ impl RepoTab {
                                 |ui, acts| {
                                     self.lock_menu_items(ui, path, rev, acts);
                                     self.storage_menu_items(ui, path, rev, acts);
-                                    self.file_metadata_menu_items(ui, &view.key, acts);
                                 },
                             );
                             let mut source = origin.to_owned();

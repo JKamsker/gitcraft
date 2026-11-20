@@ -76,9 +76,6 @@ impl RepoTab {
         if let Dialog::Confirm { preview, .. } = &mut dialog {
             self.read_preview(preview, ctx);
         }
-        if let Dialog::FileMetadata(form) = &mut dialog {
-            self.read_file_metadata(form, ctx);
-        }
         self.dialog = Some(dialog);
     }
 

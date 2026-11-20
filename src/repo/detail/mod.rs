@@ -7,6 +7,7 @@ mod commit_box;
 mod compare;
 pub(super) mod compose;
 mod extras;
+pub(in crate::repo) mod file_metadata;
 mod stash_picks;
 
 pub(super) use all_files::AllFiles;

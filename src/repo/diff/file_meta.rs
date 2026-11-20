@@ -8,7 +8,7 @@ use crate::theme::Tokens;
 
 /// The metadata lines of one file's patch.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
-pub struct FileMeta {
+pub(in crate::repo::diff) struct FileMeta {
     /// `old mode` → `new mode`, when the patch changes the mode.
     pub mode: Option<(String, String)>,
     /// The old name of a renamed file.
@@ -20,7 +20,7 @@ pub struct FileMeta {
 }
 
 impl FileMeta {
-    pub fn is_empty(&self) -> bool {
+    fn is_empty(&self) -> bool {
         self.mode.is_none() && self.renamed_from.is_none() && self.copied_from.is_none()
     }
 }
