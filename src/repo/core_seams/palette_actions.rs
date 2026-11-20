@@ -288,3 +288,6 @@ mod palette_contracts;
 #[cfg(test)]
 #[path = "palette_shortcuts.rs"]
 mod palette_shortcuts;
+#[cfg(test)]
+#[path = "palette_snapshot.rs"]
+mod palette_snapshot;
