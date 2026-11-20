@@ -4,7 +4,7 @@
 //! `Plan::decode` classifies a step built the way its producer builds it. The table is in
 //! `sentinel_table_tests.rs`; docs/architecture.md ("Operation sentinel inventory") mirrors it.
 
-use super::model::{Plan, Precondition, Step};
+use super::model::{Malformed, Plan, Precondition, Step};
 use std::collections::BTreeSet;
 use std::path::Path;
 
@@ -24,13 +24,18 @@ pub(super) fn classify(kind: &Step<'_>) -> &'static str {
             Precondition::HttpsRoute(_) => "Expectation::HttpsRoute",
             Precondition::FoldSafe(_) => "Expectation::FoldSafe",
             Precondition::FoldIgnored(_) => "Expectation::FoldIgnored",
-            Precondition::FeatureGuard => "Expectation::FeatureGuard",
+            Precondition::GerritStack { .. } => "Expectation::GerritStack",
+            Precondition::ForkDestination(_) => "Expectation::ForkDestination",
+            Precondition::ForkCheckout(_) => "Expectation::ForkCheckout",
         },
         Step::Try { .. } => "Try",
-        Step::ReviewedPush => "ReviewedPush",
-        Step::PreflightFix => "PreflightFix",
-        Step::GerritAmend => "GerritAmend",
+        Step::ReviewedPush { .. } => "ReviewedPush",
+        Step::PreflightFix { .. } => "PreflightFix",
+        Step::GerritAmend { .. } => "GerritAmend",
+        Step::TrackingApply { .. } => "TrackingApply",
         Step::Git => "Git",
+        Step::Malformed(Malformed::Operands { .. }) => "Malformed::Operands",
+        Step::Malformed(Malformed::UnknownMarker(_)) => "Malformed::UnknownMarker",
     }
 }
 
@@ -46,8 +51,9 @@ pub(super) const HOW_TO: &str = "For each new sentinel add an entry to INVENTORY
 src/repo/operation_plan/sentinel_table_tests.rs (constant, owner file, value, role, whether a \
 producer persists it, a producer-shaped sample and its Plan::decode classification) and a row to \
 the \"Operation sentinel inventory\" table in docs/architecture.md. If it marks an operation step, \
-teach Plan::decode (src/repo/operation_plan/model.rs) to classify it rather than fall through to \
-Step::Git, and if a producer persists it in an UndoEntry, add it to a fixture under \
+give it a typed Step or Precondition variant in src/repo/operation_plan/model.rs and decode it in \
+model_decode.rs (with its malformed shapes in model_decode_tests.rs) rather than let it decode as \
+Step::Malformed, and if a producer persists it in an UndoEntry, add it to a fixture under \
 src/repo/operation_plan/fixtures/v1/.";
 
 #[test]
@@ -108,13 +114,37 @@ fn every_step_sentinel_decodes_as_documented() {
             is_step,
             "{name}: only steps have samples"
         );
-        let unclassified = sentinel.role == Role::Step && sentinel.decodes == "Git";
-        assert_eq!(
-            unclassified,
-            !sentinel.handled_by.is_empty(),
-            "{name}: a step marker Plan::decode leaves as Step::Git must say what handles it. \
-             {HOW_TO}"
+        let typed = !matches!(sentinel.decodes, "Git" | "Malformed::Operands");
+        assert!(
+            sentinel.role != Role::Step || typed,
+            "{name}: a step marker must decode to its own typed variant. {HOW_TO}"
         );
+    }
+}
+
+/// No inventoried sentinel that can start a step is ever taken for a Git command, whatever
+/// operands follow it: a step marker is typed or `Malformed`, any other is an unknown marker.
+#[test]
+fn no_marker_first_word_decodes_as_git_with_any_operands() {
+    let markers = INVENTORY
+        .iter()
+        .filter(|s| s.role == Role::Step || s.value.starts_with('\0'));
+    for sentinel in markers {
+        for count in 0..=5 {
+            let step: Vec<String> = std::iter::once(sentinel.value)
+                .chain(std::iter::repeat_n("x", count))
+                .map(str::to_owned)
+                .collect();
+            let got = classify_all(std::slice::from_ref(&step));
+            let unknown = sentinel.role != Role::Step;
+            let name = sentinel.constant;
+            assert_ne!(got, ["Git"], "{name} with {count} operands. {HOW_TO}");
+            assert_eq!(
+                got == ["Malformed::UnknownMarker"],
+                unknown,
+                "{name} with {count} operands"
+            );
+        }
     }
 }
 
@@ -135,6 +165,8 @@ fn inventoried_values_are_the_constants_the_code_uses() {
         ("APPROVED", crate::push_preflight::APPROVED),
         ("FIX", crate::push_preflight::FIX),
         ("APPLY", crate::git::repository_tools::tracking::APPLY),
+        ("MARK", crate::repo::forks::guard::MARK),
+        ("CHECKOUT_MARK", crate::repo::forks::guard::CHECKOUT_MARK),
         ("WIP_HASH", crate::repo::WIP_HASH),
     ];
     for (constant, value) in visible {

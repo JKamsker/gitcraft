@@ -185,7 +185,7 @@ impl Destination {
         vec![MARK.into(), serde_json::to_string(self).unwrap_or_default()]
     }
 }
-const MARK: &str = "\0fork-destination";
+pub(in crate::repo) const MARK: &str = "\0fork-destination";
 pub(in crate::repo) fn is_guard(step: &[String]) -> bool {
     matches!(step, [mark, _] if mark == MARK || mark == CHECKOUT_MARK)
 }
@@ -220,7 +220,7 @@ pub(super) struct CheckoutDestination {
     path: String,
     initial: Option<Destination>,
 }
-const CHECKOUT_MARK: &str = "\0fork-checkout";
+pub(in crate::repo) const CHECKOUT_MARK: &str = "\0fork-checkout";
 impl CheckoutDestination {
     pub fn new(name: &str, advertised: &str, new: bool, hosting: &Hosting) -> Self {
         Self {

@@ -20,9 +20,14 @@ expectations = (owner / "expectations.rs").read_text()
 dispatch = (owner / "dispatch.rs").read_text()
 plan = (owner / "model.rs").read_text()
 plan = plan[:plan.index("#[cfg(test)]")].replace("use super::*;", "", 1).replace("//!", "//")
+decoder = '#[path = "model_decode.rs"]'
+assert decoder in plan, "model.rs no longer loads model_decode.rs"
+plan = plan.replace(decoder, f"#[path = {json.dumps(str(owner / 'model_decode.rs'))}]", 1)
 helpers = "\n".join(function(expectations, name) for name in
     ["expected_ref", "expected_symref", "expected_tree", "is_expectation"])
-helpers += "\n" + function(dispatch, "retain_unfinished")
+helpers += "\n" + "\n".join(function(dispatch, name) for name in
+    ["retain_unfinished", "reviewed_operands"])
+tracking = constant((repo_source.parent / "git/repository_tools/tracking.rs").read_text(), "APPLY")
 constants = "\n".join(constant(expectations, name) for name in
     ["EXPECT", "EXPECT_SYMREF", "EXPECT_TREE", "TRY", "EXPECT_FOLD_SAFE", "EXPECT_FOLD_IGNORED"])
 constants += "\n" + constant((repo_source / "operations.rs").read_text(), "EXPECT_HTTPS_ROUTE")
@@ -35,6 +40,8 @@ push = "\n".join(constant(push_source, name) for name in ["APPROVED", "FIX"])
 ops = function((repo_source / "mod.rs").read_text(), "ops")
 harness = f'''
 #![allow(dead_code)]
+mod i18n {{ pub fn text(key: &'static str) -> &'static str {{ key }} }}
+mod git {{ pub mod repository_tools {{ pub mod tracking {{ {tracking} }} }} }}
 mod gerrit {{ {gerrit} }}
 mod push_preflight {{ {push} }}
 mod repo {{
@@ -45,6 +52,7 @@ mod operations {{
 {helpers}
 {plan}
 #[path = {json.dumps(str(owner / 'model_pure_tests.rs'))}] mod pure_tests;
+#[path = {json.dumps(str(owner / 'model_decode_tests.rs'))}] mod decode_tests;
 }}
 }}
 '''

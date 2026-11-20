@@ -191,10 +191,11 @@ inline literals that start with NUL followed by a letter. It skips `#[cfg(test)]
 items and files named as tests. It reads ordinary single-line literals only, not
 values built with `concat!`/`format!` or continued over lines. The test fails,
 and says what to add, when the scan and the inventory disagree. It also fails
-when a step marker's producer-shaped sample does not decode as listed, or when a
-step marker falls through to `Step::Git` without naming what handles it. Another
-test fails when a row below is missing, or when its persisted or decode column
-disagrees with the inventory.
+when a step marker's producer-shaped sample does not decode as listed, when a
+step marker's sample decodes to anything but its own typed variant, or when any
+inventoried marker, followed by any number of operands, decodes as `Step::Git`.
+Another test fails when a row below is missing, or when its persisted or decode
+column disagrees with the inventory.
 
 | Constant | Owner | Value | Role | Persisted by a producer | `Plan::decode` |
 |---|---|---|---|---|---|
@@ -206,21 +207,34 @@ disagrees with the inventory.
 | `EXPECT_FOLD_SAFE` | `src/repo/operation_plan/expectations.rs` | `\0expect-fold-safe` | step | no (fold undo is a HEAD move) | `Expectation::FoldSafe` |
 | `EXPECT_FOLD_IGNORED` | `src/repo/operation_plan/expectations.rs` | `\0expect-fold-ignored` | step | no | `Expectation::FoldIgnored` |
 | `EXPECT_HTTPS_ROUTE` | `src/repo/operations.rs` | `--gitcraft-expect-https-route` (not NUL) | step | no (sign-in retry, in memory) | `Expectation::HttpsRoute` |
-| `CHECK` | `src/gerrit.rs` | `\0gerrit-review` | step | no | `Expectation::FeatureGuard` |
+| `CHECK` | `src/gerrit.rs` | `\0gerrit-review` | step | no | `Expectation::GerritStack` |
 | `AMEND` | `src/gerrit.rs` | `\0gerrit-amend` | step | no | `GerritAmend` |
 | `APPROVED` | `src/push_preflight.rs` | `\0push-preflight` | step | no (in-memory plan id) | `ReviewedPush` |
 | `FIX` | `src/push_preflight.rs` | `\0push-preflight-fix` | step | no | `PreflightFix` |
-| `MARK` | `src/repo/forks/guard.rs` | `\0fork-destination` | step | yes (fork rebase undo/redo) | `Expectation::FeatureGuard` |
-| `CHECKOUT_MARK` | `src/repo/forks/guard.rs` | `\0fork-checkout` | step | yes (fork checkout undo/redo) | `Expectation::FeatureGuard` |
+| `MARK` | `src/repo/forks/guard.rs` | `\0fork-destination` | step | yes (fork rebase undo/redo) | `Expectation::ForkDestination` |
+| `CHECKOUT_MARK` | `src/repo/forks/guard.rs` | `\0fork-checkout` | step | yes (fork checkout undo/redo) | `Expectation::ForkCheckout` |
 | `PUSHED_TIP` | `src/repo/forks/guard.rs` | `\0fork-pushed-tip` | placeholder in a push lease | no (bound to an OID before saving) | `Git` |
-| `APPLY` | `src/git/repository_tools/tracking.rs` | `\0tracking` | step | yes (tracking undo/redo) | `Git`; `Execution::step` runs it before dispatch |
+| `APPLY` | `src/git/repository_tools/tracking.rs` | `\0tracking` | step | yes (tracking undo/redo) | `TrackingApply` |
 | `GHOST_MERGE` | `src/repo/ghost/plan.rs` | `\0ghost-merge` | graph stand-in hash | no | not a step |
 | `WIP_HASH` | `src/repo/mod.rs` | `\0wip` | graph stand-in hash | no | not a step |
 | `PREFIX` | `src/repo/resolver/graph.rs` | `\0parked:` | graph hash prefix | no | not a step |
 
-`APPLY` is the one step marker `Plan::decode` does not classify. The executor
-recognizes `[APPLY, json]` before dispatch, but every other consumer of
-`Plan::steps` sees a Git command. Typing it is a follow-up, not part of this slice.
+`Plan::decode` (`model.rs`, decoding in `model_decode.rs`) is exhaustive over
+these markers. Each well-formed step decodes to its own variant carrying its
+parsed operands: preconditions (including `GerritStack { base, head }`,
+`ForkDestination(json)` and `ForkCheckout(json)`) under `Step::Expectation`,
+and `Try`, `ReviewedPush { id, evidence }`, `PreflightFix { id, fix }`,
+`GerritAmend { args }` and `TrackingApply { json }`. `GerritAmend` takes any
+operands, because `gerrit::amend_args` owns the shape of an amend and refuses a
+bad one at dispatch. A known marker with operands its producer never writes
+decodes to `Step::Malformed(Operands { marker, count })`. Any other first word
+that starts with NUL, such as a graph stand-in hash, decodes to
+`Step::Malformed(UnknownMarker)`. Only a step that starts with a Git word is
+`Step::Git`. The decoded view is read-only, and the saved argv and its format
+stay as they are. The executor runs `Malformed` exactly as it ran these steps
+when they decoded as `Git`. `model_parity_tests.rs` checks every marker with up
+to five operands, and every fixture step, against the earlier decode: each
+must still take the same executor branch.
 
 Version-1 persistence fixtures live in `src/repo/operation_plan/fixtures/v1/`,
 and `legacy_fixture_tests.rs` checks them. Fixture steps copy the shape their
