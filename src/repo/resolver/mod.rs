@@ -279,7 +279,12 @@ impl RepoTab {
         self.then(
             ctx,
             move || prepare(&repo, &files, engine, &for_id, put_aside),
-            move |tab, prepared, ctx| tab.resolver_prepared(&id, prepared, ctx),
+            move |tab, prepared, ctx| {
+                tab.resolver_prepared(&id, prepared, ctx);
+                // Its failures show on the agent's card. Without a merge put aside, nothing
+                // held the slot and this only starts what may have been stranded.
+                tab.busy_op_released(true, ctx);
+            },
         );
     }
 

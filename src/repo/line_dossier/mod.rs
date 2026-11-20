@@ -267,12 +267,14 @@ impl RepoTab {
             self.busy_op = None;
             self.op_started = None;
         }
+        let ok = result.is_ok();
         self.status=Some(crate::repo::Notice::plain(match result{
             Ok(crate::git::investigations::ignore::Appended::Changed)=>("Revision appended to .git-blame-ignore-revs; staged contents preserved. Ordinary Git blame can use blame.ignoreRevsFile=.git-blame-ignore-revs.".into(),false),
             Ok(crate::git::investigations::ignore::Appended::AlreadyPresent)=>("Revision already present; ignore file and index unchanged".into(),false),
             Err(error)=>(format!("Ignore revision: {error}"),true),
         }));
         self.reload_status(ctx);
+        self.busy_op_released(ok, ctx);
     }
 }
 

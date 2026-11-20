@@ -468,3 +468,5 @@ fn linked_forge_selects_the_exact_remote_and_never_falls_back_when_blocked_or_mi
 
 #[path = "direct_tests/forge_selection_preferences.rs"]
 mod forge_selection_preferences;
+#[path = "direct_tests/stale_operation_queue.rs"]
+mod stale_operation_queue;

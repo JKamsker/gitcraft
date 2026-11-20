@@ -9,6 +9,7 @@ impl RepoTab {
         acts: &mut Vec<Action>,
     ) {
         let state = &mut self.devcontainer;
+        let mut released = false;
         if let Some(pending) = &state.pending {
             let stale = pending.context != connections::current() || pending.scope.0.is_cancelled();
             if stale {
@@ -21,6 +22,7 @@ impl RepoTab {
                     state.pending = None;
                     if mutation {
                         self.busy_op = None;
+                        released = true;
                     }
                     state.trust = false;
                     state.rebuild = false;
@@ -69,6 +71,7 @@ impl RepoTab {
                 Err(mpsc::TryRecvError::Disconnected) => {
                     if pending.mutation {
                         self.busy_op = None;
+                        released = true;
                     }
                     state.pending = None;
                     state.remember_result(LocalResult::WorkerEnded);
@@ -77,6 +80,10 @@ impl RepoTab {
                     ctx.request_repaint_after(std::time::Duration::from_millis(100))
                 }
             }
+        }
+        if released {
+            // Its outcome shows in this window, not the status line: what waited runs.
+            self.busy_op_released(true, ctx);
         }
         let state = &mut self.devcontainer;
         if state.pending.is_none()

@@ -179,8 +179,12 @@ impl RepoTab {
                     // never run old continuations (or retries) against the new hosting.
                     self.busy_op = None;
                     self.op_started = None;
+                    self.running = None;
                     self.status = Some(crate::repo::Notice::plain(("The operation on the previous primary forge finished; refresh that repository to check its result".into(), true)));
                     self.reload(ctx);
+                    // What was asked for meanwhile (Fetch, Pull, Push) starts now, as after any
+                    // operation. Its outcome is unknown here, which is no reason to drop them.
+                    self.busy_op_released(true, ctx);
                 }
             }
             Msg::Loaded(result) => self.loaded(result, ctx),
