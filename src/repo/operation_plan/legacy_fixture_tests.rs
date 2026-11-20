@@ -16,7 +16,9 @@ const R: &str = "Expectation::Ref";
 const S: &str = "Expectation::Symref";
 const T: &str = "Expectation::Tree";
 const G: &str = "Git";
-const GUARD: &str = "Expectation::FeatureGuard";
+const CHECKOUT: &str = "Expectation::ForkCheckout";
+const DESTINATION: &str = "Expectation::ForkDestination";
+const TRACKING: &str = "TrackingApply";
 
 fn fixture(name: &str) -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR"))
@@ -99,9 +101,9 @@ fn persisted_steps_classify_to_the_expected_typed_plan() -> Result<(), String> {
         (1, &[S, G], &[S, G]),
         (2, &[R, T, T, G, G, G, G, G], &[G]),
         (3, &[R, S, R, S, G, G, G, G, G], &[R, S, R, S, G, G, G, G]),
-        (4, &[GUARD, G, R, G, G], &[GUARD, G, G, G, G, G]),
-        (5, &[GUARD, S, R, R, G, G], &[GUARD, S, R, G, G]),
-        (6, &[G], &[G]),
+        (4, &[CHECKOUT, G, R, G, G], &[CHECKOUT, G, G, G, G, G]),
+        (5, &[DESTINATION, S, R, R, G, G], &[DESTINATION, S, R, G, G]),
+        (6, &[TRACKING], &[TRACKING]),
     ];
     for (id, undo, redo) in expected {
         let entry = undo_of(&saved, id)?;
@@ -114,7 +116,7 @@ fn persisted_steps_classify_to_the_expected_typed_plan() -> Result<(), String> {
         serde_json::from_str(&text("live_only_steps.json")?).map_err(|e| e.to_string())?;
     let kinds = [
         "Expectation::HttpsRoute",
-        GUARD,
+        "Expectation::GerritStack",
         G,
         "GerritAmend",
         "Expectation::FoldSafe",

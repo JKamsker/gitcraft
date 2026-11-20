@@ -18,9 +18,8 @@ impl Execution<'_> {
         if self.check_expectation(&step.kind)? {
             return Ok(None);
         }
-        if let [marker, json] = op
-            && marker == git::repository_tools::tracking::APPLY
-        {
+        // Decoded exactly from `[APPLY, json]`, the shape this branch always matched.
+        if let model::Step::TrackingApply { json } = step.kind {
             return git::repository_tools::tracking::execute(self.path, json, self.control)
                 .map(Some)
                 .map_err(Into::into);
@@ -159,29 +158,32 @@ impl Execution<'_> {
     }
 
     fn dispatch(&self, step: &model::PlannedStep<'_>, actual: &[String]) -> Result<String, String> {
-        let op = step.argv;
-        if let [_, original @ ..] = op
-            && step.kind == model::Step::GerritAmend
-        {
-            let prepared = crate::gerrit::amend_args(self.path, original)?;
-            let args: Vec<&str> = prepared.iter().map(String::as_str).collect();
-            return run_step(self.path, &args, self.creds, self.quiet, self.control);
+        match step.kind {
+            model::Step::GerritAmend { args } => {
+                let prepared = crate::gerrit::amend_args(self.path, args)?;
+                let args: Vec<&str> = prepared.iter().map(String::as_str).collect();
+                run_step(self.path, &args, self.creds, self.quiet, self.control)
+            }
+            // `prepare_command` already refused an APPROVED step that is not well-formed.
+            model::Step::ReviewedPush { id, evidence } => self.dispatch_reviewed(id, evidence),
+            model::Step::PreflightFix { id, fix } => {
+                let plan = crate::push_preflight::registered(id)?;
+                crate::push_preflight::fix(self.path, &plan, fix)
+            }
+            // Expectations, TRY and APPLY returned before preparation; a malformed marker
+            // runs as Git, as it always did, and Git refuses its NUL.
+            model::Step::Git
+            | model::Step::Malformed(_)
+            | model::Step::Expectation(_)
+            | model::Step::Try { .. }
+            | model::Step::TrackingApply { .. } => {
+                let args: Vec<&str> = actual.iter().map(String::as_str).collect();
+                run_step(self.path, &args, self.creds, self.quiet, self.control)
+            }
         }
-        if step.kind == model::Step::ReviewedPush {
-            return self.dispatch_reviewed(op);
-        }
-        if let [_, id, fix] = op
-            && step.kind == model::Step::PreflightFix
-        {
-            let plan = crate::push_preflight::registered(id)?;
-            return crate::push_preflight::fix(self.path, &plan, fix);
-        }
-        let args: Vec<&str> = actual.iter().map(String::as_str).collect();
-        run_step(self.path, &args, self.creds, self.quiet, self.control)
     }
 
-    fn dispatch_reviewed(&self, op: &[String]) -> Result<String, String> {
-        let (id, evidence) = reviewed_operands(op)?;
+    fn dispatch_reviewed(&self, id: &str, evidence: Option<&[String]>) -> Result<String, String> {
         let plan = crate::push_preflight::registered(id)?;
         let original = crate::push_preflight::push_args(&plan)?;
         let source = evidence
