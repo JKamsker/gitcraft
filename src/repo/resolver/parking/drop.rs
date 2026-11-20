@@ -30,7 +30,11 @@ impl RepoTab {
         self.then(
             ctx,
             move || park::drop_to_branch(&repo, &parked).map(|b| (parked, b)),
-            |tab, dropped, ctx| tab.parked_dropped(dropped, ctx),
+            |tab, dropped, ctx| {
+                let ok = dropped.is_ok();
+                tab.parked_dropped(dropped, ctx);
+                tab.busy_op_released(ok, ctx);
+            },
         );
     }
 

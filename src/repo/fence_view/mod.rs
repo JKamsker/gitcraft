@@ -279,6 +279,9 @@ impl RepoTab {
                 fence::check_ref(&repo, &tip, "HEAD", &patterns)
             },
             move |tab, commits, ctx| {
+                // Only the check before the operation: it starts next (below, holding the
+                // slot again) or the dialog asks about it, so what waited is left to wait for
+                // that operation rather than run ahead of it.
                 tab.busy_op = None;
                 tab.status = None;
                 let mut found: Vec<Violation> = Vec::new();
