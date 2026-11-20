@@ -153,8 +153,9 @@ pub(crate) struct PrDraft {
     pub(super) focus_line: bool,
     /// Something is being sent, or the page is being loaded again after it.
     pub(super) posting: bool,
-    /// What's left of `posting` is the page being loaded again.
-    pub(super) settling: bool,
+    /// What's left of `posting` is the page being read again, by this read: its answer (or
+    /// its failure) settles the post, whichever page is shown by then.
+    pub(super) settling: Option<u64>,
     pub(super) error: Option<(Place, String)>,
     /// The review being dismissed, and why.
     pub(super) dismissing: Option<String>,
@@ -182,6 +183,19 @@ impl PrDraft {
         self.line_head = None;
         self.confirm_merge = false;
         self.reveal_merge = false;
+    }
+
+    /// Whether something is on its way to the forge, not only the page being read after it.
+    pub(in crate::repo) fn sending(&self) -> bool {
+        self.posting && self.settling.is_none()
+    }
+
+    /// A post that waited for the read `read` (any read, for `None`) to answer is done.
+    pub(in crate::repo) fn settle(&mut self, read: Option<u64>) {
+        if self.settling.is_some() && (read.is_none() || self.settling == read) {
+            self.settling = None;
+            self.posting = false;
+        }
     }
 
     /// Clears what has been sent. Text not yet sent stays.
@@ -237,6 +251,8 @@ fn pr_acts(acts: &mut Vec<Action>, act: PrAct) {
     acts.push(Action::Pr(act));
 }
 
+#[cfg(test)]
+mod settling_tests;
 #[cfg(test)]
 mod tests {
     use super::*;

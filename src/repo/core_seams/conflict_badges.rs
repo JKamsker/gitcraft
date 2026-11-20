@@ -10,9 +10,11 @@ impl RepoTab {
 
     /// Re-read local state on focus, retaining background forge freshness throttling.
     pub fn refresh_on_focus(&mut self, ctx: &egui::Context) {
-        self.invalidate_repository_context();
-        self.conflict_checks.forget();
-        self.reload(ctx);
+        self.refresh_search(|tab| {
+            tab.invalidate_repository_context();
+            tab.conflict_checks.forget();
+            tab.reload(ctx);
+        });
     }
 
     /// Whether a read is going or began a moment ago: the window gaining the focus then (as it

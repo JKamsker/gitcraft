@@ -21,6 +21,8 @@ pub(super) struct Search {
     pub(super) problem: Option<String>,
     pub(super) suggest: super::graph_view::suggest::SuggestState,
     pending: Option<Arc<Request>>,
+    /// A refresh retired the search being read: it is asked again once the reload is in.
+    rerun: bool,
 }
 
 /// Allocation identity survives A→B→A without counters or reusable query keys.
@@ -161,6 +163,7 @@ impl RepoTab {
             return;
         }
         self.search.retire();
+        self.search.rerun = false;
         self.history_minimap.dirty = true;
         self.search.searched = request.query.clone();
         match result {
@@ -182,6 +185,32 @@ impl RepoTab {
                 self.search.matches = Default::default();
                 self.search.problem = Some(e);
             }
+        }
+    }
+
+    /// A refresh retires the search being read with the old context. It is asked again once
+    /// the reload is in (see [`Self::search_after_load`]): asked now, it would search the
+    /// branches and order the reload is about to replace.
+    pub(super) fn refresh_search(&mut self, refresh: impl FnOnce(&mut Self)) {
+        let searching = self.search.pending.is_some();
+        refresh(self);
+        if searching {
+            self.search.rerun = true;
+            self.search.running = true;
+        }
+    }
+
+    /// The reload is in and nothing more is to be read: a search a refresh retired is asked
+    /// of what was read, unless it was closed, cleared, edited or asked again meanwhile.
+    pub(super) fn search_after_load(&mut self, ctx: &egui::Context) {
+        if !std::mem::take(&mut self.search.rerun) || self.search.pending.is_some() {
+            return;
+        }
+        let search = &self.search;
+        if search.open && search.edited.is_none() && !search.query.trim().is_empty() {
+            self.run_search(ctx);
+        } else {
+            self.search.running = false;
         }
     }
 
@@ -217,5 +246,7 @@ impl RepoTab {
     }
 }
 
+#[cfg(test)]
+mod refresh_tests;
 #[cfg(test)]
 mod tests;

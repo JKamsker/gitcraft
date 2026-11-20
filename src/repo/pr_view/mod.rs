@@ -10,7 +10,7 @@ use std::collections::HashMap;
 
 use egui_commonmark::CommonMarkCache;
 
-use super::{DiffKey, Msg, RepoTab, spawn};
+use super::{DiffKey, Msg, RepoTab};
 use crate::pull_request::{self as pr, Block, PrDetails, PrFiles};
 
 pub(super) use text::{blocks, only_web_links};
@@ -140,7 +140,9 @@ impl RepoTab {
         view.storyboard.invalidate();
         view.loading = true;
         let (path, number, hosting) = (self.path.clone(), view.number, self.hosting.clone());
-        spawn(&self.forge_sender(), ctx, move || {
+        self.pr_read_again(number, request);
+        let failed = move |e| Msg::PrDetails(request, Box::new(Err(e)));
+        super::messages::spawn_or(&self.forge_sender(), ctx, failed, move || {
             let details = match hosting
                 .as_ref()
                 .and_then(|h| Some((h, h.forge.provider().pages()?)))
@@ -161,6 +163,10 @@ impl RepoTab {
         ctx: &egui::Context,
     ) {
         let sender = self.forge_sender();
+        // With details come the files, which is when it's settled. Without, nothing comes.
+        if result.is_err() || !self.pr_view.as_ref().is_some_and(|v| v.request == request) {
+            self.settle_pr_drafts(Some(request));
+        }
         let Some(view) = self.pr_view.as_mut().filter(|v| v.request == request) else {
             return;
         };
@@ -186,10 +192,6 @@ impl RepoTab {
             if moved || restored_moved {
                 draft.head_moved();
             }
-            // With details come the files, which is when it's settled. Without, nothing comes.
-            if result.is_err() && std::mem::take(&mut draft.settling) {
-                draft.posting = false;
-            }
         }
         if let Ok(details) = &result {
             view.prepare_texts(details);
@@ -200,7 +202,8 @@ impl RepoTab {
                 self.credentials.clone(),
                 self.hosting.clone(),
             );
-            spawn(&sender, ctx, move || {
+            let failed = move |e| Msg::PrFiles(request, Err(e));
+            super::messages::spawn_or(&sender, ctx, failed, move || {
                 let files = hosting
                     .as_ref()
                     .ok_or_else(|| "No primary forge is selected".to_owned())
@@ -217,14 +220,10 @@ impl RepoTab {
         result: Result<PrFiles, String>,
         ctx: &egui::Context,
     ) {
+        self.settle_pr_drafts(Some(request));
         let Some(view) = self.pr_view.as_mut().filter(|v| v.request == request) else {
             return;
         };
-        if let Some(draft) = self.pr_drafts.get_mut(&view.number)
-            && std::mem::take(&mut draft.settling)
-        {
-            draft.posting = false;
-        }
         view.relocated = Default::default();
         let before = view.files.take().and_then(Result::ok);
         // Its commits are here now: whether it changed since it was last looked at.

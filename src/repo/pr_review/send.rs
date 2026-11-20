@@ -85,6 +85,23 @@ impl RepoTab {
         self.pr_view = None;
     }
 
+    /// The read `request` has answered or failed: the posts waiting on it are done, whichever
+    /// pull request is shown now.
+    pub(in crate::repo) fn settle_pr_drafts(&mut self, request: Option<u64>) {
+        for draft in self.pr_drafts.values_mut() {
+            draft.settle(request);
+        }
+    }
+
+    /// A post waiting for the page of `number` to be read again waits for its newest read.
+    pub(in crate::repo) fn pr_read_again(&mut self, number: u64, request: u64) {
+        if let Some(draft) = self.pr_drafts.get_mut(&number)
+            && draft.settling.is_some()
+        {
+            draft.settling = Some(request);
+        }
+    }
+
     /// Does what the page, the review box or a thread asked for.
     pub(in crate::repo) fn pr_act(&mut self, act: PrAct, ctx: &egui::Context) {
         match act {
@@ -194,8 +211,11 @@ impl RepoTab {
         // Until the page shows the new state, anything sent would go by the old one.
         if self.pr_view.as_ref().is_some_and(|v| v.number == number) {
             draft.posting = true;
-            draft.settling = true;
             self.load_pr(ctx);
+            let read = Some(self.pr_requests);
+            if let Some(draft) = self.pr_drafts.get_mut(&number) {
+                draft.settling = read;
+            }
         }
         if what == Posted::Merge {
             if let Some(draft) = self.pr_drafts.get_mut(&number) {
