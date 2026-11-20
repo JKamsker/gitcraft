@@ -1,5 +1,7 @@
 //! Reads gitcraft's own source for NUL-prefixed string literals: the internal sentinels an
-//! operation step, a graph row or an output can start with (#193). Line-based on purpose:
+//! operation step, a graph row or an output can start with (#193). It sees an ordinary
+//! single-line literal whose NUL is followed by a letter, a sentinel's name; a value built
+//! with `concat!`/`format!` or a string continued over lines is out of its reach. Line-based:
 //! rustfmt closes a `#[cfg(test)]` item with a `}` at the attribute's indentation, which is
 //! all it takes to leave test-only code out. Files named as tests are left out whole.
 
@@ -99,11 +101,12 @@ fn past_item(lines: &[&str], at: usize) -> usize {
     let Some(item) = lines.get(next).map(|l| l.trim_end()) else {
         return next;
     };
-    let one_line = item.ends_with(';') || item.ends_with(',') || item.ends_with("{}");
-    if one_line {
+    // `mod x;`, a field, `fn f() {}`, `thread_local! { … }`: the item is this line.
+    if item.ends_with([';', ',', '}']) {
         return next + 1;
     }
-    let closes = |l: &&str| indentation(l) == indent && l.trim_start().starts_with('}');
+    // Otherwise rustfmt closes it at the attribute's indentation: `}`, `];` or `);`.
+    let closes = |l: &&str| indentation(l) == indent && l.trim_start().starts_with(['}', ']', ')']);
     lines[next..]
         .iter()
         .position(closes)
@@ -210,6 +213,14 @@ fn hidden() -> Result<(), String> {
 #[cfg(test)]
 mod declared;
 const AFTER: &str = "\0after";
+#[cfg(test)]
+thread_local! { static CELL: u8 = 0; }
+const PAST_MACRO: &str = "\0past-macro";
+#[cfg(test)]
+const TABLE: &[&str] = &[
+    "\0in-table",
+];
+const PAST_TABLE: &str = "\0past-table";
 "#;
     let found: Vec<_> = scan_text("src/x.rs", source)
         .into_iter()
@@ -224,6 +235,8 @@ const AFTER: &str = "\0after";
             named(4, "HEX", "\0hex"),
             (6, None, "\0inline:".to_owned()),
             named(21, "AFTER", "\0after"),
+            named(24, "PAST_MACRO", "\0past-macro"),
+            named(29, "PAST_TABLE", "\0past-table"),
         ]
     );
     assert!(scan_text("src/x/tests.rs", source).is_empty());

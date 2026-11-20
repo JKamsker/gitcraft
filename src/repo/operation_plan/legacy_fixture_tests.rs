@@ -1,8 +1,11 @@
 //! Version-1 persistence fixtures (#193) in `fixtures/v1/`, shaped the way each producer emits
 //! its steps. `timeline.json` and `live_only_steps.json` are canonical (`store::save_to`
-//! writes exactly `serde_json::to_string`), so they must round-trip byte for byte. The others
-//! predate fields that now default; they decode and round-trip semantically, and serializing
-//! them writes the defaults out, so their bytes cannot be stable.
+//! writes exactly `serde_json::to_string`), so they must round-trip byte for byte.
+//! `timeline_legacy_fields.json` predates fields that now default; it decodes and round-trips
+//! semantically, and serializing it writes the defaults out, so its bytes cannot be stable.
+//! `undo_entry_mixed_try.json` is synthetic: no current producer persists a `TRY` (issue start
+//! runs it unrecorded), but it keeps the mixed optional/required redo the pre-#200 model test
+//! decoded, in the same legacy shape, built from `issue_work::link::start_ops` steps.
 
 use super::sentinel_inventory::{HOW_TO, INVENTORY, Role, classify_all};
 use super::*;
@@ -21,7 +24,7 @@ fn fixture(name: &str) -> PathBuf {
         .join(name)
 }
 
-/// The fixture's text as checked in (one line; a checkout may end it with CRLF).
+/// The fixture's text as checked in: one line and a newline (`.gitattributes` pins LF).
 fn text(name: &str) -> Result<String, String> {
     let text = std::fs::read_to_string(fixture(name)).map_err(|e| format!("{name}: {e}"))?;
     Ok(text.trim_end_matches(['\r', '\n']).to_owned())
@@ -163,24 +166,20 @@ fn the_fixtures_cover_every_step_sentinel_and_hold_no_unknown_one() -> Result<()
         .iter()
         .filter(|s| matches!(s.role, Role::Step | Role::Placeholder))
     {
-        let file = if sentinel.persisted {
-            &persisted
-        } else {
-            &live
-        };
         let held = |w: &&String| match sentinel.role {
             Role::Placeholder => w.contains(sentinel.value),
             _ => *w == sentinel.value,
         };
-        let name = if sentinel.persisted {
-            "timeline.json"
-        } else {
-            "live_only_steps.json"
-        };
-        assert!(
-            file.iter().any(held),
-            "{} is in no step of {name}. {HOW_TO}",
-            sentinel.constant
+        let (name, saved, unsaved) = (
+            sentinel.constant,
+            persisted.iter().any(held),
+            live.iter().any(held),
+        );
+        // Persisted ones are in the timeline file, the others only in the live steps.
+        assert_eq!(
+            (saved, unsaved),
+            (sentinel.persisted, !sentinel.persisted),
+            "{name}. {HOW_TO}"
         );
     }
     let known = |w: &&&String| INVENTORY.iter().any(|s| w.contains(s.value));

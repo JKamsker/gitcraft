@@ -186,12 +186,15 @@ and round-trip with tested compatibility. This slice leaves it intact.
 Internal steps are marked by sentinel strings, NUL-prefixed so no Git argument
 can collide with them (#193). The checked-in inventory is `INVENTORY` in
 `src/repo/operation_plan/sentinel_table_tests.rs`, and this table mirrors it.
-`sentinel_inventory_tests.rs` scans production `src/` for every NUL-prefixed
-string constant and inline literal, skipping `#[cfg(test)]` items and files named
-as tests. The test fails, and says what to add, when the scan and the inventory
-disagree. It also fails when a step marker's producer-shaped sample does not
-decode as listed, or when a step marker falls through to `Step::Git` without
-naming what handles it. Another test fails when a row below is missing.
+`sentinel_inventory_tests.rs` scans production `src/` for string constants and
+inline literals that start with NUL followed by a letter. It skips `#[cfg(test)]`
+items and files named as tests. It reads ordinary single-line literals only, not
+values built with `concat!`/`format!` or continued over lines. The test fails,
+and says what to add, when the scan and the inventory disagree. It also fails
+when a step marker's producer-shaped sample does not decode as listed, or when a
+step marker falls through to `Step::Git` without naming what handles it. Another
+test fails when a row below is missing, or when its persisted or decode column
+disagrees with the inventory.
 
 | Constant | Owner | Value | Role | Persisted by a producer | `Plan::decode` |
 |---|---|---|---|---|---|
@@ -220,17 +223,20 @@ recognizes `[APPLY, json]` before dispatch, but every other consumer of
 `Plan::steps` sees a Git command. Typing it is a follow-up, not part of this slice.
 
 Version-1 persistence fixtures live in `src/repo/operation_plan/fixtures/v1/`,
-and `legacy_fixture_tests.rs` checks them. Each fixture copies the shape its
-producer emits. `timeline.json` is a full timeline file with commit (HEAD move),
+and `legacy_fixture_tests.rs` checks them. Fixture steps copy the shape their
+producers emit. `timeline.json` is a full timeline file with commit (HEAD move),
 staged-stash, restack (worktree symref), fork checkout, fork rebase, tracking and
-outside entries. It covers every sentinel that is persisted today.
+outside entries. It holds exactly the sentinels that are persisted today.
 `live_only_steps.json` holds the step markers that never reach disk. These two are
 canonical, because `store::save_to` writes `serde_json::to_string` output, so they
-must round-trip byte for byte. `timeline_legacy_fields.json` and
-`undo_entry_mixed_try.json` predate optional fields (`folder`, `root_redo`, entry
-`files`/`redo_child`/`receipt`, `UndoEntry` `id`/`agent`, and `heads` in one entry).
-They decode with defaults and round-trip semantically. Re-serializing them writes
-those defaults out, so their bytes cannot be stable. Each fixture step is checked
+must round-trip byte for byte. `timeline_legacy_fields.json` predates optional
+fields (`folder`, `root_redo`, entry `files`/`redo_child`/`receipt`, `UndoEntry`
+`id`/`agent`, and `heads` in one entry). It decodes with defaults and round-trips
+semantically. Re-serializing it writes those defaults out, so its bytes cannot be
+stable. `undo_entry_mixed_try.json` is synthetic, in the same legacy shape. No
+current producer persists a `TRY`, because issue start runs it unrecorded. It keeps
+the mixed optional/required redo that the pre-#200 model test decoded, along with
+its sign-in retry semantics. Each fixture step is checked
 against its expected `Plan::decode` classification. Where a producer is reachable
 from a test (`undo_entry`, `expect_*`, `try_step`, `gerrit::review_ops`), the
 fixture steps are compared with its output. The fixtures are pinned to

@@ -151,10 +151,15 @@ fn the_architecture_doc_lists_every_inventoried_sentinel() -> Result<(), String>
     let doc = Path::new(env!("CARGO_MANIFEST_DIR")).join("docs/architecture.md");
     let text = std::fs::read_to_string(&doc).map_err(|e| e.to_string())?;
     for sentinel in INVENTORY {
-        let row = format!("| `{}` | `{}` |", sentinel.constant, sentinel.owner);
+        let start = format!("| `{}` | `{}` |", sentinel.constant, sentinel.owner);
+        let row = text.lines().find(|l| l.starts_with(&start));
+        let row = row.ok_or(format!("docs/architecture.md lacks a row starting {start}"))?;
+        let persisted = if sentinel.persisted { "| yes" } else { "| no" };
+        let decodes = format!("`{}`", sentinel.decodes);
+        let decoded = sentinel.decodes.is_empty() || row.contains(&decodes);
         assert!(
-            text.contains(&row),
-            "docs/architecture.md lacks a row starting {row}"
+            row.contains(persisted) && decoded,
+            "stale row in docs/architecture.md: {row}"
         );
     }
     Ok(())
