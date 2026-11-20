@@ -112,6 +112,8 @@ pub struct RepoTab {
     pub(in crate::repo) prs_loaded: Option<Instant>,
     /// The build status of the commits that show one.
     pub(in crate::repo) ci: ci_status::CiStatuses,
+    /// The SonarQube quality gate of the checkout (see `quality_gate`).
+    pub(in crate::repo) quality_gate: quality_gate::State,
     /// The _weakens checks_ scans of the file lists shown.
     pub(in crate::repo) weakened: weakened_marks::WeakenedMarks,
     /// Whether commits are signed off (DCO), and the sign-offs of the pull request shown.

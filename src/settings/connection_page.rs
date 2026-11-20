@@ -85,6 +85,13 @@ impl Settings {
                     );
                 }
                 card.row(
+                    "SonarQube",
+                    "sonarqube sonarcloud quality gate code analysis token",
+                    |ui| {
+                        crate::analysis::sonar::ui::account(ui, id, &mut profile.connections.sonar)
+                    },
+                );
+                card.row(
                     "Forgejo / Gitea login",
                     "tea forge account login alias",
                     |ui| {
