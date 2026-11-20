@@ -12,15 +12,13 @@ const HEAD: &str = "be6c75b85da526349c44e3978374c95e0b80a96d";
 const OLD: &str = "bfe36592eb7f9f2708b5d358b5b5f33ed535c8cf";
 
 type Calls = Rc<RefCell<Vec<(String, Auth)>>>;
+type Fake = Box<dyn FnMut(&str, Auth) -> Result<String, Failure>>;
 
 /// Answers by the first route whose prefix matches; unknown paths are a 404.
 fn client(
     edition: Edition,
     routes: Vec<(&'static str, Result<String, Failure>)>,
-) -> (
-    Client<impl FnMut(&str, Auth) -> Result<String, Failure>>,
-    Calls,
-) {
+) -> (Client<Fake>, Calls) {
     let calls: Calls = Rc::default();
     let seen = calls.clone();
     let account = Account {
@@ -43,7 +41,7 @@ fn client(
             .find(|(prefix, _)| path.starts_with(prefix))
             .map_or(Err(Failure::Http(404)), |(_, answer)| answer.clone())
     };
-    (Client::new(account, send), calls)
+    (Client::new(account, Box::new(send)), calls)
 }
 
 fn ok(body: &str) -> Result<String, Failure> {
