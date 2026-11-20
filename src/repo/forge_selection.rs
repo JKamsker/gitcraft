@@ -156,7 +156,9 @@ impl RepoTab {
     }
 
     pub(super) fn forge_change_blocked(&self) -> bool {
-        self.busy_op.is_some() || self.pr_drafts.values().any(|draft| draft.posting)
+        // A post on its way must be answered for this forge; one whose page is only being read
+        // again is let go of by `bind_forge_selection`.
+        self.busy_op.is_some() || self.pr_drafts.values().any(|draft| draft.sending())
     }
 
     /// Choose using the *current* preference, never the preference a slow reload captured.
@@ -252,12 +254,8 @@ impl RepoTab {
             self.pr_drafts.clear();
         } else {
             // Completed posts are only waiting on the details/files reads invalidated
-            // below. Pending mutations have settling=false and must remain blocked.
-            for draft in self.pr_drafts.values_mut() {
-                if std::mem::take(&mut draft.settling) {
-                    draft.posting = false;
-                }
-            }
+            // below. Pending mutations have no `settling` and must remain blocked.
+            self.settle_pr_drafts(None);
         }
         self.pr_graph_head = None;
         self.versions.seen_heads.clear();

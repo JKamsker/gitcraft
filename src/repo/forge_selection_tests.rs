@@ -259,12 +259,12 @@ fn adversarial_completed_post_settling_is_released_when_catalog_discards_its_ref
     // The mutation succeeded; only load_pr/details/files still keeps the editor busy.
     let draft = tab.pr_drafts.entry(7).or_default();
     draft.posting = true;
-    draft.settling = true;
+    draft.settling = Some(1);
     draft.review = "unsent review text".into();
     tab.remotes.push(remote("unrelated", "other"));
     tab.take_forge_selection(true, &ctx);
     assert!(
-        !tab.pr_drafts[&7].posting && !tab.pr_drafts[&7].settling,
+        !tab.pr_drafts[&7].posting && tab.pr_drafts[&7].settling.is_none(),
         "a completed post's discarded refresh must not block primary selection"
     );
     assert_eq!(tab.pr_drafts[&7].review, "unsent review text");
@@ -280,7 +280,7 @@ fn adversarial_completed_post_settling_is_released_when_catalog_discards_its_ref
     // A mutation with no completion yet must keep blocking selection.
     tab.pr_drafts.entry(8).or_default().posting = true;
     tab.take_forge_selection(true, &ctx);
-    assert!(tab.pr_drafts[&8].posting && !tab.pr_drafts[&8].settling);
+    assert!(tab.pr_drafts[&8].posting && tab.pr_drafts[&8].settling.is_none());
     assert!(tab.forge_change_blocked());
 }
 
