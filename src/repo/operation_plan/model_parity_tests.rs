@@ -1,13 +1,15 @@
-//! The typed decode changes no execution (#193). `legacy` is `Plan::decode` as it was before
-//! the typed variants, and the executor branched on exactly its classes. Over every marker with
-//! 0..=5 operands, and over every v1 fixture step, each new kind must route through the
-//! executor the way the legacy class did:
+//! The typed decode leaves every executor branch as it was (#193). `legacy` is `Plan::decode`
+//! as it was before the typed variants; `Execution::step`/`dispatch` branched on its classes
+//! (and on `[APPLY, json]` by hand). This does not run the executor: it checks, over every
+//! marker with 0..=5 operands (repeated and distinct words) and every v1 fixture step, that each
+//! new kind selects the branch the legacy class selected, with the operands it destructured:
 //! - an expectation is skipped, and is one exactly when `is_expectation` says so;
-//! - TRY, FIX and AMEND reach the same branch with the operands it destructured before;
-//! - APPROVED reaches the reviewed dispatch when `reviewed_operands` accepts it, and otherwise
-//!   `prepare_command` refuses it through `reviewed_push_args` before any dispatch, as before;
+//! - TRY, FIX and AMEND reach the same branch with the same operands;
+//! - APPROVED reaches the reviewed dispatch with `reviewed_operands`' operands when it accepts
+//!   them; otherwise it is `Malformed`, and `prepare_command` refuses it through
+//!   `reviewed_push_args` before any dispatch, as before;
 //! - `TrackingApply` is exactly the `[APPLY, json]` argv the executor matched by hand;
-//! - `Malformed` is what was `Git`, and still runs as Git.
+//! - `Malformed` is a legacy `Git` step that starts with a marker, and still runs as Git.
 use super::*;
 use crate::gerrit::{AMEND, CHECK};
 use crate::git::repository_tools::tracking::APPLY;
@@ -45,15 +47,25 @@ fn routes_as_before(argv: &[String], kind: Step<'_>) -> bool {
         (Legacy::ReviewedPush, Step::ReviewedPush { id, evidence }) => {
             reviewed_operands(argv) == Ok((id, evidence))
         }
-        (Legacy::ReviewedPush, Step::Malformed(_)) => reviewed_push_args(argv).is_err(),
+        // Refused before the registry is consulted: no registered plan can make it run.
+        (Legacy::ReviewedPush, Step::Malformed(_)) => {
+            reviewed_operands(argv).is_err() && reviewed_push_args(argv).is_err()
+        }
         (Legacy::Git, Step::TrackingApply { json }) => {
             matches!(argv, [mark, saved] if mark == APPLY && saved == json)
         }
-        (Legacy::Git, Step::Git | Step::Malformed(_)) => {
-            !matches!(argv, [mark, _] if mark == APPLY)
+        (Legacy::Git, Step::Git) => !starts_with_marker(argv),
+        (Legacy::Git, Step::Malformed(_)) => {
+            starts_with_marker(argv) && !matches!(argv, [mark, _] if mark == APPLY)
         }
         _ => false,
     }
+}
+
+/// A NUL-prefixed first word, or the one non-NUL marker.
+fn starts_with_marker(argv: &[String]) -> bool {
+    argv.first()
+        .is_some_and(|w| w.starts_with('\0') || w == EXPECT_HTTPS_ROUTE)
 }
 
 fn corpus() -> Result<Vec<Vec<String>>, String> {
@@ -71,6 +83,8 @@ fn corpus() -> Result<Vec<Vec<String>>, String> {
                 let step = std::iter::once(marker).chain(operands);
                 steps.push(step.map(str::to_owned).collect());
             }
+            let distinct = (0..count).map(|i| format!("w{i}"));
+            steps.push(std::iter::once(marker.to_owned()).chain(distinct).collect());
         }
         let reviewed = [marker, "7", "-c", "gitcraft.commandSource=x"];
         steps.push(reviewed.map(str::to_owned).to_vec());
