@@ -41,6 +41,8 @@ mod private;
 pub use private::{create_private_directory, detach_controller, random_bytes};
 // Pure parsers of the Windows policy protocol; their tests run on every platform.
 #[cfg(any(windows, test))]
+mod reparse;
+#[cfg(any(windows, test))]
 mod security_descriptor;
 #[cfg(any(windows, test))]
 mod stream_info;

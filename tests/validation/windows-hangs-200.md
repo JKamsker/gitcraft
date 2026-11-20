@@ -120,9 +120,12 @@ up to 11.5s for the helper lock and kept every staging test over 60 seconds.
 
 `gitcraft_os::windows_policy` now runs the protocol in-process, with two deliberate
 improvements over the helper. Every call goes through one handle opened with
-`FILE_FLAG_OPEN_REPARSE_POINT`, and a link, junction or other reparse point is refused;
-named streams are listed through the same handle (`FileStreamInfo`). Without
-SeSecurityPrivilege the scope narrows to OWNER|GROUP|DACL|LABEL before OWNER|GROUP|DACL,
+`FILE_FLAG_OPEN_REPARSE_POINT`, and a name-surrogate reparse point (symbolic link, junction,
+WSL link) is refused, while Cloud Files placeholders, Dedup and other non-surrogate reparse
+points are the file itself (`FileAttributeTagInfo`); only the final component is no-follow;
+named streams are listed through the same handle (`FileStreamInfo`). When the token holds SeSecurityPrivilege it is enabled for the call on an
+impersonated duplicate of the process token, so elevated users still capture the audit SACL. Without
+the privilege the scope narrows to OWNER|GROUP|DACL|LABEL before OWNER|GROUP|DACL,
 so a low-integrity label is captured and copied instead of dropped. The descriptor is
 canonical and bound to the scope captured; copies set explicit DACL protection, SACL
 protection only with the SACL, and are verified on target and source in that scope.

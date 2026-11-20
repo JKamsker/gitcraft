@@ -1,9 +1,30 @@
-//! Refuse named data streams, asked of the already opened (never followed) handle.
+//! What the already opened (never followed) handle is: its reparse tag and data streams.
 use super::PolicyError;
 use std::fs::File;
 use std::os::windows::io::AsRawHandle;
 use windows::Win32::Foundation::{ERROR_HANDLE_EOF, ERROR_MORE_DATA, HANDLE, WIN32_ERROR};
-use windows::Win32::Storage::FileSystem::{FileStreamInfo, GetFileInformationByHandleEx};
+use windows::Win32::Storage::FileSystem::{
+    FILE_ATTRIBUTE_TAG_INFO, FileAttributeTagInfo, FileStreamInfo, GetFileInformationByHandleEx,
+};
+
+/// The object's attributes and reparse tag (`FileAttributeTagInfo`).
+pub(super) fn attribute_tag(file: &File) -> Result<(u32, u32), PolicyError> {
+    let mut info = FILE_ATTRIBUTE_TAG_INFO::default();
+    // SAFETY: the live handle of `file` and an initialized output structure of exactly the
+    // size passed.
+    unsafe {
+        GetFileInformationByHandleEx(
+            HANDLE(file.as_raw_handle()),
+            FileAttributeTagInfo,
+            (&raw mut info).cast(),
+            std::mem::size_of::<FILE_ATTRIBUTE_TAG_INFO>() as u32,
+        )
+    }
+    .map_err(|e| {
+        PolicyError::Native(WIN32_ERROR::from_error(&e).map_or(e.code().0 as u32, |c| c.0))
+    })?;
+    Ok((info.FileAttributes, info.ReparseTag))
+}
 
 /// More stream records than fit here means named streams exist; no need to list them all.
 const LIMIT: usize = 64 * 1024;

@@ -2,19 +2,22 @@
 //!
 //! The protocol of the PowerShell metadata helper (and checked against it), with two
 //! deliberate improvements: every call goes through one handle opened without following
-//! a link (a link, junction or mount point itself is refused), and an unprivileged read
-//! keeps the mandatory integrity label instead of dropping it.
+//! the final path component (a symbolic link, junction or other name-surrogate reparse
+//! point is refused; a Cloud Files placeholder or Dedup file is the file itself), and an
+//! unprivileged read keeps the mandatory integrity label instead of dropping it.
 //!
-//! Scope: OWNER|GROUP|DACL|SACL|LABEL|ATTRIBUTE|SCOPE|PROCESS_TRUST_LABEL|ACCESS_FILTER;
-//! only ERROR_PRIVILEGE_NOT_HELD narrows it, first to OWNER|GROUP|DACL|LABEL, then to
-//! OWNER|GROUP|DACL. A snapshot is the canonical descriptor bound to the scope captured.
+//! Scope: OWNER|GROUP|DACL|SACL|LABEL|ATTRIBUTE|SCOPE|PROCESS_TRUST_LABEL|ACCESS_FILTER,
+//! with SeSecurityPrivilege enabled on this thread for the call when the token holds it (as
+//! GetNamedSecurityInfo did). Only ERROR_PRIVILEGE_NOT_HELD narrows it, first to
+//! OWNER|GROUP|DACL|LABEL, then to OWNER|GROUP|DACL. A snapshot is the canonical descriptor
+//! bound to the scope captured.
 //!
 //! These are synchronous file-system calls without a process deadline. Callers run them on
 //! background workers (staging mutations, standalone tool jobs), never on a UI thread; a
 //! hung network share blocks only that worker, for as long as the OS I/O timeouts allow.
 use crate::security_descriptor::{self, DACL_PROTECTED, DescriptorError, SACL_PROTECTED};
 use std::fs::File;
-use std::os::windows::fs::{MetadataExt, OpenOptionsExt};
+use std::os::windows::fs::OpenOptionsExt;
 use std::os::windows::io::AsRawHandle;
 use std::path::Path;
 use windows::Win32::Foundation::{HANDLE, HLOCAL, LocalFree};
@@ -23,6 +26,7 @@ use windows::Win32::Security::{
     ACL, GetSecurityDescriptorLength, OBJECT_SECURITY_INFORMATION, PSECURITY_DESCRIPTOR, PSID,
 };
 
+mod privilege;
 mod streams;
 
 const ALL_POLICY: u32 = 0x0000_01ff;
@@ -41,7 +45,6 @@ const FILE_READ_ATTRIBUTES: u32 = 0x0000_0080;
 const SHARE_ALL: u32 = 0x1 | 0x2 | 0x4;
 /// `FILE_FLAG_BACKUP_SEMANTICS` (folders too) | `FILE_FLAG_OPEN_REPARSE_POINT` (no follow).
 const NO_FOLLOW: u32 = 0x0200_0000 | 0x0020_0000;
-const REPARSE_POINT: u32 = 0x0000_0400;
 
 /// `ERROR_PRIVILEGE_NOT_HELD`.
 pub const PRIVILEGE_NOT_HELD: u32 = 1314;
@@ -79,6 +82,7 @@ impl From<DescriptorError> for PolicyError {
 
 /// The policy of the file at `path`, comparable with any other snapshot.
 pub fn file_policy_snapshot(path: &Path) -> Result<Vec<u8>, PolicyError> {
+    let _privilege = privilege::SecurityPrivilege::enable();
     let (file, descriptor) = read_widest(path)?;
     streams::refuse_named(&file)?;
     descriptor.snapshot()
@@ -86,6 +90,9 @@ pub fn file_policy_snapshot(path: &Path) -> Result<Vec<u8>, PolicyError> {
 
 /// The policy in exactly `scope`, never narrowed: for comparison with a reference.
 pub fn file_policy_snapshot_in_scope(path: &Path, scope: u32) -> Result<Vec<u8>, PolicyError> {
+    let _privilege = (scope & SACL_INFORMATION != 0)
+        .then(privilege::SecurityPrivilege::enable)
+        .flatten();
     let file = open(path, read_access(scope))?;
     streams::refuse_named(&file)?;
     Descriptor::read(&file, scope)?.snapshot()
@@ -93,6 +100,7 @@ pub fn file_policy_snapshot_in_scope(path: &Path, scope: u32) -> Result<Vec<u8>,
 
 /// Apply the policy of `source` to `target`, then verify both through their handles.
 pub fn copy_file_policy(source: &Path, target: &Path) -> Result<(), PolicyError> {
+    let _privilege = privilege::SecurityPrivilege::enable();
     let (source, descriptor) = read_widest(source)?;
     streams::refuse_named(&source)?;
     let before = descriptor.snapshot()?;
@@ -166,7 +174,10 @@ fn open(path: &Path, access: u32) -> Result<File, PolicyError> {
         .custom_flags(NO_FOLLOW)
         .open(path)
         .map_err(native)?;
-    if file.metadata().map_err(native)?.file_attributes() & REPARSE_POINT != 0 {
+    // Only a name surrogate (link, junction) stands for another object; a Cloud Files
+    // placeholder or Dedup file is the file itself.
+    let (attributes, tag) = streams::attribute_tag(&file)?;
+    if crate::reparse::is_link(attributes, tag) {
         return Err(PolicyError::ReparsePoint);
     }
     Ok(file)
@@ -265,3 +276,6 @@ impl Drop for Descriptor {
         }
     }
 }
+
+#[cfg(test)]
+mod tests;

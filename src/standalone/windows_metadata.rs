@@ -3,8 +3,10 @@
 //! Index staging takes about twenty policy snapshots per transaction. Each used to start
 //! PowerShell and compile the policy type with Add-Type under a 20-second child bound;
 //! loaded Windows runners exceeded that bound (#211). `gitcraft_os` now runs the protocol
-//! natively, through handles that never follow a link, and keeps the integrity label when
-//! the audit SACL needs a privilege the caller lacks. The PowerShell helper stays as the
+//! natively, through handles that never follow the final component (name-surrogate reparse
+//! points such as links and junctions are refused; Cloud Files placeholders are not), enables
+//! a held SeSecurityPrivilege for the call, and keeps the integrity label when the audit SACL
+//! needs a privilege the caller lacks. The PowerShell helper stays as the
 //! reviewed reference; the Windows tests check both against each other.
 //!
 //! These are synchronous file-system calls with no process deadline. Every caller runs on a

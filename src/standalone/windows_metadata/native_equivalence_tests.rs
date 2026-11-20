@@ -114,3 +114,30 @@ fn native_copies_reproduce_every_fixture_policy_and_match_the_helpers() -> Resul
     }
     Ok(())
 }
+
+#[test]
+#[ignore = "requires an elevated shell with SeSecurityPrivilege held; run explicitly"]
+fn elevated_audit_aces_are_captured_and_copied_like_the_helper() -> Result<(), String> {
+    let temp = crate::git::file_comparison::Scratch::new()?;
+    let source = temp.0.join("audited");
+    write(&source, b"audited")?;
+    let plain = snapshot(&source)?;
+    if scope_of(&plain)? & 0x8 == 0 {
+        return Err("not elevated: the audit SACL is not in scope".into());
+    }
+    let powershell = PathBuf::from(std::env::var_os("SystemRoot").ok_or("No SystemRoot")?)
+        .join("System32")
+        .join("WindowsPowerShell")
+        .join("v1.0")
+        .join("powershell.exe");
+    super::native_fixtures::run(fixture_policy_command(&powershell, &source, true))?;
+    let audited = snapshot(&source)?;
+    assert_ne!(audited, plain, "the audit ACE is part of the policy");
+    let helper = script_snapshot(&source)?;
+    assert_eq!(native(&source, scope_of(&helper)?)?, helper);
+    let target = temp.0.join("target");
+    write(&target, b"candidate")?;
+    prepare(&source, &target)?;
+    assert_eq!(snapshot(&target)?, audited, "the audit ACE is copied");
+    Ok(())
+}
