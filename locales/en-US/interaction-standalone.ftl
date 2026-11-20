@@ -282,3 +282,17 @@ interaction-standalone-helper-source-policy-changed = Source policy changed duri
 interaction-standalone-helper-failure = Could not preserve bounded Windows access metadata: { $detail }
 
 interaction-standalone-helper-native-policy = Full Windows policy unavailable (native error { NUMBER($code, useGrouping: "false") }); SACL/audit access may require SeSecurityPrivilege. Original must remain unchanged.
+
+# In-process policy protocol (#211): specific native failures.
+
+interaction-standalone-policy-reparse-point = The path is a link, junction or other reparse point; its access policy is not followed. Original unchanged.
+
+interaction-standalone-policy-access-denied = Access to the file's security information was denied (native error { NUMBER($code, useGrouping: "false") }). Original unchanged.
+
+interaction-standalone-policy-in-use = The file is in use by another program (native error { NUMBER($code, useGrouping: "false") }). Original unchanged.
+
+interaction-standalone-policy-invalid-owner = The original's owner cannot be given to the replacement without the right to assign that owner (native error { NUMBER($code, useGrouping: "false") }). Original unchanged.
+
+interaction-standalone-policy-native = Windows could not read or apply the file's access policy (native error { NUMBER($code, useGrouping: "false") }). Original unchanged.
+
+interaction-standalone-policy-streams = Could not list the file's data streams (native error { NUMBER($code, useGrouping: "false") }). Original unchanged.

@@ -100,3 +100,41 @@ stack dumps can contain stack memory; treat them as diagnostic artifacts. Dump
 failure is recorded and never converts a timeout to success. No extra GitHub CI
 retry or longer test budget is introduced. Native Windows resolution remains
 unproven until these diagnostics and repeated Windows runs establish it.
+
+## File-comparison staging timeouts (#211)
+
+dev run 44774004162 (repo-d-f, attempt 1) failed three staging tests with
+`process timed out and was stopped. Recovery: ...gitcraft-index-recovery-1388-{0,1,2}`
+at +127.9s, +148.1s and +168.2s: exactly 20 seconds apart. PR run 44763643286
+(git-a-m) failed `guarded_patch_...` the same way. The recovery path places each
+error inside `index_transaction::apply`, after the index lock was taken.
+
+That transaction took about nineteen Windows access-policy snapshots plus one policy
+copy, each a PowerShell process compiling the policy type with Add-Type under a
+20-second bound. In tests these helpers are serialized process-wide
+(`windows_metadata/fixture_resources.rs`), so when one helper overran its bound the
+next one started only then, and overran 20 seconds later: the observed spacing.
+Locally (32 threads, unloaded) one staging test started 38 helpers (0.3-0.7s each,
+24s for the test); three parallel file_comparison runs started 759 helpers, waited
+up to 11.5s for the helper lock and kept every staging test over 60 seconds.
+
+`gitcraft_os::windows_policy` now runs the protocol in-process, with two deliberate
+improvements over the helper. Every call goes through one handle opened with
+`FILE_FLAG_OPEN_REPARSE_POINT`, and a name-surrogate reparse point (symbolic link, junction,
+WSL link) is refused, while Cloud Files placeholders, Dedup and other non-surrogate reparse
+points are the file itself (`FileAttributeTagInfo`); only the final component is no-follow;
+named streams are listed through the same handle (`FileStreamInfo`). When the token holds SeSecurityPrivilege it is enabled for the call on an
+impersonated duplicate of the process token, so elevated users still capture the audit SACL. Without
+the privilege the scope narrows to OWNER|GROUP|DACL|LABEL before OWNER|GROUP|DACL,
+so a low-integrity label is captured and copied instead of dropped. The descriptor is
+canonical and bound to the scope captured; copies set explicit DACL protection, SACL
+protection only with the SACL, and are verified on target and source in that scope.
+No PowerShell process is started for access metadata outside tests. The calls are
+synchronous file-system calls without a process deadline; every caller runs on a
+background worker (staging via `spawn_mutation`, standalone via `standalone::submit`)
+and inherits the OS I/O timeouts. The helper remains the reference: the native tests
+check byte-identical snapshots within the helper's scope for inherited, granted, denied,
+labelled and protected (under a widening parent) files, equal copies, a kept label, and
+refusal of named streams and junctions. File symbolic links are checked only where they
+can be created unprivileged; FAT/exFAT volumes need administrator rights to mount and are
+not covered. The 20-second bounds are unchanged.

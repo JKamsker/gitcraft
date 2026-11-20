@@ -282,3 +282,17 @@ interaction-standalone-helper-source-policy-changed = Die Zugriffsrichtlinie der
 interaction-standalone-helper-failure = Die begrenzten Windows-Zugriffsmetadaten konnten nicht erhalten werden: { $detail }
 
 interaction-standalone-helper-native-policy = Die vollständige Windows-Zugriffsrichtlinie ist nicht verfügbar (nativer Fehler { NUMBER($code, useGrouping: "false") }); der Zugriff auf SACL/Auditdaten erfordert möglicherweise SeSecurityPrivilege. Das Original muss unverändert bleiben.
+
+# In-process policy protocol (#211): specific native failures.
+
+interaction-standalone-policy-reparse-point = Der Pfad ist eine Verknüpfung, ein Verbindungspunkt oder ein anderer Analysepunkt; seiner Zugriffsrichtlinie wird nicht gefolgt. Das Original ist unverändert.
+
+interaction-standalone-policy-access-denied = Der Zugriff auf die Sicherheitsinformationen der Datei wurde verweigert (nativer Fehler { NUMBER($code, useGrouping: "false") }). Das Original ist unverändert.
+
+interaction-standalone-policy-in-use = Die Datei wird von einem anderen Programm verwendet (nativer Fehler { NUMBER($code, useGrouping: "false") }). Das Original ist unverändert.
+
+interaction-standalone-policy-invalid-owner = Der Besitzer des Originals kann der Ersatzdatei nicht ohne das Recht zugewiesen werden, diesen Besitzer zuzuweisen (nativer Fehler { NUMBER($code, useGrouping: "false") }). Das Original ist unverändert.
+
+interaction-standalone-policy-native = Windows konnte die Zugriffsrichtlinie der Datei nicht lesen oder anwenden (nativer Fehler { NUMBER($code, useGrouping: "false") }). Das Original ist unverändert.
+
+interaction-standalone-policy-streams = Die Datenströme der Datei konnten nicht aufgelistet werden (nativer Fehler { NUMBER($code, useGrouping: "false") }). Das Original ist unverändert.

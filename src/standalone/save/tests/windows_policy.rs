@@ -95,6 +95,18 @@ fn native_windows_label_and_audit_only_drift_are_refused_and_full_copy_is_equal(
         return Err("Absolute SystemRoot required".into());
     }
     let temp = crate::git::file_comparison::Scratch::new()?;
+    // Meaningful only elevated: the audit SACL must be in scope, or audit drift is invisible.
+    let probe = temp.0.join("probe");
+    write(&probe, b"probe")?;
+    let scope = super::super::windows_metadata::snapshot(&probe)?
+        .first_chunk::<4>()
+        .map(|b| u32::from_le_bytes(*b))
+        .ok_or("empty snapshot")?;
+    if scope & 0x8 == 0 {
+        return Err(format!(
+            "scope {scope:#x} lacks the SACL: run elevated, with SeSecurityPrivilege held"
+        ));
+    }
     for audit in [false, true] {
         for phase in [
             Phase::BeforeMove,

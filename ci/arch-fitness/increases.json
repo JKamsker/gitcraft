@@ -379,6 +379,14 @@
     "owner": "@JKamsker",
     "remediation": "Reduce coordinator symbol dependencies as dialog composition is decomposed and ratchet the budget."
   },
+  "211-native-windows-file-policy": {
+    "changes": [
+      "budget/os/exported=77"
+    ],
+    "reason": "Issue #211: Windows file access-policy snapshots and copies move from a PowerShell helper (whose 20-second bound timed out in CI staging transactions) into gitcraft-os, which owns the unsafe Win32 calls. gitcraft's standalone::windows_metadata needs exactly four items: PolicyError (to localize failures), file_policy_snapshot and copy_file_policy (production), and file_policy_snapshot_in_scope (comparison with the reviewed PowerShell reference in tests). The descriptor, stream and reparse-tag parsers stay crate-private.",
+    "owner": "@JKamsker",
+    "remediation": "Narrow the pre-existing unused os exports the checker lists (for example BUNDLE_*_BYTES, file_identity, retire_private_receipt), or fold file_policy_snapshot_in_scope into a test-support feature, then ratchet the budget."
+  },
   "173-diff-coverage-gutter-diff-types": {
     "changes": [
       "budget/diff/exported=137"
