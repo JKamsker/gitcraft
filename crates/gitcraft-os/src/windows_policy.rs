@@ -7,8 +7,8 @@
 //! unprivileged read keeps the mandatory integrity label instead of dropping it.
 //!
 //! Scope: OWNER|GROUP|DACL|SACL|LABEL|ATTRIBUTE|SCOPE|PROCESS_TRUST_LABEL|ACCESS_FILTER,
-//! with SeSecurityPrivilege enabled on this thread for the call when the token holds it (as
-//! GetNamedSecurityInfo did). Only ERROR_PRIVILEGE_NOT_HELD narrows it, first to
+//! with SeSecurityPrivilege enabled on this thread while a handle is opened for the SACL, when
+//! the token holds it (as GetNamedSecurityInfo did). Only ERROR_PRIVILEGE_NOT_HELD narrows it, first to
 //! OWNER|GROUP|DACL|LABEL, then to OWNER|GROUP|DACL. A snapshot is the canonical descriptor
 //! bound to the scope captured.
 //!
@@ -80,7 +80,6 @@ fn descriptor_error(error: DescriptorError) -> PolicyError {
 
 /// The policy of the file at `path`, comparable with any other snapshot.
 pub fn file_policy_snapshot(path: &Path) -> Result<Vec<u8>, PolicyError> {
-    let _privilege = privilege::SecurityPrivilege::enable();
     let (file, descriptor) = read_widest(path)?;
     streams::refuse_named(&file)?;
     descriptor.snapshot()
@@ -88,9 +87,6 @@ pub fn file_policy_snapshot(path: &Path) -> Result<Vec<u8>, PolicyError> {
 
 /// The policy in exactly `scope`, never narrowed: for comparison with a reference.
 pub fn file_policy_snapshot_in_scope(path: &Path, scope: u32) -> Result<Vec<u8>, PolicyError> {
-    let _privilege = (scope & SACL_INFORMATION != 0)
-        .then(privilege::SecurityPrivilege::enable)
-        .flatten();
     let file = open(path, read_access(scope))?;
     streams::refuse_named(&file)?;
     Descriptor::read(&file, scope)?.snapshot()
@@ -98,7 +94,6 @@ pub fn file_policy_snapshot_in_scope(path: &Path, scope: u32) -> Result<Vec<u8>,
 
 /// Apply the policy of `source` to `target`, then verify both through their handles.
 pub fn copy_file_policy(source: &Path, target: &Path) -> Result<(), PolicyError> {
-    let _privilege = privilege::SecurityPrivilege::enable();
     let (source, descriptor) = read_widest(source)?;
     streams::refuse_named(&source)?;
     let before = descriptor.snapshot()?;
@@ -167,12 +162,18 @@ fn open(path: &Path, access: u32) -> Result<File, PolicyError> {
     if path.as_os_str().encode_wide().any(|unit| unit == 0) {
         return Err(PolicyError::Native(INVALID_NAME));
     }
-    let file = std::fs::OpenOptions::new()
+    // ACCESS_SYSTEM_SECURITY is checked at open; the handle keeps it, so the privilege is
+    // enabled for this open alone (no wider than GetNamedSecurityInfo's own window).
+    let privilege = (access & ACCESS_SYSTEM_SECURITY != 0)
+        .then(privilege::SecurityPrivilege::enable)
+        .flatten();
+    let opened = std::fs::OpenOptions::new()
         .access_mode(access)
         .share_mode(SHARE_ALL)
         .custom_flags(NO_FOLLOW)
-        .open(path)
-        .map_err(native)?;
+        .open(path);
+    drop(privilege);
+    let file = opened.map_err(native)?;
     // Only a name surrogate (link, junction) stands for another object; a Cloud Files
     // placeholder or Dedup file is the file itself.
     let (attributes, tag) = streams::attribute_tag(&file)?;

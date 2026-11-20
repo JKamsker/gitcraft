@@ -1,12 +1,16 @@
-//! SeSecurityPrivilege, enabled only for one policy call and only on this thread.
+//! SeSecurityPrivilege, enabled only while one handle is opened, and only on this thread.
 //!
 //! Opening a handle with ACCESS_SYSTEM_SECURITY needs the privilege *enabled*; an elevated
-//! token holds it disabled. Rather than change the process token, this thread impersonates
-//! an enabled duplicate of it for the guard's lifetime and then reverts to self. A token that
-//! does not hold the privilege (ERROR_NOT_ALL_ASSIGNED) yields no guard, and the caller's
-//! scope narrows as before. A thread that already impersonates is left untouched.
+//! token holds it disabled. The access check happens at open: the handle keeps its granted
+//! access, so later GetSecurityInfo/SetSecurityInfo calls on it need no privilege. Rather than
+//! change the process token, this thread impersonates an enabled duplicate of it for the
+//! guard's lifetime and then reverts to self. A token that does not hold the privilege
+//! (ERROR_NOT_ALL_ASSIGNED) yields no guard, and the caller's scope narrows as before. A thread
+//! that already impersonates, or whose impersonation cannot be inspected, is left untouched.
 use std::marker::PhantomData;
-use windows::Win32::Foundation::{CloseHandle, ERROR_NOT_ALL_ASSIGNED, GetLastError, HANDLE, LUID};
+use windows::Win32::Foundation::{
+    CloseHandle, ERROR_NO_TOKEN, ERROR_NOT_ALL_ASSIGNED, GetLastError, HANDLE, LUID, WIN32_ERROR,
+};
 use windows::Win32::Security::{
     AdjustTokenPrivileges, DuplicateTokenEx, LUID_AND_ATTRIBUTES, LookupPrivilegeValueW,
     SE_PRIVILEGE_ENABLED, SecurityImpersonation, TOKEN_ADJUST_PRIVILEGES, TOKEN_DUPLICATE,
@@ -37,13 +41,16 @@ impl Drop for Token {
 impl SecurityPrivilege {
     pub(super) fn enable() -> Option<Self> {
         let mut current = HANDLE::default();
-        // SAFETY: the pseudo-handle of this thread and a live out pointer. Success means the
-        // thread already impersonates; leave that identity alone.
-        if unsafe { OpenThreadToken(GetCurrentThread(), TOKEN_QUERY, true, &raw mut current) }
-            .is_ok()
-        {
-            drop(Token(current));
-            return None;
+        // SAFETY: the pseudo-handle of this thread and a live out pointer. Only ERROR_NO_TOKEN
+        // means the thread does not impersonate. Success, or any other failure (such as an
+        // identification token that refuses TOKEN_QUERY), leaves that identity alone.
+        match unsafe { OpenThreadToken(GetCurrentThread(), TOKEN_QUERY, true, &raw mut current) } {
+            Ok(()) => {
+                drop(Token(current));
+                return None;
+            }
+            Err(e) if WIN32_ERROR::from_error(&e) == Some(ERROR_NO_TOKEN) => {}
+            Err(_) => return None,
         }
         let mut process = HANDLE::default();
         // SAFETY: the pseudo-handle of this process and a live out pointer.
@@ -83,13 +90,15 @@ impl SecurityPrivilege {
         };
         // SAFETY: the private duplicate (TOKEN_ADJUST_PRIVILEGES) and an initialized,
         // single-entry structure; no previous state is requested.
-        unsafe {
+        let adjusted = unsafe {
             AdjustTokenPrivileges(duplicate.0, false, Some(&raw const enabled), 0, None, None)
-        }
-        .ok()?;
-        // Success still reports ERROR_NOT_ALL_ASSIGNED when the token lacks the privilege.
+        };
+        // Success still reports ERROR_NOT_ALL_ASSIGNED when the token lacks the privilege, so
+        // read the last error immediately, before anything else can change it.
         // SAFETY: reads this thread's last-error value, set by the call just above.
-        if unsafe { GetLastError() } == ERROR_NOT_ALL_ASSIGNED {
+        let last = unsafe { GetLastError() };
+        adjusted.ok()?;
+        if last == ERROR_NOT_ALL_ASSIGNED {
             return None;
         }
         // SAFETY: impersonate the private duplicate on this thread only (None = current).
