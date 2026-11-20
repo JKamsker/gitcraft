@@ -343,7 +343,7 @@ impl RepoTab {
             Msg::CiRuns(request, result) => self.ci_runs_arrived(request, result, ctx),
             Msg::CiJobs(request, run, result) => self.ci_jobs_arrived(request, run, result, ctx),
             Msg::CiLog(request, result) => self.ci_log_arrived(request, result),
-            Msg::CiActed(label, result) => self.ci_acted(label, result),
+            Msg::CiActed(request, label, result) => self.ci_acted(request, label, result),
             Msg::OpDone {
                 label,
                 result,

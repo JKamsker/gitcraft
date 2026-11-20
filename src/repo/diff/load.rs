@@ -184,6 +184,7 @@ pub(super) fn prepare(
         binary,
         textconv,
         notebook,
+        file_meta: file_meta::read(text),
         header,
         partial,
         revertable,

@@ -55,8 +55,8 @@ pub(crate) struct CiView {
     next: Option<Instant>,
     /// It was seen running: once it has finished, the dots are read again.
     was_running: bool,
-    /// Re-running or cancelling is under way.
-    acting: bool,
+    /// The re-run or cancel under way, by request: only its own answer releases the buttons.
+    acting: Option<u64>,
 }
 
 /// Runs retain their owning project; IDs can overlap between GitLab projects.
@@ -150,7 +150,7 @@ impl RepoTab {
             log_request: 0,
             next: None,
             was_running: false,
-            acting: false,
+            acting: None,
         });
         self.load_ci_view(ctx);
     }
@@ -289,14 +289,16 @@ impl RepoTab {
         }
     }
 
-    /// A re-run or a cancel went through, or didn't.
-    pub(super) fn ci_acted(&mut self, label: String, result: Result<(), String>) {
+    /// A re-run or a cancel went through, or didn't. What came of it is said either way; the
+    /// view is released (and read again) only by the answer of its own `request`, not by one
+    /// pressed in a view since replaced.
+    pub(super) fn ci_acted(&mut self, request: u64, label: String, result: Result<(), String>) {
         self.status = Some(crate::repo::Notice::plain(match result {
             Ok(()) => (label, false),
             Err(e) => (format!("{label}: {e}"), true),
         }));
-        if let Some(view) = &mut self.ci_view {
-            view.acting = false;
+        if let Some(view) = self.ci_view.as_mut().filter(|v| v.acting == Some(request)) {
+            view.acting = None;
             view.next = Some(Instant::now() + AFTER_ACTING);
         }
     }
@@ -339,10 +341,11 @@ impl RepoTab {
                 let (Some(project), Some(run)) = (project, view.shown_run().cloned()) else {
                     return;
                 };
-                if view.acting {
+                if view.acting.is_some() {
                     return;
                 }
-                view.acting = true;
+                let request = next_request();
+                view.acting = Some(request);
                 let rerun = matches!(act, CiAct::RerunFailed);
                 let path = self.path.clone();
                 spawn(&self.forge_sender(), ctx, move || {
@@ -365,7 +368,7 @@ impl RepoTab {
                             ci::cancel(&path, &project, run.id),
                         )
                     };
-                    Msg::CiActed(label, result)
+                    Msg::CiActed(request, label, result)
                 });
             }
             CiAct::ToggleLog => {
@@ -392,3 +395,6 @@ impl RepoTab {
 
 #[cfg(test)]
 mod tests;
+
+#[cfg(test)]
+mod act_tests;

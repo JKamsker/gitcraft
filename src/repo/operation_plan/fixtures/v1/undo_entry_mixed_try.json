@@ -1,0 +1,1 @@
+{"label":"Start work on #42","undo":[["checkout","main","--"]],"redo":[["\u0000expect","HEAD","a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1"],["\u0000try","couldn't fetch origin, so it starts from origin/main as last fetched","fetch","origin","main"],["checkout","-b","42-fix","--no-track","origin/main","--"],["config","branch.42-fix.gitcraft-issue","42"]],"heads":null}

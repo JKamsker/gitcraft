@@ -7,7 +7,8 @@ import unittest
 
 sys.path.insert(0, str(Path(__file__).parent))
 import check  # noqa: E402
-from test_workflow_gates import CLIPPY_CHECK, COMPLEXITY_CHECK, SIZE_CHECK, TOOLING_CHECK  # noqa: E402
+from test_workflow_gates import (CLIPPY_CHECK, COMPLEXITY_CHECK, GRAMMAR_CHECK, PLAN_CHECK,  # noqa: E402
+                                 SIZE_CHECK, TOOLING_CHECK)
 
 WORKFLOWS = Path(__file__).resolve().parents[1] / ".github/workflows"
 
@@ -20,10 +21,12 @@ def normalized(command):
 class PrePushTests(unittest.TestCase):
     def test_the_gates_are_the_commands_ci_requires(self):
         ci = [normalized(command) for command in
-              ("cargo fmt --check", TOOLING_CHECK, SIZE_CHECK, COMPLEXITY_CHECK, CLIPPY_CHECK)]
+              ("cargo fmt --check", TOOLING_CHECK, SIZE_CHECK, COMPLEXITY_CHECK, PLAN_CHECK, GRAMMAR_CHECK,
+               CLIPPY_CHECK)]
         self.assertEqual([normalized(command) for _, command in check.GATES], ci)
         workflows = "".join(path.read_text(encoding="utf-8") for path in WORKFLOWS.glob("*.yml"))
-        for command in ("cargo fmt --check", TOOLING_CHECK, SIZE_CHECK, COMPLEXITY_CHECK, CLIPPY_CHECK):
+        for command in ("cargo fmt --check", TOOLING_CHECK, SIZE_CHECK, COMPLEXITY_CHECK, PLAN_CHECK, GRAMMAR_CHECK,
+                        CLIPPY_CHECK):
             self.assertIn(f"run: {command}\n", workflows)
 
     def test_focused_full_and_default_plans(self):
@@ -39,6 +42,9 @@ class PrePushTests(unittest.TestCase):
         self.assertEqual(check.low_priority(["python3", "x.py"]), (["python3", "x.py"], {}))
         command, extra = check.low_priority(["python3", "ci/clippy_packages.py"])
         self.assertTrue(command[:3] == ["nice", "-n", "19"] or extra.get("creationflags") == 0x40)
+        for checker in (check.PLAN_CHECKER, check.GRAMMAR_CHECKER):
+            command, extra = check.low_priority(["python3", checker])
+            self.assertTrue(command[:3] == ["nice", "-n", "19"] or extra.get("creationflags") == 0x40)
 
     def test_dry_run_prints_without_running(self):
         self.assertEqual(check.main(["--dry-run", "--test", "x"]), 0)

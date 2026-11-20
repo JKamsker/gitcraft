@@ -343,7 +343,7 @@ fn run_actions(ui: &mut Ui, view: &CiView, run: &Run, jobs: &[Job], acts: &mut V
         if (failed || run.state == CheckState::Failed) && !running {
             let rerun = ui
                 .add_enabled(
-                    !view.acting,
+                    view.acting.is_none(),
                     egui::Button::new(crate::i18n::text(
                         "repo-workflows-ci_view-run-actions-8c40a11a",
                     )),
@@ -358,7 +358,7 @@ fn run_actions(ui: &mut Ui, view: &CiView, run: &Run, jobs: &[Job], acts: &mut V
         if running
             && ui
                 .add_enabled(
-                    !view.acting,
+                    view.acting.is_none(),
                     egui::Button::new(crate::i18n::text(
                         "repo-workflows-ci_view-run-actions-19766ed6",
                     )),
@@ -377,7 +377,7 @@ fn run_actions(ui: &mut Ui, view: &CiView, run: &Run, jobs: &[Job], acts: &mut V
                 acts.push(Action::Ci(CiAct::ToggleLog));
             }
         }
-        if view.acting {
+        if view.acting.is_some() {
             ui.add(crate::spinner::Spinner::new());
         }
     });
