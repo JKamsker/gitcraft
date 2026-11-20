@@ -8,7 +8,7 @@
 const NAME_AT: usize = 24;
 
 /// Whether the records name only the unnamed data stream. Malformed records are `None`.
-pub fn only_unnamed_data(records: &[u8]) -> Option<bool> {
+pub(crate) fn only_unnamed_data(records: &[u8]) -> Option<bool> {
     let mut at = 0usize;
     loop {
         let record = records.get(at..)?;

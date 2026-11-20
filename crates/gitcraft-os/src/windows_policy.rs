@@ -47,7 +47,7 @@ const SHARE_ALL: u32 = 0x1 | 0x2 | 0x4;
 const NO_FOLLOW: u32 = 0x0200_0000 | 0x0020_0000;
 
 /// `ERROR_PRIVILEGE_NOT_HELD`.
-pub const PRIVILEGE_NOT_HELD: u32 = 1314;
+const PRIVILEGE_NOT_HELD: u32 = 1314;
 /// `ERROR_INVALID_NAME`, for a path with an embedded NUL.
 const INVALID_NAME: u32 = 123;
 
@@ -71,12 +71,10 @@ pub enum PolicyError {
     SourceChanged,
 }
 
-impl From<DescriptorError> for PolicyError {
-    fn from(error: DescriptorError) -> Self {
-        match error {
-            DescriptorError::TooLarge => Self::TooLarge,
-            DescriptorError::Malformed => Self::Malformed,
-        }
+fn descriptor_error(error: DescriptorError) -> PolicyError {
+    match error {
+        DescriptorError::TooLarge => PolicyError::TooLarge,
+        DescriptorError::Malformed => PolicyError::Malformed,
     }
 }
 
@@ -105,7 +103,8 @@ pub fn copy_file_policy(source: &Path, target: &Path) -> Result<(), PolicyError>
     streams::refuse_named(&source)?;
     let before = descriptor.snapshot()?;
     let scope = descriptor.info;
-    let (_, control) = security_descriptor::canonical(descriptor.bytes()?)?;
+    let (_, control) =
+        security_descriptor::canonical(descriptor.bytes()?).map_err(descriptor_error)?;
     let mut protection = if control & DACL_PROTECTED != 0 {
         0x8000_0000
     } else {
@@ -239,10 +238,7 @@ impl Descriptor {
         Ok(unsafe { std::slice::from_raw_parts(self.descriptor.0.cast::<u8>(), len) })
     }
     fn snapshot(&self) -> Result<Vec<u8>, PolicyError> {
-        Ok(security_descriptor::snapshot_bytes(
-            self.info,
-            self.bytes()?,
-        )?)
+        security_descriptor::snapshot_bytes(self.info, self.bytes()?).map_err(descriptor_error)
     }
     /// The SACL argument carries the label too, so it is passed for either; never otherwise.
     fn apply(&self, target: &File, info: u32) -> Result<(), PolicyError> {

@@ -69,8 +69,9 @@ fn native_cause(code: u32, coded: impl Fn(&'static str, u32) -> String) -> Strin
     const ACCESS_DENIED: u32 = 5;
     const SHARING_VIOLATION: u32 = 32;
     const INVALID_OWNER: u32 = 1307;
+    const PRIVILEGE_NOT_HELD: u32 = 1314;
     let id = match code {
-        gitcraft_os::PRIVILEGE_NOT_HELD => "interaction-standalone-helper-native-policy",
+        PRIVILEGE_NOT_HELD => "interaction-standalone-helper-native-policy",
         ACCESS_DENIED => "interaction-standalone-policy-access-denied",
         SHARING_VIOLATION => "interaction-standalone-policy-in-use",
         INVALID_OWNER => "interaction-standalone-policy-invalid-owner",

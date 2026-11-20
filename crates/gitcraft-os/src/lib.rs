@@ -47,13 +47,10 @@ mod security_descriptor;
 #[cfg(any(windows, test))]
 mod stream_info;
 #[cfg(windows)]
-pub use security_descriptor::{DESCRIPTOR_LIMIT, DescriptorError};
-#[cfg(windows)]
 mod windows_policy;
 #[cfg(windows)]
 pub use windows_policy::{
-    PRIVILEGE_NOT_HELD, PolicyError, copy_file_policy, file_policy_snapshot,
-    file_policy_snapshot_in_scope,
+    PolicyError, copy_file_policy, file_policy_snapshot, file_policy_snapshot_in_scope,
 };
 mod bounded_input;
 pub use bounded_input::BoundedInput;

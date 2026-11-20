@@ -8,7 +8,7 @@
 #![cfg_attr(not(windows), allow(dead_code))]
 
 /// Longest descriptor a snapshot accepts.
-pub const DESCRIPTOR_LIMIT: usize = 1024 * 1024;
+pub(crate) const DESCRIPTOR_LIMIT: usize = 1024 * 1024;
 
 const HEADER: usize = 20;
 const SELF_RELATIVE: u16 = 0x8000;
@@ -20,7 +20,7 @@ pub(crate) const DACL_PROTECTED: u16 = 0x1000;
 pub(crate) const SACL_PROTECTED: u16 = 0x2000;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum DescriptorError {
+pub(crate) enum DescriptorError {
     /// Empty or over [`DESCRIPTOR_LIMIT`].
     TooLarge,
     /// Not a well-formed self-relative descriptor.
@@ -28,7 +28,7 @@ pub enum DescriptorError {
 }
 
 /// The canonical descriptor and its control flags (inheritance status cleared).
-pub fn canonical(raw: &[u8]) -> Result<(Vec<u8>, u16), DescriptorError> {
+pub(crate) fn canonical(raw: &[u8]) -> Result<(Vec<u8>, u16), DescriptorError> {
     if raw.is_empty() || raw.len() > DESCRIPTOR_LIMIT {
         return Err(DescriptorError::TooLarge);
     }
@@ -59,7 +59,7 @@ pub fn canonical(raw: &[u8]) -> Result<(Vec<u8>, u16), DescriptorError> {
 
 /// What a policy snapshot holds: the captured scope, then the canonical descriptor. An
 /// omitted SACL is thereby never equal to an empty one.
-pub fn snapshot_bytes(info: u32, raw: &[u8]) -> Result<Vec<u8>, DescriptorError> {
+pub(crate) fn snapshot_bytes(info: u32, raw: &[u8]) -> Result<Vec<u8>, DescriptorError> {
     let (canonical, _) = canonical(raw)?;
     let mut snapshot = info.to_le_bytes().to_vec();
     snapshot.extend_from_slice(&canonical);
