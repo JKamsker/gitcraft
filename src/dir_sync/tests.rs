@@ -51,18 +51,40 @@ fn missing_directory_is_an_error_not_a_silent_success() -> io::Result<()> {
         .err()
         .ok_or_else(|| io::Error::other("flushed nothing"))?;
     assert_eq!(error.kind(), io::ErrorKind::NotFound, "{error}");
-    assert!(!cannot_add_entries(&error));
+    assert!(!unopenable_for_flush(&error));
     assert!(!missing.exists(), "a flush never creates its directory");
     Ok(())
 }
 
 #[test]
-fn only_windows_access_denial_means_no_entries_could_be_added() {
+fn only_windows_denial_or_sharing_violation_means_unopenable_for_flush() {
     let denied = io::Error::from(io::ErrorKind::PermissionDenied);
-    assert_eq!(cannot_add_entries(&denied), cfg!(windows));
+    assert_eq!(unopenable_for_flush(&denied), cfg!(windows));
+    // ERROR_SHARING_VIOLATION on Windows (EPIPE on Unix, never skipped there).
+    let shared = io::Error::from_raw_os_error(32);
+    assert_eq!(unopenable_for_flush(&shared), cfg!(windows));
     for other in [io::ErrorKind::NotFound, io::ErrorKind::Other] {
-        assert!(!cannot_add_entries(&io::Error::from(other)));
+        assert!(!unopenable_for_flush(&io::Error::from(other)));
     }
+}
+
+/// Another process holding a directory without write sharing blocks its flush open.
+#[cfg(windows)]
+#[test]
+fn windows_reports_a_directory_held_without_write_sharing_as_unopenable() -> io::Result<()> {
+    use std::os::windows::fs::OpenOptionsExt;
+    let fixture = Fixture::new("held")?;
+    let _holder = std::fs::OpenOptions::new()
+        .read(true)
+        .share_mode(0x1) // FILE_SHARE_READ only
+        .custom_flags(0x0200_0000)
+        .open(&fixture.0)?;
+    let error = sync(&fixture.0)
+        .err()
+        .ok_or_else(|| io::Error::other("flushed a directory held without write sharing"))?;
+    assert_eq!(error.raw_os_error(), Some(32), "{error}");
+    assert!(unopenable_for_flush(&error));
+    Ok(())
 }
 
 /// The reason for the access request: Windows refuses to flush a read-only directory handle.

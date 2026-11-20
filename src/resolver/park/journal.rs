@@ -107,11 +107,13 @@ pub(super) fn sync_ancestors_of<'a>(
     Ok(())
 }
 
-/// `path` itself must flush. On Windows the climb stops at the first ancestor this process
-/// may not add entries to (e.g. `C:\Users` for a standard user): it cannot have created
-/// anything there, so everything below that it could have created is already flushed.
-/// Unix flushes through read-only descriptors and propagates every failure. A directory in
-/// `done` was flushed already, and so were the ancestors above it.
+/// `path` itself must flush. On Windows the climb stops at the first ancestor that cannot be
+/// opened for flushing: one this process may not add entries to (e.g. `C:\Users` for a
+/// standard user), which it cannot have created anything in, or one another process holds
+/// without write sharing (e.g. `%LOCALAPPDATA%`). Above the archive store such ancestors
+/// predate gitcraft; inside it, a directory gitcraft created is flushed again by every later
+/// receipt's climb. Unix flushes through read-only descriptors and propagates every
+/// failure. A directory in `done` was flushed already, and so were the ancestors above it.
 fn climb_ancestors(
     path: &Path,
     done: &mut std::collections::BTreeSet<PathBuf>,
@@ -125,7 +127,7 @@ fn climb_ancestors(
         match sync(dir) {
             Ok(()) => {}
             // Not remembered: should it be another call's own `path`, it must flush then.
-            Err(e) if dir != path && crate::dir_sync::cannot_add_entries(&e) => break,
+            Err(e) if dir != path && crate::dir_sync::unopenable_for_flush(&e) => break,
             Err(e) => return Err(format!("sync {}: {e}", dir.display())),
         }
         done.insert(dir.to_path_buf());

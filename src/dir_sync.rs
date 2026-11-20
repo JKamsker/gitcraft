@@ -22,11 +22,18 @@ pub(crate) fn sync(dir: &Path) -> io::Result<()> {
     open(dir)?.sync_all()
 }
 
-/// Whether `error` (from [`sync`]) means this process may not add entries to that directory
-/// at all, so it cannot have created or renamed anything in it either (Windows only: on Unix
-/// a directory is flushed through a read-only descriptor, and every error is a real failure).
-pub(crate) fn cannot_add_entries(error: &io::Error) -> bool {
-    cfg!(windows) && error.kind() == io::ErrorKind::PermissionDenied
+/// Whether `error` (from [`sync`]) means only that this process cannot open that directory
+/// for flushing, on Windows: it may not add entries there at all (`ERROR_ACCESS_DENIED`, so
+/// it cannot have created or renamed anything in it either), or another process holds the
+/// directory open without `FILE_SHARE_WRITE` (`ERROR_SHARING_VIOLATION`, seen on
+/// `%LOCALAPPDATA%`). Never on Unix: a directory is flushed through a read-only
+/// descriptor there, and every error is a real failure.
+pub(crate) fn unopenable_for_flush(error: &io::Error) -> bool {
+    /// `ERROR_SHARING_VIOLATION`.
+    const SHARING_VIOLATION: i32 = 32;
+    cfg!(windows)
+        && (error.kind() == io::ErrorKind::PermissionDenied
+            || error.raw_os_error() == Some(SHARING_VIOLATION))
 }
 
 #[cfg(unix)]

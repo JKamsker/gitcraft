@@ -20,7 +20,7 @@ slice.
 | `record(dir, phase)` | `journal/receipts.rs` | Reads every receipt first (`latest`), creates `journal-v1/` if needed, `sync_ancestors(journal-v1)`, then `atomic_write(journal-v1/<n:08>.json)`. Receipts are append-only. |
 | `latest(dir)` | `journal/receipts.rs` | Reads receipts in name order. Only `*.json` counts, so a `.pending` temp file is never a receipt. A torn **final** version-1 receipt is copied to `.torn` and replaced with `Uncertain`. Any other unreadable receipt, or an unknown version, is an error. |
 | `sync_dir(dir)` | `journal.rs` → `crate::dir_sync::sync` | Flushes a directory's entries. Unix: `fsync` on a read-only fd. Windows (since this slice): `FlushFileBuffers` on a directory handle opened with `FILE_FLAG_BACKUP_SEMANTICS` and `FILE_ADD_FILE` access, or `FILE_ADD_SUBDIRECTORY` if that is denied. Before this slice it did nothing on Windows. |
-| `sync_ancestors(path)` | `journal.rs` | `sync_dir` on `path` and then each parent up to the filesystem root. Boundary `directory-synced` after each one. On Windows the climb stops at the first ancestor (never `path` itself) that denies both entry-adding rights, because this process cannot have created anything in it. |
+| `sync_ancestors(path)` | `journal.rs` | `sync_dir` on `path` and then each parent up to the filesystem root. Boundary `directory-synced` after each one. On Windows the climb stops at the first ancestor (never `path` itself) that cannot be opened for flushing. One reason is access denied for both entry-adding rights, which means this process cannot have created anything there. The other is `ERROR_SHARING_VIOLATION`: another process holds the directory without `FILE_SHARE_WRITE`. This was observed on `%LOCALAPPDATA%` during a harness run. **[gap G8]** If that ancestor is one gitcraft created (`gitcraft/`, `parked/`, `parked-recovery/<id>/`), its entry waits for the next receipt's climb. |
 | `sync_existing` / `sync_file` | `journal.rs` | Opens an existing file without truncating it (write access on Windows, because `FlushFileBuffers` needs it) and calls `sync_all`. |
 | `sync_tree(dir)` | `journal.rs` | Flushes every regular file under `dir` unless `durability::proven` shows it is already flushed and unchanged. Then `sync_dir` on every directory, children before parents. Errors on a non-regular entry. |
 | `durability::copy` | `durability.rs` | `fs::copy` to a new owned output, `sync_all` (on Windows through a writable handle, after clearing and then restoring the output's READONLY bit), then `remember`: a content, identity and mtime stamp written with `atomic_write` under `durable-v1/`, plus `sync_ancestors`. |
@@ -216,7 +216,14 @@ restart.
   with `FILE_ADD_FILE` or `FILE_ADD_SUBDIRECTORY` access. With read-only access it fails
   with `ERROR_ACCESS_DENIED` (`dir_sync/tests.rs`). Standard users get `ERROR_ACCESS_DENIED`
   when opening `C:\Users` or `C:\Windows` for those rights. `C:\` grants only
-  `FILE_ADD_SUBDIRECTORY`. **[believed, not proven]** A directory flush writes out the
+  `FILE_ADD_SUBDIRECTORY`. Opening a directory for flushing requests write-class access, so
+  it conflicts with any other handle on that directory that lacks `FILE_SHARE_WRITE`. Before
+  ancestor climbs tolerated this (see `sync_ancestors`), 3 of 6 full recording-harness runs
+  on this machine failed. The 2 runs whose logs were kept show that some other process held
+  `C:\Users\Jonas\AppData\Local` that way, and the opens failed with
+  `ERROR_SHARING_VIOLATION`. The
+  directory being flushed is never skipped. When another process holds it that way, the
+  operation fails and keeps the archive. **[believed, not proven]** A directory flush writes out the
   directory's index and the NTFS log up to the rename's records. This is the guarantee
   that renames depend on. **Rename write-through:** `MOVEFILE_WRITE_THROUGH` affects only a
   move done as copy-and-delete (across volumes), per Microsoft's `MoveFileExW`

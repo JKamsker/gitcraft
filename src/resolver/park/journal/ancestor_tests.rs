@@ -54,6 +54,30 @@ fn an_ancestor_without_entry_rights_ends_the_climb_only_on_windows() {
 }
 
 #[test]
+fn an_ancestor_held_without_write_sharing_ends_the_climb_only_on_windows() {
+    let path = deep();
+    let held = Path::new("repo").to_path_buf();
+    let mut seen = Vec::new();
+    let sync = |dir: &Path| {
+        seen.push(dir.to_path_buf());
+        // ERROR_SHARING_VIOLATION, as seen on %LOCALAPPDATA% during the harness run.
+        if dir == held {
+            Err(Error::from_raw_os_error(32))
+        } else {
+            Ok(())
+        }
+    };
+    let result = climb_ancestors(&path, &mut Default::default(), sync);
+    assert_eq!(seen.len(), 4);
+    assert_eq!(result.is_ok(), cfg!(windows), "{result:?}");
+    // The directory itself held is still an error.
+    let result = climb_ancestors(&held, &mut Default::default(), |_| {
+        Err(Error::from_raw_os_error(32))
+    });
+    assert!(result.is_err());
+}
+
+#[test]
 fn any_other_ancestor_failure_is_reported_with_its_path() {
     for kind in [
         ErrorKind::NotFound,
