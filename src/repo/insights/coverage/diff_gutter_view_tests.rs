@@ -4,7 +4,7 @@
 
 use egui_kittest::{Harness, kittest::Queryable};
 
-use crate::repo::diff::coverage::{CoverageAct, Mark, mark_text};
+use crate::repo::diff::coverage::{CoverageAct, Mark};
 use crate::repo::diff::{DiffData, DiffLine, Kind};
 use crate::repo::{Action, DiffKey, DiffView, RepoTab, messages};
 use crate::settings::Settings;
@@ -81,8 +81,17 @@ fn harness(repo: &std::path::Path, hash: &str, split: bool) -> Harness<'static, 
     )
 }
 
+/// How many marks of `mark` the diff shows, by their accessible names.
 fn count(h: &Harness<'_, RepoTab>, mark: Mark) -> usize {
-    h.query_all_by_label(&mark_text(mark)).count()
+    let name = match mark {
+        Mark::Covered(hits) => crate::i18n::message(
+            "diff-coverage-mark-covered",
+            &[("hits", crate::i18n::Value::from(hits))],
+        ),
+        Mark::Uncovered => crate::i18n::text("diff-coverage-mark-uncovered").to_owned(),
+        Mark::Unknown => crate::i18n::text("diff-coverage-mark-unknown").to_owned(),
+    };
+    h.query_all_by_label(&name).count()
 }
 
 #[test]

@@ -11,7 +11,7 @@ use std::sync::Arc;
 use egui::{Rect, RichText, Sense, Stroke, Ui, pos2, vec2};
 
 use super::{DiffData, Kind};
-use crate::repo::{Action, DiffKey, DiffView, RepoTab, widgets};
+use crate::repo::{Action, DiffKey, DiffView, widgets};
 use crate::settings::Settings;
 use crate::theme::Tokens;
 
@@ -84,7 +84,7 @@ impl Overlay {
 
 /// The diffs whose new side a report can be about: not a merge's own resolution, not a
 /// conflict (it has no single new side).
-pub(in crate::repo) fn applies(key: &DiffKey) -> bool {
+pub(super) fn applies(key: &DiffKey) -> bool {
     match key {
         DiffKey::Commit { .. } | DiffKey::Range { .. } => true,
         DiffKey::Work(f) => f.area != crate::git::Area::Conflicted,
@@ -97,28 +97,6 @@ pub(super) fn request(view: &DiffView, data: &DiffData, on: bool, acts: &mut Vec
     if on && applies(&view.key) && view.coverage.asked != Some(data.source) {
         acts.push(Action::DiffCoverage(CoverageAct::Load));
     }
-}
-
-impl RepoTab {
-    /// Turns the coverage marks on or off in every diff.
-    pub(in crate::repo) fn toggle_diff_coverage(&mut self, ctx: &egui::Context) {
-        let mut settings = Settings::get(ctx);
-        settings.diff_coverage = !settings.diff_coverage;
-        settings.set(ctx);
-        if let Some(view) = &mut self.diff {
-            // Read again when next shown: the report may have changed meanwhile.
-            view.coverage = Overlay::default();
-        }
-    }
-}
-
-/// The palette's entry turning the marks on or off.
-pub(in crate::repo) fn palette_item() -> (String, String, Action) {
-    (
-        crate::i18n::text("diff-coverage-toggle").to_owned(),
-        "coverage lcov cobertura gutter tests".to_owned(),
-        Action::DiffCoverage(CoverageAct::Toggle),
-    )
 }
 
 /// The diff header's switch, laid out right to left.
@@ -151,7 +129,7 @@ pub(super) fn mark_of(gutter: &Gutter, data: &DiffData, i: usize) -> Option<Mark
 }
 
 /// What a mark says, in words: its tooltip and accessible name.
-pub(in crate::repo) fn mark_text(mark: Mark) -> String {
+pub(super) fn mark_text(mark: Mark) -> String {
     match mark {
         Mark::Covered(hits) => crate::i18n::message(
             "diff-coverage-mark-covered",
@@ -230,7 +208,7 @@ pub(super) fn banner(ui: &mut Ui, overlay: &Overlay, on: bool) {
 }
 
 /// What the banner says of `g` and its tip; `true` when the marks aren't applied.
-pub(in crate::repo) fn banner_text(g: &Gutter) -> (String, String, bool) {
+fn banner_text(g: &Gutter) -> (String, String, bool) {
     let short = |s: &str| s.chars().take(8).collect::<String>();
     let args = |id: &str, sha: &str| {
         crate::i18n::message(
@@ -257,3 +235,7 @@ pub(in crate::repo) fn banner_text(g: &Gutter) -> (String, String, bool) {
     };
     (args(id, sha), args("diff-coverage-stale-tip", &g.sha), true)
 }
+
+#[cfg(test)]
+#[path = "coverage_tests.rs"]
+mod tests;

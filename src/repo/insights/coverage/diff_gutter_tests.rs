@@ -5,7 +5,7 @@ use super::diff_gutter::{gutter_of, side_of, trust_of};
 use crate::insights::Evidence;
 use crate::insights::coverage::{Format, Found, Freshness, LineCov, LinesCoverage, Side};
 use crate::repo::DiffKey;
-use crate::repo::diff::coverage::{Gutter, Mark, Trust, banner_text};
+use crate::repo::diff::coverage::{Mark, Trust};
 
 const SHA: &str = "0123456789abcdef0123456789abcdef01234567";
 
@@ -101,36 +101,6 @@ fn an_untrusted_report_says_why_and_marks_only_unknown() -> Result<(), String> {
     staged.index_differs = true;
     assert_eq!(trust_of(&staged), Some(Trust::IndexDiffers));
     Ok(())
-}
-
-#[test]
-fn a_report_of_another_revision_gets_a_conspicuous_stale_chip() {
-    let g = Gutter {
-        report: "lcov.info".into(),
-        sha: SHA.into(),
-        trust: Trust::Other("fedcba9876543210".into()),
-        marks: Default::default(),
-    };
-    let (text, tip, warn) = banner_text(&g);
-    assert!(warn);
-    assert!(
-        text.contains("fedcba98") && text.contains("stale"),
-        "{text}"
-    );
-    assert!(
-        tip.contains("01234567") && tip.contains("lcov.info.sha"),
-        "{tip}"
-    );
-    let current = Gutter {
-        trust: Trust::Current,
-        ..g
-    };
-    let (text, _, warn) = banner_text(&current);
-    assert!(!warn);
-    assert!(
-        text.contains("lcov.info") && text.contains("01234567"),
-        "{text}"
-    );
 }
 
 #[test]
