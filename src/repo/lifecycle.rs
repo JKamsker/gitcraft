@@ -193,6 +193,8 @@ impl super::RepoTab {
             repo: super::messages::mutation_key(&self.path),
         };
         self.rx = receiver;
+        // The CI dots' read on its way answered to the channel just dropped.
+        self.ci.answer_lost();
         self.watcher = None;
         self.poller = None;
         self.fs_rx = None;
