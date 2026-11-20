@@ -130,7 +130,7 @@ fn a_failed_poll_of_a_running_build_is_tried_again() {
         log_request: 0,
         next: None,
         was_running: true,
-        acting: false,
+        acting: None,
     });
     tab.ci_runs_arrived(7, Err("timed out".to_owned()), &ctx);
     assert!(tab.ci_view.as_ref().is_some_and(|v| v.next.is_some()));
