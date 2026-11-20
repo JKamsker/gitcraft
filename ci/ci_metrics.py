@@ -366,6 +366,9 @@ def main(argv=None):
         args.record.write_text(json.dumps(data, indent=1) + "\n", encoding="utf-8")
     metrics = compute(data)
     text = markdown(metrics)
+    # The report is Markdown with `→`: write UTF-8 even where the console or a redirect
+    # would otherwise use a legacy code page (cp1252 on a Windows console).
+    sys.stdout.reconfigure(encoding="utf-8")
     sys.stdout.write(text)
     if os.environ.get("GITHUB_STEP_SUMMARY"):
         with open(os.environ["GITHUB_STEP_SUMMARY"], "a", encoding="utf-8") as summary:
