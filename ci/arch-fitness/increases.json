@@ -378,5 +378,29 @@
     "reason": "Issue #173 item 13 adds one coordinator reference: Dialog::FileMetadata holds the owned FileMetaForm. Execution uses the existing UndoableOps action, so the Action enum and apply dispatcher do not grow. No new domain edge or RepoTab mutation is introduced.",
     "owner": "@JKamsker",
     "remediation": "Reduce coordinator symbol dependencies as dialog composition is decomposed and ratchet the budget."
+  },
+  "173-diff-coverage-gutter-diff-types": {
+    "changes": [
+      "budget/diff/exported=137"
+    ],
+    "reason": "Issue #173 item 8 shows coverage in the diff gutter. The diff owns and paints five shared types: CoverageAct (the Action payload), Overlay (DiffView state), Gutter, Mark and Trust. Insights fills Gutter, Mark and Trust from its coverage reading, so diff never depends on insights (that edge would close a cycle with the baselined insights -> diff). Painting, the banner, the header switch and the text helpers stay private to repo::diff::coverage.",
+    "owner": "@JKamsker",
+    "remediation": "When the diff gains a generic gutter-annotation interface, express coverage marks through it and ratchet the budget."
+  },
+  "173-diff-coverage-gutter-insights-api": {
+    "changes": [
+      "budget/insights/exported=340"
+    ],
+    "reason": "Issue #173 item 8 reuses the coverage map's report reading and sidecar judging for the diff gutter instead of forking them: three items in insights::coverage (Side, LinesCoverage, of_lines) read one file's lines for repo::insights. The shared report reading (report.rs) stays pub(super).",
+    "owner": "@JKamsker",
+    "remediation": "Fold of_lines and analyze behind one coverage query type if more callers appear, then ratchet the budget."
+  },
+  "173-diff-coverage-gutter-dispatch": {
+    "changes": [
+      "budget/repo-core/symbols=616"
+    ],
+    "reason": "Issue #173 item 8 adds two coordinator references: Action::DiffCoverage carries diff::coverage::CoverageAct, and DiffView holds diff::coverage::Overlay. apply forwards the action to the insights reader in one arm. No new domain edge and no new RepoTab mutation pair is introduced.",
+    "owner": "@JKamsker",
+    "remediation": "Reduce coordinator symbol dependencies as DiffView state moves behind feature-owned types, then ratchet the budget."
   }
 }

@@ -13,6 +13,11 @@ impl RepoTab {
             Action::DvcPull,
         )];
         items.extend(crate::repo::file_comparison::palette::items());
+        items.push((
+            crate::i18n::text("diff-coverage-toggle").to_owned(),
+            "coverage lcov cobertura gutter tests".to_owned(),
+            Action::DiffCoverage(crate::repo::diff::coverage::CoverageAct::Toggle),
+        ));
         items.extend(crate::repo::push::palette::items(
             ctx,
             self.gerrit.is_some(),
