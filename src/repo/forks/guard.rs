@@ -186,9 +186,6 @@ impl Destination {
     }
 }
 const MARK: &str = "\0fork-destination";
-pub(super) fn is_guard(step: &[String]) -> bool {
-    matches!(step, [mark, _] if mark == MARK || mark == CHECKOUT_MARK)
-}
 /// The fork guard `step` starts with, whatever follows its marker: whether it is a
 /// checkout's (`CHECKOUT_MARK`) rather than a fork action's destination (`MARK`), and the
 /// operands after the marker. A well-formed guard has one, its JSON. `None` for other steps.

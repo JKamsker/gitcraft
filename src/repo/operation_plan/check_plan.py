@@ -32,7 +32,7 @@ constants = "\n".join(constant(expectations, name) for name in
     ["EXPECT", "EXPECT_SYMREF", "EXPECT_TREE", "TRY", "EXPECT_FOLD_SAFE", "EXPECT_FOLD_IGNORED"])
 constants += "\n" + constant((repo_source / "operations.rs").read_text(), "EXPECT_HTTPS_ROUTE")
 fork_source = (repo_source / "forks/guard.rs").read_text()
-fork = "\n".join([constant(fork_source, "MARK"), constant(fork_source, "CHECKOUT_MARK"), function(fork_source, "is_guard"), function(fork_source, "guard_of")])
+fork = "\n".join([constant(fork_source, "MARK"), constant(fork_source, "CHECKOUT_MARK"), function(fork_source, "guard_of")])
 gerrit_source = (repo_source.parent / "gerrit.rs").read_text()
 gerrit = "\n".join(constant(gerrit_source, name) for name in ["AMEND", "CHECK"])
 push_source = (repo_source.parent / "push_preflight.rs").read_text()
