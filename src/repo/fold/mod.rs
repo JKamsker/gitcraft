@@ -87,6 +87,7 @@ impl RepoTab {
             move || git::in_progress(&path),
             move |tab, state, ctx| {
                 tab.busy_op = None;
+                let ok = matches!(state, Ok(None));
                 match state {
                     Ok(None) => tab.run_fold_now(plan, ctx),
                     Ok(Some(state)) => {
@@ -111,6 +112,8 @@ impl RepoTab {
                         )))
                     }
                 }
+                // Once the fold itself started, it holds the slot and this does nothing.
+                tab.busy_op_released(ok, ctx);
             },
         );
     }

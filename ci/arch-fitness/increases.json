@@ -339,6 +339,22 @@
     "owner": "@JKamsker",
     "remediation": "Keep publication and cleanup implementation in owned feature modules; reduce coordinator symbol dependencies as dialog composition is decomposed and ratchet the budget."
   },
+  "205-runtime-dir-sync-115": {
+    "changes": [
+      "budget/runtime/exported=115"
+    ],
+    "reason": "#205: new platform helper gitcraft::dir_sync (std-only directory flush, Windows FlushFileBuffers included) exports sync and unopenable_for_flush, both used by the conflicts domain (resolver parking journal and agent run record) instead of two diverging copies. 113 -> 115.",
+    "owner": "@JKamsker",
+    "remediation": "Narrow the listed exported-but-unused runtime items (diagnostics, network, portable) and ratchet the budget."
+  },
+  "205-runtime-dir-sync-outcomes-117": {
+    "changes": [
+      "budget/runtime/exported=117"
+    ],
+    "reason": "#205 review: gitcraft::dir_sync now returns a typed outcome (Flushed::Done/Unsupported, Failure with open/flush stage) and offers sync_once beside the retrying sync, replacing unopenable_for_flush. Callers in the conflicts domain need the types to skip unsupported filesystems (SMB, 9P) and to tell a failed open from a refused flush. 115 -> 117.",
+    "owner": "@JKamsker",
+    "remediation": "Narrow the listed exported-but-unused runtime items (diagnostics, network, portable) and ratchet the budget."
+  },
   "173-file-metadata-backend-api": {
     "changes": [
       "budget/git/exported=1008"
@@ -362,5 +378,29 @@
     "reason": "Issue #173 item 13 adds one coordinator reference: Dialog::FileMetadata holds the owned FileMetaForm. Execution uses the existing UndoableOps action, so the Action enum and apply dispatcher do not grow. No new domain edge or RepoTab mutation is introduced.",
     "owner": "@JKamsker",
     "remediation": "Reduce coordinator symbol dependencies as dialog composition is decomposed and ratchet the budget."
+  },
+  "173-diff-coverage-gutter-diff-types": {
+    "changes": [
+      "budget/diff/exported=137"
+    ],
+    "reason": "Issue #173 item 8 shows coverage in the diff gutter. The diff owns and paints five shared types: CoverageAct (the Action payload), Overlay (DiffView state), Gutter, Mark and Trust. Insights fills Gutter, Mark and Trust from its coverage reading, so diff never depends on insights (that edge would close a cycle with the baselined insights -> diff). Painting, the banner, the header switch and the text helpers stay private to repo::diff::coverage.",
+    "owner": "@JKamsker",
+    "remediation": "When the diff gains a generic gutter-annotation interface, express coverage marks through it and ratchet the budget."
+  },
+  "173-diff-coverage-gutter-insights-api": {
+    "changes": [
+      "budget/insights/exported=340"
+    ],
+    "reason": "Issue #173 item 8 reuses the coverage map's report reading and sidecar judging for the diff gutter instead of forking them: three items in insights::coverage (Side, LinesCoverage, of_lines) read one file's lines for repo::insights. The shared report reading (report.rs) stays pub(super).",
+    "owner": "@JKamsker",
+    "remediation": "Fold of_lines and analyze behind one coverage query type if more callers appear, then ratchet the budget."
+  },
+  "173-diff-coverage-gutter-dispatch": {
+    "changes": [
+      "budget/repo-core/symbols=616"
+    ],
+    "reason": "Issue #173 item 8 adds two coordinator references: Action::DiffCoverage carries diff::coverage::CoverageAct, and DiffView holds diff::coverage::Overlay. apply forwards the action to the insights reader in one arm. No new domain edge and no new RepoTab mutation pair is introduced.",
+    "owner": "@JKamsker",
+    "remediation": "Reduce coordinator symbol dependencies as DiffView state moves behind feature-owned types, then ratchet the budget."
   }
 }

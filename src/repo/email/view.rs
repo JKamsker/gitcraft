@@ -5,6 +5,7 @@ use super::*;
 impl RepoTab {
     pub(in crate::repo) fn email_window(&mut self, ctx: &egui::Context, acts: &mut Vec<Action>) {
         let state = &mut self.email;
+        let mut released = false;
         if let Some(pending) = &state.pending {
             let stale = pending.context != connections::current();
             if stale {
@@ -15,6 +16,7 @@ impl RepoTab {
                     state.result_presentation = None;
                     state.pending = None;
                     self.busy_op = None;
+                    released = true;
                     state.trust = false;
                     state.confirm = false;
                     if stale {
@@ -61,12 +63,17 @@ impl RepoTab {
                 Err(mpsc::TryRecvError::Disconnected) => {
                     state.pending = None;
                     self.busy_op = None;
+                    released = true;
                     state.remember_result(LocalResult::WorkerEnded);
                 }
                 Err(mpsc::TryRecvError::Empty) => {
                     ctx.request_repaint_after(std::time::Duration::from_millis(100))
                 }
             }
+        }
+        if released {
+            // Its outcome shows in this window, not the status line: what waited runs.
+            self.busy_op_released(true, ctx);
         }
         let state = &mut self.email;
         if !state.open {

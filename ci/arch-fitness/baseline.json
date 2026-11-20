@@ -3833,7 +3833,7 @@
     },
     "diff": {
       "domains": 11,
-      "exported": 132
+      "exported": 137
     },
     "doctor": {
       "domains": 8,
@@ -3857,7 +3857,7 @@
     },
     "insights": {
       "domains": 15,
-      "exported": 337
+      "exported": 340
     },
     "os": {
       "domains": 4,
@@ -3873,7 +3873,7 @@
     },
     "repo-core": {
       "domains": 24,
-      "symbols": 614,
+      "symbols": 616,
       "exported": 179
     },
     "review": {
@@ -3886,7 +3886,7 @@
     },
     "runtime": {
       "domains": 5,
-      "exported": 113
+      "exported": 117
     },
     "settings": {
       "domains": 15,

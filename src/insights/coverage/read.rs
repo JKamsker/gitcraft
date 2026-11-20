@@ -1,27 +1,6 @@
 //! Discover coverage artifacts and assemble coverage for repository changes.
+use super::report::{committed_at, read_report, report_files, report_path};
 use super::*;
-
-/// When the file at `path` was last modified, if that can be told here.
-fn modified(path: &Path) -> Option<i64> {
-    if crate::remote::is_remote(path) {
-        return None;
-    }
-    let time = std::fs::metadata(path).ok()?.modified().ok()?;
-    let secs = time.duration_since(std::time::UNIX_EPOCH).ok()?.as_secs();
-    i64::try_from(secs).ok()
-}
-
-/// Where a report named `name` (relative to the repository, or absolute on the machine the
-/// repository is on) is.
-fn report_path(repo: &Path, name: &str) -> PathBuf {
-    if crate::remote::is_remote(repo) {
-        crate::remote::resolve(repo, name)
-    } else if Path::new(name).is_absolute() {
-        PathBuf::from(name)
-    } else {
-        repo.join(name)
-    }
-}
 
 /// An untracked file to count the lines of: a file here (not a link) no bigger than this.
 const MAX_UNTRACKED_BYTES: u64 = 4 << 20;
@@ -34,6 +13,56 @@ fn readable_untracked(repo: &Path, path: &Path) -> bool {
     }
     std::fs::symlink_metadata(path)
         .is_ok_and(|m| m.file_type().is_file() && m.len() <= MAX_UNTRACKED_BYTES)
+}
+
+/// The working tree's changes against `head`, untracked files (the first [`MAX_UNTRACKED`]
+/// readable ones) as added files; what is left out is said in `partial`.
+pub(super) fn work_tree_files(
+    repo: &Path,
+    head: &str,
+    partial: &mut Vec<String>,
+) -> Result<Vec<git::changed_lines::FileHunks>, String> {
+    let mut files = git::changed_lines::read(repo, head, None, &[])?;
+    let untracked = git::run(
+        Some(repo),
+        &["ls-files", "-z", "--others", "--exclude-standard"],
+    )?;
+    let untracked: Vec<&str> = untracked.split('\0').filter(|p| !p.is_empty()).collect();
+    if untracked.len() > MAX_UNTRACKED {
+        partial.push(format!(
+            "only {MAX_UNTRACKED} of {} untracked files are counted",
+            untracked.len()
+        ));
+    }
+    for path in untracked.into_iter().take(MAX_UNTRACKED) {
+        let at = crate::remote::join(repo, path);
+        if !readable_untracked(repo, &at) {
+            continue;
+        }
+        let Ok(bytes) = crate::remote::read(&at) else {
+            continue;
+        };
+        if bytes.contains(&0) {
+            continue;
+        }
+        let lines = bytes.split(|&b| b == b'\n').count() as u32
+            - u32::from(bytes.ends_with(b"\n") || bytes.is_empty());
+        files.push(git::changed_lines::FileHunks {
+            path: path.to_owned(),
+            added: true,
+            hunks: vec![Hunk {
+                old_start: 0,
+                old_count: 0,
+                new_start: 1,
+                new_count: lines,
+            }]
+            .into_iter()
+            .filter(|h| h.new_count > 0)
+            .collect(),
+            ..Default::default()
+        });
+    }
+    Ok(files)
 }
 
 /// The reports in the conventional places, in order.
@@ -83,46 +112,7 @@ pub fn analyze(repo: &Path, ask: &Ask, chosen: Option<&str>) -> Result<Coverage,
     let (sha, base, label, mut files) = match ask {
         Ask::WorkTree => {
             let head = git::resolve(repo, "HEAD")?;
-            let mut files = git::changed_lines::read(repo, &head, None, &[])?;
-            let untracked = git::run(
-                Some(repo),
-                &["ls-files", "-z", "--others", "--exclude-standard"],
-            )?;
-            let untracked: Vec<&str> = untracked.split('\0').filter(|p| !p.is_empty()).collect();
-            if untracked.len() > MAX_UNTRACKED {
-                partial.push(format!(
-                    "only {MAX_UNTRACKED} of {} untracked files are counted",
-                    untracked.len()
-                ));
-            }
-            for path in untracked.into_iter().take(MAX_UNTRACKED) {
-                let at = crate::remote::join(repo, path);
-                if !readable_untracked(repo, &at) {
-                    continue;
-                }
-                let Ok(bytes) = crate::remote::read(&at) else {
-                    continue;
-                };
-                if bytes.contains(&0) {
-                    continue;
-                }
-                let lines = bytes.split(|&b| b == b'\n').count() as u32
-                    - u32::from(bytes.ends_with(b"\n") || bytes.is_empty());
-                files.push(git::changed_lines::FileHunks {
-                    path: path.to_owned(),
-                    added: true,
-                    hunks: vec![Hunk {
-                        old_start: 0,
-                        old_count: 0,
-                        new_start: 1,
-                        new_count: lines,
-                    }]
-                    .into_iter()
-                    .filter(|h| h.new_count > 0)
-                    .collect(),
-                    ..Default::default()
-                });
-            }
+            let files = work_tree_files(repo, &head, &mut partial)?;
             let short = &head[..head.len().min(8)];
             (
                 head.clone(),
@@ -154,11 +144,7 @@ pub fn analyze(repo: &Path, ask: &Ask, chosen: Option<&str>) -> Result<Coverage,
     let found = find_reports(repo);
     let name = chosen.map(str::to_owned).or_else(|| found.first().cloned());
     // The reports and their `.sha` files aren't the change being looked at.
-    let reports: HashSet<String> = found
-        .iter()
-        .chain(name.iter())
-        .flat_map(|r| [r.clone(), format!("{r}{SIDECAR}")])
-        .collect();
+    let reports = report_files(&found, name.as_ref());
     files.retain(|f| !f.binary && !reports.contains(&f.path));
     if files.len() > MAX_FILES {
         partial.push(format!(
@@ -183,75 +169,19 @@ pub fn analyze(repo: &Path, ask: &Ask, chosen: Option<&str>) -> Result<Coverage,
     let root = git::run(Some(repo), &["rev-parse", "--show-toplevel"])?
         .trim()
         .to_owned();
-    let committed: i64 = git::run(Some(repo), &["log", "-1", "--format=%ct", &sha])?
-        .trim()
-        .parse()
-        .unwrap_or(0);
+    let committed = committed_at(repo, &sha)?;
 
     let mut report = None;
     let mut found_report = None;
     if let Some(name) = &name {
-        let path = report_path(repo, name);
-        let too_big = |len: u64| {
-            format!(
-                "{name} is {} MB, more than the {} MB read",
-                len >> 20,
-                MAX_REPORT >> 20
-            )
-        };
-        if !crate::remote::is_remote(repo)
-            && let Ok(meta) = std::fs::metadata(&path)
-            && meta.len() > MAX_REPORT
-        {
-            return Err(too_big(meta.len()));
-        }
-        let bytes = crate::remote::read(&path).map_err(|e| format!("{name}: {e}"))?;
-        if bytes.len() as u64 > MAX_REPORT {
-            return Err(too_big(bytes.len() as u64));
-        }
-        let parsed =
-            parse(name, &String::from_utf8_lossy(&bytes)).map_err(|e| format!("{name}: {e}"))?;
-        let sidecar = path.with_file_name(format!(
-            "{}{SIDECAR}",
-            path.file_name()
-                .map(|n| n.to_string_lossy().into_owned())
-                .unwrap_or_default()
-        ));
-        let recorded = crate::remote::read_to_string(&sidecar)
-            .ok()
-            .and_then(|t| read_sidecar(&t));
-        let written = modified(&path);
-        let edited_after = if *ask == Ask::WorkTree {
-            written.and_then(|w| {
-                let times: Option<Vec<i64>> = files
-                    .iter()
-                    .filter(|f| !f.deleted)
-                    .map(|f| modified(&repo.join(&f.path)))
-                    .collect();
-                times.map(|t| t.into_iter().any(|m| m > w))
-            })
-        } else {
-            None
-        };
-        let freshness = judge(
-            recorded.as_deref(),
-            ask,
-            &sha,
-            written,
-            committed,
-            edited_after,
-        );
-        found_report = Some(Found {
-            path: name.clone(),
-            format: parsed.format,
-            tests: parsed.tests.clone(),
-            per_test: parsed.per_test(),
-            files: parsed.files.len(),
-            recorded,
-            freshness,
-            written,
-        });
-        report = Some(parsed);
+        let changed: Vec<&str> = files
+            .iter()
+            .filter(|f| !f.deleted)
+            .map(|f| f.path.as_str())
+            .collect();
+        let loaded = read_report(repo, name, ask, &sha, committed, &changed)?;
+        found_report = Some(loaded.found);
+        report = Some(loaded.report);
     }
     let evidence = found_report
         .as_ref()
@@ -259,7 +189,7 @@ pub fn analyze(repo: &Path, ask: &Ask, chosen: Option<&str>) -> Result<Coverage,
     let files = files
         .iter()
         .map(|f| {
-            let mut mapped = map_file(&f.path, &f.hunks, report.as_ref(), &root, evidence);
+            let mut mapped = map_file(&f.path, &f.hunks, report.as_deref(), &root, evidence);
             mapped.added = f.added;
             mapped.deleted = f.deleted;
             mapped

@@ -20,15 +20,9 @@ struct Receipt {
     phase: Phase,
 }
 
-pub(super) fn sync_dir(dir: &Path) -> Result<(), String> {
-    // Windows does not support opening directories through std::fs::File.
-    #[cfg(unix)]
-    std::fs::File::open(dir)
-        .and_then(|f| f.sync_all())
-        .map_err(|e| format!("sync {}: {e}", dir.display()))?;
-    let _ = dir;
-    Ok(())
-}
+#[path = "journal/dirs.rs"]
+mod dirs;
+pub(super) use dirs::{sync_ancestors, sync_ancestors_of, sync_dir};
 
 // FlushFileBuffers requires GENERIC_WRITE on Windows, including for an existing
 // archive or live file. Unix permits fsync on a read-only descriptor. Never create,
@@ -92,17 +86,6 @@ fn sync_subtree(dir: &Path, root: &Path) -> Result<(), String> {
 #[path = "journal/receipts.rs"]
 mod receipts;
 pub(super) use receipts::{atomic_write, latest, record};
-
-/// Persist reachability, including ancestors created by repo_file/reserve.
-pub(super) fn sync_ancestors(path: &Path) -> Result<(), String> {
-    let mut at = Some(path);
-    while let Some(dir) = at {
-        sync_dir(dir)?;
-        super::effects::boundary("directory-synced")?;
-        at = dir.parent();
-    }
-    Ok(())
-}
 
 /// Finish only archive movement after a proven restore. Repeated calls are harmless.
 /// Raw files, original index and metadata are retained even after successful restoration.

@@ -12,6 +12,8 @@ use crate::repo::pull::PullMode;
 use crate::settings::Settings;
 use crate::theme::Tokens;
 
+mod release;
+
 /// The most operations that wait for the running one; more are refused, with why.
 const MAX_WAITING: usize = 3;
 

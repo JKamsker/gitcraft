@@ -8,6 +8,11 @@
 mod presentation;
 use presentation::{controls, details, lane, legend, trust, uncovered};
 
+mod diff_gutter;
+#[cfg(test)]
+mod diff_gutter_tests;
+#[cfg(test)]
+mod diff_gutter_view_tests;
 mod picture;
 mod tables;
 #[cfg(test)]

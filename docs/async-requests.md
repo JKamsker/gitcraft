@@ -118,7 +118,7 @@ stateDiagram-v2
 | Flow | Owner | Witness | Invalidated by | Late or stale reply | Busy and error cleared by | Stops work? |
 | --- | --- | --- | --- | --- | --- | --- |
 | Git operations | `operation_plan::start::RepoTab::run_ops_ex` and the other starters; `RepoTab::{busy_op, running, waiting}` | None on `Msg::OpDone`. `busy_op` admits one operation per tab, and the reply is delivered exactly once (success, panic, rejection and cancellation share one failure slot in `spawn_with`). The audited starters all return early while `busy_op` is set; that this covers every starter is **uncertain**. | — | `operation_plan::completion::RepoTab::op_done` always applies. | `op_done` clears `busy_op`, takes `running`, and runs `after_op`, which starts the next item in `waiting`. | `cancel_op` cancels `OpControl`. A queued job is purged and still delivers `OpDone(Err)`. A running one stops its process. |
-| Forge operations (create PR, stack publish, fork approval) | `forge_operation_sender` (`forge_operation = true`) | `forge_generation` | `bind_forge_selection` (which does not clear `busy_op`) | `handle` drops the continuation, calls `stale_fork_operation_finished`, clears `busy_op` and `op_started`, sets a notice and reloads. Because `busy_op` still belongs to that operation, clearing it is correct. It does not call `after_op` (see [Gaps](#gaps)). | The stale branch in `handle` | No |
+| Forge operations (create PR, stack publish, fork approval) | `forge_operation_sender` (`forge_operation = true`) | `forge_generation` | `bind_forge_selection` (which does not clear `busy_op`) | `handle` drops the continuation, calls `stale_fork_operation_finished`, clears `busy_op`, `op_started` and `running`, sets a notice and reloads. Because `busy_op` still belongs to that operation, clearing it is correct. It then starts what waited for it, or drops it after a cancel or failure (see [Gaps](#gaps), item 3). | The stale branch in `handle` | No |
 
 ## Gaps
 
@@ -145,23 +145,28 @@ These were found while writing this page. They are not fixed here.
    *Reproduce:* open CI for commit A and press Cancel. Before it answers, open CI for
    commit B and press Re-run. A's reply re-enables B's buttons while B's request is still
    running, so a second action can be sent.
-3. **A stale forge operation leaves queued actions stranded.** The stale-operation branch of
-   `RepoTab::handle` (`Msg::ForgeResult` with `operation = true`) clears `busy_op` but does
-   not call `running::RepoTab::after_op`, so actions waiting in `RepoTab::waiting` (queued
-   by `action_preconditions` through `wait_for_running`) do not start until some later
-   operation completes.
-   *Reproduce:* start Create PR and press Fetch, which queues. Before the create finishes,
-   change the primary forge in another tab of the same repository. This tab's own selector is
-   disabled while `forge_change_blocked`, but `sync_forge_selection` rebinds at the start of
-   `poll_as` without that check. A reload whose remotes changed (`take_forge_catalog`) rebinds too. `busy_op` is released, but Fetch does not run until some other operation that calls `after_op` (a background fetch, say) completes. `running` is not cleared either.
-   `forge_selection::tests::late_create_completion_releases_busy_slot_without_running_its_old_continuation`
-   simulates the rebind by calling `take_forge_selection` directly, and asserts only that
-   `busy_op` is released.
-   The same applies outside the stale path. About thirty feature completions set
-   `busy_op = None` directly, among them `forks::approval_result`, `cleanup`, `bisect`,
-   `email`, `devcontainer`, `release` and `resolver`. Only `op_done`, `bundle_done`, push and
-   echo call `after_op`. Whether each of those completions can have a waiter queued behind it
-   was not checked one by one.
+3. **Fixed: a stale forge operation left queued actions stranded.** The stale-operation
+   branch of `RepoTab::handle` (`Msg::ForgeResult` with `operation = true`) now goes through
+   `running::release::RepoTab::stale_forge_operation_ended`. It also clears `running` and calls
+   `running::release::RepoTab::busy_op_released`, which runs `running::RepoTab::after_op` once
+   the slot is free, so what waits in `RepoTab::waiting` starts. As after `op_done`, the
+   waiters are dropped instead (and named in the status) when the operation was cancelled or
+   its `OpDone` reply failed; a fork approval's reply is a continuation, so its outcome is not
+   known and counts as done. When a waiter replaces the status line, the stale operation's
+   notice stays as a toast (`finished`). Like `op_done`, it starts the waiter before its reload
+   lands: Fetch and Pull read what they need from Git when they run, and Push uses the branch
+   checked out, which a forge mutation does not move. `direct_tests/stale_operation_queue.rs` reproduces it: Create PR, Fetch queued, the
+   primary forge changed in another tab of the same repository (and, separately, a remote URL
+   change), and checks that Fetch starts.
+   The feature completions that set `busy_op = None` themselves call `busy_op_released` too,
+   among them `forks::approval_result` (`forks/busy_release_tests.rs`), `cleanup`, `bisect`,
+   `email`, `devcontainer`, `release` and `resolver`. `busy_op_released` does nothing while
+   another operation holds the slot, so a preparation step that went on to start its
+   operation leaves the waiters to that operation's `op_done`. Its `ok` is false only for a
+   failure the status line reports, where the dropped waiters are named.
+   **Remaining:** `fence_view`'s check before an operation leaves waiters queued when it opens
+   its confirmation dialog, so that they do not run ahead of the operation asked first. If the
+   dialog is dismissed, they wait until some later operation ends.
 4. **Fixed in [#264](https://github.com/JKamsker/gitcraft/pull/264): a focus refresh dropped a running commit search and did not restart
    it.** `RepoTab::refresh_on_focus` (and F5 through `refresh`) calls
    `invalidate_repository_context`, which calls `Search::retire`. `run_search` had already

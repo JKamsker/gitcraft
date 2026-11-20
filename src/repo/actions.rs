@@ -1,6 +1,5 @@
 //! What the views ask the tab to do, and the actions several views build.
 
-use crate::repo::terminals::TerminalAct;
 use std::path::PathBuf;
 
 use super::pull::PullMode;
@@ -195,7 +194,7 @@ pub(crate) enum Action {
     OpenTab(PathBuf),
     /// Open a worktree the way the settings say: in this tab, or in its own.
     OpenWorktree(PathBuf),
-    Terminal(TerminalAct),
+    Terminal(super::terminals::TerminalAct),
     /// Pop a view out into its own window, or bring it back.
     Popout(super::popout::Request),
     /// Collapse or bring back the branches panel.
@@ -271,6 +270,7 @@ pub(crate) enum Action {
     DiffDecrypted(bool),
     DiffSvgSource(bool),
     DiffWrap(bool),
+    DiffCoverage(diff::coverage::CoverageAct),
     DiffDecryptedEncoding(super::diff::encrypted::JsonEncoding),
     /// Scroll the diff to the next change (`1`) or the previous one (`-1`).
     DiffStep(i32),

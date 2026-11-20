@@ -145,3 +145,24 @@ suite, both packaging smoke platforms and the conditional forge matrix still run
 before merge. The existing nightly runs the same full contract; release still
 requires `CI result` for its exact commit. Docs-only changes also retain the full
 suite (the `changes` job selects only the forge lane).
+
+## Measuring reliability
+
+`ci/ci_metrics.py` measures a window of merges into `dev` (by default the last
+20; `--since`/`--until` for a date range) from the GitHub API through `gh api`:
+first-attempt pass rate of PR and `dev` push CI runs, re-runs, cancelled ratio,
+same-SHA flaky jobs (failed and passed on the same SHA), time to the first
+actionable failure, post-merge Release reds, per-job duration drift and the last
+known-green `dev` SHA. It prints Markdown, and `--json` writes the metrics.
+
+```sh
+python3 ci/ci_metrics.py                       # the last 20 merges into dev
+python3 ci/ci_metrics.py --logs                # + failing test names of flaky jobs
+python3 ci/ci_metrics.py --record window.json  # keep the API data
+python3 ci/ci_metrics.py --replay window.json  # recompute offline
+```
+
+It reads lists with `per_page=100`, one jobs listing per finished run (none for a
+run cancelled on its first attempt), earlier attempts only for re-run runs, and job
+logs only with `--logs`, only for flaky jobs. `--max-calls` bounds the calls
+(default 1500); it stops when fewer than 200 remain in the rate limit.

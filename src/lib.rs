@@ -15,6 +15,7 @@ pub mod connections;
 mod custom_commands;
 mod desktop_entry;
 mod diagnostics;
+mod dir_sync;
 mod drafts;
 mod drift;
 mod error_card;
