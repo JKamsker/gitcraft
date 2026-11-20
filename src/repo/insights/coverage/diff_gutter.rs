@@ -12,7 +12,6 @@ use crate::insights::coverage::{self as core, LineCov, LinesCoverage, Side};
 use crate::repo::diff::Kind;
 use crate::repo::diff::coverage::{CoverageAct, Gutter, Mark, Overlay, Trust};
 use crate::repo::{DiffKey, RepoTab};
-use crate::settings::Settings;
 
 /// The side of the diff `key` its added lines are numbered on, when a report can be about it.
 pub(super) fn side_of(key: &DiffKey) -> Option<Side> {
@@ -78,15 +77,7 @@ impl RepoTab {
     /// Turns the diff's coverage marks on or off, or reads them for the diff open.
     pub(in crate::repo) fn diff_coverage(&mut self, act: CoverageAct, ctx: &egui::Context) {
         match act {
-            CoverageAct::Toggle => {
-                let mut settings = Settings::get(ctx);
-                settings.diff_coverage = !settings.diff_coverage;
-                settings.set(ctx);
-                if let Some(view) = &mut self.diff {
-                    // Read again when next shown: the report may have changed meanwhile.
-                    view.coverage = Overlay::default();
-                }
-            }
+            CoverageAct::Toggle => self.toggle_diff_coverage(ctx),
             CoverageAct::Load => self.load_diff_coverage(ctx),
         }
     }

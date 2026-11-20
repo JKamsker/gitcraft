@@ -11,7 +11,7 @@ use std::sync::Arc;
 use egui::{Rect, RichText, Sense, Stroke, Ui, pos2, vec2};
 
 use super::{DiffData, Kind};
-use crate::repo::{Action, DiffKey, DiffView, widgets};
+use crate::repo::{Action, DiffKey, DiffView, RepoTab, widgets};
 use crate::settings::Settings;
 use crate::theme::Tokens;
 
@@ -96,6 +96,19 @@ pub(super) fn applies(key: &DiffKey) -> bool {
 pub(super) fn request(view: &DiffView, data: &DiffData, on: bool, acts: &mut Vec<Action>) {
     if on && applies(&view.key) && view.coverage.asked != Some(data.source) {
         acts.push(Action::DiffCoverage(CoverageAct::Load));
+    }
+}
+
+impl RepoTab {
+    /// Turns the coverage marks on or off in every diff.
+    pub(in crate::repo) fn toggle_diff_coverage(&mut self, ctx: &egui::Context) {
+        let mut settings = Settings::get(ctx);
+        settings.diff_coverage = !settings.diff_coverage;
+        settings.set(ctx);
+        if let Some(view) = &mut self.diff {
+            // Read again when next shown: the report may have changed meanwhile.
+            view.coverage = Overlay::default();
+        }
     }
 }
 
