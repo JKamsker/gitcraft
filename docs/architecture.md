@@ -262,7 +262,8 @@ conflict, compare/PR selection, forge and watcher requests have their own checks
 PR/CI polling and remote watchers add timers. A shared request utility should
 carry typed request identity and scoped cancellation while the feature decides
 invalidation. Test A→B→A, close/reopen, suspend/resume and late errors, not just
-different-query success.
+different-query success. [Async request ownership](async-requests.md) lists each flow's
+owner, stale/fresh witness, invalidation and cancellation, and the known gaps (#195).
 
 ## Tests, coverage and resource evidence
 
