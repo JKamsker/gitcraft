@@ -55,8 +55,9 @@ fn retries_keep_proofs_and_start_after_exact_completed_source_index() {
 
 #[test]
 fn private_dispatch_steps_are_typed_without_reinterpreting_their_payloads() {
+    let source = "gitcraft.commandSource=opaque-proof";
     let argv = ops(&[
-        &[crate::push_preflight::APPROVED, "plan", "opaque", "proof"],
+        &[crate::push_preflight::APPROVED, "plan", "-c", source],
         &[crate::push_preflight::FIX, "plan", "fix"],
         &[crate::gerrit::AMEND, "amend", "-m", "message"],
         &[TRY],
@@ -64,14 +65,23 @@ fn private_dispatch_steps_are_typed_without_reinterpreting_their_payloads() {
     ]);
     let plan = Plan::decode(&argv);
     let kinds: Vec<_> = plan.steps().map(|s| s.kind).collect();
+    let evidence = ["-c".to_owned(), source.to_owned()];
+    let amend = ["amend".to_owned(), "-m".to_owned(), "message".to_owned()];
+    let malformed = |marker, count| Step::Malformed(Malformed::Operands { marker, count });
     assert_eq!(
         kinds,
         [
-            Step::ReviewedPush,
-            Step::PreflightFix,
-            Step::GerritAmend,
-            Step::Git,
-            Step::Git
+            Step::ReviewedPush {
+                id: "plan",
+                evidence: Some(&evidence)
+            },
+            Step::PreflightFix {
+                id: "plan",
+                fix: "fix"
+            },
+            Step::GerritAmend { args: &amend },
+            malformed(TRY, 0),
+            malformed(EXPECT, 1),
         ]
     );
     assert!(

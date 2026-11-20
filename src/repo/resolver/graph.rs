@@ -35,7 +35,12 @@ pub(in crate::repo) enum Standing {
 impl RepoTab {
     /// The parked merge a graph row stands for, if it's one.
     pub(in crate::repo) fn parked_at(&self, row: usize) -> Option<&Parked> {
-        let id = self.commits.get(row)?.hash.strip_prefix(PREFIX)?;
+        self.parked_of(&self.commits.get(row)?.hash)
+    }
+
+    /// The parked merge a graph row's hash stands for, if it's one.
+    pub(in crate::repo) fn parked_of(&self, hash: &str) -> Option<&Parked> {
+        let id = hash.strip_prefix(PREFIX)?;
         self.resolver.parked.iter().find(|p| p.id == id)
     }
 
