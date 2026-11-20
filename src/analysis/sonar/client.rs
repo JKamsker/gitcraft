@@ -171,6 +171,12 @@ impl<F: FnMut(&str, Auth) -> Result<String, Failure>> Client<F> {
 
     /// Pending and failed background tasks of the target. Reading tasks may need more than
     /// 'Browse'; when it is refused the observation simply does not claim either.
+    ///
+    /// `queue` lists every queued task with its branch or pull request, so "pending" is exact.
+    /// `current` is the project's single most recent finished task, not one per branch: a
+    /// failed analysis of this target that was followed by another branch's analysis is not
+    /// seen. "Newest attempt failed" is therefore a best-effort extra; the revision match in
+    /// [`super::super::gate::evaluate`] is what keeps a stale result from passing.
     fn tasks(
         &mut self,
         key: &str,
@@ -179,9 +185,10 @@ impl<F: FnMut(&str, Auth) -> Result<String, Failure>> Client<F> {
     ) -> Result<(bool, bool), Failure> {
         let tasks = match self.get(&format!("api/ce/component?component={key}")) {
             Ok(body) => parse::tasks(&body)?,
-            // Only a refusal of this one endpoint is tolerated; a timeout or rate limit must
-            // not silently drop the pending and failed-task checks.
-            Err(Failure::Forbidden | Failure::Http(_)) => return Ok((false, false)),
+            // Only a refusal of this one endpoint is tolerated (permission, or an edition or
+            // version without it). A server error, timeout or rate limit must not silently drop
+            // the pending and failed-task checks: the read fails and shows Unavailable.
+            Err(Failure::Forbidden | Failure::Http(400 | 404)) => return Ok((false, false)),
             Err(e) => return Err(e),
         };
         let ours = |t: &&parse::Task| match target {

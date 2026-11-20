@@ -398,14 +398,31 @@ fn task_reads_that_fail_in_transit_fail_the_read_instead_of_hiding_a_pending_ana
         Failure::Timeout,
         Failure::RateLimited(None),
         Failure::Unreachable,
+        Failure::Http(500),
+        Failure::Http(503),
     ] {
         let mut routes = server("10.0", HEAD, "OK", "{}");
         routes[4].1 = Err(failure.clone());
         let (mut c, _) = client(Edition::Server, routes);
         assert_eq!(c.quality_gate(&branch("main")), Err(failure));
     }
+    // Only a refusal of the endpoint itself is tolerated.
+    for refusal in [Failure::Forbidden, Failure::Http(400), Failure::Http(404)] {
+        let mut routes = server("10.0", HEAD, "OK", "{}");
+        routes[4].1 = Err(refusal);
+        let (mut c, _) = client(Edition::Server, routes);
+        assert!(c.quality_gate(&branch("main")).is_ok());
+    }
+}
+
+#[test]
+fn a_server_error_reading_tasks_is_never_shown_as_passed() {
+    // The gate itself says OK for the open commit; only the task read fails.
     let mut routes = server("10.0", HEAD, "OK", "{}");
-    routes[4].1 = Err(Failure::Forbidden);
+    routes[4].1 = Err(Failure::Http(502));
     let (mut c, _) = client(Edition::Server, routes);
-    assert!(c.quality_gate(&branch("main")).is_ok());
+    let verdict = c
+        .quality_gate(&branch("main"))
+        .map(|o| evaluate(&o, Some(HEAD)));
+    assert_eq!(verdict, Err(Failure::Http(502)));
 }

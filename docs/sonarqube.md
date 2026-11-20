@@ -60,10 +60,19 @@ request it uses the commit recorded in `api/project_pull_requests/list`. Then:
 - any error (unreachable, timeout, refused token, rate limited) → **Unavailable**, with the
   reason. Gitcraft keeps working normally without SonarQube.
 
-Results are read in the background, never on the UI thread: when the tab shows, then every
-5 minutes, every 30 seconds while an analysis is pending, and on **Refresh**. Offline mode
-and metered connections pause the background reads (a **Refresh** still works on a
-metered connection). Each request times out after 15 seconds.
+Results are read in the background, never on the UI thread: when the tab shows, when the
+branch, pull request or HEAD changes, every 5 minutes, and on **Refresh**. While an analysis
+stays pending, and after a failure, reads back off exponentially (30 s, 60 s, 120 s, … at
+most 10 minutes). After a failure nothing is read before that time, nor before the
+server's `Retry-After` (held to 1–60 minutes), even for another branch or commit; only
+**Refresh** reads earlier. Offline mode and metered connections pause the background reads
+(a **Refresh** still works on a metered connection). Each request times out after 15
+seconds.
+
+"The newest analysis attempt failed" relies on `api/ce/component`'s `current` task, which
+is the project's single most recent finished task, not one per branch: if another branch
+was analyzed after a failed attempt on yours, the failure is not seen. That reason is a
+best-effort extra; the commit match above is what keeps an old result from passing.
 
 ## Server and Cloud differences
 
@@ -82,8 +91,14 @@ metered connection). Each request times out after 15 seconds.
   Errors are fixed sentences: no server text, URL or token reaches the UI or logs.
 - Exported profile settings contain the address, organization and a credential reference,
   never the token. Re-enter the token on another computer.
-- Requests use gitcraft's proxy selection (`HTTPS_PROXY`, `NO_PROXY`, …) and the system's
-  certificate store, so a company CA trusted by the OS is trusted here. Redirects are
+- A saved token is stored for one address and organization. To switch servers, choose
+  **Forget token** first: editing the address leaves the old entry in the credential store
+  (gitcraft does not delete it while you type, since a corrected typo would lose the token).
+- HTTPS requests to another machine use gitcraft's proxy selection (`HTTPS_PROXY`,
+  `NO_PROXY`, …). Requests to this computer (`localhost`, loopback addresses) and plain
+  HTTP never go through a proxy, which would see the token unencrypted and resolve
+  `localhost` to itself. Certificates come from the system's store, so a company CA
+  trusted by the OS is trusted here. Redirects are
   refused so that the token cannot be replayed to another host: configure the server's
   final address.
 - Only `GET` requests of the endpoints above are sent.

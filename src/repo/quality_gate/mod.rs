@@ -4,6 +4,7 @@
 
 mod binding;
 mod chip;
+mod schedule;
 #[cfg(test)]
 mod tab_tests;
 #[cfg(test)]
@@ -15,13 +16,8 @@ use super::RepoTab;
 use crate::analysis::gate::{Observation, Verdict};
 use crate::analysis::{Failure, Provider, Query};
 use binding::Binding;
+use schedule::Schedule;
 
-/// How often a settled result is read again while the tab is shown.
-const REFRESH: Duration = Duration::from_secs(300);
-/// While an analysis is queued or running on the server.
-const PENDING_POLL: Duration = Duration::from_secs(30);
-/// After a failure (unreachable, refused…).
-const RETRY: Duration = Duration::from_secs(120);
 /// A request whose answer never came (the tab was suspended) frees its slot after this; the
 /// requests themselves time out much sooner.
 const LOST_AFTER: Duration = Duration::from_secs(180);
@@ -45,8 +41,8 @@ pub(super) struct State {
     /// The request on its way: its number and when it started.
     loading: Option<(u64, Instant)>,
     requests: u64,
-    /// When to read again; `None` = as soon as possible.
-    next: Option<Instant>,
+    /// When to read again, with backoff after failures and while pending.
+    schedule: Schedule,
 }
 
 /// What the toolbar shows.
@@ -69,14 +65,7 @@ impl State {
             return;
         }
         self.loading = None;
-        let wait = match &answer.result {
-            Ok(o) if o.pending => PENDING_POLL,
-            Ok(_) => REFRESH,
-            Err(Failure::RateLimited(Some(s))) => Duration::from_secs((*s).clamp(60, 3600)),
-            Err(Failure::RateLimited(None)) => REFRESH,
-            Err(_) => RETRY,
-        };
-        self.next = Some(answer.at + wait);
+        self.schedule.answered(answer.at, &answer.result);
         self.answer = Some(answer);
     }
 
@@ -142,11 +131,12 @@ impl RepoTab {
             return;
         }
         // Unknown for this query, or asked while HEAD was elsewhere (a commit, a pull).
-        let fresh = self
+        let stale = !self
             .quality_gate
             .current(&query, &connection)
             .is_some_and(|a| a.head == self.refs.head);
-        let due = self.quality_gate.next.is_none_or(|t| Instant::now() >= t);
+        let now = Instant::now();
+        let due = self.quality_gate.schedule.due(now, asked, stale);
         let allowed = if asked {
             crate::network::refused().is_none()
         } else {
@@ -157,9 +147,9 @@ impl RepoTab {
             ctx.request_repaint_after(PAUSED_POLL);
             return;
         }
-        if !(asked || due || !fresh) {
-            if let Some(next) = self.quality_gate.next {
-                ctx.request_repaint_after(next.saturating_duration_since(Instant::now()));
+        if !due {
+            if let Some(next) = self.quality_gate.schedule.next {
+                ctx.request_repaint_after(next.saturating_duration_since(now));
             }
             return;
         }

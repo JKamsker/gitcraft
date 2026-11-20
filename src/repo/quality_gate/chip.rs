@@ -260,7 +260,7 @@ impl RepoTab {
                 draft.connection = account.identity();
                 draft.project = draft.project.trim().to_owned();
                 Binding::store(ui.ctx(), &self.path, Some(&draft));
-                self.quality_gate.next = None;
+                self.quality_gate.schedule = super::schedule::Schedule::default();
                 keep = false;
             }
             if saved.is_some() && ui.button(t("analysis-binding-remove")).clicked() {

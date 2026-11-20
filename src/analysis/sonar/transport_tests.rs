@@ -6,9 +6,34 @@ use std::time::Duration;
 
 use super::super::Failure;
 use super::client::Auth;
-use super::transport::sender;
+use super::transport::{may_use_proxy, sender};
 
 const TOKEN: &str = "squ_NEVER_SHOWN_0123456789";
+
+#[test]
+fn only_https_to_another_machine_may_go_through_a_proxy() {
+    for direct in [
+        "http://localhost:9000",
+        "http://LOCALHOST:9000/sonar",
+        "http://127.0.0.1:9000",
+        "http://127.8.9.10",
+        "http://[::1]:9000",
+        "https://localhost:9443",
+        "https://127.0.0.1",
+        "http://sonar.example.com",
+        "not a url",
+    ] {
+        assert!(!may_use_proxy(direct), "{direct}");
+    }
+    for proxied in [
+        "https://sonar.example.com",
+        "https://example.com/sonarqube",
+        "https://sonarcloud.io",
+        "https://10.0.0.5:9000",
+    ] {
+        assert!(may_use_proxy(proxied), "{proxied}");
+    }
+}
 
 /// Serves `answers` to consecutive connections and returns what each request said.
 fn serve(answers: Vec<String>) -> Result<(String, std::thread::JoinHandle<Vec<String>>), String> {

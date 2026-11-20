@@ -40,8 +40,30 @@ pub(in crate::analysis) fn for_account(account: &Account) -> Result<Client<Sende
     ))
 }
 
+/// Whether requests to `base` may go through the environment's proxy: only HTTPS to another
+/// machine. Plain HTTP is accepted for this computer only, and a proxy would both see the
+/// token in clear text and resolve `localhost` to itself.
+pub(super) fn may_use_proxy(base: &str) -> bool {
+    let Ok(url) = url::Url::parse(base) else {
+        return false;
+    };
+    let loopback = match url.host() {
+        Some(url::Host::Domain(d)) => d.eq_ignore_ascii_case("localhost"),
+        Some(url::Host::Ipv4(ip)) => ip.is_loopback(),
+        Some(url::Host::Ipv6(ip)) => ip.is_loopback(),
+        None => true,
+    };
+    url.scheme() == "https" && !loopback
+}
+
 pub(super) fn sender(base: String, token: String, timeout: Duration) -> Sender {
-    let agent = crate::forge::http::with_proxy(ureq::AgentBuilder::new(), &base)
+    let builder = if may_use_proxy(&base) {
+        crate::forge::http::with_proxy(ureq::AgentBuilder::new(), &base)
+    } else {
+        // ureq reads no proxy from the environment unless asked to.
+        ureq::AgentBuilder::new()
+    };
+    let agent = builder
         // A redirect could replay the token to another origin: refused instead.
         .redirects(0)
         .timeout(timeout)

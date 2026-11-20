@@ -139,7 +139,7 @@ fn reads_start_only_when_due_and_the_network_allows() {
         assert!(jobs.is_empty(), "one read at a time");
         tab.quality_gate.loading = None;
         tab.quality_gate.answer = Some(passed_answer(&connection));
-        tab.quality_gate.next = Some(Instant::now() + REFRESH);
+        tab.quality_gate.schedule.next = Some(Instant::now() + super::schedule::REFRESH);
         let ((), jobs) = crate::repo::messages::record_jobs(|| tab.poll_quality_gate(&ctx, false));
         assert!(jobs.is_empty(), "a fresh answer is not read again");
         {
@@ -160,6 +160,36 @@ fn reads_start_only_when_due_and_the_network_allows() {
         tab.refs.head = NEXT.into();
         let ((), jobs) = crate::repo::messages::record_jobs(|| tab.poll_quality_gate(&ctx, false));
         assert_eq!(jobs.len(), 1);
+    });
+}
+
+#[test]
+fn a_rate_limit_holds_off_reads_for_other_branches_and_commits_until_asked() {
+    let ctx = egui::Context::default();
+    let connection = connected();
+    connection.run(|| {
+        let _online = crate::network::test_pause::set(None);
+        let mut tab = tab(&ctx, &connection);
+        let ((), jobs) = crate::repo::messages::record_jobs(|| tab.poll_quality_gate(&ctx, false));
+        assert_eq!(jobs.len(), 1);
+        let number = tab.quality_gate.requests;
+        let limited = Answer {
+            result: Err(Failure::RateLimited(Some(600))),
+            ..passed_answer(&connection)
+        };
+        tab.quality_gate.arrived(number, limited);
+        let changes: [fn(&mut RepoTab); 2] = [
+            |t| t.refs.head = NEXT.into(),
+            |t| t.refs.current = Some("feature/x".into()),
+        ];
+        for change in changes {
+            change(&mut tab);
+            let ((), jobs) =
+                crate::repo::messages::record_jobs(|| tab.poll_quality_gate(&ctx, false));
+            assert!(jobs.is_empty(), "Retry-After is honored");
+        }
+        let ((), jobs) = crate::repo::messages::record_jobs(|| tab.poll_quality_gate(&ctx, true));
+        assert_eq!(jobs.len(), 1, "an explicit refresh still reads");
     });
 }
 

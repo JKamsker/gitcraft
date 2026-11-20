@@ -1,6 +1,7 @@
 use std::time::Instant;
 
 use super::binding::Binding;
+use super::schedule::{BACKOFF_BASE, BACKOFF_CAP, REFRESH};
 use super::*;
 use crate::analysis::Target;
 use crate::analysis::gate::ServerGate;
@@ -151,27 +152,79 @@ fn only_the_awaited_answer_lands_and_only_for_its_own_query_and_connection() {
     );
 }
 
+/// The waits a sequence of answers schedules, in seconds.
+fn waits(results: Vec<Result<Observation, Failure>>) -> Vec<u64> {
+    let mut schedule = Schedule::default();
+    let at = Instant::now();
+    results
+        .iter()
+        .map(|result| {
+            schedule.answered(at, result);
+            schedule.next.map_or(0, |next| (next - at).as_secs())
+        })
+        .collect()
+}
+
 #[test]
-fn pending_analyses_poll_sooner_and_rate_limits_wait_as_asked() {
-    let wait = |result| {
-        let mut state = State {
-            loading: Some((1, Instant::now())),
-            ..State::default()
-        };
-        let a = answer("main", result);
-        let at = a.at;
-        state.arrived(1, a);
-        state.next.map(|next| next - at)
+fn failures_and_stuck_pending_analyses_back_off_exponentially_up_to_ten_minutes() {
+    let timeouts = vec![Err(Failure::Timeout); 7];
+    assert_eq!(waits(timeouts), [30, 60, 120, 240, 480, 600, 600]);
+    let pending = vec![Ok(observation(true)); 6];
+    assert_eq!(waits(pending), [30, 60, 120, 240, 480, 600]);
+    // Settling resets both streaks.
+    let mixed = vec![
+        Err(Failure::Timeout),
+        Err(Failure::Timeout),
+        Ok(observation(false)),
+        Err(Failure::Timeout),
+        Ok(observation(true)),
+        Ok(observation(true)),
+        Ok(observation(false)),
+        Ok(observation(true)),
+    ];
+    assert_eq!(waits(mixed), [30, 60, 300, 30, 30, 60, 300, 30]);
+    assert_eq!(super::schedule::backoff(u32::MAX), BACKOFF_CAP);
+    assert_eq!(super::schedule::backoff(0), BACKOFF_BASE);
+}
+
+#[test]
+fn retry_after_is_honored_within_bounds_and_on_top_of_the_backoff() {
+    assert_eq!(waits(vec![Err(Failure::RateLimited(Some(900)))]), [900]);
+    assert_eq!(waits(vec![Err(Failure::RateLimited(Some(1)))]), [60]);
+    assert_eq!(waits(vec![Err(Failure::RateLimited(Some(99_999)))]), [3600]);
+    assert_eq!(waits(vec![Err(Failure::RateLimited(None))]), [30]);
+    let repeated = vec![Err(Failure::RateLimited(Some(60))); 6];
+    assert_eq!(waits(repeated), [60, 60, 120, 240, 480, 600]);
+}
+
+#[test]
+fn after_a_failure_nothing_but_an_explicit_refresh_reads_before_the_backoff_ends() {
+    let mut schedule = Schedule::default();
+    let at = Instant::now();
+    assert!(schedule.due(at, false, true), "nothing read yet");
+    schedule.answered(at, &Err(Failure::RateLimited(Some(600))));
+    let soon = at + Duration::from_secs(5);
+    // Another branch, pull request or HEAD (stale) does not bypass Retry-After.
+    assert!(!schedule.due(soon, false, true));
+    assert!(!schedule.due(soon, false, false));
+    assert!(schedule.due(soon, true, false), "the user asked");
+    let later = at + Duration::from_secs(601);
+    assert!(schedule.due(later, false, false));
+    // A settled answer: a stale one is read at once, a fresh one waits for REFRESH.
+    schedule.answered(at, &Ok(observation(false)));
+    assert!(schedule.due(soon, false, true));
+    assert!(!schedule.due(soon, false, false));
+    assert!(schedule.due(at + REFRESH, false, false));
+}
+
+#[test]
+fn an_answer_schedules_its_state() {
+    let mut state = State {
+        loading: Some((1, Instant::now())),
+        ..State::default()
     };
-    assert_eq!(wait(Ok(observation(true))), Some(PENDING_POLL));
-    assert_eq!(wait(Ok(observation(false))), Some(REFRESH));
-    assert_eq!(wait(Err(Failure::Timeout)), Some(RETRY));
-    assert_eq!(
-        wait(Err(Failure::RateLimited(Some(600)))),
-        Some(Duration::from_secs(600))
-    );
-    assert_eq!(
-        wait(Err(Failure::RateLimited(Some(1)))),
-        Some(Duration::from_secs(60))
-    );
+    let a = answer("main", Err(Failure::Http(503)));
+    let at = a.at;
+    state.arrived(1, a);
+    assert_eq!(state.schedule.not_before, Some(at + BACKOFF_BASE));
 }
