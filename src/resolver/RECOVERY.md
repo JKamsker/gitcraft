@@ -3,7 +3,8 @@
 This implementation includes original slice `9cd34bd9e08084aa642040d331df1b72dc50c5b0`
 and its safety-review repairs. Existing Parked/run/workspace schemas are retained.
 Journal readers accept version 1 and 2; new receipts use version 2. Receipts are
-written to a temporary file, synced, renamed, then their directory is synced.
+written to a temporary file, synced, renamed, then their directory is synced (on Windows
+too).
 Temporary files are not receipts. A malformed final receipt with an identifiable
 version-1 prefix is preserved as `.torn` and replaced with an explicit Uncertain
 receipt. Interior corruption, unidentifiable versions, and unsupported versions
@@ -102,9 +103,27 @@ failure cleanup cannot mask the recorded stop. Rust RAII still releases handles
 (including archive locks); no process is killed, and this does not reproduce
 arbitrary termination inside a syscall. This is error/interruption evidence,
 not power-loss or process-kill evidence.
-Directory fsync is Unix-only through std; Windows directory durability and rename
-replacement remain unvalidated. Durability also depends on the filesystem/device
-honoring sync and Git's object/ref persistence configuration. Raw restore publication reserves a private temporary directory beside each live
+Directory flushes run on Unix (`fsync` of a read-only descriptor) and on Windows
+(`FlushFileBuffers` on a directory handle with `FILE_ADD_FILE`, or else
+`FILE_ADD_SUBDIRECTORY`, access; a read-only handle is refused), via `src/dir_sync.rs`.
+If another process holds the directory without write sharing, its open is retried 5 times
+(about 0.2 s); access denial is never retried. A filesystem that opens a directory but does
+not implement its flush (error 1, 50, 87 or 120; observed as error 1 on SMB shares and
+`\\wsl$`) is skipped with a diagnostic note. Directory durability there rests on the server.
+Any other flush failure, including a refused flush after a successful open, fails the
+operation and keeps the archive. Climbing ancestors on Windows stops at the first one that
+cannot be opened for flushing: this process may not add entries to it (e.g. `C:\Users`),
+or another process holds it without write sharing (seen on `%LOCALAPPDATA%`). An
+archive directory itself is never skipped. A live worktree directory that this process may
+not add entries to is not flushed on Windows, because neither the restore nor Git could have
+written there, and its parent still is. Renames do not request write-through:
+`MOVEFILE_WRITE_THROUGH` only affects cross-volume copy moves and all renames here stay on
+one volume, so NTFS's logged rename plus the following directory flushes is what is relied
+on. Flush success is observed on NTFS; its on-disk effect, ReFS/FAT/exFAT and power loss are
+unvalidated. Git's default `core.fsync` does not harden loose objects or refs, so a snapshot
+ref can outlive its objects after power loss even though `raw/`, `index` and metadata are
+durable. Durability also depends on the device honoring flushes. See
+[park/DURABILITY-AUDIT.md](park/DURABILITY-AUDIT.md) for each transition's crash points. Raw restore publication reserves a private temporary directory beside each live
 file, writes and syncs the raw bytes there, rechecks the target, and renames on
 that destination filesystem. Both affected directories are synced. Archive
 movement stays within the common Git directory. Interrupted staging directories

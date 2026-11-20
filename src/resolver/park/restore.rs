@@ -288,6 +288,8 @@ pub(super) fn sync_live(repo: &Path, gd: &Path, parked: &Parked) -> Result<(), S
         .split('\0')
         .chain(changed.split('\0'))
         .chain(parked.raw.iter().map(String::as_str));
+    // Each live directory once, after the files below it are flushed.
+    let mut parents = std::collections::BTreeSet::new();
     for path in paths.filter(|p| !p.is_empty()) {
         let path = repo.join(crate::mcp::args::repo_path(path)?);
         if std::fs::symlink_metadata(&path).is_ok_and(|m| m.file_type().is_file()) {
@@ -299,11 +301,12 @@ pub(super) fn sync_live(repo: &Path, gd: &Path, parked: &Parked) -> Result<(), S
         while !parent.is_dir() {
             parent = parent.parent().ok_or("Missing parent")?;
         }
-        journal::sync_ancestors(parent)?;
+        parents.insert(parent.to_path_buf());
     }
     for name in std::iter::once("index").chain(parked.state_files.iter().map(String::as_str)) {
         durability::sync_live_file(&dir, &format!("live/true/{name}"), &gd.join(name))?;
     }
-    journal::sync_ancestors(gd)?;
+    // Deepest paths sort last: reversed, each child is flushed before its parent.
+    journal::sync_ancestors_of(parents.iter().rev().map(PathBuf::as_path).chain([gd]))?;
     effects::boundary("live-restore-synced")
 }

@@ -174,13 +174,7 @@ impl RepoTab {
                 if generation == self.forge_generation || same_review {
                     self.handle(*msg, ctx);
                 } else if operation {
-                    self.stale_fork_operation_finished();
-                    // The mutation used its captured old target. Let the busy slot go, but
-                    // never run old continuations (or retries) against the new hosting.
-                    self.busy_op = None;
-                    self.op_started = None;
-                    self.status = Some(crate::repo::Notice::plain(("The operation on the previous primary forge finished; refresh that repository to check its result".into(), true)));
-                    self.reload(ctx);
+                    self.stale_forge_operation_ended(&msg, ctx);
                 }
             }
             Msg::Loaded(result) => self.loaded(result, ctx),

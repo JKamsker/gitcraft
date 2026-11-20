@@ -269,6 +269,7 @@ impl RepoTab {
                     tab.busy_op = None;
                     tab.op_started = None;
                     tab.status = Some(crate::repo::Notice::plain((why, true)));
+                    tab.busy_op_released(false, ctx);
                 }
             },
         );
@@ -277,7 +278,9 @@ impl RepoTab {
     /// Runs the first step not done, then the next, until one fails or all are done.
     fn next_release_step(&mut self, ctx: &Context) {
         let Some(run) = self.release.as_mut().and_then(|v| v.run.as_mut()) else {
+            // The release was closed meanwhile, nothing to report: what waited runs.
             self.busy_op = None;
+            self.busy_op_released(true, ctx);
             return;
         };
         let Some(i) = run.next() else {
@@ -325,6 +328,7 @@ impl RepoTab {
             move |tab, (result, done), ctx| {
                 let Some(run) = tab.release.as_mut().and_then(|v| v.run.as_mut()) else {
                     tab.busy_op = None;
+                    tab.busy_op_released(true, ctx);
                     return;
                 };
                 run.done = done;
@@ -363,6 +367,7 @@ impl RepoTab {
         let started = self.op_started.take();
         let mut remember = None;
         let Some(run) = self.release.as_mut().and_then(|v| v.run.as_mut()) else {
+            self.busy_op_released(true, ctx);
             return;
         };
         let label = release_operation_label(&run.plan.tag);
@@ -384,6 +389,7 @@ impl RepoTab {
             Status::Failed(e) => Some((*step, e.clone())),
             _ => None,
         });
+        let ok = failed.is_none();
         self.status = Some(crate::repo::Notice::plain(match failed {
             Some((step, e)) => (format!("{label}: {} failed: {e}", step.label()), true),
             None if run.finished() => (format!("Released {}", run.plan.tag), false),
@@ -405,6 +411,7 @@ impl RepoTab {
                 }));
         }
         self.reload(ctx);
+        self.busy_op_released(ok, ctx);
     }
 }
 

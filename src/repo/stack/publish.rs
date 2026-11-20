@@ -187,6 +187,7 @@ impl RepoTab {
         self.prs_loaded = None;
         self.load_prs(ctx);
         self.reload(ctx);
+        self.busy_op_released(report.failed.is_none(), ctx);
     }
 
     /// The preview, when it is open.

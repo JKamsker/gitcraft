@@ -230,7 +230,7 @@ impl RepoTab {
     }
 }
 fn completion(result: Result<Report, String>) -> Msg {
-    Msg::Then(Box::new(move |tab, _| {
+    Msg::Then(Box::new(move |tab, ctx| {
         tab.busy_op = None;
         if let Some(state) = &mut tab.cleanup {
             state.running = None;
@@ -241,6 +241,8 @@ fn completion(result: Result<Report, String>) -> Msg {
             // Do not retain sensitive find/replacement values after the operation.
             state.replacements.clear();
         }
+        // Its outcome shows in its own window, not the status line: what waited runs.
+        tab.busy_op_released(true, ctx);
     }))
 }
 fn report_ui(ui: &mut egui::Ui, report: &Report) {

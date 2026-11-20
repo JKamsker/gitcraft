@@ -355,11 +355,13 @@ impl RepoTab {
             |tab, result, ctx| {
                 tab.busy_op = None;
                 tab.op_started = None;
+                let ok = result.is_ok();
                 tab.status = Some(crate::repo::Notice::plain(match result {
                     Ok(_) => ("Marked in the bisect".to_owned(), false),
                     Err(e) => (format!("Mark in the bisect failed: {e}"), true),
                 }));
                 tab.reload(ctx);
+                tab.busy_op_released(ok, ctx);
             },
         );
     }

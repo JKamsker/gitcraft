@@ -44,7 +44,12 @@ impl RepoTab {
         self.then(
             ctx,
             move || ws.apply(&repo, &picked, &done),
-            move |tab, applied, ctx| tab.resolved_applied(&id, applied, ctx),
+            move |tab, applied, ctx| {
+                tab.resolved_applied(&id, applied, ctx);
+                // What was not applied shows on its card: what waited runs, unless staging
+                // what was applied holds the slot now.
+                tab.busy_op_released(true, ctx);
+            },
         );
     }
 

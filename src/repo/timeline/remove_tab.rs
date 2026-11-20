@@ -217,10 +217,12 @@ impl RepoTab {
         } else {
             label.to_owned()
         };
+        let failed = status.1;
         self.status = Some(crate::repo::Notice::plain(status));
         self.set_remove(Some(state));
         self.timeline_op_ended(&entry_label, &OpKind::plain(), undo, ok, Refresh::All, ctx);
         self.reload(ctx);
+        self.busy_op_released(!failed, ctx);
     }
 
     /// Throws away an attempt that stopped on a conflict: its worktree and its branch.
@@ -263,6 +265,7 @@ impl RepoTab {
                 }
                 tab.timeline_op_ended(&label, &OpKind::plain(), None, ok, Refresh::All, ctx);
                 tab.reload(ctx);
+                tab.busy_op_released(ok, ctx);
             },
         );
     }

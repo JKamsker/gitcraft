@@ -15,6 +15,23 @@ thread_local! {
     pub(super) static HOOK: BoundaryHook = Default::default();
 }
 
+#[cfg(any(test, recovery_recording))]
+thread_local! {
+    /// Diagnostics such as a directory flush the filesystem does not implement.
+    pub(super) static NOTES: std::cell::RefCell<Vec<String>> = const {
+        std::cell::RefCell::new(Vec::new())
+    };
+}
+
+/// Records a diagnostic for the test and recording harnesses. It is no effect boundary: it
+/// never interrupts and never shifts the boundary count. Production has no log to keep it.
+pub(super) fn note(text: &str) {
+    #[cfg(any(test, recovery_recording))]
+    NOTES.with(|notes| notes.borrow_mut().push(text.to_owned()));
+    #[cfg(not(any(test, recovery_recording)))]
+    let _ = text;
+}
+
 pub(super) fn boundary(label: &str) -> Result<(), String> {
     #[cfg(recovery_recording)]
     HOOK.with(|hook| {
