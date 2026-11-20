@@ -2,7 +2,7 @@
 # Kleinschreibung, und Modus- und Namensänderungen getrennt von den Zeilen eines Diffs (#173, Punkt 13).
 
 file-metadata-executable-menu = Ausführbar-Bit im Index…
-file-metadata-executable-menu-tip = Das Ausführbar-Bit der Datei im Index setzen oder entfernen. Nur der Modus ändert sich: gestagte und ungestagte Inhalte bleiben, auch unter Windows.
+file-metadata-executable-menu-tip = Das Ausführbar-Bit des Index-Eintrags der Datei setzen oder entfernen. Nur dieser Modus ändert sich: gestagte und ungestagte Inhalte bleiben, wie sie sind. Funktioniert auch unter Windows, wo Dateien auf der Festplatte kein Ausführbar-Bit haben.
 file-metadata-case-menu = Groß-/Kleinschreibung des Namens ändern…
 file-metadata-case-menu-tip = Die Datei in denselben Namen mit anderer Groß-/Kleinschreibung umbenennen, sicher auf Dateisystemen ohne Unterscheidung (Windows, macOS). Änderungen wandern mit.
 file-metadata-executable-title = Ausführbar-Bit im Index
@@ -37,3 +37,8 @@ file-metadata-diff-copied = { $similarity ->
     [none] Kopiert von { $from }
    *[other] Kopiert von { $from } · { $similarity } % ähnlich
 }
+file-metadata-changed = Die Datei hat sich geändert, seit der Dialog geöffnet wurde. Prüfen Sie, was jetzt angezeigt wird, und bestätigen Sie erneut.
+file-metadata-file-mode-warning = Git verfolgt hier Dateimodi (core.fileMode), und die Datei auf der Festplatte behält ihre alte Berechtigung: Git zeigt die umgekehrte Änderung als ungestagt, und alle Dateien zu stagen oder commit -a würde dies rückgängig machen. Ändern Sie auch die Berechtigung der Datei (chmod).
+file-metadata-read-failed = Die Datei konnte nicht gelesen werden. Schließen Sie den Dialog und öffnen Sie ihn erneut.
+file-metadata-patch-placeholder = <Modus-Patch, wird beim Bestätigen geschrieben>
+file-metadata-rename-rolled-back = { $via } konnte nicht in { $to } umbenannt werden; zurück nach { $from } verschoben

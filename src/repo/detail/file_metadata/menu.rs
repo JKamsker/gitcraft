@@ -4,7 +4,6 @@
 use egui::Ui;
 
 use super::{Edit, FileMetaForm};
-use crate::git::file_metadata as meta;
 use crate::git::{Area, StatusFile};
 use crate::repo::{Action, Dialog, RepoTab};
 
@@ -42,31 +41,10 @@ impl RepoTab {
                 .show(ui)
                 .on_hover_text(crate::i18n::text(tip));
             if r.clicked() {
-                let form = FileMetaForm::new(&file.path, edit);
-                self.read_file_metadata(&form, ui.ctx());
+                let form = FileMetaForm::new(self.path.clone(), &file.path, edit);
                 acts.push(Action::Dialog(Dialog::FileMetadata(Box::new(form))));
             }
         }
-    }
-
-    /// Reads what `form`'s edit needs on a background thread, into the form's own cell.
-    fn read_file_metadata(&self, form: &FileMetaForm, ctx: &egui::Context) {
-        let (repo, path, edit) = (self.path.clone(), form.path.clone(), form.edit);
-        let cell = form.read.clone();
-        self.then(
-            ctx,
-            move || {
-                let read = meta::snapshot(&repo, &path, edit == Edit::LetterCase).map(|found| {
-                    let patch = (edit == Edit::Executable)
-                        .then(|| meta::save_executable_patch(&repo, &found));
-                    (found, patch)
-                });
-                // A fresh cell, set only here: it can't be full already.
-                let _ = cell.set(read);
-            },
-            // The answer is in the cell; coming back only repaints the dialog.
-            |_, (), _| {},
-        );
     }
 }
 

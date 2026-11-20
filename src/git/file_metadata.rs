@@ -32,6 +32,10 @@ pub(crate) struct Snapshot {
     pub(crate) missing: bool,
     /// The names in its folder (first path component below it), tracked or not.
     pub(crate) siblings: BTreeSet<String>,
+    /// Git tracks the executable bit of working-tree files (`core.fileMode`, on unless set
+    /// off; Git for Windows sets it off): an index-only edit then shows the opposite change
+    /// as unstaged.
+    pub(crate) file_mode: bool,
 }
 
 /// Commands that make an edit, and the commands that take it back.
@@ -46,6 +50,8 @@ pub(crate) struct Plan {
     pub(crate) to: String,
     /// The executable bit is set after the edit (an executable-bit edit that sets it).
     pub(crate) executable: bool,
+    /// The temporary path a rename goes through.
+    pub(crate) via: Option<String>,
 }
 
 /// Reads what planning an edit of `path` needs. `siblings`: also list its folder (for a
@@ -85,12 +91,16 @@ pub(crate) fn snapshot(repo: &Path, path: &str, siblings: bool) -> Result<Snapsh
     } else {
         BTreeSet::new()
     };
+    // Unset (exit 1) means Git's default, on.
+    let set = run(Some(repo), &["config", "--bool", "--get", "core.fileMode"]);
+    let file_mode = !matches!(set, Ok(v) if v.trim() == "false");
     Ok(Snapshot {
         path: path.to_owned(),
         entry,
         conflicted,
         missing,
         siblings,
+        file_mode,
     })
 }
 
@@ -205,6 +215,7 @@ pub(crate) fn executable_plan(snapshot: &Snapshot, patch: &str) -> Result<Plan, 
         from: from.to_owned(),
         to: to.to_owned(),
         executable: to == EXECUTABLE,
+        via: None,
     })
 }
 
@@ -251,6 +262,7 @@ pub(crate) fn case_rename_plan(snapshot: &Snapshot, name: &str) -> Result<Plan, 
         from,
         to,
         executable: false,
+        via: Some(via),
     })
 }
 

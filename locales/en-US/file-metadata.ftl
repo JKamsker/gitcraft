@@ -2,7 +2,7 @@
 # mode and name changes a diff shows apart from its lines (#173, item 13).
 
 file-metadata-executable-menu = Executable bit in the index…
-file-metadata-executable-menu-tip = Set or clear the file's executable bit in the index. Only its mode changes: staged and unstaged contents stay as they are, on Windows too.
+file-metadata-executable-menu-tip = Set or clear the executable bit of the file's index entry. Only that mode changes: staged and unstaged contents stay as they are. Works on Windows too, where files on disk have no executable bit.
 file-metadata-case-menu = Change letter case of the name…
 file-metadata-case-menu-tip = Rename the file to the same name in other letter case, safely on case-insensitive filesystems (Windows, macOS). Edits move with it.
 file-metadata-executable-title = Executable bit in the index
@@ -37,3 +37,8 @@ file-metadata-diff-copied = { $similarity ->
     [none] Copied from { $from }
    *[other] Copied from { $from } · { $similarity }% similar
 }
+file-metadata-changed = The file changed since the dialog opened. Check what is shown now and confirm again.
+file-metadata-file-mode-warning = Git tracks file modes here (core.fileMode), and the file on disk keeps its old permission: Git shows the opposite change as unstaged, and staging all files or commit -a would undo this. Change the file's permission too (chmod).
+file-metadata-read-failed = The file couldn't be read. Close the dialog and open it again.
+file-metadata-patch-placeholder = <mode patch, written when confirmed>
+file-metadata-rename-rolled-back = Couldn't rename { $via } to { $to }; moved it back to { $from }

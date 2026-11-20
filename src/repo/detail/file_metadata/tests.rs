@@ -1,98 +1,134 @@
-//! The painted dialog and its click-to-action path, from a read made by hand: no
-//! repository, worker or Git command.
-
-use std::collections::BTreeSet;
+//! The dialog against real repositories: painted, clicked, its background reads, the
+//! re-check on confirm, and the rename's rollback through the operation executor.
 
 use egui_kittest::{Harness, kittest::Queryable};
 
 use super::*;
+use crate::git::fixture::Repo;
 use crate::git::{Area, StatusFile};
+use crate::repo::operations::run_steps;
+use crate::repo::{Action, OpKind, Refresh, Undo};
 
-fn snapshot(path: &str, mode: &str) -> Snapshot {
-    Snapshot {
-        path: path.to_owned(),
-        entry: Some((mode.to_owned(), "b".repeat(40))),
-        conflicted: false,
-        missing: false,
-        siblings: BTreeSet::from(["Run.sh".to_owned(), "other".to_owned()]),
-    }
-}
+mod rollback;
 
-/// Paints `form` (idle or busy), clicks `button` and returns what the dialog answered.
-fn click(form: FileMetaForm, idle: bool, button: &str) -> Option<Action> {
+type State = (FileMetaForm, bool, Option<Action>);
+
+/// A harness painting `form`; the state's flag is whether the tab is idle.
+fn harness(form: FileMetaForm, idle: bool) -> Harness<'static, State> {
     crate::i18n::set_language("en-US");
     let fonts = std::cell::Cell::new(false);
-    let mut form = form;
-    let mut h = Harness::new_ui_state(
-        move |ui, done: &mut Option<Action>| {
+    Harness::new_ui_state(
+        move |ui, (form, idle, done): &mut State| {
             if !fonts.replace(true) {
                 crate::theme::install_fonts(ui.ctx());
                 return;
             }
-            if let Outcome::Done(action) = form.show(ui, idle) {
+            if let Outcome::Done(action) = form.show(ui, *idle) {
                 *done = Some(*action);
             }
             crate::a11y::end_frame(ui.ctx());
         },
-        None,
-    );
-    // A spinner repaints while nothing is read: a fixed number of frames.
-    h.run_steps(3);
-    h.get_by_role_and_label(egui::accesskit::Role::Button, button)
-        .click();
-    h.run_steps(3);
-    h.state_mut().take()
+        (form, idle, None),
+    )
 }
 
-fn ready(path: &str, mode: &str, edit: Edit) -> FileMetaForm {
-    let form = FileMetaForm::new(path, edit);
-    let patch = (edit == Edit::Executable).then(|| Ok("/tmp/mode.patch".to_owned()));
-    let _ = form.read.set(Ok((snapshot(path, mode), patch)));
-    form
+/// Paints frames until the dialog has no read in flight (a few seconds at most).
+fn settled(h: &mut Harness<'static, State>) -> Result<(), String> {
+    for _ in 0..500 {
+        h.run_steps(1);
+        if h.state().0.pending.is_none() {
+            h.run_steps(1);
+            return Ok(());
+        }
+        std::thread::sleep(std::time::Duration::from_millis(10));
+    }
+    Err("the dialog's read never arrived".into())
+}
+
+fn click(h: &mut Harness<'static, State>, button: &str) {
+    h.get_by_role_and_label(egui::accesskit::Role::Button, button)
+        .click();
+    h.run_steps(1);
 }
 
 #[test]
-fn executable_dialog_answers_the_undoable_index_edit() -> Result<(), String> {
-    let form = ready("bin/Run.sh", "100644", Edit::Executable);
+fn executable_dialog_rereads_on_confirm_and_answers_the_index_edit() -> Result<(), String> {
+    let repo = Repo::new("file-metadata-dialog-chmod")?;
+    repo.commit("script", &[("run.sh", Some("echo\n"))])?;
+    let form = FileMetaForm::new(repo.dir.clone(), "run.sh", Edit::Executable);
+    let mut h = harness(form, true);
+    settled(&mut h)?;
+    // Shown, not written: the patch file only comes with the confirming read.
+    assert!(matches!(h.state().0.preview(), Some(Ok(p)) if p.ops[0][2] == patch_text()));
+    click(&mut h, "Apply");
+    settled(&mut h)?;
     let Some(Action::UndoableOps {
         ops,
         refresh,
         undo: Undo::Custom { undo, redo },
         ..
-    }) = click(form, true, "Apply")
+    }) = h.state_mut().2.take()
     else {
         return Err("Apply must answer an undoable operation".into());
     };
-    assert_eq!(ops, [["apply", "--cached", "/tmp/mode.patch"]]);
-    assert_eq!(redo, ops);
-    assert_eq!(undo, [["apply", "--cached", "-R", "/tmp/mode.patch"]]);
     assert_eq!(refresh, Refresh::Status);
-    Ok(())
-}
-
-#[test]
-fn busy_tab_unread_and_refused_edits_answer_nothing() {
-    assert!(click(ready("Run.sh", "100644", Edit::Executable), false, "Apply").is_none());
-    assert!(click(ready("Run.sh", "120000", Edit::Executable), true, "Apply").is_none());
-    let unread = FileMetaForm::new("Run.sh", Edit::Executable);
-    assert!(click(unread, true, "Apply").is_none());
-    // The name as it is: nothing to rename yet.
-    assert!(click(ready("Run.sh", "100644", Edit::LetterCase), true, "Rename").is_none());
-}
-
-#[test]
-fn case_dialog_answers_the_two_step_rename() -> Result<(), String> {
-    let mut form = ready("Run.sh", "100644", Edit::LetterCase);
-    form.name = "run.sh".to_owned();
-    let Some(Action::UndoableOps { ops, .. }) = click(form, true, "Rename") else {
-        return Err("Rename must answer an undoable operation".into());
+    assert_eq!(redo, ops);
+    let [op] = ops.as_slice() else {
+        return Err(format!("one step expected: {ops:?}"));
     };
-    let temp = ".Run.sh.gitcraft-case-rename";
-    assert_eq!(
-        ops,
-        [["mv", "--", "Run.sh", temp], ["mv", "--", temp, "run.sh"]]
-    );
+    assert_eq!(&op[..2], ["apply", "--cached"]);
+    assert!(std::path::Path::new(&op[2]).is_file(), "{op:?}");
+    assert_eq!(undo, [["apply", "--cached", "-R", op[2].as_str()]]);
+    run_steps(repo.path(), &ops, OpKind::plain(), None).0?;
+    assert!(repo.git(&["ls-files", "-s"])?.starts_with("100755 "));
     Ok(())
+}
+
+#[test]
+fn a_file_changed_while_the_dialog_was_open_is_shown_again_not_renamed() -> Result<(), String> {
+    let repo = Repo::new("file-metadata-dialog-stale")?;
+    repo.commit("base", &[("a/Foo.txt", Some("foo\n"))])?;
+    let mut form = FileMetaForm::new(repo.dir.clone(), "a/Foo.txt", Edit::LetterCase);
+    form.name = "foo.txt".to_owned();
+    let mut h = harness(form, true);
+    settled(&mut h)?;
+    assert!(matches!(h.state().0.preview(), Some(Ok(_))));
+    // Something takes the new name in another letter case meanwhile.
+    let blob = repo.rev(":a/Foo.txt")?;
+    let other = [
+        "update-index",
+        "--add",
+        "--cacheinfo",
+        "100644",
+        &blob,
+        "a/FOO.TXT",
+    ];
+    repo.git(&other)?;
+    click(&mut h, "Rename");
+    settled(&mut h)?;
+    assert!(h.state().2.is_none(), "a stale rename must not run");
+    assert!(h.state().0.changed);
+    assert!(matches!(h.state().0.preview(), Some(Err(e)) if e.contains("a/FOO.TXT")));
+    h.get_by_label(crate::i18n::text("file-metadata-changed"));
+    Ok(())
+}
+
+#[test]
+fn tracked_file_modes_are_warned_about_and_a_busy_tab_answers_nothing() -> Result<(), String> {
+    let repo = Repo::new("file-metadata-dialog-filemode")?;
+    repo.commit("script", &[("run.sh", Some("echo\n"))])?;
+    repo.git(&["config", "core.fileMode", "true"])?;
+    let form = FileMetaForm::new(repo.dir.clone(), "run.sh", Edit::Executable);
+    let mut h = harness(form, false);
+    settled(&mut h)?;
+    h.get_by_label(crate::i18n::text("file-metadata-file-mode-warning"));
+    click(&mut h, "Apply");
+    assert!(h.state().0.pending.is_none() && h.state().2.is_none());
+    Ok(())
+}
+
+fn patch_text() -> &'static str {
+    crate::i18n::text("file-metadata-patch-placeholder")
 }
 
 #[test]

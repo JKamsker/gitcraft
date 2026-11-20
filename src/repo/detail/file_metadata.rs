@@ -1,17 +1,19 @@
 //! Asks before changing a working-tree file's metadata: the executable bit of its index
 //! entry, or the letter case of its name. What the file is in the index is read in the
-//! background when the dialog opens; the edit, its commands and its undo are worked out from
-//! that, and run through the tab's undoable operations.
+//! background when the dialog opens and read again when the edit is confirmed: the edit runs
+//! only when it is still the one shown, through the tab's undoable operations.
 
-use std::sync::{Arc, OnceLock};
+use std::path::PathBuf;
+use std::sync::mpsc::Receiver;
 
 use egui::{Key, RichText, Ui};
 
-use crate::git::file_metadata::{self as meta, Plan, Snapshot};
+use crate::git::file_metadata::{Plan, Snapshot};
 use crate::repo::dialogs::Outcome;
-use crate::repo::{Action, Refresh, Undo, widgets};
+use crate::repo::widgets;
 use crate::theme::{self, Tokens};
 
+mod flow;
 mod menu;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -20,47 +22,35 @@ enum Edit {
     LetterCase,
 }
 
-/// The file, and for the executable bit the patch file its commands apply (or why not).
-type Read = Result<(Snapshot, Option<Result<String, String>>), String>;
+/// The file read, and for a confirmed executable-bit edit the patch file its commands apply
+/// (or why it couldn't be saved).
+type Reread = Result<(Snapshot, Option<Result<String, String>>), String>;
+
+/// A read in flight: the first one, or the one confirming the edit.
+struct Pending {
+    rx: Receiver<Reread>,
+    confirming: bool,
+}
 
 /// The dialog's file, edit and what was read of the file.
 pub(crate) struct FileMetaForm {
+    repo: PathBuf,
     path: String,
     edit: Edit,
     /// The new name typed (a case-only rename).
     name: String,
     focus: bool,
-    /// Filled once by the background read; only this dialog holds it, so no other read's
-    /// answer can land here.
-    read: Arc<OnceLock<Read>>,
+    read: Option<Result<Snapshot, String>>,
+    pending: Option<Pending>,
+    /// A confirming read found the file changed since it was shown.
+    changed: bool,
 }
 
 impl FileMetaForm {
-    fn new(path: &str, edit: Edit) -> Self {
-        let name = path.rsplit('/').next().unwrap_or(path).to_owned();
-        FileMetaForm {
-            path: path.to_owned(),
-            edit,
-            name,
-            focus: true,
-            read: Arc::default(),
-        }
-    }
-
-    fn plan(&self) -> Option<Result<Plan, String>> {
-        let Ok((snapshot, patch)) = self.read.get()? else {
-            return None;
-        };
-        Some(match self.edit {
-            Edit::Executable => patch
-                .clone()
-                .unwrap_or_else(|| Err(String::new()))
-                .and_then(|file| meta::executable_plan(snapshot, &file)),
-            Edit::LetterCase => meta::case_rename_plan(snapshot, &self.name),
-        })
-    }
-
     pub(in crate::repo) fn show(&mut self, ui: &mut Ui, idle: bool) -> Outcome {
+        if let Some(action) = self.settle() {
+            return Outcome::Done(Box::new(action));
+        }
         let t = Tokens::get(ui.ctx());
         let (heading, button) = match self.edit {
             Edit::Executable => ("file-metadata-executable-title", "file-metadata-apply"),
@@ -74,22 +64,24 @@ impl FileMetaForm {
             enter = self.name_field(ui);
         }
         self.state(ui, &t);
-        let plan = self.plan();
+        let plan = self.preview();
         match &plan {
             Some(Ok(plan)) => self.describe(ui, plan),
-            Some(Err(why)) => {
-                ui.add(egui::Label::new(RichText::new(why).color(t.warning)).wrap());
-            }
+            Some(Err(why)) => warn(ui, why, t.warning),
             None => {}
         }
         ui.add_space(12.0);
-        buttons(
-            ui,
-            crate::i18n::text(button),
-            idle,
-            enter,
-            plan.and_then(Result::ok),
-        )
+        let ready = idle && self.pending.is_none() && matches!(plan, Some(Ok(_)));
+        let label = crate::i18n::text(button);
+        let (confirm, cancel) = buttons(ui, label, ready, enter);
+        if confirm {
+            self.start(true);
+        }
+        if cancel {
+            Outcome::Cancel
+        } else {
+            Outcome::Open
+        }
     }
 
     /// The new name, which takes the keyboard when the dialog opens. True on Enter.
@@ -106,19 +98,29 @@ impl FileMetaForm {
         crate::a11y::singleline_enter(&edit)
     }
 
-    /// Reading, or why the file couldn't be read.
+    /// Reading, why the file couldn't be read, and what changed since it was shown.
     fn state(&self, ui: &mut Ui, t: &Tokens) {
-        match self.read.get() {
-            None => {
-                ui.horizontal(|ui| {
-                    ui.add(crate::spinner::Spinner::new().size(14.0));
-                    ui.label(RichText::new(crate::i18n::text("repo-core-1435")).color(t.text_dim));
-                });
-            }
-            Some(Err(e)) => {
-                ui.add(egui::Label::new(RichText::new(e).color(t.danger)).wrap());
-            }
-            Some(Ok(_)) => {}
+        if self.pending.is_some() {
+            ui.horizontal(|ui| {
+                ui.add(crate::spinner::Spinner::new().size(14.0));
+                ui.label(RichText::new(crate::i18n::text("repo-core-1435")).color(t.text_dim));
+            });
+            ui.ctx()
+                .request_repaint_after(std::time::Duration::from_millis(50));
+        }
+        if let Some(Err(e)) = &self.read {
+            warn(ui, e, t.danger);
+        }
+        if self.changed {
+            warn(ui, crate::i18n::text("file-metadata-changed"), t.warning);
+        }
+        let tracks_modes = matches!(&self.read, Some(Ok(s)) if s.file_mode);
+        if self.edit == Edit::Executable && tracks_modes {
+            warn(
+                ui,
+                crate::i18n::text("file-metadata-file-mode-warning"),
+                t.warning,
+            );
         }
     }
 
@@ -164,40 +166,20 @@ impl FileMetaForm {
     }
 }
 
-/// The primary button, enabled once there is an edit to make and nothing runs, and Cancel.
-fn buttons(ui: &mut Ui, label: &str, idle: bool, enter: bool, plan: Option<Plan>) -> Outcome {
-    let valid = idle && plan.is_some();
-    let mut plan = plan;
-    let mut outcome = Outcome::Open;
-    ui.horizontal(|ui| {
-        let primary = widgets::primary_button(ui, label, valid, 90.0);
-        if valid
-            && (primary.clicked() || enter)
-            && let Some(plan) = plan.take()
-        {
-            outcome = Outcome::Done(Box::new(run_action(plan)));
-        }
-        let cancel =
-            egui::Button::new(crate::i18n::text("repo-core-0443")).min_size(egui::vec2(80.0, 30.0));
-        if ui.add(cancel).clicked() {
-            outcome = Outcome::Cancel;
-        }
-    });
-    outcome
+fn warn(ui: &mut Ui, text: &str, color: egui::Color32) {
+    ui.add(egui::Label::new(RichText::new(text).color(color)).wrap());
 }
 
-/// The operation the dialog confirms: undoable with the plan's inverse commands.
-fn run_action(plan: Plan) -> Action {
-    let undo = Undo::Custom {
-        undo: plan.undo,
-        redo: plan.ops.clone(),
-    };
-    Action::UndoableOps {
-        label: plan.label,
-        ops: plan.ops,
-        refresh: Refresh::Status,
-        undo,
-    }
+/// The primary button, enabled when `ready` (also Enter), and Cancel: (confirmed, cancelled).
+fn buttons(ui: &mut Ui, label: &str, ready: bool, enter: bool) -> (bool, bool) {
+    ui.horizontal(|ui| {
+        let primary = widgets::primary_button(ui, label, ready, 90.0);
+        let cancel =
+            egui::Button::new(crate::i18n::text("repo-core-0443")).min_size(egui::vec2(80.0, 30.0));
+        let cancelled = ui.add(cancel).clicked();
+        (ready && (primary.clicked() || enter), cancelled)
+    })
+    .inner
 }
 
 #[cfg(test)]
