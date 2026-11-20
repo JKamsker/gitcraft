@@ -24,7 +24,7 @@ mod discovery;
 mod effects;
 #[path = "park/locking.rs"]
 mod locking;
-pub use discovery::recovery_location;
+pub use discovery::{Listing, recovery_location};
 #[path = "park/bytes.rs"]
 mod bytes;
 #[path = "park/durability.rs"]
@@ -343,27 +343,13 @@ fn forget_locked(repo: &Path, id: &str) {
 
 /// Active parked merges and retained completed recovery archives for `repo`, oldest first.
 pub fn list(repo: &Path) -> Result<Vec<Parked>, String> {
-    let top = trimmed(run(repo, &["rev-parse", "--show-toplevel"])?);
-    let ids = discovery::identities(repo)?;
-    // A snapshot can name a source which is retired before its lock is acquired.
-    // Resolve and read under the same stable lease used by foreground operations.
-    let mut recovered = Vec::new();
-    for id in ids {
-        let _lease = locking::acquire(repo, &id)?;
-        let Some(parked) = discovery::manifest(repo, &id)? else {
-            continue;
-        };
-        if crate::remote::same_dir(Path::new(&parked.worktree), Path::new(&top))
-            && journal::recover_locked(repo, &parked)?
-        {
-            recovered.push(parked);
-        }
-    }
-    let mut found = recovered;
-    found.sort_by(|a, b| a.id.cmp(&b.id));
-    found.dedup_by(|a, b| a == b);
-    found.sort_by_key(|p| p.at);
-    Ok(found)
+    discovery::listing(repo).map(|found| found.parked)
+}
+
+/// [`list`], and the reservations of put-asides that never completed (to report, and
+/// [`forget`] on the user's say).
+pub fn list_all(repo: &Path) -> Result<Listing, String> {
+    discovery::listing(repo)
 }
 
 /// Drops `parked` without bringing it back, its files kept on a branch of their own (named

@@ -3329,3 +3329,7 @@ publish-edit = Ziel ändern
 publish-checklist = Weiter zur Push-Prüfliste. Der Upstream wird erst nach erfolgreichem Push geändert. Gerrit-Reviews bleiben eine separate Aktion.
 publish-no-remotes = Vor der Veröffentlichung ein Remote hinzufügen.
 publish-tracking-blocked = Dieser Branch hat mehrere Upstream-Werte. Zuerst über Upstream ändern einen einzelnen Upstream auswählen.
+repo-core-incomplete-parked-archive = { $count ->
+        [one] Ein Beiseitelegen wurde unterbrochen, bevor sein Archiv vollständig war. Der Merge wurde nie aus dem Arbeitsverzeichnis entfernt, es geht also nichts verloren. Die Reste können entfernt werden: der Ordner { $path } und die Ref { $ref }.
+       *[other] { $count } Beiseitelegen wurden unterbrochen, bevor ihre Archive vollständig waren. Ihre Merges wurden nie aus dem Arbeitsverzeichnis entfernt, es geht also nichts verloren. Die Reste können entfernt werden, zuerst der Ordner { $path } und die Ref { $ref }.
+    }

@@ -62,7 +62,9 @@ a stop at each point:
   After P5, `refs/gitcraft/parked/<id>` can exist with no listed archive. Nothing finds it
   automatically, and nothing removes it after a crash: `forget_locked` runs only on
   returned errors. **[gap G1: orphaned reservation and ref after a crash during
-  archiving; they waste space but lose no data]**
+  archiving; they waste space but lose no data]** Since slice 3, `list_all` reports such a
+  reservation as incomplete and the resolver tab names its folder and ref; removal stays
+  the user's choice.
 - **After P7, before P9 (process kill):** `parked.json` is complete and
   `latest == Archiving`. `manifest` returns the archive and `recover_locked`
   (`_ => Ok(true)`) lists it, even though the worktree was never cleared. Bring back is
@@ -77,8 +79,9 @@ a stop at each point:
   manifest made `manifest` return `Err("Invalid recovery manifest …")` and `list` fail for
   every archive of the repository. Archives written that way can still exist, so
   `manifest` now treats an unreadable manifest whose last receipt is `Archiving` as an
-  incomplete reservation: not listed and its manifest left untouched. The skip is noted for the
-  test and recording harnesses only (`effects::note`); production has no log to show it. The
+  incomplete reservation: not listed as an archive, its manifest left untouched, and reported
+  by `list_all` with its folder; the resolver tab then tells the user (once per change)
+  where its folder and ref are, so they can be removed (`forget` removes both). The
   worktree was never cleared at `Archiving`, so nothing is hidden that is not still live.
   Past `Archiving`, or with no receipts at all (a legacy archive whose worktree may have been
   cleared), it still fails closed. **[code; `checks/discovery.rs`]**
@@ -285,7 +288,7 @@ byte under the fixture. **[observed: Windows 11 26200 NTFS, local runs; CI runs 
 
 | Killed after | Restart finds |
 |---|---|
-| P2 `archive-reserved`, P3 `phase:Archiving`, P4 `archive-index-copied`, P5 `update-ref refs/gitcraft/parked/…`, P6 last `archive-metadata-copied` and a `raw` copy, P7 manifest temp flushed | Nothing listed; live worktree untouched; explicit `forget` removes the reservation and ref (G1 stays: nothing removes them automatically) |
+| P2 `archive-reserved`, P3 `phase:Archiving`, P4 `archive-index-copied`, P5 `update-ref refs/gitcraft/parked/…`, P6 last `archive-metadata-copied` and a `raw` copy, P7 manifest temp flushed | Not listed as an archive but reported as incomplete (`list_all`; the tab tells the user its folder and ref); live worktree untouched; `forget` removes the reservation and ref. Nothing removes them automatically |
 | P7 `archive-manifest-written`, P9 `archive-reachable`, P10 `phase:Archived`, `phase:Clearing` | Listed; bring back refused (merge still in progress); drop to branch keeps it |
 | P11 `git reset`, P12 `phase:Parked` | Listed; brought back byte-exact |
 | R1 evidence, R2 `phase:Restoring`, R5 `restore-plan-durable`, R6b `destination-temp-durable` / `destination-published`, last `restore-copy-applied`, R7 `live-restore-synced`, R8 `phase:Restored` / `phase:Cleanup` | Brought back byte-exact (resumed against the plan where one is durable) |

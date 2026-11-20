@@ -6,6 +6,7 @@
 //! kept, or waits to be brought back.
 
 mod drop;
+mod incomplete;
 mod record;
 pub(super) use record::preserve_uncertain;
 use record::*;
@@ -53,12 +54,12 @@ impl RepoTab {
         let repo = self.path.clone();
         self.then(
             ctx,
-            move || park::list(&repo),
+            move || park::list_all(&repo),
             |tab, parked, ctx| tab.parked_read(parked, ctx),
         );
     }
 
-    fn parked_read(&mut self, parked: Result<Vec<Parked>, String>, ctx: &egui::Context) {
+    fn parked_read(&mut self, parked: Result<park::Listing, String>, ctx: &egui::Context) {
         self.resolver.reading_parked = false;
         // Read before a change made here (or asked for since): read again, this one dropped.
         if std::mem::take(&mut self.resolver.read_parked_again) {
@@ -66,7 +67,10 @@ impl RepoTab {
             return;
         }
         let parked = match parked {
-            Ok(parked) => parked,
+            Ok(found) => {
+                self.report_incomplete(&found.incomplete);
+                found.parked
+            }
             Err(error) => {
                 self.status = Some(crate::repo::notice::Notice::plain((
                     format!("The recovery archives couldn't be read: {error}"),

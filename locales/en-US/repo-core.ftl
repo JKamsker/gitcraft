@@ -3326,3 +3326,7 @@ publish-edit = Change destination
 publish-checklist = Continue to the push checklist. Tracking changes only after the reviewed push succeeds. Gerrit review submission remains a separate action.
 publish-no-remotes = Add a remote before publishing a branch.
 publish-tracking-blocked = This branch has multiple tracking values. Use Change upstream to select a single upstream before publishing.
+repo-core-incomplete-parked-archive = { $count ->
+        [one] A put-aside was interrupted before its archive was complete. The merge was never cleared from the worktree, so nothing is lost. Its leftovers can be removed: the folder { $path } and the ref { $ref }.
+       *[other] { $count } put-asides were interrupted before their archives were complete. Their merges were never cleared from the worktree, so nothing is lost. Their leftovers can be removed, the first being the folder { $path } and the ref { $ref }.
+    }

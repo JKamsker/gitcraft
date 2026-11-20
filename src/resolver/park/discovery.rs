@@ -60,19 +60,77 @@ pub(super) fn identities(repo: &Path) -> Result<std::collections::BTreeSet<Strin
     Ok(ids)
 }
 
+/// What [`list`](super::list) finds: archives, and reservations of put-asides that never
+/// completed.
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct Listing {
+    pub parked: Vec<Parked>,
+    /// Ids and folders of reservations interrupted before their manifest was published (or
+    /// with one torn while still archiving). Their worktree was never cleared, so nothing of
+    /// them is lost; [`forget`](super::forget) removes one and its ref. Never removed
+    /// automatically.
+    pub incomplete: Vec<(String, PathBuf)>,
+}
+
+/// Active parked merges, retained completed recovery archives (oldest first) and
+/// incomplete reservations for `repo`.
+pub(super) fn listing(repo: &Path) -> Result<Listing, String> {
+    let top = trimmed(run(repo, &["rev-parse", "--show-toplevel"])?);
+    let ids = identities(repo)?;
+    // A snapshot can name a source which is retired before its lock is acquired.
+    // Resolve and read under the same stable lease used by foreground operations.
+    let mut found = Listing::default();
+    for id in ids {
+        let _lease = locking::acquire(repo, &id)?;
+        let parked = match manifest(repo, &id)? {
+            Manifest::Archive(parked) => parked,
+            Manifest::Incomplete(dir) => {
+                found.incomplete.push((id, dir));
+                continue;
+            }
+            Manifest::Absent => continue,
+        };
+        if crate::remote::same_dir(Path::new(&parked.worktree), Path::new(&top))
+            && journal::recover_locked(repo, &parked)?
+        {
+            found.parked.push(parked);
+        }
+    }
+    found.parked.sort_by(|a, b| a.id.cmp(&b.id));
+    found.parked.dedup_by(|a, b| a == b);
+    found.parked.sort_by_key(|p| p.at);
+    Ok(found)
+}
+
+pub(super) enum Manifest {
+    Archive(Parked),
+    /// An active reservation whose manifest is missing or torn while its last receipt is
+    /// still Archiving (or it has none): the worktree was never cleared.
+    Incomplete(PathBuf),
+    /// Nothing readable where a retained archive would be.
+    Absent,
+}
+
 /// The caller holds the stable identity lease through reading and reconciliation.
-pub(super) fn manifest(repo: &Path, id: &str) -> Result<Option<Parked>, String> {
+pub(super) fn manifest(repo: &Path, id: &str) -> Result<Manifest, String> {
     let source = folder(repo, id)?;
     let retained = crate::agent::repo_file(repo, &format!("parked-recovery/{id}/parked"))?;
     if source.join("parked.json").exists() && retained.join("parked.json").exists() {
         return Err(format!("Recovery archive collision: {id}"));
     }
     let dir = if source.join("parked.json").exists() {
-        source
+        source.clone()
     } else if retained.is_dir() {
         retained
     } else {
-        source
+        source.clone()
+    };
+    let incomplete = || {
+        if dir == source {
+            Manifest::Incomplete(dir.clone())
+        } else {
+            Manifest::Absent
+        }
     };
     let path = dir.join("parked.json");
     let bytes = match std::fs::read(&path) {
@@ -84,7 +142,7 @@ pub(super) fn manifest(repo: &Path, id: &str) -> Result<Option<Parked>, String> 
                 journal::latest(&dir)?,
                 None | Some(journal::Phase::Archiving)
             ) {
-                return Ok(None);
+                return Ok(incomplete());
             }
             return Err(format!("Missing recovery manifest: {}", path.display()));
         }
@@ -95,19 +153,20 @@ pub(super) fn manifest(repo: &Path, id: &str) -> Result<Option<Parked>, String> 
         // While the last receipt is Archiving the worktree was never cleared, so an
         // unreadable manifest (torn by a version that wrote it in place) is an incomplete
         // reservation, not an archive: it must not hide every other archive of the
-        // repository. It stays on disk, untouched. Without receipts (a legacy archive, whose
-        // worktree may have been cleared) or past Archiving it is corruption: fail closed.
+        // repository. It stays on disk, untouched, and is reported. Without receipts (a
+        // legacy archive, whose worktree may have been cleared) or past Archiving it is
+        // corruption: fail closed.
         Err(e) if journal::latest(&dir)? == Some(journal::Phase::Archiving) => {
             effects::note(&format!(
                 "Incomplete recovery reservation {} (unreadable manifest: {e})",
                 dir.display()
             ));
-            return Ok(None);
+            return Ok(incomplete());
         }
         Err(e) => return Err(format!("Invalid recovery manifest {}: {e}", path.display())),
     };
     if parked.id != id {
         return Err(format!("Recovery manifest identity mismatch: {id}"));
     }
-    Ok(Some(parked))
+    Ok(Manifest::Archive(parked))
 }

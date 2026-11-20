@@ -100,6 +100,10 @@ fn a_torn_manifest_while_archiving_hides_no_other_archive() {
     for _ in 0..2 {
         assert_eq!(list(&f.0).unwrap(), vec![p.clone()]);
     }
+    // Reported, so the user can be told, and removable with forget, alone.
+    let found = list_all(&f.0).unwrap();
+    assert_eq!(found.parked, vec![p.clone()]);
+    assert_eq!(found.incomplete, vec![("torn-id".to_owned(), torn.clone())]);
     let notes = effects::NOTES.with(|n| n.borrow().clone());
     assert!(
         notes
@@ -122,7 +126,12 @@ fn a_torn_manifest_while_archiving_hides_no_other_archive() {
             .unwrap_err()
             .contains("Invalid recovery manifest")
     );
-    std::fs::remove_dir_all(&torn).unwrap();
-    assert_eq!(list(&f.0).unwrap(), vec![p]);
+    // Archiving again: reported again, and forget removes it and nothing else.
+    journal::record(&torn, journal::Phase::Archiving).unwrap();
+    assert_eq!(list_all(&f.0).unwrap().incomplete.len(), 1);
+    forget(&f.0, "torn-id");
+    assert!(!torn.exists());
+    let found = list_all(&f.0).unwrap();
+    assert_eq!((found.parked, found.incomplete), (vec![p], Vec::new()));
     f.proof();
 }

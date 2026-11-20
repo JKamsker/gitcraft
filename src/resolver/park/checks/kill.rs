@@ -184,8 +184,26 @@ fn restart(f: &Fixture, action: &str, parked: Option<&Parked>, at: &str) -> &'st
         // Killed before the manifest was published: the worktree was never touched.
         assert_eq!(action, "park", "{at}");
         live_original(f);
+        // Reported as incomplete (the user is told where), then forgotten on request.
+        let found = list_all(&f.0).unwrap();
+        let reservation = folder(&f.0, "test-id").unwrap();
+        assert_eq!(
+            found.incomplete,
+            vec![("test-id".into(), reservation)],
+            "{at}"
+        );
         forget(&f.0, "test-id");
-        assert!(list(&f.0).unwrap().is_empty(), "{at}");
+        assert_eq!(list_all(&f.0).unwrap(), Listing::default(), "{at}");
+        let pinned = run(
+            &f.0,
+            &[
+                "rev-parse",
+                "-q",
+                "--verify",
+                "refs/gitcraft/parked/test-id",
+            ],
+        );
+        assert!(pinned.is_err(), "{at}: forget left the ref");
         let settled = tree(&f.0);
         forget(&f.0, "test-id");
         assert!(list(&f.0).unwrap().is_empty(), "{at}");
