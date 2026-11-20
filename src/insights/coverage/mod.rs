@@ -302,7 +302,13 @@ impl Coverage {
     }
 }
 
+mod cache;
 mod read;
+mod report;
 pub use read::analyze;
+mod lines;
+pub use lines::{LinesCoverage, Side, of_lines};
+#[cfg(test)]
+mod lines_tests;
 #[cfg(test)]
 use read::read_sidecar;

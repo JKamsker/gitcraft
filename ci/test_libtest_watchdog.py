@@ -35,7 +35,11 @@ def feed(parser, text):
 
 def alive(pid):
     if sys.platform == "win32":
-        listing = subprocess.run(["tasklist", "/FI", f"PID eq {pid}", "/NH"], stdout=subprocess.PIPE, text=True)
+        # tasklist answers in the console's OEM code page (a German "ausgeführt" is not valid
+        # cp1252); only the PID's digits matter here.
+        listing = subprocess.run(
+            ["tasklist", "/FI", f"PID eq {pid}", "/NH"], stdout=subprocess.PIPE, text=True, errors="replace"
+        )
         return str(pid) in listing.stdout
     state = subprocess.run(["ps", "-p", str(pid), "-o", "stat="], stdout=subprocess.PIPE, text=True).stdout.strip()
     return bool(state) and not state.startswith("Z")

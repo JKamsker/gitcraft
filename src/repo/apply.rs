@@ -318,6 +318,7 @@ impl RepoTab {
             Action::DiffRich(kind) => self.show_diff_rich(kind, ctx),
             Action::DiffGoToLine { old, new } => self.diff_go_to_line(old, new),
             Action::DiffWrap(on) => self.wrap_diff(on, ctx),
+            Action::DiffCoverage(act) => self.diff_coverage(act, ctx),
             Action::DiffSvgSource(on) => {
                 if let Some(view) = &mut self.diff {
                     view.svg_source = on;

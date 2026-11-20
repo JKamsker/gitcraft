@@ -53,6 +53,7 @@ impl RepoTab {
                 view.scroll_to = Some(super::offset_of_place(data, split, place));
                 view.restore = None;
             }
+            view.coverage.sync(settings.diff_coverage);
             // The choice for its file type changed elsewhere (another tab, the settings).
             let algorithm = super::algorithm_for(&settings, view.key.path());
             if view.algorithm != algorithm {
@@ -175,6 +176,8 @@ impl RepoTab {
                 auto_opened = Some(mark);
             }
         }
+        super::coverage::request(view, settings.diff_coverage, acts);
+        super::coverage::banner(ui, &view.coverage, settings.diff_coverage);
         if let Some(open) = &view.moved {
             super::moved_view::panel(ui, &t, data, open, acts);
         }
@@ -199,6 +202,7 @@ impl RepoTab {
         let mut rows = Rows::new(ui, view, data, review.as_ref(), pickable, split)
             .with_find(&self.find, reveal);
         rows.links = links.as_ref();
+        rows.coverage = settings.diff_coverage.then_some(&view.coverage);
         let sel = rows.show(ui, &path, acts);
         let text_started = rows.text_started;
         let (clicked, offset, jumped, seen) = (rows.clicked, rows.offset, rows.jumped, rows.seen);

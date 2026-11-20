@@ -1,5 +1,5 @@
-//! The Diffs card of the Git page: folding generated files and lockfiles, and the diff
-//! algorithms chosen per file type.
+//! The Diffs card of the Git page: folding generated files and lockfiles, test coverage marks,
+//! and the diff algorithms chosen per file type.
 
 use super::layout::{self, Card};
 use super::{FIELD_WIDTH, Settings};
@@ -29,6 +29,17 @@ impl Settings {
                         .desired_width(layout::fit(ui, FIELD_WIDTH)),
                 )
                 .on_hover_text(crate::i18n::text("interaction-settings-fold-pattern-tip"));
+            },
+        );
+        card.row(
+            "Test coverage in diffs",
+            "coverage lcov cobertura gutter covered uncovered tests",
+            |ui| {
+                ui.checkbox(
+                    &mut self.diff_coverage,
+                    crate::i18n::text("diff-coverage-setting"),
+                )
+                .on_hover_text(crate::i18n::text("diff-coverage-setting-tip"));
             },
         );
         card.row(
