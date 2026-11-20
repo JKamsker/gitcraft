@@ -338,5 +338,13 @@
     "reason": "Plain merge combines dev #243 publication-dialog coordinator dependency (613 symbols) with PR #224 independent WorktreeCleanup state dependency (+1), for a combined 614. All declarations published on either branch remain unchanged.",
     "owner": "@JKamsker",
     "remediation": "Keep publication and cleanup implementation in owned feature modules; reduce coordinator symbol dependencies as dialog composition is decomposed and ratchet the budget."
+  },
+  "205-runtime-dir-sync-115": {
+    "changes": [
+      "budget/runtime/exported=115"
+    ],
+    "reason": "#205: new platform helper gitcraft::dir_sync (std-only directory flush, Windows FlushFileBuffers included) exports sync and unopenable_for_flush, both used by the conflicts domain (resolver parking journal and agent run record) instead of two diverging copies. 113 -> 115.",
+    "owner": "@JKamsker",
+    "remediation": "Narrow the listed exported-but-unused runtime items (diagnostics, network, portable) and ratchet the budget."
   }
 }
