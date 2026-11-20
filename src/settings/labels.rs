@@ -49,6 +49,7 @@ pub(super) fn display(raw: &str) -> &str {
         "Diff context" => crate::i18n::text("interaction-settings-label-diff-context"),
         "Diff layout" => crate::i18n::text("interaction-settings-label-diff-layout"),
         "Diff tool" => crate::i18n::text("interaction-settings-label-diff-tool"),
+        "Test coverage in diffs" => crate::i18n::text("diff-coverage-setting-label"),
         "Diffs" => crate::i18n::text("interaction-settings-label-diffs"),
         "Diffs and files" => crate::i18n::text("interaction-settings-label-diffs-and-files"),
         "Editor command" => crate::i18n::text("interaction-settings-label-editor-command"),
