@@ -11,6 +11,8 @@
 //! subdirectories (a volume root for a standard user) can still be flushed. The handle shares
 //! read, write and delete, so it never blocks another process renaming or removing entries.
 //!
+//! Any other platform gets an `Unsupported` error, never a silent no-op: callers fail closed.
+//!
 //! This module is std-only: the recovery-recording harness (`src/resolver/park/checks`)
 //! compiles it too.
 use std::io;

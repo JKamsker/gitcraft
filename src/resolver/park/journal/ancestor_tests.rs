@@ -26,7 +26,7 @@ fn the_directory_itself_must_flush_even_when_access_is_denied() {
     let sync = recorded(&mut seen, |dir| {
         (dir == deep()).then_some(ErrorKind::PermissionDenied)
     });
-    let error = climb_ancestors(&path, &mut Default::default(), sync)
+    let error = climb_ancestors(&path, &mut Default::default(), false, sync)
         .err()
         .unwrap_or_else(|| "flush denial was ignored".into());
     assert!(error.contains("parked"), "{error}");
@@ -41,7 +41,7 @@ fn an_ancestor_without_entry_rights_ends_the_climb_only_on_windows() {
     let sync = recorded(&mut seen, |dir| {
         (dir == denied).then_some(ErrorKind::PermissionDenied)
     });
-    let result = climb_ancestors(&path, &mut Default::default(), sync);
+    let result = climb_ancestors(&path, &mut Default::default(), false, sync);
     // Nothing above the denied ancestor is flushed: the climb stops right there.
     assert_eq!(seen.last().map(PathBuf::as_path), Some(denied.as_path()));
     assert_eq!(seen.len(), 3);
@@ -67,11 +67,11 @@ fn an_ancestor_held_without_write_sharing_ends_the_climb_only_on_windows() {
             Ok(())
         }
     };
-    let result = climb_ancestors(&path, &mut Default::default(), sync);
+    let result = climb_ancestors(&path, &mut Default::default(), false, sync);
     assert_eq!(seen.len(), 4);
     assert_eq!(result.is_ok(), cfg!(windows), "{result:?}");
     // The directory itself held is still an error.
-    let result = climb_ancestors(&held, &mut Default::default(), |_| {
+    let result = climb_ancestors(&held, &mut Default::default(), false, |_| {
         Err(Error::from_raw_os_error(32))
     });
     assert!(result.is_err());
@@ -87,7 +87,7 @@ fn any_other_ancestor_failure_is_reported_with_its_path() {
         let path = deep();
         let mut seen = Vec::new();
         let sync = recorded(&mut seen, |dir| (dir == Path::new("repo")).then_some(kind));
-        let error = climb_ancestors(&path, &mut Default::default(), sync)
+        let error = climb_ancestors(&path, &mut Default::default(), false, sync)
             .err()
             .unwrap_or_default();
         assert!(error.starts_with("sync repo:"), "{kind:?}: {error}");
@@ -103,7 +103,7 @@ fn shared_ancestors_flush_once_but_each_requested_directory_stays_strict() {
     let b = Path::new("repo").join("src").join("b");
     for dir in [&a, &b, &a] {
         assert_eq!(
-            climb_ancestors(dir, &mut done, recorded(&mut seen, |_| None)),
+            climb_ancestors(dir, &mut done, false, recorded(&mut seen, |_| None)),
             Ok(())
         );
     }
@@ -115,9 +115,9 @@ fn shared_ancestors_flush_once_but_each_requested_directory_stays_strict() {
     let src = Path::new("repo").join("src");
     let deny = |dir: &Path| (dir == src).then_some(ErrorKind::PermissionDenied);
     let mut seen = Vec::new();
-    let first = climb_ancestors(&a, &mut done, recorded(&mut seen, deny));
+    let first = climb_ancestors(&a, &mut done, false, recorded(&mut seen, deny));
     assert_eq!(first.is_ok(), cfg!(windows));
-    let error = climb_ancestors(&src, &mut done, recorded(&mut seen, deny))
+    let error = climb_ancestors(&src, &mut done, false, recorded(&mut seen, deny))
         .err()
         .unwrap_or_default();
     assert!(error.contains("src"), "{error}");

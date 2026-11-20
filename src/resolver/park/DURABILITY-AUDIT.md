@@ -20,7 +20,7 @@ slice.
 | `record(dir, phase)` | `journal/receipts.rs` | Reads every receipt first (`latest`), creates `journal-v1/` if needed, `sync_ancestors(journal-v1)`, then `atomic_write(journal-v1/<n:08>.json)`. Receipts are append-only. |
 | `latest(dir)` | `journal/receipts.rs` | Reads receipts in name order. Only `*.json` counts, so a `.pending` temp file is never a receipt. A torn **final** version-1 receipt is copied to `.torn` and replaced with `Uncertain`. Any other unreadable receipt, or an unknown version, is an error. |
 | `sync_dir(dir)` | `journal.rs` → `crate::dir_sync::sync` | Flushes a directory's entries. Unix: `fsync` on a read-only fd. Windows (since this slice): `FlushFileBuffers` on a directory handle opened with `FILE_FLAG_BACKUP_SEMANTICS` and `FILE_ADD_FILE` access, or `FILE_ADD_SUBDIRECTORY` if that is denied. Before this slice it did nothing on Windows. |
-| `sync_ancestors(path)` | `journal.rs` | `sync_dir` on `path` and then each parent up to the filesystem root. Boundary `directory-synced` after each one. On Windows the climb stops at the first ancestor (never `path` itself) that cannot be opened for flushing. One reason is access denied for both entry-adding rights, which means this process cannot have created anything there. The other is `ERROR_SHARING_VIOLATION`: another process holds the directory without `FILE_SHARE_WRITE`. This was observed on `%LOCALAPPDATA%` during a harness run. **[gap G8]** If that ancestor is one gitcraft created (`gitcraft/`, `parked/`, `parked-recovery/<id>/`), its entry waits for the next receipt's climb. |
+| `sync_ancestors(path)` | `journal.rs` | `sync_dir` on `path` and then each parent up to the filesystem root. Boundary `directory-synced` after each one. On Windows the climb stops at the first ancestor (never `path` itself) that cannot be opened for flushing. One reason is access denied for both entry-adding rights, which means this process cannot have created anything there. The other is `ERROR_SHARING_VIOLATION`: another process holds the directory without `FILE_SHARE_WRITE`. This was observed on `%LOCALAPPDATA%` during a harness run. **[gap G8]** If that ancestor is one gitcraft created (`gitcraft/`, `parked/`, `parked-recovery/<id>/`), every later receipt retries its entry. While another process keeps holding that directory, the entry stays unflushed. Retrying a few times, or failing when the held directory is inside the store, would close this. |
 | `sync_existing` / `sync_file` | `journal.rs` | Opens an existing file without truncating it (write access on Windows, because `FlushFileBuffers` needs it) and calls `sync_all`. |
 | `sync_tree(dir)` | `journal.rs` | Flushes every regular file under `dir` unless `durability::proven` shows it is already flushed and unchanged. Then `sync_dir` on every directory, children before parents. Errors on a non-regular entry. |
 | `durability::copy` | `durability.rs` | `fs::copy` to a new owned output, `sync_all` (on Windows through a writable handle, after clearing and then restoring the output's READONLY bit), then `remember`: a content, identity and mtime stamp written with `atomic_write` under `durable-v1/`, plus `sync_ancestors`. |
@@ -29,7 +29,7 @@ slice.
 All renames use `std::fs::rename`. On Windows that is
 `MoveFileExW(MOVEFILE_REPLACE_EXISTING)`, falling back to `SetFileInformationByHandle(
 FileRenameInfoEx, POSIX_SEMANTICS)` on access denial **[code: std
-`sys/fs/windows.rs`, Rust 1.99]**. No rename asks for write-through. The rename itself is
+`sys/fs/windows.rs` of the local 1.99.1 toolchain; older std versions may differ]**. No rename asks for write-through. The rename itself is
 not flushed. It becomes durable through the `sync_dir` calls that follow it.
 
 ## Park (`park::park`)
@@ -101,7 +101,7 @@ a stop at each point:
 | R5 | `transaction::prepare` → `atomic_write(restore-plan.json)` | full before/after images | yes | yes |
 | R6a | `resume`, index entry | `index.lock` (create_new), then evidence | lock file, evidence | `index.lock` → `index`, then `sync_dir(git dir)` |
 | R6b | `resume`, other entries → `publish` | `.gitcraft-restore-<n>/bytes`, evidence | copy, staging and parent before the rename; parent and staging after it | copy → live path |
-| R7 | `verified`, `sync_live` | — | every live tracked, changed or raw file unless proven; index and state files; then `sync_ancestors_of` every distinct file parent and the git dir | — |
+| R7 | `verified`, `sync_live` | — | every live tracked, changed or raw file unless proven; index and state files; then `sync_ancestors_of` every distinct file parent, deepest first, and the git dir. On Windows a live parent this process may not add entries to is skipped. Neither the restore nor Git, running as this process, can have created anything in such a directory. A parent that another process holds without write sharing fails the restore, and the archive is kept. | — |
 | R8 | `record(Restored)`, `record(Cleanup)`, `retire` | receipts | yes | see cleanup |
 
 Restart in `bring_back`, when `latest` is `Restoring`, `Restored`, `Cleanup` or
@@ -185,7 +185,11 @@ missing or invalid.
   be missing. The scratch worktree is kept by `preserve`, so the agent's work survives at
   its original location. Only the published copy is lost.
 - Windows: `sync_dir` in this file did nothing before this slice. It now flushes, like
-  the journal's.
+  the journal's, and `sync_tree` flushes every directory of the kept copy strictly. If a directory
+  of the copy cannot be opened for flushing, `keep_record` now fails on Windows. That
+  happens, for example, while another process holds the directory without write sharing.
+  Before this slice it was skipped silently. The scratch worktree
+  is still preserved in that case.
 
 ## Git durability
 

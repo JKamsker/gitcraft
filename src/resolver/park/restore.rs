@@ -306,6 +306,7 @@ pub(super) fn sync_live(repo: &Path, gd: &Path, parked: &Parked) -> Result<(), S
     for name in std::iter::once("index").chain(parked.state_files.iter().map(String::as_str)) {
         durability::sync_live_file(&dir, &format!("live/true/{name}"), &gd.join(name))?;
     }
-    journal::sync_ancestors_of(parents.iter().map(PathBuf::as_path).chain([gd]))?;
+    // Deepest paths sort last: reversed, each child is flushed before its parent.
+    journal::sync_ancestors_of(parents.iter().rev().map(PathBuf::as_path).chain([gd]))?;
     effects::boundary("live-restore-synced")
 }

@@ -92,33 +92,49 @@ pub(super) use receipts::{atomic_write, latest, record};
 
 /// Persist reachability, including ancestors created by repo_file/reserve.
 pub(super) fn sync_ancestors(path: &Path) -> Result<(), String> {
-    climb_ancestors(path, &mut Default::default(), crate::dir_sync::sync)
+    climb_ancestors(path, &mut Default::default(), false, crate::dir_sync::sync)
 }
 
-/// [`sync_ancestors`] of each directory, flushing a shared ancestor once rather than once
-/// per file below it (each flush is a real `FlushFileBuffers` call on Windows).
+/// [`sync_ancestors`] of each live directory (children first), flushing a shared ancestor
+/// once rather than once per file below it (each flush is a real `FlushFileBuffers` call on
+/// Windows). Unlike an archive directory, a live directory may be one this process may not
+/// add entries to (a deny ACL on a tracked folder): then neither this restore nor Git running
+/// as this process created or renamed anything in it, so it is skipped on Windows. A live
+/// directory held by another process without write sharing still fails the restore.
 pub(super) fn sync_ancestors_of<'a>(
     dirs: impl IntoIterator<Item = &'a Path>,
 ) -> Result<(), String> {
+    sync_each(dirs, crate::dir_sync::sync)
+}
+
+fn sync_each<'a>(
+    dirs: impl IntoIterator<Item = &'a Path>,
+    mut sync: impl FnMut(&Path) -> std::io::Result<()>,
+) -> Result<(), String> {
     let mut done = std::collections::BTreeSet::new();
     for dir in dirs {
-        climb_ancestors(dir, &mut done, crate::dir_sync::sync)?;
+        climb_ancestors(dir, &mut done, true, &mut sync)?;
     }
     Ok(())
 }
 
-/// `path` itself must flush. On Windows the climb stops at the first ancestor that cannot be
+/// `path` itself must flush, unless `live` and this process may not add entries to it (see
+/// [`sync_ancestors_of`]). On Windows the climb stops at the first ancestor that cannot be
 /// opened for flushing: one this process may not add entries to (e.g. `C:\Users` for a
 /// standard user), which it cannot have created anything in, or one another process holds
 /// without write sharing (e.g. `%LOCALAPPDATA%`). Above the archive store such ancestors
-/// predate gitcraft; inside it, a directory gitcraft created is flushed again by every later
-/// receipt's climb. Unix flushes through read-only descriptors and propagates every
-/// failure. A directory in `done` was flushed already, and so were the ancestors above it.
+/// predate gitcraft. Inside it, a directory gitcraft created is retried by every later
+/// receipt's climb, but stays unflushed for as long as another process keeps holding it.
+/// Unix flushes through read-only descriptors and propagates every failure. A directory
+/// in `done` was flushed already, and the climb from it already ran.
 fn climb_ancestors(
     path: &Path,
     done: &mut std::collections::BTreeSet<PathBuf>,
+    live: bool,
     mut sync: impl FnMut(&Path) -> std::io::Result<()>,
 ) -> Result<(), String> {
+    let denied =
+        |e: &std::io::Error| cfg!(windows) && e.kind() == std::io::ErrorKind::PermissionDenied;
     let mut at = Some(path);
     while let Some(dir) = at {
         if done.contains(dir) {
@@ -128,6 +144,7 @@ fn climb_ancestors(
             Ok(()) => {}
             // Not remembered: should it be another call's own `path`, it must flush then.
             Err(e) if dir != path && crate::dir_sync::unopenable_for_flush(&e) => break,
+            Err(e) if dir == path && live && denied(&e) => break,
             Err(e) => return Err(format!("sync {}: {e}", dir.display())),
         }
         done.insert(dir.to_path_buf());
@@ -251,3 +268,7 @@ mod tests;
 #[cfg(test)]
 #[path = "journal/ancestor_tests.rs"]
 mod ancestor_tests;
+
+#[cfg(test)]
+#[path = "journal/live_dir_tests.rs"]
+mod live_dir_tests;

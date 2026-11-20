@@ -109,8 +109,10 @@ Directory flushes run on Unix (`fsync` of a read-only descriptor) and on Windows
 Every flush failure is returned, so a filesystem that cannot flush a directory fails the
 operation and keeps the archive. Climbing ancestors on Windows stops at the first one that
 cannot be opened for flushing: this process may not add entries to it (e.g. `C:\Users`),
-or another process holds it without write sharing (seen on `%LOCALAPPDATA%`). The
-directory itself is never skipped. Renames do not request write-through:
+or another process holds it without write sharing (seen on `%LOCALAPPDATA%`). An
+archive directory itself is never skipped. A live worktree directory that this process may
+not add entries to is skipped on Windows, because neither the restore nor Git could have
+written there. Renames do not request write-through:
 `MOVEFILE_WRITE_THROUGH` only affects cross-volume copy moves and all renames here stay on
 one volume, so NTFS's logged rename plus the following directory flushes is what is relied
 on. Flush success is observed on NTFS; its on-disk effect, ReFS/FAT/SMB and power loss are
