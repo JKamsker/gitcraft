@@ -118,7 +118,7 @@ stateDiagram-v2
 | Flow | Owner | Witness | Invalidated by | Late or stale reply | Busy and error cleared by | Stops work? |
 | --- | --- | --- | --- | --- | --- | --- |
 | Git operations | `operation_plan::start::RepoTab::run_ops_ex` and the other starters; `RepoTab::{busy_op, running, waiting}` | None on `Msg::OpDone`. `busy_op` admits one operation per tab, and the reply is delivered exactly once (success, panic, rejection and cancellation share one failure slot in `spawn_with`). The audited starters all return early while `busy_op` is set; that this covers every starter is **uncertain**. | — | `operation_plan::completion::RepoTab::op_done` always applies. | `op_done` clears `busy_op`, takes `running`, and runs `after_op`, which starts the next item in `waiting`. | `cancel_op` cancels `OpControl`. A queued job is purged and still delivers `OpDone(Err)`. A running one stops its process. |
-| Forge operations (create PR, stack publish, fork approval) | `forge_operation_sender` (`forge_operation = true`) | `forge_generation` | `bind_forge_selection` (which does not clear `busy_op`) | `handle` drops the continuation, calls `stale_fork_operation_finished`, clears `busy_op`, `op_started` and `running`, sets a notice and reloads. Because `busy_op` still belongs to that operation, clearing it is correct. It then calls `busy_op_released`, which starts what waited for it (see [Gaps](#gaps), item 3). | The stale branch in `handle` | No |
+| Forge operations (create PR, stack publish, fork approval) | `forge_operation_sender` (`forge_operation = true`) | `forge_generation` | `bind_forge_selection` (which does not clear `busy_op`) | `handle` drops the continuation, calls `stale_fork_operation_finished`, clears `busy_op`, `op_started` and `running`, sets a notice and reloads. Because `busy_op` still belongs to that operation, clearing it is correct. It then starts what waited for it, or drops it after a cancel or failure (see [Gaps](#gaps), item 3). | The stale branch in `handle` | No |
 
 ## Gaps
 
@@ -146,10 +146,16 @@ These were found while writing this page. They are not fixed here.
    commit B and press Re-run. A's reply re-enables B's buttons while B's request is still
    running, so a second action can be sent.
 3. **Fixed: a stale forge operation left queued actions stranded.** The stale-operation
-   branch of `RepoTab::handle` (`Msg::ForgeResult` with `operation = true`) now also clears
-   `running` and calls `running::release::RepoTab::busy_op_released`, which runs
-   `running::RepoTab::after_op` once the slot is free, so what waits in `RepoTab::waiting`
-   starts. `direct_tests/stale_operation_queue.rs` reproduces it: Create PR, Fetch queued, the
+   branch of `RepoTab::handle` (`Msg::ForgeResult` with `operation = true`) now goes through
+   `running::release::RepoTab::stale_forge_operation_ended`. It also clears `running` and calls
+   `running::release::RepoTab::busy_op_released`, which runs `running::RepoTab::after_op` once
+   the slot is free, so what waits in `RepoTab::waiting` starts. As after `op_done`, the
+   waiters are dropped instead (and named in the status) when the operation was cancelled or
+   its `OpDone` reply failed; a fork approval's reply is a continuation, so its outcome is not
+   known and counts as done. When a waiter replaces the status line, the stale operation's
+   notice stays as a toast (`finished`). Like `op_done`, it starts the waiter before its reload
+   lands: Fetch and Pull read what they need from Git when they run, and Push uses the branch
+   checked out, which a forge mutation does not move. `direct_tests/stale_operation_queue.rs` reproduces it: Create PR, Fetch queued, the
    primary forge changed in another tab of the same repository (and, separately, a remote URL
    change), and checks that Fetch starts.
    The feature completions that set `busy_op = None` themselves call `busy_op_released` too,
