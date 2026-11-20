@@ -272,7 +272,7 @@ fn esc_in_a_message_does_not_close_the_rebase_editor() {
         let mut out = ctx.run_ui(input, |ui| tab.shortcuts(ui.ctx(), &mut acts));
         out.textures_delta.clear();
         acts.iter()
-            .any(|a| matches!(a, super::super::Action::CloseRebase))
+            .any(|a| matches!(a, super::super::Action::Rewrite(crate::repo::rewrite::RewriteAct::CloseRebase)))
     };
     if let Some(e) = tab.rebase.as_mut() {
         e.typing = true;

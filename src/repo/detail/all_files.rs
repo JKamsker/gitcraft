@@ -160,11 +160,11 @@ impl RepoTab {
                             locks,
                         );
                         if r.row.clicked() {
-                            acts.push(Action::FileView {
+                            acts.push(Action::FileView(crate::repo::file_view::FileViewAct::Open {
                                 path: path.clone(),
                                 rev: Some(detail.hash.clone()),
                                 tab: FileTab::File,
-                            });
+                            }));
                         }
                     },
                 )

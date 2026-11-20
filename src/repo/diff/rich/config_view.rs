@@ -52,7 +52,7 @@ pub(super) fn show(ui: &mut Ui, diff: &ConfigDiff, acts: &mut Vec<Action>) {
                         .on_hover_text(crate::i18n::text("repo-core-2056"))
                         .clicked()
                 {
-                    acts.push(Action::DiffRich(Some(super::RichKind::Api)));
+                    acts.push(Action::Diff(crate::repo::diff::DiffAct::Rich(Some(super::RichKind::Api))));
                 }
             });
         });
@@ -143,6 +143,6 @@ fn row(ui: &mut Ui, t: &Tokens, font: &egui::FontId, e: &Entry, acts: &mut Vec<A
             Change::Removed => (e.old_line, None),
             _ => (None, e.new_line),
         };
-        acts.push(Action::DiffGoToLine { old, new });
+        acts.push(Action::Diff(crate::repo::diff::DiffAct::GoToLine { old, new }));
     }
 }

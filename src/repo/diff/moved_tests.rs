@@ -297,11 +297,11 @@ fn the_moved_panel_names_both_places_and_goes_to_them() {
     let acts = acts.borrow();
     assert!(
         acts.iter()
-            .any(|a| matches!(a, Action::DiffJumpLine(i) if *i == block.del.start))
+            .any(|a| matches!(a, Action::Diff(crate::repo::diff::DiffAct::JumpLine(i)) if *i == block.del.start))
     );
     assert!(
         acts.iter()
-            .any(|a| matches!(a, Action::DiffJumpLine(i) if *i == block.add.start))
+            .any(|a| matches!(a, Action::Diff(crate::repo::diff::DiffAct::JumpLine(i)) if *i == block.add.start))
     );
 }
 

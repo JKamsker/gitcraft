@@ -54,7 +54,7 @@ pub(in crate::repo) fn split<'a, T>(
         None => {
             let unknown = folding.unknown(files.iter().map(&path));
             if !unknown.is_empty() {
-                acts.push(Action::FoldAttributes(unknown));
+                acts.push(Action::Diff(crate::repo::diff::DiffAct::FoldAttributes(unknown)));
             }
             let folded: Arc<Vec<(usize, FoldReason)>> = Arc::new(
                 files

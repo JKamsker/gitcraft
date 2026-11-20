@@ -84,10 +84,10 @@ pub(crate) fn fast_forward_action(branch: BranchRef<'_>, current: &str) -> Actio
 }
 
 pub(crate) fn rebase_action(onto: BranchRef<'_>, current: &str) -> Action {
-    Action::AskRebase {
+    Action::Rewrite(crate::repo::rewrite::RewriteAct::AskRebase {
         onto: onto.full(),
         label: format!("Rebase {current} onto {}", onto.name),
-    }
+    })
 }
 
 /// Cherry-picks the commit `hash` onto what is checked out.
@@ -102,10 +102,10 @@ pub(crate) fn cherry_pick_action(hash: &str) -> Action {
 
 /// Opens the interactive rebase editor for the checked-out branch onto `onto`.
 pub(crate) fn interactive_rebase_action(onto: BranchRef<'_>) -> Action {
-    Action::InteractiveRebase {
+    Action::Rewrite(crate::repo::rewrite::RewriteAct::InteractiveRebase {
         onto: onto.full(),
         label: onto.name.to_owned(),
-    }
+    })
 }
 
 /// Asks before aborting: the conflicts resolved so far (in the index only) are thrown away, with

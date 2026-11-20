@@ -42,7 +42,7 @@ impl RepoTab {
             None => button,
         };
         if button.clicked() {
-            acts.push(Action::FoldInto(hash.to_owned()));
+            acts.push(Action::Rewrite(crate::repo::rewrite::RewriteAct::FoldInto(hash.to_owned())));
         }
     }
 
@@ -88,7 +88,7 @@ impl RepoTab {
                         None => item,
                     };
                     if item.clicked() {
-                        acts.push(Action::FoldInto(commit.hash.clone()));
+                        acts.push(Action::Rewrite(crate::repo::rewrite::RewriteAct::FoldInto(commit.hash.clone())));
                     }
                 }
                 if line.len() > PICKER_COMMITS {

@@ -32,7 +32,7 @@ impl RepoTab {
             }
             if opened {
                 // Clicked: its lines are what was asked for, folded or not.
-                acts.push(Action::UnfoldDiff);
+                acts.push(Action::Diff(crate::repo::diff::DiffAct::ShowFolded));
             }
         };
         // Rows are known by their path within the list: a file can be both staged and unstaged.

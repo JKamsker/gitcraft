@@ -161,7 +161,7 @@ fn selection_registry_runs_actual_diff_rows_and_history_action() {
         }
         if key == Some(Key::F10) {
             assert!(
-                matches!(acts.as_slice(), [Action::LineHistory { path, at, range: (1, 2) }] if path == "file.txt" && *at == crate::git::LinesAt::Rev("recorded".into()))
+                matches!(acts.as_slice(), [Action::FileView(crate::repo::file_view::FileViewAct::LineHistory { path, at, range: (1, 2) })] if path == "file.txt" && *at == crate::git::LinesAt::Rev("recorded".into()))
             );
         }
         out.drop_without_applying_deltas();

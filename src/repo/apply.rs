@@ -54,22 +54,22 @@ impl RepoTab {
                 ));
             }
 
-            Action::OpenFileComparison(page) => self.open_file_comparison(page, ctx),
-            Action::RefreshFileComparison => self.load_file_comparison(ctx),
-            Action::CloseFileComparison => self.file_comparison = None,
-            Action::ComparisonMove { request, index } => self.comparison_move(request, index, ctx),
-            Action::ComparisonCell {
+            Action::Comparison(crate::repo::file_comparison::ComparisonAct::Open(page)) => self.open_file_comparison(page, ctx),
+            Action::Comparison(crate::repo::file_comparison::ComparisonAct::Refresh) => self.load_file_comparison(ctx),
+            Action::Comparison(crate::repo::file_comparison::ComparisonAct::Close) => self.file_comparison = None,
+            Action::Comparison(crate::repo::file_comparison::ComparisonAct::Move { request, index }) => self.comparison_move(request, index, ctx),
+            Action::Comparison(crate::repo::file_comparison::ComparisonAct::Cell {
                 request,
                 path,
                 column,
-            } => self.comparison_cell(request, path, column, ctx),
-            Action::ComparisonPick {
+            }) => self.comparison_cell(request, path, column, ctx),
+            Action::Comparison(crate::repo::file_comparison::ComparisonAct::Pick {
                 request,
                 boundary,
                 lines,
                 whole,
-            } => self.comparison_pick(request, boundary, lines, whole, ctx),
-            Action::ComparisonNormalPatch => self.comparison_normal_patch(ctx),
+            }) => self.comparison_pick(request, boundary, lines, whole, ctx),
+            Action::Comparison(crate::repo::file_comparison::ComparisonAct::NormalPatch) => self.comparison_normal_patch(ctx),
             Action::ReviewTools(act) => self.review_tools_act(act, ctx),
             Action::Story(act) => self.story_act(act, ctx),
             Action::Freshness(act) => self.freshness_act(act, ctx),
@@ -148,14 +148,14 @@ impl RepoTab {
                     return;
                 }
             }
-            Action::EarlierVersions => self.earlier_versions(ctx),
-            Action::DraftEnable(on) => self.enable_working_drafts(on, ctx),
-            Action::DraftSnapshot => self.save_working_draft(false, ctx),
-            Action::DraftUndo => self.undo_working_draft(ctx),
-            Action::DraftPreview { id, path, index } => {
+            Action::Drafts(crate::repo::working_drafts::DraftAct::EarlierVersions) => self.earlier_versions(ctx),
+            Action::Drafts(crate::repo::working_drafts::DraftAct::Enable(on)) => self.enable_working_drafts(on, ctx),
+            Action::Drafts(crate::repo::working_drafts::DraftAct::Snapshot) => self.save_working_draft(false, ctx),
+            Action::Drafts(crate::repo::working_drafts::DraftAct::Undo) => self.undo_working_draft(ctx),
+            Action::Drafts(crate::repo::working_drafts::DraftAct::Preview { id, path, index }) => {
                 self.preview_working_draft(id, path, index, ctx)
             }
-            Action::DraftRecover { preview, hunks } => {
+            Action::Drafts(crate::repo::working_drafts::DraftAct::Recover { preview, hunks }) => {
                 self.recover_working_draft(*preview, hunks, ctx)
             }
             Action::OpenContentRecovery => self.dialog = Some(super::Dialog::ContentRecovery),
@@ -300,40 +300,40 @@ impl RepoTab {
                 ctx,
             ),
             Action::ClearIdentity { name, email } => self.clear_identity(name, email, ctx),
-            Action::SetDiffOptions {
+            Action::Diff(crate::repo::diff::DiffAct::Options {
                 split,
                 ignore_ws,
                 whole_file,
-            } => self.set_diff_options(split, ignore_ws, whole_file, ctx),
-            Action::SetDiffAlgorithm(algorithm) => self.set_diff_algorithm(algorithm, ctx),
-            Action::UnfoldDiff => {
+            }) => self.set_diff_options(split, ignore_ws, whole_file, ctx),
+            Action::Diff(crate::repo::diff::DiffAct::Algorithm(algorithm)) => self.set_diff_algorithm(algorithm, ctx),
+            Action::Diff(crate::repo::diff::DiffAct::ShowFolded) => {
                 if let Some(view) = &mut self.diff {
                     view.unfolded = true;
                 }
             }
-            Action::FoldAttributes(paths) => self.ask_fold_attributes(&paths, ctx),
-            Action::DiffAsFile(on) => self.show_diff_as_file(on, ctx),
-            Action::DiffRendered(on) => self.show_diff_rendered(on, ctx),
-            Action::DiffBesideGraph(on) => self.set_diff_beside_graph(on, ctx),
-            Action::DiffRich(kind) => self.show_diff_rich(kind, ctx),
-            Action::DiffGoToLine { old, new } => self.diff_go_to_line(old, new),
-            Action::DiffWrap(on) => self.wrap_diff(on, ctx),
-            Action::DiffCoverage(act) => self.diff_coverage(act, ctx),
-            Action::DiffSvgSource(on) => {
+            Action::Diff(crate::repo::diff::DiffAct::FoldAttributes(paths)) => self.ask_fold_attributes(&paths, ctx),
+            Action::Diff(crate::repo::diff::DiffAct::AsFile(on)) => self.show_diff_as_file(on, ctx),
+            Action::Diff(crate::repo::diff::DiffAct::Rendered(on)) => self.show_diff_rendered(on, ctx),
+            Action::Diff(crate::repo::diff::DiffAct::BesideGraph(on)) => self.set_diff_beside_graph(on, ctx),
+            Action::Diff(crate::repo::diff::DiffAct::Rich(kind)) => self.show_diff_rich(kind, ctx),
+            Action::Diff(crate::repo::diff::DiffAct::GoToLine { old, new }) => self.diff_go_to_line(old, new),
+            Action::Diff(crate::repo::diff::DiffAct::Wrap(on)) => self.wrap_diff(on, ctx),
+            Action::Diff(crate::repo::diff::DiffAct::Coverage(act)) => self.diff_coverage(act, ctx),
+            Action::Diff(crate::repo::diff::DiffAct::SvgSource(on)) => {
                 if let Some(view) = &mut self.diff {
                     view.svg_source = on;
                 }
             }
-            Action::DiffDecrypted(on) => self.show_diff_decrypted(on, ctx),
-            Action::DiffDecryptedEncoding(encoding) => {
+            Action::Diff(crate::repo::diff::DiffAct::Decrypted(on)) => self.show_diff_decrypted(on, ctx),
+            Action::Diff(crate::repo::diff::DiffAct::DecryptedEncoding(encoding)) => {
                 if let Some(view) = &mut self.diff {
                     view.encrypted.close();
                     view.encrypted.json_encoding = encoding;
                 }
             }
-            Action::DiffStructural(on) => self.show_diff_structural(on, ctx),
-            Action::DiffStep(delta) => self.step_displayed_diff(delta, ctx),
-            Action::DiffMoved(block) => {
+            Action::Diff(crate::repo::diff::DiffAct::Structural(on)) => self.show_diff_structural(on, ctx),
+            Action::Diff(crate::repo::diff::DiffAct::Step(delta)) => self.step_displayed_diff(delta, ctx),
+            Action::Diff(crate::repo::diff::DiffAct::Moved(block)) => {
                 if let Some(view) = &mut self.diff {
                     view.moved = match (&view.data, block) {
                         (Some(Ok(data)), Some(b)) => diff::moved_view::Opened::new(data, b),
@@ -341,12 +341,12 @@ impl RepoTab {
                     };
                 }
             }
-            Action::DiffUnfold { gap, how } => {
+            Action::Diff(crate::repo::diff::DiffAct::Unfold { gap, how }) => {
                 if let Some(view) = &mut self.diff {
                     view.unfold(gap, how);
                 }
             }
-            Action::DiffJumpLine(i) => {
+            Action::Diff(crate::repo::diff::DiffAct::JumpLine(i)) => {
                 if let Some(view) = &mut self.diff {
                     view.jump_line = Some(i);
                 }
@@ -360,65 +360,65 @@ impl RepoTab {
                     self.diff = None;
                 }
             }
-            Action::FileView { path, rev, tab } => {
+            Action::FileView(crate::repo::file_view::FileViewAct::Open { path, rev, tab }) => {
                 self.open_file_view(path, rev, tab, ctx);
                 // A line marked by an earlier `BlameAt` isn't what this one asks for.
                 if let Some(view) = &mut self.file_view {
                     view.marked_line = None;
                 }
             }
-            Action::CloseFileView => self.file_view = None,
+            Action::FileView(crate::repo::file_view::FileViewAct::Close) => self.file_view = None,
             Action::Navigate(step) => self.navigate(step, ctx),
-            Action::LineHistory { path, at, range } => self.open_line_history(path, at, range, ctx),
-            Action::OpenDiffOfLines { hash, path, lines } => {
+            Action::FileView(crate::repo::file_view::FileViewAct::LineHistory { path, at, range }) => self.open_line_history(path, at, range, ctx),
+            Action::FileView(crate::repo::file_view::FileViewAct::DiffOfLines { hash, path, lines }) => {
                 let lines = (!lines.is_empty()).then_some(lines);
                 self.open_diff_of_lines(DiffKey::Commit { hash, path }, lines, ctx);
             }
             Action::RevertFile { hash, path } => self.revert_file(hash, path, ctx),
-            Action::BlameAt { path, rev, line } => {
+            Action::FileView(crate::repo::file_view::FileViewAct::BlameAt { path, rev, line }) => {
                 self.open_file_view(path, rev, super::file_view::FileTab::Blame, ctx);
                 if let Some(view) = &mut self.file_view {
                     view.goto_line.set(Some(line));
                     view.marked_line = Some(line);
                 }
             }
-            Action::InteractiveRebase { onto, label } => self.interactive_rebase(onto, label, ctx),
-            Action::Reword { hash, message } => self.reword_commit(hash, message, ctx),
-            Action::EditMessage(hash) => self.edit_message(hash, ctx),
+            Action::Rewrite(crate::repo::rewrite::RewriteAct::InteractiveRebase { onto, label }) => self.interactive_rebase(onto, label, ctx),
+            Action::Rewrite(crate::repo::rewrite::RewriteAct::Reword { hash, message }) => self.reword_commit(hash, message, ctx),
+            Action::Rewrite(crate::repo::rewrite::RewriteAct::EditMessage(hash)) => self.edit_message(hash, ctx),
             Action::ReviewBranch { branch, base } => self.start_review(ctx, branch, base),
-            Action::SavePatch { hash, summary } => self.save_patch(hash, &summary, ctx),
-            Action::ApplyPatch => self.apply_patch(ctx),
+            Action::Rewrite(crate::repo::rewrite::RewriteAct::SavePatch { hash, summary }) => self.save_patch(hash, &summary, ctx),
+            Action::Rewrite(crate::repo::rewrite::RewriteAct::ApplyPatch) => self.apply_patch(ctx),
             Action::OpenBehaviour => self.open_behaviour(),
             Action::OpenLinkedMachines => self.open_linked_machines(ctx),
             Action::OpenBundleExport => self.open_bundle_export(ctx),
             Action::OpenBundleInspect => self.open_bundle_inspect(ctx),
             Action::ExportBundle { refs, base } => self.export_bundle(refs, base, ctx),
-            Action::QuickEdit {
+            Action::Rewrite(crate::repo::rewrite::RewriteAct::QuickEdit {
                 edit,
                 hash,
                 branch_guard,
-            } => self.quick_edit(edit, hash, branch_guard, ctx),
-            Action::DropMenu(menu) => self.drop_menu = Some(menu),
-            Action::CommitDrop(drop) => self.commit_drop(drop, ctx),
-            Action::RunRebase => self.ask_run_rebase(ctx),
-            Action::ConfirmedRebase(id) => {
+            }) => self.quick_edit(edit, hash, branch_guard, ctx),
+            Action::Rewrite(crate::repo::rewrite::RewriteAct::DropMenu(menu)) => self.drop_menu = Some(menu),
+            Action::Rewrite(crate::repo::rewrite::RewriteAct::CommitDrop(drop)) => self.commit_drop(drop, ctx),
+            Action::Rewrite(crate::repo::rewrite::RewriteAct::RunRebase) => self.ask_run_rebase(ctx),
+            Action::Rewrite(crate::repo::rewrite::RewriteAct::ConfirmedRebase(id)) => {
                 self.confirmed_rebase(id, ctx);
             }
-            Action::AskRebase { onto, label } => self.ask_plain_rebase(onto, label, ctx),
-            Action::FoldInto(hash) => self.fold_into(hash, ctx),
-            Action::RunFold(plan) => self.run_fold(*plan, ctx),
-            Action::AbortFold => self.abort_fold(ctx),
-            Action::CloseRebase => self.rebase = None,
-            Action::OpenSplit(hash) => self.open_split(hash, ctx),
-            Action::OpenMove(hash) => self.open_move(hash, ctx),
-            Action::CheckSplit => self.check_split(ctx),
-            Action::RunSplit => self.run_split(ctx),
-            Action::CloseSplit => self.split = None,
-            Action::OpenAbsorb => self.open_absorb(ctx),
-            Action::CheckAbsorb => self.check_absorb(ctx),
-            Action::RunAbsorb => self.run_absorb(ctx),
-            Action::RunGitAbsorb => self.run_git_absorb(ctx),
-            Action::CloseAbsorb => self.absorb = None,
+            Action::Rewrite(crate::repo::rewrite::RewriteAct::AskRebase { onto, label }) => self.ask_plain_rebase(onto, label, ctx),
+            Action::Rewrite(crate::repo::rewrite::RewriteAct::FoldInto(hash)) => self.fold_into(hash, ctx),
+            Action::Rewrite(crate::repo::rewrite::RewriteAct::RunFold(plan)) => self.run_fold(*plan, ctx),
+            Action::Rewrite(crate::repo::rewrite::RewriteAct::AbortFold) => self.abort_fold(ctx),
+            Action::Rewrite(crate::repo::rewrite::RewriteAct::CloseRebase) => self.rebase = None,
+            Action::Surgery(crate::repo::surgery::SurgeryAct::OpenSplit(hash)) => self.open_split(hash, ctx),
+            Action::Surgery(crate::repo::surgery::SurgeryAct::OpenMove(hash)) => self.open_move(hash, ctx),
+            Action::Surgery(crate::repo::surgery::SurgeryAct::CheckSplit) => self.check_split(ctx),
+            Action::Surgery(crate::repo::surgery::SurgeryAct::RunSplit) => self.run_split(ctx),
+            Action::Surgery(crate::repo::surgery::SurgeryAct::CloseSplit) => self.split = None,
+            Action::Surgery(crate::repo::surgery::SurgeryAct::OpenAbsorb) => self.open_absorb(ctx),
+            Action::Surgery(crate::repo::surgery::SurgeryAct::CheckAbsorb) => self.check_absorb(ctx),
+            Action::Surgery(crate::repo::surgery::SurgeryAct::RunAbsorb) => self.run_absorb(ctx),
+            Action::Surgery(crate::repo::surgery::SurgeryAct::RunGitAbsorb) => self.run_git_absorb(ctx),
+            Action::Surgery(crate::repo::surgery::SurgeryAct::CloseAbsorb) => self.absorb = None,
             Action::Stack(act) => self.stack_act(act, ctx),
             Action::SignIn(creds) => self.sign_in(creds, ctx),
             Action::SwitchHttps(url) => self.switch_https(url, ctx),

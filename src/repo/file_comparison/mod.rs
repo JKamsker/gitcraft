@@ -1,4 +1,6 @@
 //! Separate raw snapshot panes. Opening one drops DiffView and its reading-mode lifetimes.
+mod act;
+pub(in crate::repo) use act::ComparisonAct;
 pub(super) mod palette;
 mod selection;
 

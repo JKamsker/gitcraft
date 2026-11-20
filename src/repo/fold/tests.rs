@@ -141,7 +141,7 @@ fn fold(
     assert!(plan.is_ok(), "{plan:?}");
     let mut plan = plan.ok()?;
     plan.keep_fixup = keep;
-    tab.apply(Action::RunFold(Box::new(plan)), ctx);
+    tab.apply(Action::Rewrite(crate::repo::rewrite::RewriteAct::RunFold(Box::new(plan))), ctx);
     finish(tab, ctx)
 }
 
@@ -183,7 +183,7 @@ fn a_commit_made_since_the_dialog_stops_the_fold() {
     let since = git::head(&dir);
     assert!(read.is_ok(), "{read:?}");
     let Ok(read) = read else { return };
-    tab.apply(Action::RunFold(Box::new(read)), &ctx);
+    tab.apply(Action::Rewrite(crate::repo::rewrite::RewriteAct::RunFold(Box::new(read))), &ctx);
     let result = finish(&mut tab, &ctx);
     assert!(matches!(result, Some(Err(_))), "{result:?}");
     assert_eq!(git::head(&dir), since);
@@ -274,7 +274,7 @@ fn the_dialog_runs_the_fold_it_shows() {
     };
     let ran = |acts: &[Action]| {
         acts.iter().find_map(|a| match a {
-            Action::RunFold(plan) => Some(plan.keep_fixup),
+            Action::Rewrite(crate::repo::rewrite::RewriteAct::RunFold(plan)) => Some(plan.keep_fixup),
             _ => None,
         })
     };

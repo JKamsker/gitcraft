@@ -59,11 +59,11 @@ impl RepoTab {
                     | Action::ActivityCommit(_)
                     | Action::OpenCommitChanges(_)
                     | Action::OpenDiff(_)
-                    | Action::OpenDiffOfLines { .. }
+                    | Action::FileView(crate::repo::file_view::FileViewAct::DiffOfLines { .. })
                     | Action::CloseDiff
-                    | Action::FileView { .. }
-                    | Action::LineHistory { .. }
-                    | Action::BlameAt { .. }
+                    | Action::FileView(crate::repo::file_view::FileViewAct::Open { .. })
+                    | Action::FileView(crate::repo::file_view::FileViewAct::LineHistory { .. })
+                    | Action::FileView(crate::repo::file_view::FileViewAct::BlameAt { .. })
                     | Action::OpenPinnedFileLine(_)
                     | Action::OpenLineDossier(_)
                     | Action::OpenSymbolBiography(_)
@@ -72,14 +72,14 @@ impl RepoTab {
                     | Action::Insights(InsightsAct::Open(_))
                     | Action::OpenDoctor(_)
                     | Action::OpenTour
-                    | Action::OpenFileComparison(_)
+                    | Action::Comparison(crate::repo::file_comparison::ComparisonAct::Open(_))
                     | Action::Compare { .. }
                     | Action::Story(StoryAct::OpenCode { .. })
                     | Action::Review(ReviewAct::Open(_))
-                    | Action::OpenSplit(_)
-                    | Action::OpenMove(_)
-                    | Action::OpenAbsorb
-                    | Action::InteractiveRebase { .. }
+                    | Action::Surgery(crate::repo::surgery::SurgeryAct::OpenSplit(_))
+                    | Action::Surgery(crate::repo::surgery::SurgeryAct::OpenMove(_))
+                    | Action::Surgery(crate::repo::surgery::SurgeryAct::OpenAbsorb)
+                    | Action::Rewrite(crate::repo::rewrite::RewriteAct::InteractiveRebase { .. })
                     | Action::Versions(
                         VersionsAct::Rewrite(_)
                             | VersionsAct::Branches { .. }
@@ -91,7 +91,7 @@ impl RepoTab {
                     | Action::Reflog(
                         ReflogAct::Show(_) | ReflogAct::FindLost | ReflogAct::Select(_)
                     )
-                    | Action::ComparisonNormalPatch
+                    | Action::Comparison(crate::repo::file_comparison::ComparisonAct::NormalPatch)
                     | Action::Navigate(_)
             )
         {

@@ -405,7 +405,7 @@ impl RepoTab {
                         if icons::small_button(ui, "x", crate::i18n::text("repo-core-3237"))
                             .clicked()
                         {
-                            acts.push(Action::CloseRebase);
+                            acts.push(Action::Rewrite(crate::repo::rewrite::RewriteAct::CloseRebase));
                         }
                         if icons::small_button(
                             ui,
@@ -449,10 +449,10 @@ impl RepoTab {
                     )
                     .clicked()
                     {
-                        acts.push(Action::RunRebase);
+                        acts.push(Action::Rewrite(crate::repo::rewrite::RewriteAct::RunRebase));
                     }
                     if ui.button(crate::i18n::text("repo-core-0443")).clicked() {
-                        acts.push(Action::CloseRebase);
+                        acts.push(Action::Rewrite(crate::repo::rewrite::RewriteAct::CloseRebase));
                     }
                     if editor.starting {
                         ui.add(crate::spinner::Spinner::new());

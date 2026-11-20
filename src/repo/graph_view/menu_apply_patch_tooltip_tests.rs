@@ -38,7 +38,7 @@ fn actual_patch_menu_hover_resolves_explanation_in_both_locales() {
         h.get_by_role_and_label(egui::accesskit::Role::Button, label)
             .click();
         h.run();
-        assert!(matches!(h.state().1.as_slice(), [Action::ApplyPatch]));
+        assert!(matches!(h.state().1.as_slice(), [Action::Rewrite(crate::repo::rewrite::RewriteAct::ApplyPatch)]));
     }
     crate::i18n::set_language("en-US");
 }

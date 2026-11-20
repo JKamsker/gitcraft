@@ -1,5 +1,7 @@
 //! Rewriting history: editing a commit's message, and the interactive rebase.
 
+mod act;
+pub(in crate::repo) use act::RewriteAct;
 #[path = "core_seams/rebase_execution.rs"]
 mod rebase_execution;
 
@@ -364,7 +366,7 @@ impl RepoTab {
                 Vec::new(),
                 None,
             )
-            .instead(super::Action::ConfirmedRebase(id), described)
+            .instead(super::Action::Rewrite(crate::repo::rewrite::RewriteAct::ConfirmedRebase(id)), described)
             .undo(Undo::HeadMove { mode: "--keep" })
             .preview(
                 ask,

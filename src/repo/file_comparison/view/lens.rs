@@ -71,12 +71,12 @@ pub(super) fn lens(
                 || snapshot.versions[i].mode != snapshot.versions[i + 1].mode;
             let enabled = allowed && part.writable() && changed;
             if ui.add_enabled(enabled, egui::Button::new(label)).clicked() {
-                acts.push(Action::ComparisonPick {
+                acts.push(Action::Comparison(crate::repo::file_comparison::ComparisonAct::Pick {
                     request: state.data_request,
                     boundary: i,
                     lines: Default::default(),
                     whole: true,
-                });
+                }));
             }
         }
     });
@@ -168,12 +168,12 @@ pub(super) fn boundary_button(
     let response = ui.add_enabled(enabled, egui::Button::new(text).min_size(vec2(64., 20.)));
     crate::a11y::a11y(&response, egui::WidgetType::Button, &label);
     if response.clicked() {
-        acts.push(Action::ComparisonPick {
+        acts.push(Action::Comparison(crate::repo::file_comparison::ComparisonAct::Pick {
             request: state.data_request,
             boundary: side,
             lines: row.changes[side].clone(),
             whole: false,
-        });
+        }));
     }
 }
 pub(super) fn line_cell(

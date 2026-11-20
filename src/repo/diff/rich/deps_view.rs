@@ -150,7 +150,7 @@ fn row(
             Change::Removed => (d.old_line, None),
             _ => (None, d.new_line),
         };
-        acts.push(Action::DiffGoToLine { old, new });
+        acts.push(Action::Diff(crate::repo::diff::DiffAct::GoToLine { old, new }));
     }
     ui.add_space(8.0);
     // Links for packages of a registry, not the project's own.
@@ -252,10 +252,10 @@ mod interaction_tests {
         h.run();
         assert!(matches!(
             h.state().1.as_slice(),
-            [Action::DiffGoToLine {
+            [Action::Diff(crate::repo::diff::DiffAct::GoToLine {
                 old: None,
                 new: Some(12)
-            }]
+            })]
         ));
     }
 }

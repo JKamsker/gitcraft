@@ -36,7 +36,7 @@ pub(super) fn wip_menu(resp: &Response, idle: bool, acts: &mut Vec<Action>) {
                 .on_hover_text(crate::i18n::text(APPLY_PATCH_TIP))
                 .clicked()
             {
-                acts.push(Action::ApplyPatch);
+                acts.push(Action::Rewrite(crate::repo::rewrite::RewriteAct::ApplyPatch));
             }
         });
 }

@@ -57,7 +57,7 @@ impl RepoTab {
             // The choice for its file type changed elsewhere (another tab, the settings).
             let algorithm = super::algorithm_for(&settings, view.key.path());
             if view.algorithm != algorithm {
-                acts.push(Action::SetDiffAlgorithm(algorithm));
+                acts.push(Action::Diff(crate::repo::diff::DiffAct::Algorithm(algorithm)));
             }
         }
         let Some(view) = &self.diff else { return };
@@ -131,7 +131,7 @@ impl RepoTab {
                 _ => None,
             };
             if folding::folded_diff(ui, &path, data, reason) {
-                acts.push(Action::UnfoldDiff);
+                acts.push(Action::Diff(crate::repo::diff::DiffAct::ShowFolded));
             }
             return;
         }
@@ -172,7 +172,7 @@ impl RepoTab {
                 super::context::unfold_to(ctx, line, old, 3).map(|f| (f, (old, line)))
             });
             if let Some(((gap, how), mark)) = folded {
-                acts.push(Action::DiffUnfold { gap, how });
+                acts.push(Action::Diff(crate::repo::diff::DiffAct::Unfold { gap, how }));
                 auto_opened = Some(mark);
             }
         }

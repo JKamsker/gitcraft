@@ -81,7 +81,7 @@ pub(super) fn open(t: &Transform, edits: &[usize]) -> Option<Action> {
     let first = t.edits.get(*edits.first()?)?;
     let path = t.files.get(first.file)?.clone();
     Some(match &t.subject.commit {
-        Some(hash) => Action::OpenDiffOfLines {
+        Some(hash) => Action::FileView(crate::repo::file_view::FileViewAct::DiffOfLines {
             hash: hash.clone(),
             path,
             lines: edits
@@ -89,7 +89,7 @@ pub(super) fn open(t: &Transform, edits: &[usize]) -> Option<Action> {
                 .filter_map(|&e| t.edits.get(e))
                 .map(|e| e.lines())
                 .collect(),
-        },
+        }),
         None => Action::OpenDiff(DiffKey::Range {
             from: t.subject.base.clone(),
             to: Some(t.subject.head.clone()),

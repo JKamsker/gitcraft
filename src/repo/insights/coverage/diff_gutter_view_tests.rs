@@ -43,7 +43,7 @@ fn harness(
             egui::CentralPanel::default().show(ui, |ui| tab.diff_view(ui, &mut acts));
             let (_, jobs) = messages::record_jobs(|| {
                 for act in acts {
-                    if matches!(act, Action::DiffCoverage(CoverageAct::Load)) {
+                    if matches!(act, Action::Diff(crate::repo::diff::DiffAct::Coverage(CoverageAct::Load))) {
                         tab.apply(act, ui.ctx());
                     }
                 }
@@ -126,7 +126,7 @@ fn the_diff_gutter_marks_changed_lines_from_a_fixture_report() -> Result<(), Str
     h.run_steps(4);
     let ctx = h.ctx.clone();
     h.state_mut()
-        .apply(Action::DiffCoverage(CoverageAct::Toggle), &ctx);
+        .apply(Action::Diff(crate::repo::diff::DiffAct::Coverage(CoverageAct::Toggle)), &ctx);
     h.run_steps(2);
     assert!(!Settings::get(&h.ctx).diff_coverage);
     assert_eq!(count(&h, Mark::Covered(3)), 0);

@@ -121,7 +121,7 @@ impl RepoTab {
             if r.row.clicked() {
                 self.keyboard_select_file(keyboard_scope, key(&f.path));
                 acts.push(Action::OpenDiff(key(&f.path)));
-                acts.push(Action::UnfoldDiff);
+                acts.push(Action::Diff(crate::repo::diff::DiffAct::ShowFolded));
             }
         };
         // Rows are known by their path within the list of this commit (or range): a menu left

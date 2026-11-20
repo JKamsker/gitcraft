@@ -81,7 +81,7 @@ fn pair(
                 Some(n) => (None, Some(n.line)),
                 None => (Some(any.line), None),
             };
-            acts.push(Action::DiffGoToLine { old: o, new: n });
+            acts.push(Action::Diff(crate::repo::diff::DiffAct::GoToLine { old: o, new: n }));
         }
         if any.list == "deps" {
             let what = match &any.repo {
@@ -199,10 +199,10 @@ mod interaction_tests {
         h.run();
         assert!(matches!(
             h.state().1.as_slice(),
-            [Action::DiffGoToLine {
+            [Action::Diff(crate::repo::diff::DiffAct::GoToLine {
                 old: None,
                 new: Some(7)
-            }]
+            })]
         ));
     }
 }

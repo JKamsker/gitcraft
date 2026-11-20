@@ -18,9 +18,9 @@ impl RepoTab {
                     | Action::OpenCommitChanges(_)
                     | Action::OpenDiff(_)
                     | Action::CloseDiff
-                    | Action::DiffBesideGraph(_)
-                    | Action::FileView { .. }
-                    | Action::CloseFileView
+                    | Action::Diff(crate::repo::diff::DiffAct::BesideGraph(_))
+                    | Action::FileView(crate::repo::file_view::FileViewAct::Open { .. })
+                    | Action::FileView(crate::repo::file_view::FileViewAct::Close)
                     | Action::Reload
             )
         {
@@ -42,7 +42,7 @@ impl RepoTab {
             &action,
             Action::OpenDiff(_)
                 | Action::OpenCommitChanges(_)
-                | Action::FileView { .. }
+                | Action::FileView(crate::repo::file_view::FileViewAct::Open { .. })
                 | Action::ShowActivity(_)
                 | Action::OpenPr(_)
                 | Action::OpenCi { .. }
@@ -78,14 +78,14 @@ impl RepoTab {
                 | Action::OpenCommitChanges(_)
                 | Action::OpenPr(_)
                 | Action::OpenCi { .. }
-                | Action::FileView { .. }
+                | Action::FileView(crate::repo::file_view::FileViewAct::Open { .. })
         ) {
             self.file_comparison = None;
         }
         if matches!(
             &action,
             Action::OpenDiff(_)
-                | Action::FileView { .. }
+                | Action::FileView(crate::repo::file_view::FileViewAct::Open { .. })
                 | Action::OpenPr(_)
                 | Action::Select(_)
                 | Action::SelectBranchTip(_)

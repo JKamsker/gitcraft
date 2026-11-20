@@ -270,10 +270,10 @@ fn the_prose_view_shows_changes_and_goes_back_to_the_line() {
     harness.run();
     assert!(acts.borrow().iter().any(|a| matches!(
         a,
-        Action::DiffGoToLine {
+        Action::Diff(crate::repo::diff::DiffAct::GoToLine {
             old: None,
             new: Some(5)
-        }
+        })
     )));
 }
 

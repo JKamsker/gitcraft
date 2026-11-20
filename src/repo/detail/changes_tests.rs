@@ -158,7 +158,7 @@ fn ctrl_click_picks_a_file_to_stash() {
     let acts = frame(&tab, click(plain).to_vec(), plain);
     assert!(matches!(
         acts.as_slice(),
-        [Action::OpenDiff(_), Action::UnfoldDiff]
+        [Action::OpenDiff(_), Action::Diff(crate::repo::diff::DiffAct::ShowFolded)]
     ));
 }
 

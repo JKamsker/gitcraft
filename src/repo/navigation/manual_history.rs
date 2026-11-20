@@ -98,11 +98,11 @@ fn manual_case(saved: bool, same_row: bool, first: &str, readiness: Readiness) {
         assert_eq!(tab.current_view(), Some(diff_at(key.clone(), Some(&head))));
         act(
             &mut tab,
-            Action::FileView {
+            Action::FileView(crate::repo::file_view::FileViewAct::Open {
                 path: FILE.into(),
                 rev: Some(head.clone()),
                 tab: FileTab::History,
-            },
+            }),
             &ctx,
         );
         if matches!(readiness, Readiness::AfterFile) {

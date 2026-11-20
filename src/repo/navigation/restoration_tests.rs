@@ -195,16 +195,16 @@ fn a_later_explicit_destination_retires_a_paged_restoration() {
             Action::Select(0),
             Action::SelectHash(a.clone()),
             Action::OpenDiff(key(&a)),
-            Action::OpenDiffOfLines {
+            Action::FileView(crate::repo::file_view::FileViewAct::DiffOfLines {
                 hash: a.clone(),
                 path: "file.txt".into(),
                 lines: Vec::new(),
-            },
-            Action::FileView {
+            }),
+            Action::FileView(crate::repo::file_view::FileViewAct::Open {
                 path: "file.txt".into(),
                 rev: Some(a.clone()),
                 tab: file_view::FileTab::File,
-            },
+            }),
         ];
         destinations.extend(
             crate::repo::insights::Kind::ALL
@@ -232,17 +232,17 @@ fn a_later_explicit_destination_retires_a_paged_restoration() {
                 crate::repo::file_comparison::Page::Lens,
                 crate::repo::file_comparison::Page::Matrix,
             ]
-            .map(Action::OpenFileComparison),
+            .map(|page| Action::Comparison(crate::repo::file_comparison::ComparisonAct::Open(page))),
         );
         for action in destinations {
             let opens_diff = matches!(
                 &action,
-                Action::OpenDiff(_) | Action::OpenDiffOfLines { .. }
+                Action::OpenDiff(_) | Action::FileView(crate::repo::file_view::FileViewAct::DiffOfLines { .. })
             );
             let opens_comparison = matches!(&action, Action::Compare { .. });
-            let opens_file_comparison = matches!(&action, Action::OpenFileComparison(_));
+            let opens_file_comparison = matches!(&action, Action::Comparison(crate::repo::file_comparison::ComparisonAct::Open(_)));
             let opens_story = matches!(&action, Action::Story(_));
-            let opens_file = opens_story || matches!(&action, Action::FileView { .. });
+            let opens_file = opens_story || matches!(&action, Action::FileView(crate::repo::file_view::FileViewAct::Open { .. }));
             let opens_insights = matches!(&action, Action::Insights(_));
             let ctx = egui::Context::default();
             let mut tab = tab(&ctx, saved);

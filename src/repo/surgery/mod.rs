@@ -4,6 +4,8 @@
 //! them in place of the old one and replays the commits after it, so a conflict goes to the
 //! usual conflict flow and Ctrl+Z puts the branch back as one step.
 
+mod act;
+pub(in crate::repo) use act::{SurgeryAct, absorb_palette_item};
 mod absorb;
 #[cfg(test)]
 mod absorb_tests;
@@ -110,7 +112,7 @@ impl RepoTab {
             None => button,
         };
         if button.clicked() {
-            acts.push(Action::OpenSplit(hash.to_owned()));
+            acts.push(Action::Surgery(crate::repo::surgery::SurgeryAct::OpenSplit(hash.to_owned())));
         }
         let button = crate::menu_item::MenuItem::new(crate::i18n::text(
             "repo-workflows-surgery-surgery-items-a795cec5",
@@ -127,7 +129,7 @@ impl RepoTab {
             None => button,
         };
         if button.clicked() {
-            acts.push(Action::OpenMove(hash.to_owned()));
+            acts.push(Action::Surgery(crate::repo::surgery::SurgeryAct::OpenMove(hash.to_owned())));
         }
     }
 

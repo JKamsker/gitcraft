@@ -245,12 +245,12 @@ impl RepoTab {
             egui::DragAndDrop::clear_payload(ui.ctx());
             if !offers.is_empty() {
                 let at = ui.ctx().pointer_interact_pos().unwrap_or(light.center());
-                acts.push(Action::DropMenu(DropMenu::new(
+                acts.push(Action::Rewrite(crate::repo::rewrite::RewriteAct::DropMenu(DropMenu::new(
                     at,
                     &payload.item,
                     target,
                     offers,
-                )));
+                ))));
             }
         } else if offers.is_empty() {
             ui.ctx().set_cursor_icon(egui::CursorIcon::NotAllowed);
@@ -371,10 +371,10 @@ impl Offer {
                 Rev::Branch { name, remote } => {
                     interactive_rebase_action(branch_ref(name, *remote))
                 }
-                Rev::Commit { hash } => Action::InteractiveRebase {
+                Rev::Commit { hash } => Action::Rewrite(crate::repo::rewrite::RewriteAct::InteractiveRebase {
                     onto: hash.clone(),
                     label: short(hash).to_owned(),
-                },
+                }),
             },
             Offer::FastForward {
                 branch,
@@ -410,7 +410,7 @@ impl Offer {
             Offer::CherryPick { hash, onto } => {
                 on_checked_out(super::actions::cherry_pick_action(hash), onto)
             }
-            Offer::Rewrite(drop) => Action::CommitDrop(drop.clone()),
+            Offer::Rewrite(drop) => Action::Rewrite(crate::repo::rewrite::RewriteAct::CommitDrop(drop.clone())),
         }
     }
 }

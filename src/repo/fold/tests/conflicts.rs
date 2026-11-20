@@ -38,9 +38,9 @@ fn a_conflict_aborted_goes_back_to_before_the_fold() {
     assert!(tab.fold_stopped_here(InProgress::Rebase).is_some());
     assert!(matches!(
         tab.abort_for(InProgress::Rebase),
-        Action::AbortFold
+        Action::Rewrite(crate::repo::rewrite::RewriteAct::AbortFold)
     ));
-    tab.apply(Action::AbortFold, &ctx);
+    tab.apply(Action::Rewrite(crate::repo::rewrite::RewriteAct::AbortFold), &ctx);
     wait_for(&mut tab, &ctx, "abort confirmation", |t| t.dialog.is_some());
     let steps = match tab.dialog.take() {
         Some(Dialog::Confirm { ops, title, .. }) => Some((title, ops)),

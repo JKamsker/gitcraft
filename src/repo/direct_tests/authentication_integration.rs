@@ -232,11 +232,11 @@ fn a_drop_confirmed_while_busy_says_so() {
     let mut tab = RepoTab::new_deferred(dir.clone(), &ctx);
     tab.busy_op = Some("Fetch".to_owned());
     tab.apply(
-        Action::QuickEdit {
+        Action::Rewrite(crate::repo::rewrite::RewriteAct::QuickEdit {
             edit: Edit::Drop,
             hash: "0123456789abcdef".to_owned(),
             branch_guard: crate::repo::operations::expect_symref("HEAD", "refs/heads/main"),
-        },
+        }),
         &ctx,
     );
     let status = tab.status.as_deref().cloned();

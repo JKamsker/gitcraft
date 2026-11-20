@@ -133,7 +133,7 @@ fn receipt_of(dir: &Path, action: Action) -> (Option<Receipt>, String) {
     }));
     assert!(wait("initial settle", &mut tab, &ctx, settled));
     let review = match &action {
-        Action::AskRebase { onto, .. } => Some((
+        Action::Rewrite(crate::repo::rewrite::RewriteAct::AskRebase { onto, .. }) => Some((
             tab.refs
                 .current
                 .clone()

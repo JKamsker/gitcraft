@@ -84,7 +84,7 @@ fn the_view_reads_a_commit_and_draws_its_matrix_and_table() -> Result<(), String
     // A cell opens the commit's diff at the edit's lines.
     let opened = open(t, &[0]);
     let at = match &opened {
-        Some(Action::OpenDiffOfLines { hash, path, lines }) => {
+        Some(Action::FileView(crate::repo::file_view::FileViewAct::DiffOfLines { hash, path, lines })) => {
             Some((hash.clone(), path.clone(), lines.clone()))
         }
         _ => None,

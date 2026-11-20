@@ -247,7 +247,7 @@ mod tests {
 
     fn drop_menu(acts: &[Action]) -> Option<&crate::repo::drag_drop::DropMenu> {
         acts.iter().find_map(|a| match a {
-            Action::DropMenu(menu) => Some(menu),
+            Action::Rewrite(crate::repo::rewrite::RewriteAct::DropMenu(menu)) => Some(menu),
             _ => None,
         })
     }

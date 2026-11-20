@@ -43,7 +43,7 @@ impl RepoTab {
                 ))
                 .clicked()
             {
-                acts.push(Action::RefreshFileComparison);
+                acts.push(Action::Comparison(crate::repo::file_comparison::ComparisonAct::Refresh));
             }
             if state.loading
                 && ui
@@ -63,7 +63,7 @@ impl RepoTab {
                 ))
                 .clicked()
             {
-                acts.push(Action::CloseFileComparison);
+                acts.push(Action::Comparison(crate::repo::file_comparison::ComparisonAct::Close));
             }
         });
         ui.label(
@@ -131,7 +131,7 @@ impl RepoTab {
                         ))
                         .clicked()
                     {
-                        acts.push(Action::RefreshFileComparison);
+                        acts.push(Action::Comparison(crate::repo::file_comparison::ComparisonAct::Refresh));
                     }
                 });
                 ui.label(crate::i18n::text(
@@ -187,7 +187,7 @@ impl RepoTab {
                         ))
                         .clicked()
                     {
-                        acts.push(Action::RefreshFileComparison);
+                        acts.push(Action::Comparison(crate::repo::file_comparison::ComparisonAct::Refresh));
                     }
                 });
                 ui.label(crate::i18n::text(
@@ -211,7 +211,7 @@ impl RepoTab {
                         ))
                         .clicked()
                     {
-                        acts.push(Action::RefreshFileComparison);
+                        acts.push(Action::Comparison(crate::repo::file_comparison::ComparisonAct::Refresh));
                     }
                     if ui
                         .button(crate::i18n::text(
@@ -219,7 +219,7 @@ impl RepoTab {
                         ))
                         .clicked()
                     {
-                        acts.push(Action::ComparisonNormalPatch);
+                        acts.push(Action::Comparison(crate::repo::file_comparison::ComparisonAct::NormalPatch));
                     }
                 });
                 ui.label(crate::i18n::text(
@@ -247,7 +247,7 @@ impl RepoTab {
                         )
                         .clicked()
                     {
-                        acts.push(Action::RefreshFileComparison);
+                        acts.push(Action::Comparison(crate::repo::file_comparison::ComparisonAct::Refresh));
                     }
                 });
                 egui::CollapsingHeader::new(crate::i18n::message(

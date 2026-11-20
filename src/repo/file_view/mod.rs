@@ -2,6 +2,8 @@
 //! its blame (who last changed each line) or the whole file as it is at a commit. Opened from a
 //! file's right-click menu and from the list of all the files of a commit.
 
+mod act;
+pub(crate) use act::FileViewAct;
 mod view;
 use view::error;
 

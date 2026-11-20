@@ -41,7 +41,7 @@ pub(super) fn wrap_control(ui: &mut Ui, acts: &mut Vec<Action>) {
         .on_hover_text(crate::i18n::text("repo-core-2387"))
         .clicked()
     {
-        acts.push(Action::DiffWrap(!wrap));
+        acts.push(Action::Diff(crate::repo::diff::DiffAct::Wrap(!wrap)));
     }
 }
 
@@ -65,11 +65,11 @@ pub(super) fn view_options(
         widgets::active_underline(ui, ws.rect, t.accent);
     }
     if ws.clicked() {
-        acts.push(Action::SetDiffOptions {
+        acts.push(Action::Diff(crate::repo::diff::DiffAct::Options {
             split,
             ignore_ws: !ignore_ws,
             whole_file,
-        });
+        }));
     }
     let whole = icons::small_button(
         ui,
@@ -84,33 +84,33 @@ pub(super) fn view_options(
         widgets::active_underline(ui, whole.rect, t.accent);
     }
     if whole.clicked() {
-        acts.push(Action::SetDiffOptions {
+        acts.push(Action::Diff(crate::repo::diff::DiffAct::Options {
             split,
             ignore_ws,
             whole_file: !whole_file,
-        });
+        }));
     }
     let s = icons::small_button(ui, "columns-2", crate::i18n::text("repo-core-2395"));
     if split {
         widgets::active_underline(ui, s.rect, t.accent);
     }
     if s.clicked() {
-        acts.push(Action::SetDiffOptions {
+        acts.push(Action::Diff(crate::repo::diff::DiffAct::Options {
             split: true,
             ignore_ws,
             whole_file,
-        });
+        }));
     }
     let u = icons::small_button(ui, "rows-2", crate::i18n::text("repo-core-2397"));
     if !split {
         widgets::active_underline(ui, u.rect, t.accent);
     }
     if u.clicked() {
-        acts.push(Action::SetDiffOptions {
+        acts.push(Action::Diff(crate::repo::diff::DiffAct::Options {
             split: false,
             ignore_ws,
             whole_file,
-        });
+        }));
     }
 }
 
@@ -139,7 +139,7 @@ pub(super) fn change_steps(ui: &mut Ui, acts: &mut Vec<Action>) {
     )
     .clicked()
     {
-        acts.push(Action::DiffStep(1));
+        acts.push(Action::Diff(crate::repo::diff::DiffAct::Step(1)));
     }
     if icons::small_button(
         ui,
@@ -164,6 +164,6 @@ pub(super) fn change_steps(ui: &mut Ui, acts: &mut Vec<Action>) {
     )
     .clicked()
     {
-        acts.push(Action::DiffStep(-1));
+        acts.push(Action::Diff(crate::repo::diff::DiffAct::Step(-1)));
     }
 }

@@ -372,7 +372,7 @@ impl RepoTab {
     /// changes staged again.
     pub(super) fn abort_for(&self, state: InProgress) -> Action {
         match &self.fold.stopped {
-            Some(_) if state == InProgress::Rebase => Action::AbortFold,
+            Some(_) if state == InProgress::Rebase => Action::Rewrite(crate::repo::rewrite::RewriteAct::AbortFold),
             _ => abort_action(state),
         }
     }

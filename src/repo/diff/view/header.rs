@@ -192,7 +192,7 @@ impl RepoTab {
                         )
                         .clicked()
                         {
-                            acts.push(Action::DiffAsFile(true));
+                            acts.push(Action::Diff(crate::repo::diff::DiffAct::AsFile(true)));
                         }
                         if icons::toggle_button(
                             ui,
@@ -202,7 +202,7 @@ impl RepoTab {
                         )
                         .clicked()
                         {
-                            acts.push(Action::DiffAsFile(false));
+                            acts.push(Action::Diff(crate::repo::diff::DiffAct::AsFile(false)));
                         }
                         ui.vertical(|ui| {
                             ui.set_width(ui.available_width().max(0.0));
@@ -300,16 +300,16 @@ impl RepoTab {
                             if matches!(view.key, DiffKey::Work(_))
                                 && ui.button(crate::i18n::text("repo-core-2361")).clicked()
                             {
-                                acts.push(Action::OpenFileComparison(
+                                acts.push(Action::Comparison(crate::repo::file_comparison::ComparisonAct::Open(
                                     crate::repo::file_comparison::Page::Lens,
-                                ));
+                                )));
                             }
                             if !matches!(view.key, DiffKey::Remerge { .. })
                                 && ui.button(crate::i18n::text("repo-core-2362")).clicked()
                             {
-                                acts.push(Action::OpenFileComparison(
+                                acts.push(Action::Comparison(crate::repo::file_comparison::ComparisonAct::Open(
                                     crate::repo::file_comparison::Page::CodeMoves,
-                                ));
+                                )));
                             }
                             structural::toggle(ui, view.structural.enabled, acts);
                             ui.add_space(4.0);
@@ -351,7 +351,7 @@ impl RepoTab {
                                 widgets::active_underline(ui, r.rect, t.accent);
                             }
                             if r.clicked() {
-                                acts.push(Action::DiffRich((!on).then_some(kind)));
+                                acts.push(Action::Diff(crate::repo::diff::DiffAct::Rich((!on).then_some(kind))));
                             }
                         }
                         if markdown.is_some() {
@@ -365,7 +365,7 @@ impl RepoTab {
                                 widgets::active_underline(ui, r.rect, t.accent);
                             }
                             if r.clicked() {
-                                acts.push(Action::DiffRendered(markdown != Some(true)));
+                                acts.push(Action::Diff(crate::repo::diff::DiffAct::Rendered(markdown != Some(true))));
                             }
                             ui.add_space(4.0);
                         }
@@ -407,13 +407,13 @@ impl RepoTab {
         let path = view.key.path();
         let unknown = self.folding.unknown([path]);
         if !unknown.is_empty() {
-            acts.push(Action::FoldAttributes(unknown));
+            acts.push(Action::Diff(crate::repo::diff::DiffAct::FoldAttributes(unknown)));
         }
         let reason = self.folding.reason(&rules, path);
         if reason.is_none() && matches!(view.data, Some(Ok(_))) {
             // Its lines show: they stay, rather than fold away under the reader when an
             // answer about its attributes comes (the first one, or one read again).
-            acts.push(Action::UnfoldDiff);
+            acts.push(Action::Diff(crate::repo::diff::DiffAct::ShowFolded));
         }
         reason
     }

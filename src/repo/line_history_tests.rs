@@ -139,12 +139,12 @@ fn the_window_opens_the_history_of_lines_and_the_diff_of_one_of_them() -> Result
     let ctx = egui::Context::default();
     let mut tab = RepoTab::new_deferred(dir.clone(), &ctx);
     tab.apply(
-        Action::LineHistory {
+        Action::FileView(crate::repo::file_view::FileViewAct::LineHistory {
             path: PATH.to_owned(),
             at: head(),
             // Picked from the bottom up.
             range: (8, 5),
-        },
+        }),
         &ctx,
     );
     wait(&mut tab, &ctx, |t| {
@@ -178,11 +178,11 @@ fn the_window_opens_the_history_of_lines_and_the_diff_of_one_of_them() -> Result
     // Clicking "five" shows only what it did to those lines, and offers nothing to revert.
     let five = commits[0].clone();
     tab.apply(
-        Action::OpenDiffOfLines {
+        Action::FileView(crate::repo::file_view::FileViewAct::DiffOfLines {
             hash: five.hash.clone(),
             path: five.path.clone(),
             lines: five.lines.clone(),
-        },
+        }),
         &ctx,
     );
     wait(&mut tab, &ctx, |t| {
@@ -200,11 +200,11 @@ fn the_window_opens_the_history_of_lines_and_the_diff_of_one_of_them() -> Result
 
     // The whole file's history replaces it when asked for.
     tab.apply(
-        Action::FileView {
+        Action::FileView(crate::repo::file_view::FileViewAct::Open {
             path: PATH.to_owned(),
             rev: Some("HEAD".to_owned()),
             tab: super::file_view::FileTab::History,
-        },
+        }),
         &ctx,
     );
     assert!(tab.file_view.as_ref().is_some_and(|v| v.lines.is_none()));

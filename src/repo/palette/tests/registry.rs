@@ -204,10 +204,10 @@ fn area_d_hidden_optional_tools_stay_in_palette_with_selected_commit_scope() {
         );
     }
     assert!(items.iter().any(
-        |i| matches!(&i.run, PaletteRun::Action(Action::OpenSplit(hash)) if hash == &selected)
+        |i| matches!(&i.run, PaletteRun::Action(Action::Surgery(crate::repo::surgery::SurgeryAct::OpenSplit(hash))) if hash == &selected)
     ));
     assert!(items.iter().any(
-        |i| matches!(&i.run, PaletteRun::Action(Action::OpenMove(hash)) if hash == &selected)
+        |i| matches!(&i.run, PaletteRun::Action(Action::Surgery(crate::repo::surgery::SurgeryAct::OpenMove(hash))) if hash == &selected)
     ));
     tab.refs.current = None;
     assert!(
@@ -215,7 +215,7 @@ fn area_d_hidden_optional_tools_stay_in_palette_with_selected_commit_scope() {
             .iter()
             .any(|i| matches!(
                 &i.run,
-                PaletteRun::Action(Action::OpenSplit(_) | Action::OpenMove(_))
+                PaletteRun::Action(Action::Surgery(crate::repo::surgery::SurgeryAct::OpenSplit(_)) | Action::Surgery(crate::repo::surgery::SurgeryAct::OpenMove(_)))
             ))
     );
 }

@@ -124,17 +124,17 @@ impl RepoTab {
                         if icons::small_button(ui, "x", crate::i18n::text("repo-core-0711"))
                             .clicked()
                         {
-                            acts.push(Action::CloseFileView);
+                            acts.push(Action::FileView(crate::repo::file_view::FileViewAct::Close));
                         }
                         let whole = ui
                             .button(crate::i18n::text("repo-core-2489"))
                             .on_hover_text(crate::i18n::text("repo-core-2490"));
                         if whole.clicked() {
-                            acts.push(Action::FileView {
+                            acts.push(Action::FileView(crate::repo::file_view::FileViewAct::Open {
                                 path: view.path.clone(),
                                 rev: view.rev.clone(),
                                 tab: FileTab::History,
-                            });
+                            }));
                         }
                     });
                 });

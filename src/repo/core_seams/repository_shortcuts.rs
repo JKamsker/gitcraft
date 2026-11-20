@@ -50,7 +50,7 @@ impl RepoTab {
         let diff_keys =
             self.diff.is_some() && (self.main_keys(ctx, Panel::Diff) || self.conflict.is_some());
         if self.file_comparison.is_some() {
-            acts.push(Action::CloseFileComparison);
+            acts.push(Action::Comparison(crate::repo::file_comparison::ComparisonAct::Close));
         } else if self.close_drop_menu() {
         } else if self.resolver.reviewing() {
             // Drawn over everything else of the big area (a conflict editor too): it
@@ -65,23 +65,23 @@ impl RepoTab {
         } else if diff_keys && self.line_comment_open() {
             acts.push(Action::Pr(pr_review::PrAct::CloseLine));
         } else if self.diff.as_ref().is_some_and(|d| d.moved.is_some()) {
-            acts.push(Action::DiffMoved(None));
+            acts.push(Action::Diff(crate::repo::diff::DiffAct::Moved(None)));
         } else if self.conflict.is_none() && self.rebase.as_ref().is_some_and(|r| !r.typing) {
             // What is drawn first (see the central panel) closes first: a diff opened
             // meanwhile is under it.
-            acts.push(Action::CloseRebase);
+            acts.push(Action::Rewrite(crate::repo::rewrite::RewriteAct::CloseRebase));
         } else if self.conflict.is_none() && self.split.is_some() {
-            acts.push(Action::CloseSplit);
+            acts.push(Action::Surgery(crate::repo::surgery::SurgeryAct::CloseSplit));
         } else if self.conflict.is_none() && self.absorb.is_some() {
-            acts.push(Action::CloseAbsorb);
+            acts.push(Action::Surgery(crate::repo::surgery::SurgeryAct::CloseAbsorb));
         } else if diff_keys {
             acts.push(Action::CloseDiff);
         } else if let Some(rebase) = &self.rebase {
             if !rebase.typing {
-                acts.push(Action::CloseRebase);
+                acts.push(Action::Rewrite(crate::repo::rewrite::RewriteAct::CloseRebase));
             }
         } else if self.file_view.is_some() {
-            acts.push(Action::CloseFileView);
+            acts.push(Action::FileView(crate::repo::file_view::FileViewAct::Close));
         } else if self.bakeoff.view.is_some() {
             acts.push(Action::Bake(crate::repo::bakeoff::BakeAct::Close));
         } else if self.ci_view.is_some() && self.main_keys(ctx, Panel::Ci) {

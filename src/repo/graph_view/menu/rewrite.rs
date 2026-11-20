@@ -44,10 +44,10 @@ pub(super) fn rewrite_items(
     .on_hover_text(crate::i18n::text("repo-core-2653"))
     .clicked()
     {
-        acts.push(Action::InteractiveRebase {
+        acts.push(Action::Rewrite(crate::repo::rewrite::RewriteAct::InteractiveRebase {
             onto: hash.to_owned(),
             label: short.to_owned(),
-        });
+        }));
     }
     let cherry_pick = crate::i18n::text("repo-core-2654").to_owned();
     let picked = if r.merge {

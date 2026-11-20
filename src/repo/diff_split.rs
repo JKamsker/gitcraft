@@ -85,7 +85,7 @@ impl RepoTab {
             widgets::active_underline(ui, button.rect, t.accent);
         }
         if button.clicked() {
-            acts.push(Action::DiffBesideGraph(!on));
+            acts.push(Action::Diff(crate::repo::diff::DiffAct::BesideGraph(!on)));
         }
         true
     }

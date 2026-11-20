@@ -154,15 +154,15 @@ impl RepoTab {
                         crate::i18n::text("repo-core-2488")
                     });
                     if resp.double_clicked() {
-                        acts.push(Action::CloseFileView);
+                        acts.push(Action::FileView(crate::repo::file_view::FileViewAct::Close));
                         acts.push(Action::SelectHash(c.hash.clone()));
                     } else if resp.clicked() && view.lines.is_some() {
                         // Only the part of its diff that changed the lines.
-                        acts.push(Action::OpenDiffOfLines {
+                        acts.push(Action::FileView(crate::repo::file_view::FileViewAct::DiffOfLines {
                             hash: c.hash.clone(),
                             path: c.path.clone(),
                             lines: c.lines.clone(),
-                        });
+                        }));
                     } else if resp.clicked() {
                         acts.push(Action::OpenDiff(DiffKey::Commit {
                             hash: c.hash.clone(),

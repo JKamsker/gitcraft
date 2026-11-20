@@ -139,10 +139,10 @@ pub(super) fn migration(
                 let clicked = response.clicked();
                 response.on_hover_text(&label);
                 if clicked {
-                    acts.push(Action::ComparisonMove {
+                    acts.push(Action::Comparison(crate::repo::file_comparison::ComparisonAct::Move {
                         request: state.data_request,
                         index: i,
-                    });
+                    }));
                 }
             }
         });

@@ -64,10 +64,10 @@ impl RepoTab {
                 PaletteItem::action(
                     format!("Interactive rebase {target} onto {at}…"),
                     "commit",
-                    Action::InteractiveRebase {
+                    Action::Rewrite(crate::repo::rewrite::RewriteAct::InteractiveRebase {
                         onto: hash.to_owned(),
                         label: at.to_owned(),
-                    },
+                    }),
                 )
                 .key("commit:interactive-rebase"),
             );
@@ -93,10 +93,10 @@ impl RepoTab {
                 PaletteItem::action(
                     format!("Create patch from {at}…"),
                     "commit",
-                    Action::SavePatch {
+                    Action::Rewrite(crate::repo::rewrite::RewriteAct::SavePatch {
                         hash: hash.to_owned(),
                         summary: commit.summary.clone(),
-                    },
+                    }),
                 )
                 .key("commit:patch"),
             );
@@ -118,7 +118,7 @@ impl RepoTab {
                 PaletteItem::action(
                     format!("Split commit {at}…"),
                     "rewrite",
-                    Action::OpenSplit(hash.to_owned()),
+                    Action::Surgery(crate::repo::surgery::SurgeryAct::OpenSplit(hash.to_owned())),
                 )
                 .key("commit:split"),
             );
@@ -126,7 +126,7 @@ impl RepoTab {
                 PaletteItem::action(
                     format!("Move changes from {at}…"),
                     "rewrite",
-                    Action::OpenMove(hash.to_owned()),
+                    Action::Surgery(crate::repo::surgery::SurgeryAct::OpenMove(hash.to_owned())),
                 )
                 .key("commit:move"),
             );
@@ -209,11 +209,11 @@ impl RepoTab {
                     PaletteItem::action(
                         format!("{label} {path}"),
                         "file",
-                        Action::FileView {
+                        Action::FileView(crate::repo::file_view::FileViewAct::Open {
                             path: path.to_owned(),
                             rev: rev.clone(),
                             tab,
-                        },
+                        }),
                     )
                     .key(format!("file:{kind}")),
                 );

@@ -178,13 +178,13 @@ fn responsive_composer_toggles_keep_keyboard_and_continuation_guards() {
     h.state_mut().1.clear();
     h.get_by_label("Distribute staged fixes…").click();
     h.step();
-    assert!(!h.state().1.iter().any(|a| matches!(a, Action::OpenAbsorb)));
+    assert!(!h.state().1.iter().any(|a| matches!(a, Action::Surgery(crate::repo::surgery::SurgeryAct::OpenAbsorb))));
     h.state_mut().0.work.in_progress = None;
     h.state_mut().0.refs.current = None;
     h.step();
     h.get_by_label("Distribute staged fixes…").click();
     h.step();
-    assert!(!h.state().1.iter().any(|a| matches!(a, Action::OpenAbsorb)));
+    assert!(!h.state().1.iter().any(|a| matches!(a, Action::Surgery(crate::repo::surgery::SurgeryAct::OpenAbsorb))));
 }
 
 #[test]
