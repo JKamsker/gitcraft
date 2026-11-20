@@ -37,7 +37,7 @@
 - Run every local Rust toolchain command (`cargo build`/`check`/`test`/`clippy`, `rustc`) at the lowest OS priority so it never competes with the user's work. Windows: `cmd /c start "" /low /b /wait cargo build --release` (child `rustc`/linker processes inherit the idle class). Unix: `nice -n 19 cargo …`.
 - On Windows, antivirus may block freshly compiled build-script executables under `target/debug/build`. When `target/release` already holds build scripts that ran, prefer the `release` profile: cargo reuses them instead of compiling new ones. This is a workaround only — after `cargo clean` or a dependency change they are compiled again and may be blocked too.
 - Worktrees: keep the default per-worktree `target/`. Do not point concurrent worktrees at one shared `CARGO_TARGET_DIR`: Cargo's build lock serializes them and their `target/debug/gitcraft.exe` overwrite each other. A worktree's `target/` goes away with it, so remove worktrees with `git worktree remove`, not by deleting the folder (`git worktree prune` clears ones already deleted).
-- The dev profile builds line tables only (`Cargo.toml`). A `target/` built before that change holds full-debug artifacts Cargo no longer uses; `cargo clean` it once. For full debugger locals, build with `CARGO_PROFILE_DEV_DEBUG=full`.
+- The dev profile builds line tables only (`Cargo.toml`). A `target/` built before that change holds full-debug artifacts Cargo no longer uses; remove them once with `cargo clean --profile dev`, which keeps `target/release` and the build scripts above. For full debugger locals, build with `CARGO_PROFILE_DEV_DEBUG=full`.
 
 # Process-test safety
 

@@ -68,6 +68,8 @@ cognitive_complexity="forbid"
                     try:
                         os.symlink(os.path.relpath(target, path.parent), path, target_is_directory=directory)
                     except OSError as error:
+                        # The next case removes `.cargo`, which must be left empty.
+                        config.unlink()
                         self.skipTest(f"symlink creation unavailable: {error}")
                     git("add", relative)
                     try:

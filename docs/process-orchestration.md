@@ -57,7 +57,8 @@ readers before clearing the loading state.
 
 Tabs own cancellation scopes inherited by jobs and reload readers. Closing a tab cancels
 queued work and migrated children. Suspension renews the scope/result channel so late results
-cannot repopulate a resumed view. App exit cancels jobs, drains/joins the process loop and
+cannot repopulate a resumed view. Which request each feature owns, and how its late replies are
+rejected, is listed per flow in [async request ownership](async-requests.md). App exit cancels jobs, drains/joins the process loop and
 closes idle persistent shells. Shutdown also cancels/joins parallel bisects and waits for their
 remote stop requests. No process-owner futures are aborted. Inherited open pipes have
 a drain deadline; timed Git calls retain their completed result while cleaning up helpers.
