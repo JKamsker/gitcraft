@@ -201,3 +201,19 @@ rustix = { version = "1", features = ["time"] }
 # position before a drag's final MouseInput. Branch `gitcraft/dock-menu-drag-release` of the fork.
 [patch.crates-io]
 winit = { git = "https://github.com/JKamsker/winit", rev = "b641090c1688c6425c4589b999209cc680954f98" }
+
+# egui 0.36.2 with no vsync while a window is being resized on Windows: presenting without waiting
+# for vblank halves the strip a dragged edge shows through (black) before the new frame arrives.
+# Branch `gitcraft/windows-resize-novsync` of the fork. Every egui crate comes from it: the fork's
+# crates depend on each other by path, so a crates.io egui next to them would be a second egui.
+ecolor = { git = "https://github.com/JKamsker/egui", rev = "94295cb85d393c59575ca8f0a74878c2b43c4ce8" }
+eframe = { git = "https://github.com/JKamsker/egui", rev = "94295cb85d393c59575ca8f0a74878c2b43c4ce8" }
+egui = { git = "https://github.com/JKamsker/egui", rev = "94295cb85d393c59575ca8f0a74878c2b43c4ce8" }
+egui-wgpu = { git = "https://github.com/JKamsker/egui", rev = "94295cb85d393c59575ca8f0a74878c2b43c4ce8" }
+egui-winit = { git = "https://github.com/JKamsker/egui", rev = "94295cb85d393c59575ca8f0a74878c2b43c4ce8" }
+egui_extras = { git = "https://github.com/JKamsker/egui", rev = "94295cb85d393c59575ca8f0a74878c2b43c4ce8" }
+egui_glow = { git = "https://github.com/JKamsker/egui", rev = "94295cb85d393c59575ca8f0a74878c2b43c4ce8" }
+egui_kittest = { git = "https://github.com/JKamsker/egui", rev = "94295cb85d393c59575ca8f0a74878c2b43c4ce8" }
+emath = { git = "https://github.com/JKamsker/egui", rev = "94295cb85d393c59575ca8f0a74878c2b43c4ce8" }
+epaint = { git = "https://github.com/JKamsker/egui", rev = "94295cb85d393c59575ca8f0a74878c2b43c4ce8" }
+epaint_default_fonts = { git = "https://github.com/JKamsker/egui", rev = "94295cb85d393c59575ca8f0a74878c2b43c4ce8" }
