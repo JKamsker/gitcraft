@@ -37,5 +37,7 @@ any action by name.
 - [Code layout](code-layout.md): where things live in `src/`.
 - [Architecture boundaries](architecture-boundaries.md): feature domains, allowed dependency
   directions, `RepoTab` state ownership and the CI fitness checks.
+- [Async request ownership](async-requests.md): who owns each background request, how late
+  replies are rejected, and the known gaps.
 - [CPU performance](cpu-performance.md), [workflow suite](cpu-workflows.md),
   [process orchestration](process-orchestration.md): measurements and how to reproduce them.
