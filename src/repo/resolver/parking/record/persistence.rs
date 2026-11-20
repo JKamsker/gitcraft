@@ -3,13 +3,9 @@
 use super::*;
 use std::io::Write as _;
 
+/// Flushes `dir`'s entries on every platform, Windows included (`crate::dir_sync`).
 fn sync_dir(dir: &Path) -> Result<(), String> {
-    #[cfg(unix)]
-    std::fs::File::open(dir)
-        .and_then(|f| f.sync_all())
-        .map_err(|e| e.to_string())?;
-    let _ = dir;
-    Ok(())
+    crate::dir_sync::sync(dir).map_err(|e| format!("couldn't sync {}: {e}", dir.display()))
 }
 fn sync_tree(dir: &Path) -> Result<(), String> {
     for entry in std::fs::read_dir(dir).map_err(|e| e.to_string())? {

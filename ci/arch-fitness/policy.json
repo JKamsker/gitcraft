@@ -132,12 +132,13 @@
     "runtime": {
       "layer": "platform",
       "owner": "@JKamsker",
-      "description": "Process event loop, bounded workers, timing, safe file reads, PATH, network policy, portable mode, catalogs, sound, diagnostics and secret scrubbing.",
+      "description": "Process event loop, bounded workers, timing, safe file reads, directory flushes, PATH, network policy, portable mode, catalogs, sound, diagnostics and secret scrubbing.",
       "modules": [
         "gitcraft::processes",
         "gitcraft::tasks",
         "gitcraft::timing",
         "gitcraft::safe_read",
+        "gitcraft::dir_sync",
         "gitcraft::shell_path",
         "gitcraft::network",
         "gitcraft::portable",

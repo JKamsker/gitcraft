@@ -20,14 +20,11 @@ struct Receipt {
     phase: Phase,
 }
 
+/// Flushes `dir`'s entries on every platform: Windows too (`FlushFileBuffers` on a
+/// directory handle, see `crate::dir_sync`). Renames do not request write-through; a
+/// rename is durable once the directories it touched are flushed by this.
 pub(super) fn sync_dir(dir: &Path) -> Result<(), String> {
-    // Windows does not support opening directories through std::fs::File.
-    #[cfg(unix)]
-    std::fs::File::open(dir)
-        .and_then(|f| f.sync_all())
-        .map_err(|e| format!("sync {}: {e}", dir.display()))?;
-    let _ = dir;
-    Ok(())
+    crate::dir_sync::sync(dir).map_err(|e| format!("sync {}: {e}", dir.display()))
 }
 
 // FlushFileBuffers requires GENERIC_WRITE on Windows, including for an existing
@@ -95,9 +92,43 @@ pub(super) use receipts::{atomic_write, latest, record};
 
 /// Persist reachability, including ancestors created by repo_file/reserve.
 pub(super) fn sync_ancestors(path: &Path) -> Result<(), String> {
+    climb_ancestors(path, &mut Default::default(), crate::dir_sync::sync)
+}
+
+/// [`sync_ancestors`] of each directory, flushing a shared ancestor once rather than once
+/// per file below it (each flush is a real `FlushFileBuffers` call on Windows).
+pub(super) fn sync_ancestors_of<'a>(
+    dirs: impl IntoIterator<Item = &'a Path>,
+) -> Result<(), String> {
+    let mut done = std::collections::BTreeSet::new();
+    for dir in dirs {
+        climb_ancestors(dir, &mut done, crate::dir_sync::sync)?;
+    }
+    Ok(())
+}
+
+/// `path` itself must flush. On Windows the climb stops at the first ancestor this process
+/// may not add entries to (e.g. `C:\Users` for a standard user): it cannot have created
+/// anything there, so everything below that it could have created is already flushed.
+/// Unix flushes through read-only descriptors and propagates every failure. A directory in
+/// `done` was flushed already, and so were the ancestors above it.
+fn climb_ancestors(
+    path: &Path,
+    done: &mut std::collections::BTreeSet<PathBuf>,
+    mut sync: impl FnMut(&Path) -> std::io::Result<()>,
+) -> Result<(), String> {
     let mut at = Some(path);
     while let Some(dir) = at {
-        sync_dir(dir)?;
+        if done.contains(dir) {
+            break;
+        }
+        match sync(dir) {
+            Ok(()) => {}
+            // Not remembered: should it be another call's own `path`, it must flush then.
+            Err(e) if dir != path && crate::dir_sync::cannot_add_entries(&e) => break,
+            Err(e) => return Err(format!("sync {}: {e}", dir.display())),
+        }
+        done.insert(dir.to_path_buf());
         super::effects::boundary("directory-synced")?;
         at = dir.parent();
     }
@@ -214,3 +245,7 @@ pub(super) fn recover_locked(repo: &Path, parked: &Parked) -> Result<bool, Strin
 #[cfg(test)]
 #[path = "journal/tests.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "journal/ancestor_tests.rs"]
+mod ancestor_tests;
