@@ -215,6 +215,9 @@ impl RepoTab {
                 if !automatic {
                     tab.earlier_versions(ctx);
                 }
+                // A failure shows with the drafts, not in the status line: what waited (asked
+                // for during an automatic snapshot, say) runs.
+                tab.busy_op_released(true, ctx);
             },
         );
     }

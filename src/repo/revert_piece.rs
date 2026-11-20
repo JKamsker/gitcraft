@@ -135,6 +135,7 @@ impl RepoTab {
     ) {
         self.busy_op = None;
         self.op_started = None;
+        let ok = matches!(&outcome, Ok((_, Reverted::Clean | Reverted::Merged)));
         self.status = Some(crate::repo::Notice::plain(match outcome {
             Ok((file, Reverted::Clean)) => {
                 // Applying the same patch forward brings the changes back.
@@ -201,5 +202,6 @@ impl RepoTab {
             ),
         }));
         self.reload_status(ctx);
+        self.busy_op_released(ok, ctx);
     }
 }

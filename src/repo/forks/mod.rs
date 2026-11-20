@@ -351,6 +351,7 @@ fn approval_result(number: u64, result: Result<(), String>) -> super::Msg {
         tab.forks.scope = None;
         tab.forks.scope_label = None;
         tab.forks.approving = false;
+        let ok = result.is_ok();
         tab.status = Some(crate::repo::Notice::plain(match result {
             Ok(()) => (format!("#{number}'s workflow runs are approved"), false),
             Err(e) => (
@@ -360,6 +361,7 @@ fn approval_result(number: u64, result: Result<(), String>) -> super::Msg {
         }));
         tab.forks.read_for = None;
         tab.refresh_ci(ctx);
+        tab.busy_op_released(ok, ctx);
     }))
 }
 
@@ -408,3 +410,6 @@ mod fluent_checkout_identity_tests;
 
 #[cfg(test)]
 mod staged_recording_tests;
+
+#[cfg(test)]
+mod busy_release_tests;

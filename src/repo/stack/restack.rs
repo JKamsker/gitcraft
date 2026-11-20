@@ -183,6 +183,7 @@ impl RepoTab {
                 self.focus_wip = worktree.is_none();
             }
         }
+        let ok = !self.status.as_ref().is_some_and(|notice| notice.1);
         if long && let Some((message, failed)) = self.status.as_deref().cloned() {
             self.finished.push(crate::repo::Notice::plain((
                 format!("{} · {message}", self.name),
@@ -190,6 +191,7 @@ impl RepoTab {
             )));
         }
         self.reload(ctx);
+        self.busy_op_released(ok, ctx);
     }
 
     /// The preview, when it is open.

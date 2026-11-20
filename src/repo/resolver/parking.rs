@@ -220,7 +220,11 @@ impl RepoTab {
         self.then(
             ctx,
             move || park::bring_back(&repo, &parked).map(|()| parked),
-            |tab, back, ctx| tab.brought_back(back, ctx),
+            |tab, back, ctx| {
+                let ok = back.is_ok();
+                tab.brought_back(back, ctx);
+                tab.busy_op_released(ok, ctx);
+            },
         );
     }
 

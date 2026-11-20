@@ -210,11 +210,13 @@ impl RepoTab {
     ) {
         self.busy_op = None;
         self.op_started = None;
+        let ok = result.is_ok();
         self.status = Some(crate::repo::Notice::plain(match result {
             Ok(said) => (format!("{label}: {}", said_briefly(&said)), false),
             Err(e) => (format!("{label} failed: {e}"), true),
         }));
         self.reload(ctx);
+        self.busy_op_released(ok, ctx);
     }
 
     /// Reads the bisect again, in the background (after every reload).
@@ -294,6 +296,7 @@ impl RepoTab {
         self.busy_op = None;
         self.op_started = None;
         let Some(run) = &mut self.bisect.run else {
+            self.busy_op_released(true, ctx);
             return;
         };
         let (last_line, only_skipped) = run
@@ -321,6 +324,7 @@ impl RepoTab {
         run.ended = Some(ended);
         self.status = Some(crate::repo::Notice::plain((message, failed)));
         self.reload(ctx);
+        self.busy_op_released(!failed, ctx);
     }
 
     /// The command offered in the run dialog: the last one run.

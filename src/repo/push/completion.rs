@@ -134,9 +134,11 @@ impl RepoTab {
         let creds = self.credentials.clone();
         // Let go of all the same if it panics.
         let failed = |e: String| -> Msg {
-            Msg::Then(Box::new(move |tab: &mut RepoTab, _: &egui::Context| {
+            Msg::Then(Box::new(move |tab: &mut RepoTab, ctx: &egui::Context| {
                 tab.busy_op = None;
                 tab.status = Some(crate::repo::Notice::plain((e, true)));
+                // Only a look at the remote: what waited for it does not build on it.
+                tab.busy_op_released(true, ctx);
             }))
         };
         spawn_or(&self.tx, ctx, failed, move || {
@@ -185,5 +187,8 @@ impl RepoTab {
         }
         // The remote branch was fetched.
         self.reload(ctx);
+        // Only a look at the remote (the push it explains was refused already, dropping what
+        // waited then): what was asked for since runs.
+        self.busy_op_released(true, ctx);
     }
 }

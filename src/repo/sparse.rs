@@ -157,6 +157,8 @@ impl RepoTab {
                             }
                         }
                     }
+                    // A failure shows in its own window, not the status line: what waited runs.
+                    tab.busy_op_released(true, ctx);
                 },
             );
         } else if !open && !state.writing {

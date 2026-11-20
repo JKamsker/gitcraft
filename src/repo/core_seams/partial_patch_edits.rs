@@ -115,9 +115,13 @@ impl RepoTab {
                 crate::i18n::text("repo-core-0167").to_owned(),
                 true,
             )));
+            self.busy_op_released(false, ctx);
             return;
         }
         self.apply_picked(prepared.pick, &prepared.label, saved, ctx);
+        // Nothing to do once the patch went on to be applied (that operation holds the slot).
+        // When it did not, the reason is not always in the status line: what waited runs.
+        self.busy_op_released(true, ctx);
     }
 
     /// Applies the patch of lines picked, saved at `saved` (see [`Self::pick_lines`]).
