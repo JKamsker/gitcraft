@@ -8,7 +8,7 @@ use super::{Account, Edition};
 
 /// How the token goes along. `None` for public endpoints (`api/server/version`).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub(crate) enum Auth {
+pub(in crate::analysis) enum Auth {
     None,
     /// The token as the Basic login with an empty password: SonarQube Server before 10.0
     /// ("The token is sent via the login field of HTTP basic authentication").
@@ -22,7 +22,7 @@ const OLDEST: Version = Version { major: 7, minor: 7 };
 /// First Server documenting Bearer tokens.
 const BEARER_SINCE: u32 = 10;
 
-pub(crate) struct Client<F> {
+pub(in crate::analysis) struct Client<F> {
     account: Account,
     send: F,
     auth: Auth,
@@ -42,7 +42,7 @@ fn project(result: Result<String, Failure>) -> Result<String, Failure> {
 
 impl<F: FnMut(&str, Auth) -> Result<String, Failure>> Client<F> {
     /// `send(path, auth)` performs `GET {base}/{path}` and returns the body of a 2xx answer.
-    pub(crate) fn new(account: Account, send: F) -> Self {
+    pub(in crate::analysis) fn new(account: Account, send: F) -> Self {
         Self {
             account,
             send,
@@ -192,17 +192,18 @@ impl<F: FnMut(&str, Auth) -> Result<String, Failure>> Client<F> {
         };
         format!("{}/dashboard?id={key}{scope}", self.account.base())
     }
-}
 
-impl<F: FnMut(&str, Auth) -> Result<String, Failure>> Provider for Client<F> {
-    fn check(&mut self) -> Result<Connected, Failure> {
+    /// Verifies that the server answers and accepts the token (Profile → Connections).
+    pub(in crate::analysis) fn check(&mut self) -> Result<Connected, Failure> {
         let version = self.prepare()?;
         if !parse::valid(&self.get("api/authentication/validate")?)? {
             return Err(Failure::Unauthorized);
         }
         Ok(Connected { version })
     }
+}
 
+impl<F: FnMut(&str, Auth) -> Result<String, Failure>> Provider for Client<F> {
     fn quality_gate(&mut self, query: &Query) -> Result<Observation, Failure> {
         if !super::project_key(&query.project) {
             return Err(Failure::ProjectNotFound);

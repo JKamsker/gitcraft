@@ -378,5 +378,23 @@
     "reason": "Issue #173 item 13 adds one coordinator reference: Dialog::FileMetadata holds the owned FileMetaForm. Execution uses the existing UndoableOps action, so the Action enum and apply dispatcher do not grow. No new domain edge or RepoTab mutation is introduced.",
     "owner": "@JKamsker",
     "remediation": "Reduce coordinator symbol dependencies as dialog composition is decomposed and ratchet the budget."
+  },
+  "203-sonar-analysis-provider-api": {
+    "changes": [
+      "budget/forge/exported=237"
+    ],
+    "reason": "Issue #203 slice 1 adds the read-only code-analysis provider (gitcraft::analysis) to the forge services domain. Exactly the 15 items other domains use are exported: the gate verdict types and evaluate (review), Query/Target/Failure/Provider (review), sonar::Account (profile connections), live and project_key (review) and the settings section. Client, transport, parsers, Edition, CLOUD_ORIGINS and token storage stay pub(in crate::analysis) or private. No new domain edge.",
+    "owner": "@JKamsker",
+    "remediation": "Put one facade in front of the analysis gate types when the findings slices of #203 settle, and ratchet the budget."
+  },
+  "203-sonar-quality-gate-composition": {
+    "changes": [
+      "budget/repo-core/symbols=615",
+      "budget/review/exported=113",
+      "budget/settings/symbols=182"
+    ],
+    "reason": "Issue #203 slice 1: the coordinator composes one new review-owned field (quality_gate::State) and calls its toolbar chip (one exported review method); Profile -> Connections renders the SonarQube section (one settings reference, like the tracker sections). Background reads use the existing then_or job seam; no Msg variant, dispatch arm or RepoTab mutation outside the owning feature is added.",
+    "owner": "@JKamsker",
+    "remediation": "Move toolbar chips behind one feature-provided chip list when the toolbar is decomposed, and ratchet the budgets."
   }
 }

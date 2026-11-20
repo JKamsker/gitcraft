@@ -15,11 +15,7 @@ const NEXT: &str = "bfe36592eb7f9f2708b5d358b5b5f33ed535c8cf";
 fn connected() -> Context {
     Context {
         choices: Choices {
-            sonar: Account {
-                origin: "https://sonar.example.com".into(),
-                secret_ref: "profile-1".into(),
-                ..Account::default()
-            },
+            sonar: Account::server_for_tests("https://sonar.example.com", "profile-1"),
             ..Choices::default()
         },
         ..Context::default()

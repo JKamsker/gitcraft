@@ -26,7 +26,7 @@ pub(crate) struct Query {
 
 /// What a connection check found.
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub(crate) struct Connected {
+pub(in crate::analysis) struct Connected {
     /// The server's reported version; SonarQube Cloud reports its own build number.
     pub version: String,
 }
@@ -73,7 +73,7 @@ pub(crate) enum Failure {
 }
 
 impl Failure {
-    pub(crate) fn message_id(&self) -> &'static str {
+    fn message_id(&self) -> &'static str {
         match self {
             Self::NotConfigured => "analysis-error-not-configured",
             Self::InvalidConnection => "analysis-error-invalid-connection",
@@ -115,10 +115,9 @@ impl Failure {
 }
 
 /// A read-only analysis provider. Every method may block on the network: call it from a
-/// background worker, never the UI thread.
+/// background worker, never the UI thread. (Connection checks are adapter-specific: they
+/// run from the adapter's own settings section.)
 pub(crate) trait Provider {
-    /// Verifies that the server answers and accepts the credential.
-    fn check(&mut self) -> Result<Connected, Failure>;
     /// The quality gate of the newest analysis of `query`, with the identity of that analysis.
     fn quality_gate(&mut self, query: &Query) -> Result<gate::Observation, Failure>;
 }

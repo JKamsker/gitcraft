@@ -3,7 +3,7 @@
 
 use egui::Ui;
 
-use super::super::{Connected, Failure, Provider};
+use super::super::{Connected, Failure};
 use super::{Account, CLOUD_ORIGINS, Edition};
 
 /// What the last action said; localized only when painted.
@@ -43,7 +43,7 @@ pub(crate) fn account(ui: &mut Ui, profile: u64, account: &mut Account) {
         Edition::Cloud => cloud_fields(ui, profile, account),
     }
     if let Err(id) = account.validate() {
-        ui.colored_label(crate::theme::Tokens::get(ui.ctx()).warning, t(id));
+        ui.colored_label(ui.visuals().warn_fg_color, t(id));
     }
     token_row(ui, profile, account);
     ui.small(t("analysis-connection-policy"));

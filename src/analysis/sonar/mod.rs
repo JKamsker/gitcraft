@@ -21,7 +21,8 @@ mod transport_tests;
 #[cfg(test)]
 mod ui_tests;
 
-pub(crate) use transport::{for_account, live};
+pub(in crate::analysis) use transport::for_account;
+pub(crate) use transport::live;
 
 use serde::{Deserialize, Serialize};
 use serde_json::json;
@@ -32,14 +33,14 @@ use super::Failure;
 const SERVICE: &str = "gitcraft-analysis";
 
 /// SonarQube Cloud's regional origins (Web API v1 hosts, per the Cloud Web API page).
-pub(crate) const CLOUD_ORIGINS: [&str; 3] = [
+pub(in crate::analysis) const CLOUD_ORIGINS: [&str; 3] = [
     "https://sonarcloud.io",
     "https://sonarqube.us",
     "https://sonarqube.au",
 ];
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash, Serialize, Deserialize)]
-pub(crate) enum Edition {
+pub(in crate::analysis) enum Edition {
     /// A self-hosted SonarQube Server (or Community Build).
     #[default]
     Server,
@@ -52,7 +53,7 @@ pub(crate) enum Edition {
 #[derive(Clone, Debug, Default, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(default)]
 pub(crate) struct Account {
-    pub edition: Edition,
+    pub(in crate::analysis) edition: Edition,
     /// Server: its base URL including any context path (`https://host/sonarqube`).
     /// Cloud: one of [`CLOUD_ORIGINS`].
     pub origin: String,
@@ -62,13 +63,23 @@ pub(crate) struct Account {
 }
 
 impl Account {
+    /// A Server connection, for tests outside this module.
+    #[cfg(test)]
+    pub(crate) fn server_for_tests(origin: &str, secret_ref: &str) -> Self {
+        Self {
+            origin: origin.into(),
+            secret_ref: secret_ref.into(),
+            ..Self::default()
+        }
+    }
+
     /// Whether the profile has a connection at all; an empty one is valid and inert.
     pub(crate) fn configured(&self) -> bool {
         !self.origin.trim().is_empty()
     }
 
     /// The base URL requests go to, without a trailing slash.
-    pub(crate) fn base(&self) -> &str {
+    pub(in crate::analysis) fn base(&self) -> &str {
         self.origin.trim().trim_end_matches('/')
     }
 
@@ -120,7 +131,7 @@ impl Account {
 
     /// Saves `token` for this connection. The error is a Fluent message id, so no error can
     /// contain the token.
-    pub(crate) fn store(&self, token: &str) -> Result<(), &'static str> {
+    pub(in crate::analysis) fn store(&self, token: &str) -> Result<(), &'static str> {
         self.validate()?;
         if !self.configured() || self.secret_ref.is_empty() || !token_is_plausible(token) {
             return Err("analysis-token-required");
@@ -136,7 +147,7 @@ impl Account {
             .map_err(|_| "analysis-token-store-failed")
     }
 
-    pub(crate) fn forget(&self) -> Result<(), &'static str> {
+    pub(in crate::analysis) fn forget(&self) -> Result<(), &'static str> {
         self.entry()
             .and_then(|e| e.delete_credential().map_err(|_| Failure::MissingToken))
             .map_err(|_| "analysis-token-forget-failed")

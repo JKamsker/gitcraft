@@ -7,7 +7,7 @@ use std::time::Duration;
 
 use base64::Engine;
 
-use super::super::Failure;
+use super::super::{Failure, Provider};
 use super::Account;
 use super::client::{Auth, Client};
 
@@ -16,10 +16,10 @@ pub(super) const TIMEOUT: Duration = Duration::from_secs(15);
 /// The largest answer read; the lists used are far smaller.
 const MAX_BODY: u64 = 4 * 1024 * 1024;
 
-pub(crate) type Sender = Box<dyn FnMut(&str, Auth) -> Result<String, Failure> + Send>;
+pub(in crate::analysis) type Sender = Box<dyn FnMut(&str, Auth) -> Result<String, Failure> + Send>;
 
 /// A client for the connection of the profile the calling worker runs for.
-pub(crate) fn live() -> Result<Client<Sender>, Failure> {
+pub(crate) fn live() -> Result<impl Provider, Failure> {
     let context = crate::connections::current();
     if context.error.is_some() {
         return Err(Failure::InvalidConnection);
@@ -28,7 +28,7 @@ pub(crate) fn live() -> Result<Client<Sender>, Failure> {
 }
 
 /// A client for `account` as edited (the connection check in settings).
-pub(crate) fn for_account(account: &Account) -> Result<Client<Sender>, Failure> {
+pub(in crate::analysis) fn for_account(account: &Account) -> Result<Client<Sender>, Failure> {
     if !account.configured() {
         return Err(Failure::NotConfigured);
     }
