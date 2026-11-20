@@ -63,13 +63,22 @@ pub(in crate::repo) struct Gutter {
     pub(in crate::repo) marks: HashMap<u32, Mark>,
 }
 
-/// The gutter of the diff open: asked for once per reading of the diff.
+/// Numbers each read of a gutter, so only the latest read's answer is taken.
+static TICKETS: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+
+/// The gutter of the diff open: read again for every reading of the diff (a refresh after a
+/// commit, a checkout or an edit), since whether the report is current can change while the
+/// diff's own lines don't.
 #[derive(Default)]
 pub(in crate::repo) struct Overlay {
-    /// The reading (its source hash) it was asked for.
-    pub(in crate::repo) asked: Option<u64>,
+    /// The reading of the diff (`DiffView::data_request`) it was asked for.
+    asked: Option<u64>,
+    /// That reading's source hash: what the marks' line numbers are of.
+    source: Option<u64>,
+    /// The read whose answer is awaited.
+    ticket: u64,
     /// The answer: `Ok(None)` when there is no report.
-    pub(in crate::repo) gutter: Option<Result<Option<Arc<Gutter>>, String>>,
+    gutter: Option<Result<Option<Arc<Gutter>>, String>>,
 }
 
 impl Overlay {
@@ -78,6 +87,31 @@ impl Overlay {
         match &self.gutter {
             Some(Ok(Some(g))) if on => Some(g),
             _ => None,
+        }
+    }
+
+    /// Starts a read for `reading` of the diff, whose text hashes to `source`; returns its
+    /// ticket. The marks shown so far stay only while the lines are the same ones.
+    pub(in crate::repo) fn begin(&mut self, reading: u64, source: u64) -> u64 {
+        let ticket = TICKETS.fetch_add(1, std::sync::atomic::Ordering::Relaxed) + 1;
+        let kept = self.gutter.take().filter(|_| self.source == Some(source));
+        *self = Self {
+            asked: Some(reading),
+            source: Some(source),
+            ticket,
+            gutter: kept,
+        };
+        ticket
+    }
+
+    /// Takes the answer of read `ticket`, unless a later read (or the toggle) replaced it.
+    pub(in crate::repo) fn accept(
+        &mut self,
+        ticket: u64,
+        answer: Result<Option<Arc<Gutter>>, String>,
+    ) {
+        if self.ticket == ticket {
+            self.gutter = Some(answer);
         }
     }
 }
@@ -93,8 +127,8 @@ pub(super) fn applies(key: &DiffKey) -> bool {
 }
 
 /// Asks for the gutter when it is on and not read for this reading of the diff yet.
-pub(super) fn request(view: &DiffView, data: &DiffData, on: bool, acts: &mut Vec<Action>) {
-    if on && applies(&view.key) && view.coverage.asked != Some(data.source) {
+pub(super) fn request(view: &DiffView, on: bool, acts: &mut Vec<Action>) {
+    if on && applies(&view.key) && view.coverage.asked != Some(view.data_request) {
         acts.push(Action::DiffCoverage(CoverageAct::Load));
     }
 }

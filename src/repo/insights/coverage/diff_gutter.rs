@@ -10,7 +10,7 @@ use crate::git::Area;
 use crate::insights::Evidence;
 use crate::insights::coverage::{self as core, LineCov, LinesCoverage, Side};
 use crate::repo::diff::Kind;
-use crate::repo::diff::coverage::{CoverageAct, Gutter, Mark, Overlay, Trust};
+use crate::repo::diff::coverage::{CoverageAct, Gutter, Mark, Trust};
 use crate::repo::{DiffKey, RepoTab};
 
 /// The side of the diff `key` its added lines are numbered on, when a report can be about it.
@@ -98,12 +98,9 @@ impl RepoTab {
             .filter_map(|l| l.new)
             .collect();
         let key = view.key.clone();
-        view.coverage = Overlay {
-            asked: Some(source),
-            gutter: None,
-        };
+        let ticket = view.coverage.begin(view.data_request, source);
         let Some(side) = side_of(&key) else {
-            view.coverage.gutter = Some(Ok(None));
+            view.coverage.accept(ticket, Ok(None));
             return;
         };
         let (repo, path) = (self.path.clone(), key.path().to_owned());
@@ -116,9 +113,8 @@ impl RepoTab {
             move |tab, result, _| {
                 if let Some(view) = tab.diff.as_mut()
                     && view.key == key
-                    && view.coverage.asked == Some(source)
                 {
-                    view.coverage.gutter = Some(result);
+                    view.coverage.accept(ticket, result);
                 }
             },
         );

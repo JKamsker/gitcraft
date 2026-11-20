@@ -175,7 +175,7 @@ impl RepoTab {
                 auto_opened = Some(mark);
             }
         }
-        super::coverage::request(view, data, settings.diff_coverage, acts);
+        super::coverage::request(view, settings.diff_coverage, acts);
         super::coverage::banner(ui, &view.coverage, settings.diff_coverage);
         if let Some(open) = &view.moved {
             super::moved_view::panel(ui, &t, data, open, acts);
