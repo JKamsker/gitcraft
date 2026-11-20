@@ -145,6 +145,9 @@ fn token_row(ui: &mut Ui, profile: u64, account: &mut Account) {
         {
             let selected = account.clone();
             run(ui, id, &mut state, move || {
+                if crate::network::refused().is_some() {
+                    return Outcome::Failed(Failure::Offline);
+                }
                 match super::for_account(&selected).and_then(|mut c| c.check()) {
                     Ok(connected) => Outcome::Checked(connected),
                     Err(failure) => Outcome::Failed(failure),

@@ -146,7 +146,7 @@ fn servers_before_10_use_basic_tokens_and_before_7_7_are_unsupported() -> Result
     let (mut old, calls) = client(Edition::Server, server("7.6.0.21501", HEAD, "OK", "{}"));
     assert_eq!(
         old.quality_gate(&branch("main")),
-        Err(Failure::UnsupportedVersion("7.6.0.21501".into()))
+        Err(Failure::UnsupportedVersion("7.6".into()))
     );
     assert_eq!(
         calls.borrow().len(),
@@ -351,4 +351,63 @@ fn connection_check_validates_the_token() {
     routes.push(("api/authentication/validate", ok(r#"{"valid":false}"#)));
     let (mut c, _) = client(Edition::Server, routes);
     assert_eq!(c.check(), Err(Failure::Unauthorized));
+    // Server text other than the version number never reaches the UI.
+    let mut routes = server("10.6.0.92116 <b>beta</b>", HEAD, "OK", "{}");
+    routes.push(("api/authentication/validate", ok(r#"{"valid":true}"#)));
+    let (mut c, _) = client(Edition::Server, routes);
+    assert_eq!(c.check().map(|c| c.version), Ok("10.6.0.92116".to_owned()));
+}
+
+#[test]
+fn a_pull_request_analysis_that_lands_mid_read_does_not_lend_its_commit() -> Result<(), String> {
+    let account = Account {
+        edition: Edition::Server,
+        origin: "https://sonar.example.com".into(),
+        organization: String::new(),
+        secret_ref: "profile-1".into(),
+    };
+    let mut lists = 0;
+    let send = |path: &str, _: Auth| -> Result<String, Failure> {
+        if path.starts_with("api/server/version") {
+            return ok("10.5");
+        }
+        if path.starts_with("api/project_branches/list") {
+            return branches();
+        }
+        if path.starts_with("api/project_pull_requests/list") {
+            lists += 1;
+            let sha = if lists == 1 { OLD } else { HEAD };
+            return Ok(format!(
+                r#"{{"pullRequests":[{{"key":"42","analysisDate":"2024-01-0{lists}T03:04:05+0000","commit":{{"sha":"{sha}"}}}}]}}"#
+            ));
+        }
+        if path.starts_with("api/qualitygates/project_status") {
+            return status("OK");
+        }
+        ok("{}")
+    };
+    let mut c = Client::new(account, send);
+    let o = c
+        .quality_gate(&pull_request("42"))
+        .map_err(|e| format!("{e:?}"))?;
+    assert_eq!(o.analysis.and_then(|a| a.revision), None);
+    Ok(())
+}
+
+#[test]
+fn task_reads_that_fail_in_transit_fail_the_read_instead_of_hiding_a_pending_analysis() {
+    for failure in [
+        Failure::Timeout,
+        Failure::RateLimited(None),
+        Failure::Unreachable,
+    ] {
+        let mut routes = server("10.0", HEAD, "OK", "{}");
+        routes[4].1 = Err(failure.clone());
+        let (mut c, _) = client(Edition::Server, routes);
+        assert_eq!(c.quality_gate(&branch("main")), Err(failure));
+    }
+    let mut routes = server("10.0", HEAD, "OK", "{}");
+    routes[4].1 = Err(Failure::Forbidden);
+    let (mut c, _) = client(Edition::Server, routes);
+    assert!(c.quality_gate(&branch("main")).is_ok());
 }

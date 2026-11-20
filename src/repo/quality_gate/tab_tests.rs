@@ -45,6 +45,7 @@ fn passed_answer(connection: &Context) -> Answer {
             target: Target::Branch("main".into()),
         },
         connection: connection.choices.sonar.identity(),
+        head: HEAD.into(),
         result: Ok(Observation {
             target: Target::Branch("main".into()),
             gate: ServerGate::Ok,
@@ -149,6 +150,29 @@ fn reads_start_only_when_due_and_the_network_allows() {
                 jobs.is_empty(),
                 "offline mode refuses even an asked refresh"
             );
+            assert_eq!(
+                tab.quality_gate_badge(&ctx),
+                Some(Badge::Verdict(Verdict::Passed)),
+                "what was read stays shown, still checked against HEAD"
+            );
         }
+        // A new commit is asked about at once, not only at the next refresh.
+        tab.refs.head = NEXT.into();
+        let ((), jobs) = crate::repo::messages::record_jobs(|| tab.poll_quality_gate(&ctx, false));
+        assert_eq!(jobs.len(), 1);
+    });
+}
+
+#[test]
+fn without_network_and_without_an_answer_the_badge_says_offline() {
+    let ctx = egui::Context::default();
+    let connection = connected();
+    connection.run(|| {
+        let tab = tab(&ctx, &connection);
+        let _offline = crate::network::test_pause::set(Some(crate::network::Pause::Switch));
+        assert_eq!(
+            tab.quality_gate_badge(&ctx),
+            Some(Badge::Failed(Failure::Offline))
+        );
     });
 }

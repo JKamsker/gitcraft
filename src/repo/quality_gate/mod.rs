@@ -25,12 +25,16 @@ const RETRY: Duration = Duration::from_secs(120);
 /// A request whose answer never came (the tab was suspended) frees its slot after this; the
 /// requests themselves time out much sooner.
 const LOST_AFTER: Duration = Duration::from_secs(180);
+/// How often a paused network (offline, metered) is looked at again.
+const PAUSED_POLL: Duration = Duration::from_secs(30);
 
 /// One answer, with what it was asked for.
 #[derive(Clone, Debug)]
 struct Answer {
     query: Query,
     connection: String,
+    /// HEAD when it was asked; a moved HEAD asks again (the badge re-evaluates at once).
+    head: String,
     result: Result<Observation, Failure>,
     at: Instant,
 }
@@ -110,6 +114,11 @@ impl RepoTab {
         }
         let head = Some(self.refs.head.as_str()).filter(|h| !h.is_empty());
         Some(match self.quality_gate.current(&query, &connection) {
+            None if self.quality_gate.loading.is_none()
+                && !crate::network::background_may_run() =>
+            {
+                Badge::Failed(Failure::Offline)
+            }
             None => Badge::Checking,
             Some(Answer { result: Err(f), .. }) => Badge::Failed(f.clone()),
             Some(Answer { result: Ok(o), .. }) => {
@@ -132,14 +141,23 @@ impl RepoTab {
         if binding.connection != connection {
             return;
         }
-        let known = self.quality_gate.current(&query, &connection).is_some();
+        // Unknown for this query, or asked while HEAD was elsewhere (a commit, a pull).
+        let fresh = self
+            .quality_gate
+            .current(&query, &connection)
+            .is_some_and(|a| a.head == self.refs.head);
         let due = self.quality_gate.next.is_none_or(|t| Instant::now() >= t);
         let allowed = if asked {
             crate::network::refused().is_none()
         } else {
             crate::network::background_may_run()
         };
-        if !allowed || !(asked || due || !known) {
+        if !allowed {
+            // Offline or metered: looked at again later, without repainting every frame.
+            ctx.request_repaint_after(PAUSED_POLL);
+            return;
+        }
+        if !(asked || due || !fresh) {
             if let Some(next) = self.quality_gate.next {
                 ctx.request_repaint_after(next.saturating_duration_since(Instant::now()));
             }
@@ -152,10 +170,13 @@ impl RepoTab {
         self.quality_gate.requests += 1;
         let number = self.quality_gate.requests;
         self.quality_gate.loading = Some((number, Instant::now()));
-        let (failed_query, failed_connection) = (query.clone(), connection.clone());
+        let head = self.refs.head.clone();
+        let (failed_query, failed_connection, failed_head) =
+            (query.clone(), connection.clone(), head.clone());
         let failed = move |_: String| Answer {
             query: failed_query,
             connection: failed_connection,
+            head: failed_head,
             result: Err(Failure::Busy),
             at: Instant::now(),
         };
@@ -169,6 +190,7 @@ impl RepoTab {
                 Answer {
                     query,
                     connection,
+                    head,
                     result,
                     at: Instant::now(),
                 }

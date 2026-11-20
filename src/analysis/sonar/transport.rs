@@ -11,7 +11,7 @@ use super::super::{Failure, Provider};
 use super::Account;
 use super::client::{Auth, Client};
 
-/// Per request; a quality-gate refresh makes at most seven.
+/// Per request; a quality-gate refresh makes at most eight.
 pub(super) const TIMEOUT: Duration = Duration::from_secs(15);
 /// The largest answer read; the lists used are far smaller.
 const MAX_BODY: u64 = 4 * 1024 * 1024;

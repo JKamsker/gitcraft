@@ -57,7 +57,13 @@ impl<F: FnMut(&str, Auth) -> Result<String, Failure>> Client<F> {
     /// Reads the version and picks the authentication scheme it supports.
     fn prepare(&mut self) -> Result<String, Failure> {
         let raw = match (self.send)("api/server/version", Auth::None) {
-            Ok(text) => text.trim().chars().take(64).collect::<String>(),
+            // Digits and dots only: no other server text reaches the UI.
+            Ok(text) => text
+                .trim()
+                .chars()
+                .take(32)
+                .filter(|c| c.is_ascii_digit() || *c == '.')
+                .collect::<String>(),
             // Some locked-down servers refuse even this; assume a current one.
             Err(Failure::Unauthorized | Failure::Forbidden) => String::new(),
             Err(e) => return Err(e),
@@ -67,7 +73,10 @@ impl<F: FnMut(&str, Auth) -> Result<String, Failure>> Client<F> {
             return Ok(raw);
         }
         match parse::version(&raw) {
-            Some(v) if v < OLDEST => Err(Failure::UnsupportedVersion(raw)),
+            Some(v) if v < OLDEST => Err(Failure::UnsupportedVersion(format!(
+                "{}.{}",
+                v.major, v.minor
+            ))),
             Some(v) if v.major < BEARER_SINCE => {
                 self.auth = Auth::Basic;
                 Ok(raw)
@@ -118,6 +127,27 @@ impl<F: FnMut(&str, Auth) -> Result<String, Failure>> Client<F> {
         key: &str,
         pr: &str,
     ) -> Result<(Option<Analysis>, ServerGate, Vec<String>), Failure> {
+        let Some(row) = self.pull_request_row(key, pr)? else {
+            return Ok((None, ServerGate::Unknown, Vec::new()));
+        };
+        let (gate, failing) =
+            self.status(&format!("projectKey={key}&pullRequest={}", encoded(pr)))?;
+        // The PR gate cannot be asked by analysis id: read the row again, and if another
+        // analysis landed in between, the commit is not claimed for this gate.
+        let unchanged = self.pull_request_row(key, pr)?.as_ref() == Some(&row);
+        let analysis = Analysis {
+            key: None,
+            date: row.date,
+            revision: row.sha.filter(|_| unchanged),
+        };
+        Ok((Some(analysis), gate, failing))
+    }
+
+    fn pull_request_row(
+        &mut self,
+        key: &str,
+        pr: &str,
+    ) -> Result<Option<parse::PullRequest>, Failure> {
         let body = self
             .get(&format!("api/project_pull_requests/list?project={key}"))
             .map_err(|e| match e {
@@ -125,20 +155,9 @@ impl<F: FnMut(&str, Auth) -> Result<String, Failure>> Client<F> {
                 Failure::Http(400 | 404) => Failure::PullRequestsUnsupported,
                 other => other,
             })?;
-        let Some(row) = parse::pull_requests(&body)?
+        Ok(parse::pull_requests(&body)?
             .into_iter()
-            .find(|row| row.key == pr)
-        else {
-            return Ok((None, ServerGate::Unknown, Vec::new()));
-        };
-        let analysis = Analysis {
-            key: None,
-            date: row.date,
-            revision: row.sha,
-        };
-        let (gate, failing) =
-            self.status(&format!("projectKey={key}&pullRequest={}", encoded(pr)))?;
-        Ok((Some(analysis), gate, failing))
+            .find(|row| row.key == pr))
     }
 
     fn status(&mut self, selector: &str) -> Result<(ServerGate, Vec<String>), Failure> {
@@ -160,8 +179,10 @@ impl<F: FnMut(&str, Auth) -> Result<String, Failure>> Client<F> {
     ) -> Result<(bool, bool), Failure> {
         let tasks = match self.get(&format!("api/ce/component?component={key}")) {
             Ok(body) => parse::tasks(&body)?,
-            Err(e @ (Failure::Cancelled | Failure::Unauthorized)) => return Err(e),
-            Err(_) => return Ok((false, false)),
+            // Only a refusal of this one endpoint is tolerated; a timeout or rate limit must
+            // not silently drop the pending and failed-task checks.
+            Err(Failure::Forbidden | Failure::Http(_)) => return Ok((false, false)),
+            Err(e) => return Err(e),
         };
         let ours = |t: &&parse::Task| match target {
             Target::PullRequest(pr) => t.pull_request.as_deref() == Some(pr),

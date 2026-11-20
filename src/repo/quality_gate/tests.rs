@@ -114,6 +114,7 @@ fn answer(name: &str, result: Result<Observation, Failure>) -> Answer {
     Answer {
         query: query(name),
         connection: "c".into(),
+        head: String::new(),
         result,
         at: Instant::now(),
     }
