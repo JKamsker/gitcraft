@@ -75,7 +75,7 @@ None of these are needed to use gitcraft; each one turns on more of it.
 | [`tea`](https://gitea.com/gitea/tea) | a login gitcraft can use for Forgejo and Gitea (not required; see [forges](guide/pull-requests.md#setting-up-forges)) |
 | [Mergiraf](https://mergiraf.org) | solving conflicts from the syntax of the code ([setup](mergiraf.md)) |
 | [git-lfs](https://git-lfs.com) | LFS fetch, pull, locks and storage |
-| `claude`, `codex`, `gh copilot`… | AI commit messages and branch reviews (Settings → AI) |
+| `claude`, `codex`, `gh copilot` (gh 2.86+ with the Copilot CLI)… | AI commit messages and branch reviews (Settings → AI) |
 
 ## Updates
 
