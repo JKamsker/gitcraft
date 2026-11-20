@@ -44,7 +44,8 @@ fn click(form: FileMetaForm, idle: bool, button: &str) -> Option<Action> {
 
 fn ready(path: &str, mode: &str, edit: Edit) -> FileMetaForm {
     let mut form = FileMetaForm::new(path, edit);
-    form.state = State::Ready(snapshot(path, mode));
+    let patch = (edit == Edit::Executable).then(|| Ok("/tmp/mode.patch".to_owned()));
+    form.state = State::Ready(snapshot(path, mode), patch);
     form
 }
 
@@ -64,19 +65,9 @@ fn executable_dialog_answers_the_undoable_index_edit() -> Result<(), String> {
     else {
         return Err("Apply must answer an undoable operation".into());
     };
-    let blob = "b".repeat(40);
-    assert_eq!(
-        ops,
-        [[
-            "update-index",
-            "--cacheinfo",
-            "100755",
-            blob.as_str(),
-            "bin/Run.sh"
-        ]]
-    );
+    assert_eq!(ops, [["apply", "--cached", "/tmp/mode.patch"]]);
     assert_eq!(redo, ops);
-    assert_eq!(undo[0][2], "100644");
+    assert_eq!(undo, [["apply", "--cached", "-R", "/tmp/mode.patch"]]);
     assert_eq!(refresh, Refresh::Status);
     Ok(())
 }
@@ -119,6 +110,7 @@ fn menus_offer_edits_only_for_tracked_files() {
     for (code, area) in [
         ('D', Area::Staged),
         ('D', Area::Unstaged),
+        ('A', Area::Unstaged),
         ('?', Area::Untracked),
         ('U', Area::Conflicted),
     ] {

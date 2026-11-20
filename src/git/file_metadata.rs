@@ -3,8 +3,8 @@
 //!
 //! Both are planned from a [`Snapshot`] read in the background, then run as plain Git
 //! commands with exact inverse commands for undo. Neither touches the file's contents: the
-//! executable bit is set on the index entry as it is (`update-index --cacheinfo`, not
-//! `--chmod`, which would also stage the working-tree contents), and a case-only rename
+//! executable bit changes by applying a mode-only patch to the index (not with
+//! `update-index --chmod`, which also stages the working-tree contents), and a case-only rename
 //! moves the file through a temporary name, so it works the same on case-insensitive
 //! filesystems (Windows, macOS) and keeps staged and unstaged edits with the file.
 
@@ -130,33 +130,77 @@ fn editable(snapshot: &Snapshot) -> Result<(&str, &str), String> {
     }
 }
 
-/// Sets the executable bit of the index entry if it is clear, clears it if it is set. Only
-/// the entry's mode changes: its blob stays, so unstaged edits stay unstaged.
-pub(crate) fn executable_plan(snapshot: &Snapshot) -> Result<Plan, String> {
-    let (mode, hash) = editable(snapshot)?;
-    let (to, verb) = match mode {
-        PLAIN => (EXECUTABLE, "Make"),
-        EXECUTABLE => (PLAIN, "Clear the executable bit of"),
-        _ => {
-            return Err(crate::i18n::message(
-                "file-metadata-refused-not-regular",
-                &[("mode", mode.to_owned().into())],
-            ));
+/// The modes of the executable edit, `(from, to)`: the bit is set when clear and cleared when
+/// set; only a regular file has it.
+fn executable_modes(snapshot: &Snapshot) -> Result<(&str, &'static str), String> {
+    let (mode, _) = editable(snapshot)?;
+    match mode {
+        PLAIN => Ok((mode, EXECUTABLE)),
+        EXECUTABLE => Ok((mode, PLAIN)),
+        _ => Err(crate::i18n::message(
+            "file-metadata-refused-not-regular",
+            &[("mode", mode.to_owned().into())],
+        )),
+    }
+}
+
+/// A patch that changes nothing of `path` but its mode, `from` → `to`. `git apply --cached`
+/// sets the mode of whatever blob the index holds when it runs, so neither the edit nor its
+/// undo or redo ever puts back contents staged at another time.
+pub(crate) fn mode_patch(path: &str, from: &str, to: &str) -> String {
+    let (old, new) = (quote(&format!("a/{path}")), quote(&format!("b/{path}")));
+    format!("diff --git {old} {new}\nold mode {from}\nnew mode {to}\n")
+}
+
+/// `text` quoted as Git quotes a path in a patch: in double quotes, with `"`, `\` and ASCII
+/// control characters escaped; other characters stay as they are, which Git reads back.
+fn quote(text: &str) -> String {
+    let mut out = String::from('"');
+    for c in text.chars() {
+        match c {
+            '"' | '\\' => {
+                out.push('\\');
+                out.push(c);
+            }
+            '\n' => out.push_str("\\n"),
+            '\t' => out.push_str("\\t"),
+            c if c.is_ascii_control() => out.push_str(&format!("\\{:03o}", u32::from(c))),
+            c => out.push(c),
         }
-    };
-    let set = |mode: &str| {
-        let args = ["update-index", "--cacheinfo", mode, hash, &snapshot.path];
-        args.map(str::to_owned).to_vec()
+    }
+    out.push('"');
+    out
+}
+
+/// Saves the patch of the executable edit where Git runs for `repo` (see
+/// [`super::save_patch_for`]): the file its commands apply, forward and reversed.
+pub(crate) fn save_executable_patch(repo: &Path, snapshot: &Snapshot) -> Result<String, String> {
+    let (from, to) = executable_modes(snapshot)?;
+    super::save_patch_for(repo, &mode_patch(&snapshot.path, from, to))
+}
+
+/// Sets the executable bit of the index entry if it is clear, clears it if it is set, by
+/// applying `patch` (from [`save_executable_patch`]) to the index. Only the entry's mode
+/// changes: its blob stays, so unstaged edits stay unstaged.
+pub(crate) fn executable_plan(snapshot: &Snapshot, patch: &str) -> Result<Plan, String> {
+    let (from, to) = executable_modes(snapshot)?;
+    let apply = |reverse: bool| {
+        let mut args = vec!["apply".to_owned(), "--cached".to_owned()];
+        if reverse {
+            args.push("-R".to_owned());
+        }
+        args.push(patch.to_owned());
+        args
     };
     let label = match to {
-        EXECUTABLE => format!("{verb} {} executable", snapshot.path),
-        _ => format!("{verb} {}", snapshot.path),
+        EXECUTABLE => format!("Make {} executable", snapshot.path),
+        _ => format!("Clear the executable bit of {}", snapshot.path),
     };
     Ok(Plan {
         label,
-        ops: vec![set(to)],
-        undo: vec![set(mode)],
-        from: mode.to_owned(),
+        ops: vec![apply(false)],
+        undo: vec![apply(true)],
+        from: from.to_owned(),
         to: to.to_owned(),
     })
 }

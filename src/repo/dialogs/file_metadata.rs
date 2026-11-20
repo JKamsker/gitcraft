@@ -25,7 +25,8 @@ pub(crate) enum Edit {
 enum State {
     Unread,
     Loading(u64),
-    Ready(Snapshot),
+    /// The file, and for the executable bit the patch file its commands apply (or why not).
+    Ready(Snapshot, Option<Result<String, String>>),
     Failed(String),
 }
 
@@ -52,11 +53,14 @@ impl FileMetaForm {
     }
 
     fn plan(&self) -> Option<Result<Plan, String>> {
-        let State::Ready(snapshot) = &self.state else {
+        let State::Ready(snapshot, patch) = &self.state else {
             return None;
         };
         Some(match self.edit {
-            Edit::Executable => meta::executable_plan(snapshot),
+            Edit::Executable => patch
+                .clone()
+                .unwrap_or_else(|| Err(String::new()))
+                .and_then(|file| meta::executable_plan(snapshot, &file)),
             Edit::LetterCase => meta::case_rename_plan(snapshot, &self.name),
         })
     }
@@ -84,7 +88,7 @@ impl FileMetaForm {
             State::Failed(e) => {
                 ui.add(egui::Label::new(RichText::new(e).color(t.danger)).wrap());
             }
-            State::Ready(_) => {}
+            State::Ready(..) => {}
         }
         let plan = self.plan();
         match &plan {
@@ -169,17 +173,22 @@ impl RepoTab {
         let asked = ASKED.fetch_add(1, Ordering::Relaxed) + 1;
         form.state = State::Loading(asked);
         let (repo, path) = (self.path.clone(), form.path.clone());
-        let siblings = form.edit == Edit::LetterCase;
+        let edit = form.edit;
         self.then(
             ctx,
-            move || meta::snapshot(&repo, &path, siblings),
+            move || {
+                let found = meta::snapshot(&repo, &path, edit == Edit::LetterCase)?;
+                let patch =
+                    (edit == Edit::Executable).then(|| meta::save_executable_patch(&repo, &found));
+                Ok::<_, String>((found, patch))
+            },
             move |tab, result, _| {
                 let Some(Dialog::FileMetadata(form)) = &mut tab.dialog else {
                     return;
                 };
                 if matches!(form.state, State::Loading(n) if n == asked) {
                     form.state = match result {
-                        Ok(found) => State::Ready(found),
+                        Ok((found, patch)) => State::Ready(found, patch),
                         Err(e) => State::Failed(e),
                     };
                 }
@@ -232,13 +241,13 @@ impl RepoTab {
 
 /// The edits a working-tree file's menu offers: only for a file in the index and the working
 /// tree, not conflicted; the executable bit only on the staged side, as it is an index edit.
+/// An unstaged `A` is an intent-to-add entry (`git add -N`): nothing real is in the index yet.
 pub(crate) fn offered(file: &StatusFile) -> Vec<Edit> {
-    let tracked =
-        matches!(file.area, Area::Staged | Area::Unstaged) && !matches!(file.code, 'D' | '?' | 'U');
-    match (tracked, file.area) {
-        (false, _) => Vec::new(),
-        (true, Area::Staged) => vec![Edit::Executable, Edit::LetterCase],
-        (true, _) => vec![Edit::LetterCase],
+    match (file.area, file.code) {
+        (_, 'D' | '?' | 'U') | (Area::Unstaged, 'A') => Vec::new(),
+        (Area::Staged, _) => vec![Edit::Executable, Edit::LetterCase],
+        (Area::Unstaged, _) => vec![Edit::LetterCase],
+        (Area::Untracked | Area::Conflicted, _) => Vec::new(),
     }
 }
 
