@@ -189,7 +189,7 @@ pub fn analyze(repo: &Path, ask: &Ask, chosen: Option<&str>) -> Result<Coverage,
     let files = files
         .iter()
         .map(|f| {
-            let mut mapped = map_file(&f.path, &f.hunks, report.as_ref(), &root, evidence);
+            let mut mapped = map_file(&f.path, &f.hunks, report.as_deref(), &root, evidence);
             mapped.added = f.added;
             mapped.deleted = f.deleted;
             mapped

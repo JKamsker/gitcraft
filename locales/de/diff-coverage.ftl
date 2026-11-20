@@ -18,3 +18,5 @@ diff-coverage-stale-tip = Es lässt sich nicht zeigen, dass { $report } von { $s
 diff-coverage-setting-label = Testabdeckung in Diffs
 diff-coverage-setting = Geänderte Zeilen als abgedeckt, nicht abgedeckt oder unbekannt markieren
 diff-coverage-setting-tip = Liest den Abdeckungsbericht an den üblichen Orten (lcov.info, coverage/lcov.info, coverage.xml, cobertura.xml, *.lcov). Seine Markierungen gelten nur, wenn eine .sha-Datei daneben die Revision nennt, die der Diff zeigt; sonst sind die Zeilen unbekannt und der Diff sagt, warum.
+diff-coverage-checking = Der Testabdeckungsbericht wird erneut geprüft…
+diff-coverage-checking-tip = Die Markierungen sind unbekannt, bis der Bericht mit der gezeigten Revision abgeglichen ist.

@@ -4,7 +4,7 @@
 //! taken from a report that can't be shown to be of the revision: those lines are unknown.
 
 use super::read::{find_reports, work_tree_files};
-use super::report::{committed_at, read_report, report_files};
+use super::report::{self, committed_at, report_files};
 use super::*;
 
 /// The side of a diff the lines are numbered on.
@@ -55,7 +55,11 @@ pub fn of_lines(
         Side::Commit(rev) => (Ask::Commit(rev.clone()), rev.as_str()),
         Side::WorkTree | Side::Index => (Ask::WorkTree, "HEAD"),
     };
-    let sha = git::resolve(repo, rev)?;
+    let sha = if is_full_id(rev) {
+        rev.to_ascii_lowercase()
+    } else {
+        git::resolve(repo, rev)?
+    };
     let reports = find_reports(repo);
     let Some(name) = reports.first() else {
         return Ok(LinesCoverage {
@@ -66,22 +70,40 @@ pub fn of_lines(
             lines: lines.iter().map(|&n| (n, LineCov::Unknown)).collect(),
         });
     };
-    let mut changed = Vec::new();
-    if ask == Ask::WorkTree {
+    // The report is parsed again only when its file changed. Git is asked only what can change
+    // the verdict ([`judge`]): when the commit was made only matters without a `.sha`, and
+    // whether files were edited after the report only when its `.sha` names HEAD.
+    let read = report::read(repo, name)?;
+    let committed = match read.recorded {
+        None => committed_at(repo, &sha)?,
+        Some(_) => 0,
+    };
+    let edited = if ask == Ask::WorkTree && read.names(&sha) {
         let skip = report_files(&reports, Some(name));
-        changed = work_tree_files(repo, &sha, &mut Vec::new())?
+        let changed: Vec<String> = work_tree_files(repo, &sha, &mut Vec::new())?
             .into_iter()
             .filter(|f| !f.deleted && !f.binary && !skip.contains(&f.path))
             .map(|f| f.path)
             .collect();
-    }
-    let changed: Vec<&str> = changed.iter().map(String::as_str).collect();
-    let committed = committed_at(repo, &sha)?;
-    let loaded = read_report(repo, name, &ask, &sha, committed, &changed)?;
+        let changed: Vec<&str> = changed.iter().map(String::as_str).collect();
+        report::edited_after(repo, read.written, &changed)
+    } else {
+        None
+    };
+    let freshness = judge(
+        read.recorded.as_deref(),
+        &ask,
+        &sha,
+        read.written,
+        committed,
+        edited,
+    );
     let index_differs = *side == Side::Index && index_differs(repo, path)?;
-    let root = git::run(Some(repo), &["rev-parse", "--show-toplevel"])?
-        .trim()
-        .to_owned();
+    let root = super::cache::toplevel(repo)?;
+    let loaded = report::Loaded {
+        found: read.found(name, freshness),
+        report: read.report,
+    };
     let entry = loaded.report.file(path, &root).map(|(f, _)| f);
     let mut out = LinesCoverage {
         found: Some(loaded.found),
@@ -106,4 +128,9 @@ fn index_differs(repo: &Path, path: &str) -> Result<bool, String> {
         &["diff", "--name-only", "-z", "--no-ext-diff", "--", &literal],
     )?;
     Ok(!out.trim_matches('\0').trim().is_empty())
+}
+
+/// Whether `rev` is a full commit id already (SHA-1 or SHA-256), which needs no resolving.
+fn is_full_id(rev: &str) -> bool {
+    matches!(rev.len(), 40 | 64) && rev.bytes().all(|b| b.is_ascii_hexdigit())
 }

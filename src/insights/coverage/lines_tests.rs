@@ -97,3 +97,39 @@ fn staged_lines_count_only_when_the_working_tree_holds_the_same_file() -> Result
     assert_eq!(work.lines, [(2, LineCov::Uncovered)]);
     Ok(())
 }
+
+#[test]
+fn a_report_unchanged_since_the_last_read_is_not_parsed_again() -> Result<(), String> {
+    let parses = || super::cache::PARSES.with(std::cell::Cell::get);
+    let repo = crate::git::fixture::Repo::new("coverage-cache")?;
+    repo.commit("one", &[(".gitignore", Some("lcov.info*\n"))])?;
+    let two = repo.commit("two", &[("src/lib.rs", Some("fn a() {\n    1\n}\n"))])?;
+    write(&repo.path().join("lcov.info"), LCOV)?;
+    write(&repo.path().join("lcov.info.sha"), &two)?;
+    let side = Side::Commit(two.clone());
+    let before = parses();
+    let first = of_lines(repo.path(), &side, "src/lib.rs", &[1, 2])?;
+    assert_eq!(parses(), before + 1);
+    // Another file of the same diff, and the same one again: the report is reused.
+    let second = of_lines(repo.path(), &side, "src/lib.rs", &[1, 2])?;
+    of_lines(repo.path(), &side, "README.md", &[1])?;
+    assert_eq!(parses(), before + 1);
+    assert_eq!(first, second);
+    // A new report (another size): parsed again, and what it says is taken.
+    write(
+        &repo.path().join("lcov.info"),
+        "SF:src/lib.rs\nDA:1,7\nDA:2,1\nend_of_record\n",
+    )?;
+    let third = of_lines(repo.path(), &side, "src/lib.rs", &[1, 2])?;
+    assert_eq!(parses(), before + 2);
+    assert_eq!(
+        third.lines,
+        [(1, LineCov::Covered(7)), (2, LineCov::Covered(1))]
+    );
+    // The `.sha` is read every time: a report of another commit now is not applied.
+    write(&repo.path().join("lcov.info.sha"), "fedcba9876543210")?;
+    let stale = of_lines(repo.path(), &side, "src/lib.rs", &[1])?;
+    assert_eq!(parses(), before + 2);
+    assert_eq!(stale.evidence(), Evidence::Unknown);
+    Ok(())
+}

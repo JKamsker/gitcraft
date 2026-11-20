@@ -134,5 +134,20 @@ fn the_diff_gutter_marks_changed_lines_from_a_fixture_report() -> Result<(), Str
         h.query_by_label(&chip("diff-coverage-current", &two))
             .is_none()
     );
+
+    // A new report, then on again the way the settings' checkbox does it (the setting alone):
+    // read afresh, not the marks from before.
+    write(
+        "lcov.info",
+        "SF:src/lib.rs\nDA:1,15\nDA:2,4\nend_of_record\n",
+    )?;
+    let mut settings = Settings::get(&h.ctx);
+    settings.diff_coverage = true;
+    settings.put_for_test(&h.ctx);
+    h.run_steps(4);
+    assert_eq!(count(&h, Mark::Covered(3)), 0);
+    assert_eq!(count(&h, Mark::Uncovered), 0);
+    assert_eq!(count(&h, Mark::Covered(15)), 1);
+    assert_eq!(count(&h, Mark::Covered(4)), 1);
     Ok(())
 }

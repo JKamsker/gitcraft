@@ -93,9 +93,7 @@ impl Rows<'_> {
             crate::repo::authorship_view::stripe(ui.painter(), &self.t, rect, who, 4.0);
         }
         if matches!(side, Side::Unified | Side::New)
-            && let Some(mark) = self
-                .coverage
-                .and_then(|g| super::super::coverage::mark_of(g, data, i))
+            && let Some(mark) = self.coverage.and_then(|o| o.mark(data, i))
         {
             let right = rect.left() + gutter_width(side);
             super::super::coverage::paint_mark(ui, rect, right, mark, i);

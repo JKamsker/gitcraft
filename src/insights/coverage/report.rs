@@ -1,6 +1,8 @@
 //! Reading one coverage report and judging how far it can be trusted for a revision: what the
 //! Insights map and the diff's coverage gutter both rest on, so the two never disagree about
 //! whether a report is current.
+use std::sync::Arc;
+
 use super::read::read_sidecar;
 use super::*;
 
@@ -44,9 +46,71 @@ pub(super) fn report_files(found: &[String], name: Option<&String>) -> HashSet<S
         .collect()
 }
 
+/// A report as read, before it is judged for a revision.
+pub(super) struct Read {
+    pub(super) report: Arc<Report>,
+    /// What its `.sha` holds, if it has one.
+    pub(super) recorded: Option<String>,
+    /// When it was written (seconds since the epoch), when that could be told.
+    pub(super) written: Option<i64>,
+}
+
+impl Read {
+    /// Whether its `.sha` names commit `sha`, as [`judge`] takes it.
+    pub(super) fn names(&self, sha: &str) -> bool {
+        self.recorded
+            .as_deref()
+            .is_some_and(|r| r.len() >= 7 && sha.starts_with(r))
+    }
+
+    /// What it says it is, judged `freshness`.
+    pub(super) fn found(&self, name: &str, freshness: Freshness) -> Found {
+        Found {
+            path: name.to_owned(),
+            format: self.report.format,
+            tests: self.report.tests.clone(),
+            per_test: self.report.per_test(),
+            files: self.report.files.len(),
+            recorded: self.recorded.clone(),
+            freshness,
+            written: self.written,
+        }
+    }
+}
+
+/// Reads the report `name` (parsed again only when its file changed, see [`cache`]) and its
+/// `.sha`.
+pub(super) fn read(repo: &Path, name: &str) -> Result<Read, String> {
+    let path = report_path(repo, name);
+    let report = super::cache::parsed(repo, &path, name)?;
+    let sidecar = path.with_file_name(format!(
+        "{}{SIDECAR}",
+        path.file_name()
+            .map(|n| n.to_string_lossy().into_owned())
+            .unwrap_or_default()
+    ));
+    let recorded = crate::remote::read_to_string(&sidecar)
+        .ok()
+        .and_then(|t| read_sidecar(&t));
+    Ok(Read {
+        report,
+        recorded,
+        written: modified(&path),
+    })
+}
+
+/// Whether one of the working tree's `changed` files (that still exist) was modified after a
+/// report written at `written` (`None`: not known).
+pub(super) fn edited_after(repo: &Path, written: Option<i64>, changed: &[&str]) -> Option<bool> {
+    written.and_then(|w| {
+        let times: Option<Vec<i64>> = changed.iter().map(|f| modified(&repo.join(f))).collect();
+        times.map(|t| t.into_iter().any(|m| m > w))
+    })
+}
+
 /// A report read and judged.
 pub(super) struct Loaded {
-    pub(super) report: Report,
+    pub(super) report: Arc<Report>,
     pub(super) found: Found,
 }
 
@@ -62,64 +126,20 @@ pub(super) fn read_report(
     committed: i64,
     changed: &[&str],
 ) -> Result<Loaded, String> {
-    let path = report_path(repo, name);
-    let too_big = |len: u64| {
-        format!(
-            "{name} is {} MB, more than the {} MB read",
-            len >> 20,
-            MAX_REPORT >> 20
-        )
-    };
-    if !crate::remote::is_remote(repo)
-        && let Ok(meta) = std::fs::metadata(&path)
-        && meta.len() > MAX_REPORT
-    {
-        return Err(too_big(meta.len()));
-    }
-    let bytes = crate::remote::read(&path).map_err(|e| format!("{name}: {e}"))?;
-    if bytes.len() as u64 > MAX_REPORT {
-        return Err(too_big(bytes.len() as u64));
-    }
-    let parsed =
-        parse(name, &String::from_utf8_lossy(&bytes)).map_err(|e| format!("{name}: {e}"))?;
-    let sidecar = path.with_file_name(format!(
-        "{}{SIDECAR}",
-        path.file_name()
-            .map(|n| n.to_string_lossy().into_owned())
-            .unwrap_or_default()
-    ));
-    let recorded = crate::remote::read_to_string(&sidecar)
-        .ok()
-        .and_then(|t| read_sidecar(&t));
-    let written = modified(&path);
-    let edited_after = if *ask == Ask::WorkTree {
-        written.and_then(|w| {
-            let times: Option<Vec<i64>> = changed.iter().map(|f| modified(&repo.join(f))).collect();
-            times.map(|t| t.into_iter().any(|m| m > w))
-        })
-    } else {
-        None
-    };
+    let read = read(repo, name)?;
+    let edited = (*ask == Ask::WorkTree)
+        .then(|| edited_after(repo, read.written, changed))
+        .flatten();
     let freshness = judge(
-        recorded.as_deref(),
+        read.recorded.as_deref(),
         ask,
         sha,
-        written,
+        read.written,
         committed,
-        edited_after,
+        edited,
     );
-    let found = Found {
-        path: name.to_owned(),
-        format: parsed.format,
-        tests: parsed.tests.clone(),
-        per_test: parsed.per_test(),
-        files: parsed.files.len(),
-        recorded,
-        freshness,
-        written,
-    };
     Ok(Loaded {
-        report: parsed,
-        found,
+        found: read.found(name, freshness),
+        report: read.report,
     })
 }

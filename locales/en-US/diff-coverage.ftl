@@ -21,3 +21,5 @@ diff-coverage-stale-tip = { $report } can't be shown to be of { $sha }, the revi
 diff-coverage-setting-label = Test coverage in diffs
 diff-coverage-setting = Mark changed lines covered, uncovered or unknown
 diff-coverage-setting-tip = Reads the coverage report in the usual places (lcov.info, coverage/lcov.info, coverage.xml, cobertura.xml, *.lcov). Its marks are applied only when a .sha file beside it records the revision the diff shows; otherwise the lines show unknown and the diff says why.
+diff-coverage-checking = Checking the test coverage report again…
+diff-coverage-checking-tip = The marks show unknown until the report is checked against the revision shown.

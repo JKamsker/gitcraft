@@ -79,26 +79,52 @@ pub(in crate::repo) struct Overlay {
     ticket: u64,
     /// The answer: `Ok(None)` when there is no report.
     gutter: Option<Result<Option<Arc<Gutter>>, String>>,
+    /// The gutter shown is the previous read's, kept while it is read again: its marks show
+    /// unknown until the answer, so no verdict is shown that may no longer hold.
+    pending: bool,
 }
 
 impl Overlay {
-    /// The gutter to paint, when the setting is on and it is read.
-    pub(super) fn shown(&self, on: bool) -> Option<&Gutter> {
+    /// The gutter read, if there is one.
+    fn gutter(&self) -> Option<&Gutter> {
         match &self.gutter {
-            Some(Ok(Some(g))) if on => Some(g),
+            Some(Ok(Some(g))) => Some(g),
             _ => None,
         }
     }
 
-    /// Starts a read for `reading` of the diff, whose text hashes to `source`; returns its
-    /// ticket. The marks shown so far stay only while the lines are the same ones.
-    pub(in crate::repo) fn begin(&mut self, reading: u64, source: u64) -> u64 {
+    /// The mark of line `i` of the diff: what the report says of an added line, unknown
+    /// while it is read again.
+    pub(super) fn mark(&self, data: &DiffData, i: usize) -> Option<Mark> {
+        let line = data.lines.get(i).filter(|l| l.kind == Kind::Add)?;
+        let mark = self.gutter()?.marks.get(&line.new?).copied()?;
+        Some(if self.pending { Mark::Unknown } else { mark })
+    }
+
+    /// Forgets what was read once the marks are off, so they are read afresh when turned on
+    /// again, however that is done (the switch, the palette, the settings).
+    pub(super) fn sync(&mut self, on: bool) {
+        if !on && self.asked.is_some() {
+            *self = Self::default();
+        }
+    }
+
+    /// Starts a read for `reading` of the diff, whose text hashes to `source` and whose new
+    /// side is of commit `revision` as far as the tab knows (HEAD for uncommitted changes);
+    /// returns its ticket. The gutter shown so far is kept, pending, only while it is of the
+    /// same lines at the same revision; otherwise nothing shows until the answer.
+    pub(in crate::repo) fn begin(&mut self, reading: u64, source: u64, revision: &str) -> u64 {
         let ticket = TICKETS.fetch_add(1, std::sync::atomic::Ordering::Relaxed) + 1;
-        let kept = self.gutter.take().filter(|_| self.source == Some(source));
+        let same = self.source == Some(source);
+        let kept = self.gutter.take().filter(|answer| {
+            same && matches!(answer, Ok(Some(g))
+                if revision.len() >= 7 && g.sha.eq_ignore_ascii_case(revision))
+        });
         *self = Self {
             asked: Some(reading),
             source: Some(source),
             ticket,
+            pending: kept.is_some(),
             gutter: kept,
         };
         ticket
@@ -112,6 +138,7 @@ impl Overlay {
     ) {
         if self.ticket == ticket {
             self.gutter = Some(answer);
+            self.pending = false;
         }
     }
 }
@@ -128,7 +155,11 @@ pub(super) fn applies(key: &DiffKey) -> bool {
 
 /// Asks for the gutter when it is on and not read for this reading of the diff yet.
 pub(super) fn request(view: &DiffView, on: bool, acts: &mut Vec<Action>) {
-    if on && applies(&view.key) && view.coverage.asked != Some(view.data_request) {
+    if on
+        && matches!(view.data, Some(Ok(_)))
+        && applies(&view.key)
+        && view.coverage.asked != Some(view.data_request)
+    {
         acts.push(Action::DiffCoverage(CoverageAct::Load));
     }
 }
@@ -141,7 +172,7 @@ impl RepoTab {
         settings.set(ctx);
         if let Some(view) = &mut self.diff {
             // Read again when next shown: the report may have changed meanwhile.
-            view.coverage = Overlay::default();
+            view.coverage.sync(false);
         }
     }
 }
@@ -164,15 +195,6 @@ pub(super) fn control(ui: &mut Ui, t: &Tokens, acts: &mut Vec<Action>) {
     if b.clicked() {
         acts.push(Action::DiffCoverage(CoverageAct::Toggle));
     }
-}
-
-/// The mark of line `i` of the diff, painted on the new side.
-pub(super) fn mark_of(gutter: &Gutter, data: &DiffData, i: usize) -> Option<Mark> {
-    let line = data.lines.get(i)?;
-    if line.kind != Kind::Add {
-        return None;
-    }
-    gutter.marks.get(&line.new?).copied()
 }
 
 /// What a mark says, in words: its tooltip and accessible name.
@@ -230,6 +252,12 @@ pub(super) fn banner(ui: &mut Ui, overlay: &Overlay, on: bool) {
     }
     let t = Tokens::get(ui.ctx());
     let (text, tip, warn) = match &overlay.gutter {
+        // Read again: the line keeps its place, saying so, until the answer.
+        Some(Ok(Some(_))) if overlay.pending => (
+            crate::i18n::text("diff-coverage-checking").to_owned(),
+            crate::i18n::text("diff-coverage-checking-tip").to_owned(),
+            false,
+        ),
         Some(Ok(Some(g))) => banner_text(g),
         Some(Err(e)) => (
             crate::i18n::text("diff-coverage-error").to_owned(),

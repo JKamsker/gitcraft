@@ -98,11 +98,18 @@ impl RepoTab {
             .filter_map(|l| l.new)
             .collect();
         let key = view.key.clone();
-        let ticket = view.coverage.begin(view.data_request, source);
         let Some(side) = side_of(&key) else {
+            let ticket = view.coverage.begin(view.data_request, source, "");
             view.coverage.accept(ticket, Ok(None));
             return;
         };
+        // The revision the answer will be of, as the tab knows it now: a gutter of another
+        // (HEAD moved, a commit was made) isn't kept while it is read again.
+        let revision = match &side {
+            Side::Commit(rev) => rev.as_str(),
+            Side::WorkTree | Side::Index => self.refs.head.as_str(),
+        };
+        let ticket = view.coverage.begin(view.data_request, source, revision);
         let (repo, path) = (self.path.clone(), key.path().to_owned());
         self.then(
             ctx,

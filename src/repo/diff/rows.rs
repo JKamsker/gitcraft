@@ -64,7 +64,7 @@ pub(super) struct Rows<'a> {
     /// open the lines' menu too.
     picks: Vec<egui::Response>,
     /// The test coverage marks of the changed lines, when they are on.
-    pub(super) coverage: Option<&'a super::coverage::Gutter>,
+    pub(super) coverage: Option<&'a super::coverage::Overlay>,
 }
 
 impl<'a> Rows<'a> {

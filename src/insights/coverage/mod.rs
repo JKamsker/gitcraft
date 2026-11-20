@@ -302,6 +302,7 @@ impl Coverage {
     }
 }
 
+mod cache;
 mod read;
 mod report;
 pub use read::analyze;

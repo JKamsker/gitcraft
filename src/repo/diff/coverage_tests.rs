@@ -66,56 +66,93 @@ fn the_stale_chip_is_said_in_every_language() {
     assert!(mark_text(Mark::Covered(3)).contains("3 times"));
 }
 
-#[test]
-fn only_the_new_side_of_added_lines_gets_a_mark() {
-    let line = |kind, new| super::super::DiffLine {
+fn line(kind: Kind, new: Option<u32>) -> super::super::DiffLine {
+    super::super::DiffLine {
         kind,
         old: None,
         new,
         text: String::new(),
         raw: String::new(),
-    };
-    let data = DiffData {
+    }
+}
+
+/// Lines 1 (unchanged), 2 (added) and one removed.
+fn data() -> DiffData {
+    DiffData {
         lines: vec![
             line(Kind::Context, Some(1)),
             line(Kind::Add, Some(2)),
             line(Kind::Del, None),
         ],
         ..Default::default()
-    };
-    let mut g = gutter(Trust::Current);
+    }
+}
+
+fn answer(trust: Trust) -> Result<Option<Arc<Gutter>>, String> {
+    let mut g = gutter(trust);
     g.marks = HashMap::from([(1, Mark::Covered(1)), (2, Mark::Uncovered)]);
-    assert_eq!(mark_of(&g, &data, 0), None);
-    assert_eq!(mark_of(&g, &data, 1), Some(Mark::Uncovered));
-    assert_eq!(mark_of(&g, &data, 2), None);
-    let mut off = Overlay::default();
-    let ticket = off.begin(7, 1);
-    off.accept(ticket, Ok(Some(Arc::new(g))));
-    assert!(off.shown(true).is_some());
-    assert!(off.shown(false).is_none());
+    Ok(Some(Arc::new(g)))
 }
 
 #[test]
-fn only_the_latest_read_is_taken_and_marks_stay_only_for_the_same_lines() {
-    let answer = |trust| Ok(Some(Arc::new(gutter(trust))));
+fn only_the_new_side_of_added_lines_gets_a_mark() {
+    let data = data();
     let mut overlay = Overlay::default();
-    let first = overlay.begin(1, 10);
+    let ticket = overlay.begin(7, 1, SHA);
+    overlay.accept(ticket, answer(Trust::Current));
+    assert_eq!(overlay.mark(&data, 0), None);
+    assert_eq!(overlay.mark(&data, 1), Some(Mark::Uncovered));
+    assert_eq!(overlay.mark(&data, 2), None);
+    // Turned off by any route: forgotten, so it is read afresh when turned on.
+    overlay.sync(true);
+    assert_eq!(overlay.mark(&data, 1), Some(Mark::Uncovered));
+    overlay.sync(false);
+    assert_eq!(overlay.mark(&data, 1), None);
+    assert_eq!(overlay.asked, None);
+}
+
+#[test]
+fn only_the_latest_read_is_taken() {
+    let data = data();
+    let mut overlay = Overlay::default();
+    let first = overlay.begin(1, 10, SHA);
     // Off and on again before the first read answered: a second read of the same lines.
-    let second = overlay.begin(1, 10);
+    let second = overlay.begin(1, 10, SHA);
     overlay.accept(first, answer(Trust::Current));
-    assert!(
-        overlay.shown(true).is_none(),
+    assert_eq!(
+        overlay.mark(&data, 1),
+        None,
         "an older read's answer is dropped"
     );
-    overlay.accept(second, answer(Trust::EditedAfter));
-    assert_eq!(
-        overlay.shown(true).map(|g| &g.trust),
-        Some(&Trust::EditedAfter)
-    );
-    // Read again, same lines (a refresh): what is shown stays until the answer.
-    let _third = overlay.begin(2, 10);
-    assert!(overlay.shown(true).is_some());
-    // Other lines: nothing is shown until their own answer.
-    let _fourth = overlay.begin(3, 11);
-    assert!(overlay.shown(true).is_none());
+    overlay.accept(second, answer(Trust::Current));
+    assert_eq!(overlay.mark(&data, 1), Some(Mark::Uncovered));
+}
+
+#[test]
+fn a_gutter_read_again_is_kept_only_pending_and_only_for_the_same_revision() {
+    let data = data();
+    let mut overlay = Overlay::default();
+    let ticket = overlay.begin(1, 10, SHA);
+    overlay.accept(ticket, answer(Trust::Current));
+    // A refresh, same lines, same revision: kept, but its marks say unknown until the answer,
+    // and the banner says it is being checked.
+    let refresh = overlay.begin(2, 10, SHA);
+    assert!(overlay.pending);
+    assert_eq!(overlay.mark(&data, 1), Some(Mark::Unknown));
+    overlay.accept(refresh, answer(Trust::EditedAfter));
+    assert!(!overlay.pending);
+    assert_eq!(overlay.mark(&data, 1), Some(Mark::Uncovered));
+    // HEAD moved (or a commit was made): the old verdict isn't kept at all.
+    let _moved = overlay.begin(3, 10, "fedcba9876543210fedcba9876543210fedcba98");
+    assert_eq!(overlay.mark(&data, 1), None);
+    assert!(!overlay.pending);
+    // Nor for other lines, nor when the tab doesn't know the revision.
+    let again = overlay.begin(4, 10, SHA);
+    overlay.accept(again, answer(Trust::Current));
+    let _other = overlay.begin(5, 11, SHA);
+    assert_eq!(overlay.mark(&data, 1), None);
+    let again = overlay.begin(6, 10, SHA);
+    overlay.accept(again, answer(Trust::Current));
+    let _unknown = overlay.begin(7, 10, "");
+    assert_eq!(overlay.mark(&data, 1), None);
 }
