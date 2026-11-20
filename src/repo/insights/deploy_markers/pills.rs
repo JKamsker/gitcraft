@@ -146,7 +146,7 @@ impl RepoTab {
                 .on_hover_text(text("graph-deployments-menu-compare-tip"))
                 .clicked()
             {
-                acts.push(compare(other, m));
+                acts.push(compare(m, other));
             }
         }
         if let Some(commit) = self.deploy_reached_subject(m) {

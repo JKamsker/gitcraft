@@ -113,7 +113,60 @@ fn only_the_latest_answer_counts_and_a_failure_keeps_what_was_read_as_stale() {
         assert_eq!(state.markers.len(), 5);
         assert!(state.read_stale(crate::git::now()));
         assert!(state.read_stale(i64::MAX), "an old read is stale too");
+        assert!(
+            state.next.is_some(),
+            "a failed read is asked for again in a while"
+        );
     })
+}
+
+#[test]
+fn showing_them_again_after_a_while_reads_them_again() {
+    pinned(|| {
+        let _run = crate::network::test_pause::set(None);
+        let ctx = egui::Context::default();
+        let mut tab = tab(&ctx, Kind::Deploy);
+        frame(&mut tab, &ctx, true);
+        let request = required(tab.deploy_markers.pending).0;
+        tab.deploy_markers_arrived(request, Ok(read()));
+        assert_eq!(frame(&mut tab, &ctx, false), 0);
+        assert_eq!(
+            frame(&mut tab, &ctx, true),
+            0,
+            "shown again soon: what was read holds"
+        );
+        frame(&mut tab, &ctx, false);
+        tab.deploy_markers.loaded = Instant::now().checked_sub(STALE * 2);
+        assert_eq!(
+            frame(&mut tab, &ctx, true),
+            1,
+            "shown again later: read again"
+        );
+    })
+}
+
+#[test]
+fn compare_goes_from_the_pill_to_the_other_environment() {
+    let markers = fixture_markers();
+    let (production, staging) = (&markers[0], &markers[1]);
+    let Action::Compare {
+        base,
+        base_label,
+        target,
+        target_label,
+        since_fork,
+        ..
+    } = super::pills::compare(production, staging)
+    else {
+        unreachable!("not a comparison")
+    };
+    assert_eq!(
+        (base.as_str(), base_label.as_str()),
+        (production.sha(), "production")
+    );
+    assert_eq!(target.as_deref(), Some(staging.sha()));
+    assert_eq!(target_label, "staging");
+    assert!(!since_fork, "every difference, as the menu says");
 }
 
 #[test]

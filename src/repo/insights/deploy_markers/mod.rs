@@ -115,6 +115,7 @@ impl RepoTab {
     /// Each frame the graph is drawn: whether the markers show (the setting). They are read
     /// the first time they show for a repository, forge and account, and again when due.
     pub(in crate::repo) fn deploy_markers_frame(&mut self, visible: bool, ctx: &egui::Context) {
+        let shown_again = visible && !self.deploy_markers.visible;
         self.deploy_markers.visible = visible;
         if !visible {
             return;
@@ -125,7 +126,10 @@ impl RepoTab {
         }
         let now = Instant::now();
         let state = &self.deploy_markers;
-        let due = state.loaded.is_none() || state.next.is_some_and(|next| now >= next);
+        let due = state
+            .loaded
+            .is_none_or(|at| shown_again && at.elapsed() > STALE)
+            || state.next.is_some_and(|next| now >= next);
         if due {
             self.load_deploy_markers(key, ctx);
         } else if let Some(next) = state.next {
@@ -145,12 +149,12 @@ impl RepoTab {
 
     fn load_deploy_markers(&mut self, key: Key, ctx: &egui::Context) {
         let now = Instant::now();
+        if self.deploy_markers.key.as_ref() != Some(&key) {
+            self.deploy_markers.retire();
+        }
         // Offline or metered: read once that is over (the next trigger, or the next frame).
         if self.deploy_markers.reading(now) || !crate::network::background_may_run() {
             return;
-        }
-        if self.deploy_markers.key.as_ref() != Some(&key) {
-            self.deploy_markers.retire();
         }
         let available = crate::insights::deploy::availability(self.forge());
         let state = &mut self.deploy_markers;
@@ -201,8 +205,11 @@ impl RepoTab {
                 state.error = None;
                 state.observed = Some(crate::git::now());
             }
-            // What was read before is kept, and drawn as stale.
-            Err(error) => state.error = Some(error),
+            // What was read before is kept, drawn as stale, and asked for again in a while.
+            Err(error) => {
+                state.error = Some(error);
+                state.next = Some(Instant::now() + STALE);
+            }
         }
     }
 
