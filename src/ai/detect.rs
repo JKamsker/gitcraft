@@ -22,20 +22,28 @@ use super::settings::AiTool;
 const LOOK_FOR: Duration = Duration::from_secs(30);
 
 /// What `sh` runs to look: a word for each tool found.
+///
+/// Copilot: this assumes gh 2.86 or newer, whose built-in `copilot` command runs the Copilot
+/// CLI. An older gh beside a `copilot` from npm is taken for Copilot, and `gh copilot -p … -s`
+/// then fails with gh's "unknown command"; finding that out would mean running gh.
 const SH: &str = "\
 command -v claude >/dev/null 2>&1 && echo claude
 command -v codex >/dev/null 2>&1 && echo codex
 command -v gh >/dev/null 2>&1 && { command -v copilot >/dev/null 2>&1 || \
-[ -x \"${XDG_DATA_HOME:-$HOME/.local/share}/gh/copilot/copilot\" ]; } && echo copilot
+{ c=\"${XDG_DATA_HOME:-$HOME/.local/share}/gh/copilot/copilot\"; [ -f \"$c\" ] && [ -x \"$c\" ]; }; \
+} && echo copilot
 true";
 
-/// The same for `cmd` (Windows).
-/// `$PATH:`: only the PATH, never the folder it runs in.
+/// The same for `cmd` (Windows), with the same assumption about gh's version.
+/// `$PATH:`: only the PATH, never the folder it runs in. `if not exist "…\"`: a file, not a
+/// folder of that name.
 const CMD: &str = "(where $PATH:claude >nul 2>nul && echo claude) & \
 (where $PATH:codex >nul 2>nul && echo codex) & \
 (where $PATH:gh >nul 2>nul && (where $PATH:copilot >nul 2>nul && echo copilot || \
-if defined XDG_DATA_HOME (if exist \"%XDG_DATA_HOME%\\gh\\copilot\\copilot.exe\" echo copilot) \
-else if exist \"%LOCALAPPDATA%\\GitHub CLI\\copilot\\copilot.exe\" echo copilot)) & ver >nul";
+if defined XDG_DATA_HOME (if exist \"%XDG_DATA_HOME%\\gh\\copilot\\copilot.exe\" \
+if not exist \"%XDG_DATA_HOME%\\gh\\copilot\\copilot.exe\\\" echo copilot) \
+else if exist \"%LOCALAPPDATA%\\GitHub CLI\\copilot\\copilot.exe\" \
+if not exist \"%LOCALAPPDATA%\\GitHub CLI\\copilot\\copilot.exe\\\" echo copilot)) & ver >nul";
 
 /// Where looking for the tools of a machine stands.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]

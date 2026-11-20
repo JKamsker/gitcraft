@@ -79,15 +79,22 @@ impl Machine {
         executable(&self.bin().join(file))
     }
 
+    /// Where `gh copilot` downloads the Copilot CLI.
+    fn download(&self) -> PathBuf {
+        if cfg!(windows) {
+            self.home().join(r"local\GitHub CLI\copilot\copilot.exe")
+        } else {
+            self.home().join(".local/share/gh/copilot/copilot")
+        }
+    }
+
     /// The Copilot CLI where `gh copilot` downloads it.
     fn downloaded_copilot(&self) -> Result<(), String> {
-        let (folder, file) = if cfg!(windows) {
-            (self.home().join(r"local\GitHub CLI\copilot"), "copilot.exe")
-        } else {
-            (self.home().join(".local/share/gh/copilot"), "copilot")
-        };
-        std::fs::create_dir_all(&folder).map_err(|e| e.to_string())?;
-        executable(&folder.join(file))
+        let path = self.download();
+        if let Some(folder) = path.parent() {
+            std::fs::create_dir_all(folder).map_err(|e| e.to_string())?;
+        }
+        executable(&path)
     }
 
     /// The look, with only this machine's PATH and home: a real tool here isn't found.
@@ -161,6 +168,10 @@ fn copilot_needs_the_copilot_cli_beside_gh() -> Result<(), String> {
     machine.program("claude")?;
     machine.program("gh")?;
     assert_eq!(machine.look()?, [AiTool::Claude]);
+    // A folder of that name isn't the Copilot CLI.
+    std::fs::create_dir_all(machine.download()).map_err(|e| e.to_string())?;
+    assert_eq!(machine.look()?, [AiTool::Claude]);
+    std::fs::remove_dir(machine.download()).map_err(|e| e.to_string())?;
     machine.downloaded_copilot()?;
     assert_eq!(machine.look()?, [AiTool::Claude, AiTool::Copilot]);
     Ok(())
