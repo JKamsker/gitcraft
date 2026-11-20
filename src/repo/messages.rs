@@ -197,8 +197,8 @@ pub(super) enum Msg {
     /// The jobs of a run (by id), for the read numbered so.
     CiJobs(u64, u64, Result<Vec<crate::ci::Job>, String>),
     CiLog(u64, Result<String, String>),
-    /// A run was re-run or cancelled, or wasn't.
-    CiActed(String, Result<(), String>),
+    /// A run was re-run or cancelled, or wasn't, for the action numbered so (`CiView::acting`).
+    CiActed(u64, String, Result<(), String>),
     /// A pull request in full, for the request numbered so.
     PrDetails(u64, Box<Result<crate::pull_request::PrDetails, String>>),
     PrFiles(u64, Result<crate::pull_request::PrFiles, String>),
