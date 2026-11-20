@@ -56,7 +56,9 @@ fn aborted(status: ExitStatus) -> bool {
 /// Runs the child for `action` on `repo`, killed at boundary `stop`; returns its log.
 pub(super) fn kill(action: &str, stop: usize, repo: &Path) -> String {
     let name = module_path!().split_once("::").unwrap().1.to_owned() + "::child";
-    let log = repo.with_extension("kill.log");
+    let mut log = repo.as_os_str().to_owned();
+    log.push(".kill.log");
+    let log = PathBuf::from(log);
     let out = std::fs::File::create(&log).unwrap();
     let mut child = Command::new(std::env::current_exe().unwrap())
         .args([

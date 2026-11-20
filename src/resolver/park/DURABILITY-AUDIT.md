@@ -77,7 +77,8 @@ a stop at each point:
   manifest made `manifest` return `Err("Invalid recovery manifest …")` and `list` fail for
   every archive of the repository. Archives written that way can still exist, so
   `manifest` now treats an unreadable manifest whose last receipt is `Archiving` as an
-  incomplete reservation: not listed, left on disk untouched, with a diagnostic note. The
+  incomplete reservation: not listed and its manifest left untouched. The skip is noted for the
+  test and recording harnesses only (`effects::note`); production has no log to show it. The
   worktree was never cleared at `Archiving`, so nothing is hidden that is not still live.
   Past `Archiving`, or with no receipts at all (a legacy archive whose worktree may have been
   cleared), it still fails closed. **[code; `checks/discovery.rs`]**
@@ -278,7 +279,7 @@ with `std::process::abort` right after the named effect; `checks/kill_child.rs` 
 child and its spawn. The parent waits for that one child, then restarts through production
 `list`, `bring_back`, `drop_to_branch` and `forget`. For every case: tracked, untracked and
 ignored files, the index and `MERGE_HEAD` are byte-exact, live or in a discoverable archive;
-`list` gives the same answer twice; an `index.lock` the child left is neither adopted nor
+`list` gives the same answer twice and lists exactly this archive (or nothing, for the first row); the outcome below is asserted for each boundary; an `index.lock` the child left is neither adopted nor
 removed; after the archive is dropped to a branch, listing and dropping again change no
 byte under the fixture. **[observed: Windows 11 26200 NTFS, local runs; CI runs it on Linux and Windows in the `recovery recording` job]**
 
@@ -289,7 +290,7 @@ byte under the fixture. **[observed: Windows 11 26200 NTFS, local runs; CI runs 
 | P11 `git reset`, P12 `phase:Parked` | Listed; brought back byte-exact |
 | R1 evidence, R2 `phase:Restoring`, R5 `restore-plan-durable`, R6b `destination-temp-durable` / `destination-published`, last `restore-copy-applied`, R7 `live-restore-synced`, R8 `phase:Restored` / `phase:Cleanup` | Brought back byte-exact (resumed against the plan where one is durable) |
 | R4 `git read-tree` (no plan yet), R6a `index-lock-synced` | Bring back refused with the archive's path (`Interrupted recovery at …`); drop to branch keeps it |
-| C1 recovery ref, C3 `archive-moved`, C5 original ref removed; D1 `phase:Dropping`, D2 branch ref, `archive-moved`, original ref removed | Finished on restart; recovery ref and archive kept, original ref gone |
+| C1 recovery ref, C3 `archive-moved`, C5 original ref removed; D1 `phase:Dropping`, D2 branch ref, `archive-moved`, original ref removed | Listed; brought back byte-exact (after a restore, listing finishes the move); after the drop, the recovery ref and archive are kept and the original ref is gone |
 
 `checks/kill_cases.rs` adds two cases after a kill. A foreign file placed where the archive
 would move (C1–C2) makes `list` (after a restore), bring back and drop refuse with

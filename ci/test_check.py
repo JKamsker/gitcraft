@@ -46,8 +46,7 @@ class PrePushTests(unittest.TestCase):
         ci = (WORKFLOWS / "ci.yml").read_text(encoding="utf-8")
         self.assertIn(f"\n          {shlex.join(command)}\n", ci)
         self.assertIn("RUSTFLAGS: --cfg recovery_recording\n", ci)
-        _, extra = check.low_priority(command)
-        lowered, _ = check.low_priority(command)
+        lowered, extra = check.low_priority(command)
         self.assertTrue(lowered[:3] == ["nice", "-n", "19"] or extra.get("creationflags") == 0x40)
 
     def test_cargo_runs_at_low_priority(self):

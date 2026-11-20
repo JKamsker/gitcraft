@@ -37,43 +37,64 @@ const fn last(action: &'static str, prefix: &'static str) -> At {
     }
 }
 
+/// What restart finds, per the durability audit's kill table.
+const UNLISTED: &str = "not listed, live worktree untouched, forgotten";
+const BUSY: &str = "listed, bring back refused (progress)";
+const STOPPED: &str = "listed, bring back refused (Interrupted recovery)";
+const BACK: &str = "listed, brought back byte-exact";
+
 /// One kill per transition the durability audit lists (P2-P12, R1-R8, C1-C5, D1-D2).
-const KEY: &[At] = &[
-    first("park", "archive-reserved"),
-    first("park", "phase:Archiving"),
-    first("park", "archive-index-copied"),
-    first("park", "git:update-ref refs/gitcraft/parked/"),
-    first("park", "archive-raw-copied"),
-    last("park", "archive-metadata-copied"),
+const KEY: &[(At, &str)] = &[
+    (first("park", "archive-reserved"), UNLISTED),
+    (first("park", "phase:Archiving"), UNLISTED),
+    (first("park", "archive-index-copied"), UNLISTED),
+    (
+        first("park", "git:update-ref refs/gitcraft/parked/"),
+        UNLISTED,
+    ),
+    (first("park", "archive-raw-copied"), UNLISTED),
+    (last("park", "archive-metadata-copied"), UNLISTED),
     // The manifest's temp file is flushed but not yet renamed into place (gap G2).
-    At {
-        before: Some("archive-manifest-written"),
-        ..last("park", "atomic-temp-synced")
-    },
-    first("park", "archive-manifest-written"),
-    first("park", "archive-reachable"),
-    first("park", "phase:Archived"),
-    first("park", "phase:Clearing"),
-    first("park", "git:reset --hard -q HEAD"),
-    first("park", "phase:Parked"),
-    last("restore", "untouched-evidence-durable"),
-    first("restore", "phase:Restoring"),
-    first("restore", "git:read-tree"),
-    first("restore", "restore-plan-durable"),
-    first("restore", "index-lock-synced"),
-    first("restore", "destination-temp-durable"),
-    first("restore", "destination-published"),
-    last("restore", "restore-copy-applied"),
-    first("restore", "live-restore-synced"),
-    first("restore", "phase:Restored"),
-    first("restore", "phase:Cleanup"),
-    first("restore", "git:update-ref refs/gitcraft/parked-recovery/"),
-    first("restore", "archive-moved"),
-    first("restore", "git:update-ref -d refs/gitcraft/parked/"),
-    first("drop", "phase:Dropping"),
-    first("drop", "git:update-ref refs/heads/"),
-    first("drop", "archive-moved"),
-    first("drop", "git:update-ref -d refs/gitcraft/parked/"),
+    (
+        At {
+            before: Some("archive-manifest-written"),
+            ..last("park", "atomic-temp-synced")
+        },
+        UNLISTED,
+    ),
+    (first("park", "archive-manifest-written"), BUSY),
+    (first("park", "archive-reachable"), BUSY),
+    (first("park", "phase:Archived"), BUSY),
+    (first("park", "phase:Clearing"), BUSY),
+    (first("park", "git:reset --hard -q HEAD"), BACK),
+    (first("park", "phase:Parked"), BACK),
+    (last("restore", "untouched-evidence-durable"), BACK),
+    (first("restore", "phase:Restoring"), BACK),
+    (first("restore", "git:read-tree"), STOPPED),
+    (first("restore", "restore-plan-durable"), BACK),
+    (first("restore", "index-lock-synced"), STOPPED),
+    (first("restore", "destination-temp-durable"), BACK),
+    (first("restore", "destination-published"), BACK),
+    (last("restore", "restore-copy-applied"), BACK),
+    (first("restore", "live-restore-synced"), BACK),
+    (first("restore", "phase:Restored"), BACK),
+    (first("restore", "phase:Cleanup"), BACK),
+    (
+        first("restore", "git:update-ref refs/gitcraft/parked-recovery/"),
+        BACK,
+    ),
+    (first("restore", "archive-moved"), BACK),
+    (
+        first("restore", "git:update-ref -d refs/gitcraft/parked/"),
+        BACK,
+    ),
+    (first("drop", "phase:Dropping"), BACK),
+    (first("drop", "git:update-ref refs/heads/"), BACK),
+    (first("drop", "archive-moved"), BACK),
+    (
+        first("drop", "git:update-ref -d refs/gitcraft/parked/"),
+        BACK,
+    ),
 ];
 
 pub(super) fn act(action: &str, repo: &Path, parked: Option<&Parked>) -> Result<(), String> {
@@ -152,16 +173,9 @@ pub(super) fn untouched(f: &Fixture) {
     assert_eq!(std::fs::read(f.0.join("untracked")).unwrap(), UNTRACKED);
 }
 
-const REFUSALS: [&str; 4] = [
-    "Interrupted recovery",
-    "progress",
-    "locked",
-    "Commit or stash",
-];
-
 /// A restart after the kill: production entry points only, byte-exact, then replayed.
-/// Returns what bring back did, for the log.
-fn restart(f: &Fixture, action: &str, parked: Option<&Parked>, at: &str) -> String {
+/// Returns what it found, one of the outcomes of [`KEY`].
+fn restart(f: &Fixture, action: &str, parked: Option<&Parked>, at: &str) -> &'static str {
     untouched(f);
     let lock = std::fs::read(f.0.join(".git/index.lock")).ok();
     let listed = list(&f.0).unwrap();
@@ -177,20 +191,21 @@ fn restart(f: &Fixture, action: &str, parked: Option<&Parked>, at: &str) -> Stri
         assert!(list(&f.0).unwrap().is_empty(), "{at}");
         assert_eq!(tree(&f.0), settled, "{at}: forget replay changed files");
         untouched(f);
-        return "not listed, live worktree untouched, forgotten".into();
+        return UNLISTED;
     };
+    assert_eq!(listed, vec![p.clone()], "{at}");
+    let archive = discovery::locate(&f.0, &p.id)
+        .unwrap()
+        .display()
+        .to_string();
     let outcome = match bring_back(&f.0, &p) {
         Ok(()) => {
             live_original(f);
-            "brought back byte-exact".to_owned()
+            BACK
         }
-        Err(e) => {
-            let why = REFUSALS.iter().find(|s| e.contains(**s));
-            format!(
-                "bring back refused ({})",
-                why.unwrap_or_else(|| panic!("{at}: {e}"))
-            )
-        }
+        Err(e) if e.contains("in progress") => BUSY,
+        Err(e) if e.contains(&format!("Interrupted recovery at {archive}")) => STOPPED,
+        Err(e) => panic!("{at}: {e}"),
     };
     // An index lock the killed child left is never adopted or removed.
     let now = std::fs::read(f.0.join(".git/index.lock")).ok();
@@ -205,28 +220,29 @@ fn restart(f: &Fixture, action: &str, parked: Option<&Parked>, at: &str) -> Stri
     assert_eq!(list(&f.0).unwrap(), vec![p.clone()], "{at}");
     assert_eq!(tree(&f.0), settled, "{at}: replay changed files");
     untouched(f);
-    outcome + ", dropped, replay unchanged"
+    outcome
 }
 
 /// Recording only, no child: the child counts boundaries from the start of its action, so
 /// every key boundary must exist and sit at the same number on every run.
 #[test]
 fn key_boundaries_exist_and_are_numbered_deterministically() {
-    for at in KEY {
+    for (at, _) in KEY {
         assert_eq!(boundary(at), boundary(at), "{} {}", at.action, at.prefix);
     }
 }
 
 #[test]
 fn a_real_kill_at_each_key_boundary_restarts_byte_exact_and_idempotently() {
-    for at in KEY {
+    for (at, expected) in KEY {
         let (stop, label) = boundary(at);
         let (f, parked) = fixture(at.action);
         let log = kill(at.action, stop, &f.0);
         assert!(log.contains(&format!("{MARKER}{stop}: {label}")), "{log}");
         let name = format!("{} {stop} ({label})", at.action);
         let outcome = restart(&f, at.action, parked.as_ref(), &name);
-        eprintln!("killed {name}: {outcome}");
+        assert_eq!(outcome, *expected, "{name}");
+        eprintln!("killed {name}: {outcome}; dropped to a branch, replay unchanged");
     }
     eprintln!("real kills: {} boundaries restarted", KEY.len());
 }
