@@ -45,6 +45,11 @@ impl Search {
         self.running = false;
     }
 
+    /// Whether a search is being read, which a refresh's retirement would leave unanswered.
+    pub(super) fn in_flight(&self) -> bool {
+        self.pending.is_some()
+    }
+
     #[cfg(test)]
     pub(super) fn request(&self) -> Option<Arc<Request>> {
         self.pending.clone()
@@ -217,5 +222,7 @@ impl RepoTab {
     }
 }
 
+#[cfg(test)]
+mod refresh_tests;
 #[cfg(test)]
 mod tests;
