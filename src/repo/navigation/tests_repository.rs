@@ -42,13 +42,12 @@ fn select(tab: &mut RepoTab, hash: &str, ctx: &egui::Context) {
     act(tab, Action::Select(row.unwrap_or_default()), ctx);
 }
 
-/// Sets up a graph place without the first-file reveal of a user row/link action.
+/// Sets up a graph place the way restoring one does, without a user row/link action.
 fn select_graph(tab: &mut RepoTab, hash: &str, ctx: &egui::Context) {
     assert!(tab.diff.is_none());
     tab.restore_commit_selection(tab.index[hash], ctx);
     tab.record_view();
     assert_eq!(tab.current_view(), Some(graph(Some(hash))));
-    assert!(!tab.commit_changes.follows_history());
 }
 
 /// Equal graph neighbours merge, while a distinct forward diff remains reachable.
@@ -219,30 +218,23 @@ fn back_to_a_diff_selects_its_commit_again() {
 
 #[test]
 fn following_links_to_commits_are_steps() {
-    let (dir, file) = repo("links");
+    let (dir, _) = repo("links");
     let ctx = egui::Context::default();
     let mut tab = opened(&dir, &ctx);
     let (head, base) = head_and_base(&dir);
     act(&mut tab, Action::SelectHash(base.clone()), &ctx);
     act(&mut tab, Action::SelectHash(head.clone()), &ctx);
-    // A ready detail reveals the first file; a pending one still shows the graph.
-    let forward = tab.diff.as_ref().map(|view| {
-        assert_eq!(view.key, commit_key(&head, &file));
-        diff_at(view.key.clone(), Some(&head))
-    });
-    assert_eq!(
-        tab.current_view(),
-        Some(forward.clone().unwrap_or_else(|| graph(Some(&head))))
-    );
+    // A commit link shows the graph place with details, never a diff.
+    assert!(tab.diff.is_none());
+    assert_eq!(tab.current_view(), Some(graph(Some(&head))));
     act(&mut tab, Action::Navigate(-1), &ctx);
     assert_eq!(tab.selected_hash(), Some(base));
     act(&mut tab, Action::Navigate(-1), &ctx);
     assert_eq!(tab.selected_hash(), Some(head.clone()));
-    // Refining a graph place merges equal neighbours. A user row selection instead
-    // reveals the first changed file, which can make a distinct diff place.
+    // Refining a graph place merges equal neighbours.
     act(&mut tab, Action::Navigate(1), &ctx);
     select_graph(&mut tab, &head, &ctx);
-    assert_graph_refinement(&mut tab, &head, forward, &ctx);
+    assert_graph_refinement(&mut tab, &head, None, &ctx);
     let _ = std::fs::remove_dir_all(&dir);
 }
 

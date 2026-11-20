@@ -96,12 +96,11 @@ impl FilesCache {
 
 impl super::RepoTab {
     /// Cache immutable content even when selection moved on; only the current detail
-    /// may change the visible panel or fulfill a pending first-file reveal.
+    /// may change the visible panel. It never opens a diff.
     pub(in crate::repo) fn detail_arrived(
         &mut self,
         hash: String,
         result: Result<CommitDetail, String>,
-        ctx: &egui::Context,
     ) {
         if let Ok(d) = &result {
             self.files_cache.insert(d.hash.clone(), d.files.clone());
@@ -109,11 +108,8 @@ impl super::RepoTab {
         }
         if self.detail_hash.as_deref() == Some(hash.as_str()) {
             match result {
-                Ok(d) => self.show_detail(d, ctx),
-                Err(e) => {
-                    self.detail_error = Some(e);
-                    self.finish_commit_changes(&hash, ctx);
-                }
+                Ok(d) => self.show_detail(d),
+                Err(e) => self.detail_error = Some(e),
             }
         }
     }

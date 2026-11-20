@@ -301,7 +301,6 @@ repo-core-0387 = { $label }-Reset
 repo-core-0388 = { $target } auf { $short } ({ $summary }) verschieben? { $explain }
 repo-core-0389 = { $to-lowercase } zurücksetzen
 repo-core-0392 = Aktuellen Editor fertigstellen oder schließen, bevor Sie einem Rückverweis folgen
-repo-core-0393 = Dieser Commit hat keine anzeigbaren Dateiänderungen
 repo-core-0402 = { $name } kann nicht gelesen werden: Ist der Vorgang noch aktiv?
 repo-core-0403 = { $head } hat keinen Vorgänger (erster Commit): Es gibt keine History zu untersuchen
 repo-core-0404 = Kein anderer Branch zum Vergleichen

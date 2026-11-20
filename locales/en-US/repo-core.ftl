@@ -301,7 +301,6 @@ repo-core-0387 = { $label } reset
 repo-core-0388 = Move { $target } to { $short } ({ $summary })? { $explain }
 repo-core-0389 = Reset { $to-lowercase }
 repo-core-0392 = Finish or close the current editor before following a backlink
-repo-core-0393 = This commit has no file changes to show
 repo-core-0402 = { $name } can't be read: is the operation still in progress?
 repo-core-0403 = { $head } has no parent (a first commit): there is no history to look into
 repo-core-0404 = No other branch to compare with

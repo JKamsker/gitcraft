@@ -13,7 +13,7 @@ use crate::repo::{
 pub(in crate::repo) enum PendingGoto {
     History(String),
     Restore(String),
-    /// A branch clicked by name: its tip shows details without an automatic file diff.
+    /// A branch clicked by name: its tip shows details, and drops another commit's diff.
     BranchTip(String),
 }
 
@@ -31,6 +31,18 @@ impl PendingGoto {
 
 impl RepoTab {
     pub(in crate::repo) fn retire_navigation_restore(&mut self, action: &Action) {
+        // A row, pill, stash or pull request picked directly supersedes any link still paging
+        // history toward its target: that page must not take the selection away later.
+        if matches!(
+            action,
+            Action::Select(_)
+                | Action::SelectBranchTip(_)
+                | Action::SelectStash(_)
+                | Action::SelectPr(_)
+        ) {
+            self.pending_goto = None;
+            return;
+        }
         if self
             .pending_goto
             .as_ref()
@@ -98,7 +110,7 @@ impl RepoTab {
                 match target {
                     PendingGoto::Restore(_) => self.restore_commit_selection(row, ctx),
                     PendingGoto::BranchTip(_) => self.select_graph_row(row, true, ctx),
-                    PendingGoto::History(_) => self.select_history(row, ctx),
+                    PendingGoto::History(_) => self.select_graph_row(row, false, ctx),
                 }
                 self.scroll_to = Some(row);
             }

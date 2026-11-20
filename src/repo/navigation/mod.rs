@@ -273,7 +273,6 @@ impl RepoTab {
     /// Shows `view` again through the actions that open it.
     fn restore_navigation(&mut self, view: &View, ctx: &egui::Context) {
         self.tour = None;
-        self.commit_changes.stop();
         match view {
             View::Graph { selected } => {
                 self.close_pages(true, ctx);
@@ -373,7 +372,6 @@ impl RepoTab {
     /// Restoring a place selects its commit without opening a new place. An explicit
     /// diff remains that place even when its selected commit arrives on a later page.
     pub(super) fn restore_commit_selection(&mut self, row: usize, ctx: &egui::Context) {
-        self.commit_changes.stop();
         self.keyboard_clear_cursor();
         let shown = self.diff.take();
         self.select(row, ctx);

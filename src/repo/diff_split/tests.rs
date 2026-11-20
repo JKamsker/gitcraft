@@ -1,15 +1,9 @@
-//! Header clicks must replace automatic layout with the user's visible choice.
+//! Header clicks switch the diff between below the graph and in its place.
 use super::*;
 use crate::repo::DiffView;
 use egui_kittest::{Harness, kittest::Queryable};
 
-fn harness(
-    width: f32,
-    saved: bool,
-    automatic: bool,
-    snapshot: bool,
-    ready: bool,
-) -> Harness<'static, RepoTab> {
+fn harness(width: f32, saved: bool, snapshot: bool, ready: bool) -> Harness<'static, RepoTab> {
     let ctx = egui::Context::default();
     let mut tab = RepoTab::new_deferred("/recording-only/diff-layout-toggle".into(), &ctx);
     tab.snapshot_shown = snapshot;
@@ -31,9 +25,6 @@ fn harness(
                 let mut settings = Settings::get(ui.ctx());
                 settings.diff_beside_graph = saved;
                 settings.put_for_test(ui.ctx());
-                if automatic {
-                    tab.reveal_selected_changes("a".repeat(40), ui.ctx());
-                }
                 styled = true;
                 return;
             }
@@ -67,7 +58,7 @@ fn toggle_header(h: &mut Harness<'_, RepoTab>, beside: bool) {
 }
 
 #[test]
-fn header_toggle_uses_visible_layout_and_retires_automatic_history_following() {
+fn header_toggle_uses_visible_layout() {
     for (width, ready) in [
         (360.0, false),
         (1100.0, false),
@@ -75,13 +66,11 @@ fn header_toggle_uses_visible_layout_and_retires_automatic_history_following() {
         (1100.0, true),
     ] {
         for saved in [false, true] {
-            for (automatic, snapshot) in
-                [(false, false), (false, true), (true, false), (true, true)]
-            {
-                let mut h = harness(width, saved, automatic, snapshot, ready);
+            for snapshot in [false, true] {
+                let mut h = harness(width, saved, snapshot, ready);
                 h.run_steps(2);
                 let request = h.state().diff.as_ref().map(|view| view.request);
-                let mut beside = saved || automatic;
+                let mut beside = saved;
                 assert_eq!(Settings::get(&h.ctx).diff_beside_graph, saved);
                 for _ in 0..3 {
                     assert_eq!(h.state().diff_beside_graph(&h.ctx), beside);
@@ -89,7 +78,6 @@ fn header_toggle_uses_visible_layout_and_retires_automatic_history_following() {
                     beside = !beside;
                     assert_eq!(h.state().diff_beside_graph(&h.ctx), beside);
                     assert_eq!(Settings::get(&h.ctx).diff_beside_graph, beside);
-                    assert!(!h.state().commit_changes.follows_history());
                     assert_eq!(h.state().diff.as_ref().map(|view| view.request), request);
                 }
             }
@@ -98,38 +86,32 @@ fn header_toggle_uses_visible_layout_and_retires_automatic_history_following() {
 }
 
 #[test]
-fn explicit_same_file_actions_still_toggle_automatic_and_manual_diffs() {
+fn explicit_same_file_actions_toggle_the_diff() {
     for saved in [false, true] {
-        for automatic in [false, true] {
-            let ctx = egui::Context::default();
-            let mut tab = RepoTab::new_deferred("/recording-only/same-file-toggle".into(), &ctx);
-            let key = DiffKey::Commit {
-                hash: "a".repeat(40),
-                path: "file.txt".into(),
-            };
-            tab.diff = Some(DiffView::new(key.clone()));
-            let mut settings = Settings::get(&ctx);
-            settings.diff_beside_graph = saved;
-            settings.put_for_test(&ctx);
-            if automatic {
-                tab.reveal_selected_changes("a".repeat(40), &ctx);
-            }
-            crate::repo::messages::record_jobs(|| {
-                tab.apply(Action::OpenDiff(key.clone()), &ctx);
-            });
-            assert!(tab.diff.is_none());
-            assert!(!tab.commit_changes.follows_history());
-            crate::repo::messages::record_jobs(|| {
-                tab.apply(Action::OpenDiff(key.clone()), &ctx);
-            });
-            assert_eq!(tab.diff.as_ref().map(|view| &view.key), Some(&key));
-            assert_eq!(tab.diff_beside_graph(&ctx), saved);
-        }
+        let ctx = egui::Context::default();
+        let mut tab = RepoTab::new_deferred("/recording-only/same-file-toggle".into(), &ctx);
+        let key = DiffKey::Commit {
+            hash: "a".repeat(40),
+            path: "file.txt".into(),
+        };
+        tab.diff = Some(DiffView::new(key.clone()));
+        let mut settings = Settings::get(&ctx);
+        settings.diff_beside_graph = saved;
+        settings.put_for_test(&ctx);
+        crate::repo::messages::record_jobs(|| {
+            tab.apply(Action::OpenDiff(key.clone()), &ctx);
+        });
+        assert!(tab.diff.is_none());
+        crate::repo::messages::record_jobs(|| {
+            tab.apply(Action::OpenDiff(key.clone()), &ctx);
+        });
+        assert_eq!(tab.diff.as_ref().map(|view| &view.key), Some(&key));
+        assert_eq!(tab.diff_beside_graph(&ctx), saved);
     }
 }
 
 #[test]
-fn history_reveal_and_explicit_layout_choices_do_not_reapply_the_profile() {
+fn row_selection_and_explicit_layout_choices_do_not_reapply_the_profile() {
     for already_open in [false, true] {
         let ctx = egui::Context::default();
         let mut tab = RepoTab::new_deferred("/recording-only/layout-profile".into(), &ctx);
@@ -181,7 +163,7 @@ fn history_reveal_and_explicit_layout_choices_do_not_reapply_the_profile() {
 }
 
 #[test]
-fn history_reveal_keeps_popped_diff_ownership_for_both_saved_layouts() {
+fn commit_links_leave_a_docked_or_popped_diff_window_empty() {
     use crate::repo::popout::Panel;
     for saved in [false, true] {
         for popped in [false, true] {
@@ -205,25 +187,12 @@ fn history_reveal_keeps_popped_diff_ownership_for_both_saved_layouts() {
             for row in 0..2 {
                 let hash = tab.commits[row].hash.clone();
                 crate::repo::messages::record_jobs(|| tab.apply(Action::SelectHash(hash), &ctx));
-                let shown = tab.diff.as_ref().map(|view| view.key.clone());
-                assert_eq!(
-                    shown,
-                    Some(DiffKey::Commit {
-                        hash: tab.commits[row].hash.clone(),
-                        path: "file.txt".into()
-                    })
-                );
-                assert!(tab.commit_changes.follows_history());
+                assert_eq!(tab.selected, Some(row));
+                assert!(tab.detail.is_some());
+                assert!(tab.diff.is_none(), "a commit link opened a diff");
                 assert_eq!(tab.docked(Panel::Diff), !popped);
-                assert_eq!(tab.diff_can_split(), !popped);
-                // This is layout's first diff branch; a popped owner must skip it.
-                assert_eq!(tab.diff_beside_graph(&ctx), !popped);
                 assert_eq!(Settings::get(&ctx).diff_beside_graph, saved);
             }
-            let request = tab.diff.as_ref().map(|view| view.request);
-            tab.popouts.dock(Panel::Diff);
-            assert!(tab.diff_beside_graph(&ctx));
-            assert_eq!(tab.diff.as_ref().map(|view| view.request), request);
         }
     }
 }

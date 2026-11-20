@@ -59,11 +59,10 @@ fn restored(tab: &RepoTab, diff: bool, selected: &str) {
         tab.diff.as_ref().map(|view| view.key.clone()),
         diff.then(|| key(&"a".repeat(40)))
     );
-    assert!(!tab.commit_changes.follows_history());
     assert!(tab.pending_goto.is_none());
 }
 
-fn known_case(saved: bool, automatic: bool, same: bool, cached: bool) {
+fn known_case(saved: bool, same: bool, cached: bool) {
     let ctx = egui::Context::default();
     let mut tab = tab(&ctx, saved);
     let a = "a".repeat(40);
@@ -74,11 +73,7 @@ fn known_case(saved: bool, automatic: bool, same: bool, cached: bool) {
         tab.detail_cache.insert(&tab.refs.head, detail(target));
     }
     messages::record_jobs(|| {
-        if automatic {
-            tab.reveal_selected_changes(a.clone(), &ctx);
-        } else {
-            tab.diff = Some(DiffView::new(key(&a)));
-        }
+        tab.diff = Some(DiffView::new(key(&a)));
         tab.detail = None;
         tab.detail_hash = Some(a.clone());
         tab.nav.visit(View::Graph {
@@ -108,11 +103,9 @@ fn known_case(saved: bool, automatic: bool, same: bool, cached: bool) {
 #[test]
 fn known_row_back_and_forward_preserve_graph_and_explicit_diff_places() {
     for saved in [false, true] {
-        for automatic in [false, true] {
-            for same in [false, true] {
-                for cached in [false, true] {
-                    known_case(saved, automatic, same, cached);
-                }
+        for same in [false, true] {
+            for cached in [false, true] {
+                known_case(saved, same, cached);
             }
         }
     }
@@ -308,7 +301,7 @@ fn a_later_explicit_destination_retires_a_paged_restoration() {
 }
 
 #[test]
-fn restoring_an_existing_automatic_diff_adopts_its_request_as_explicit() {
+fn restoring_an_existing_diff_keeps_its_request() {
     for saved in [false, true] {
         for ready in [false, true] {
             for same in [false, true] {
@@ -325,8 +318,6 @@ fn restoring_an_existing_automatic_diff_adopts_its_request_as_explicit() {
                 let request = view.request;
                 tab.diff = Some(view);
                 messages::record_jobs(|| {
-                    tab.reveal_selected_changes(a.clone(), &ctx);
-                    assert!(tab.commit_changes.follows_history());
                     tab.restore_navigation(
                         &View::Diff {
                             key: key(&a),
