@@ -103,6 +103,8 @@ pub struct Settings {
     pub show_hash: bool,
     /// The test lane: a pass / fail dot by each commit for the repository's test command.
     pub show_test_lane: bool,
+    /// Pills on the commits each environment last deployed, as the forge recorded them.
+    pub show_deploy_markers: bool,
     /// The branches panel on the left of a repository tab.
     pub show_branches: bool,
     /// The commit detail / changes panel on the right of a repository tab.
@@ -233,6 +235,7 @@ impl Default for Settings {
             show_date: false,
             show_hash: false,
             show_test_lane: false,
+            show_deploy_markers: false,
             show_branches: true,
             show_detail: true,
             worktrees_in_same_tab: true,

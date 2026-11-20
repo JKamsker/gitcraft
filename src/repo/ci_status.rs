@@ -171,6 +171,7 @@ impl RepoTab {
     /// Reads the statuses again if they are old, or commits came that weren't asked about
     /// (after a push, a fetch, a new pull request).
     pub(super) fn refresh_ci(&mut self, ctx: &egui::Context) {
+        self.refresh_deploy_markers(ctx);
         let plan = self.ci_plan();
         let projects: HashSet<Project> = plan.iter().map(|(p, _)| p.clone()).collect();
         if projects != self.ci.projects {

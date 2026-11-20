@@ -148,6 +148,7 @@ impl RepoTab {
         }
         items.extend(self.versions_palette_item());
         items.extend(self.insights_palette_items());
+        items.push(self.deploy_markers_palette_item());
         if self.owners.file().is_some() {
             items.push((
                 "Check CODEOWNERS".into(),

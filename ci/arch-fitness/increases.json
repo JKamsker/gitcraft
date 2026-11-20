@@ -378,5 +378,21 @@
     "reason": "Issue #173 item 13 adds one coordinator reference: Dialog::FileMetadata holds the owned FileMetaForm. Execution uses the existing UndoableOps action, so the Action enum and apply dispatcher do not grow. No new domain edge or RepoTab mutation is introduced.",
     "owner": "@JKamsker",
     "remediation": "Reduce coordinator symbol dependencies as dialog composition is decomposed and ratchet the budget."
+  },
+  "173-graph-deployment-markers-state": {
+    "changes": [
+      "budget/insights/exported=338"
+    ],
+    "reason": "Issue #173 item 9 keeps each tab's deployment markers (forge records, read state) in one insights-owned RepoTab field, deploy_markers: insights::deploy_markers::State, as review_purpose does. Its model, drawing and Act stay private to repo::insights::deploy_markers; the graph reaches them through RepoTab methods, so no graph -> insights edge is added.",
+    "owner": "@JKamsker",
+    "remediation": "Hold feature tab state behind one coordinator interface when RepoTab composition is decomposed, then ratchet the budget."
+  },
+  "173-graph-deployment-markers-field": {
+    "changes": [
+      "budget/repo-core/symbols=615"
+    ],
+    "reason": "Issue #173 item 9 adds one coordinator reference: the RepoTab field type insights::deploy_markers::State. Actions route through the existing InsightsAct (the Action enum does not grow), and no new domain edge or RepoTab mutation is introduced.",
+    "owner": "@JKamsker",
+    "remediation": "Reduce coordinator symbol dependencies as RepoTab composition is decomposed and ratchet the budget."
   }
 }

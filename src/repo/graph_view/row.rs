@@ -180,6 +180,9 @@ impl RepoTab {
                 &commit.hash,
                 acts,
             );
+            let left = description_cell.left() + CELL_PAD + deferred;
+            let deferred = deferred
+                + self.deploy_marker_pills(&mut badge_ui, left, row.mid(), &commit.hash, acts);
             let lane = if self.test_lane.visible { LANE_W } else { 0.0 };
             // With the lane, the CI dot's place is kept on every row, so the lane is straight.
             let dots = if lane > 0.0 || ci.is_some() {

@@ -21,6 +21,7 @@ mod constellation;
 mod coupling;
 mod coverage;
 mod deploy;
+pub(in crate::repo) mod deploy_markers;
 mod evolution;
 mod impact;
 pub(super) mod purpose;
@@ -212,6 +213,8 @@ pub(crate) enum InsightsAct {
     ReviewHeat(review_heat::Act),
     Transform(transform::Act),
     Deploy(deploy::Act),
+    /// The deployment markers on the graph (#173 item 9).
+    DeployMarkers(deploy_markers::Act),
     Ribbons(ribbons::Act),
     Coverage(coverage::Act),
     Churn(churn::Act),
@@ -254,6 +257,7 @@ impl RepoTab {
             InsightsAct::ReviewHeat(act) => self.review_heat_act(act, ctx),
             InsightsAct::Transform(act) => self.transform_act(act, ctx),
             InsightsAct::Deploy(act) => self.deploy_act(act, ctx),
+            InsightsAct::DeployMarkers(act) => self.deploy_markers_act(act, ctx),
             InsightsAct::Ribbons(act) => self.ribbons_act(act, ctx),
             InsightsAct::Coverage(act) => self.coverage_act(act, ctx),
             InsightsAct::Churn(act) => self.churn_act(act, ctx),

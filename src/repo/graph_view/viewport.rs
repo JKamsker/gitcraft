@@ -180,6 +180,7 @@ impl RepoTab {
                     scroll = scroll.max_height(total as f32 * ROW_PITCH);
                 }
                 self.test_lane_frame(&settings, ui.ctx());
+                self.deploy_markers_frame(settings.show_deploy_markers, ui.ctx());
                 let mut hovered_message = None;
                 // The rows on screen, whose files are read ahead (see `prefetch_files`).
                 let mut on_screen = None;

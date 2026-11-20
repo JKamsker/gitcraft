@@ -182,6 +182,8 @@ pub struct RepoTab {
     pub(in crate::repo) insights: Option<Box<insights::InsightsView>>,
     /// A pull request's files by purpose, kept while other pages take the big area.
     pub(in crate::repo) review_purpose: insights::purpose::State,
+    /// The environments' deployed commits, marked on the graph.
+    pub(in crate::repo) deploy_markers: insights::deploy_markers::State,
     pub(in crate::repo) pr_requests: u64,
     /// What was written on each pull request and not sent, by its number.
     pub(in crate::repo) pr_drafts: HashMap<u64, pr_review::PrDraft>,

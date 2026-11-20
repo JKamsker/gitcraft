@@ -71,6 +71,11 @@ pub(super) fn header_menu(resp: &Response, settings: &Settings) {
                 crate::i18n::text("repo-core-1020"),
             )
             .on_hover_text(crate::i18n::text(crate::repo::TEST_LANE_TIP));
+            ui.checkbox(
+                &mut next.show_deploy_markers,
+                crate::i18n::text("graph-deployments-toggle"),
+            )
+            .on_hover_text(crate::i18n::text("graph-deployments-toggle-tip"));
             ui.separator();
             let mut fit = next.fit_visible_refs();
             if ui
@@ -116,4 +121,13 @@ pub(super) fn header_menu(resp: &Response, settings: &Settings) {
                 next.set(ui.ctx());
             }
         });
+}
+
+impl crate::repo::RepoTab {
+    /// Shows or hides the deployment markers (the setting), for the palette's entry.
+    pub(in crate::repo) fn toggle_deploy_markers(&self, ctx: &egui::Context) {
+        let mut next = Settings::get(ctx);
+        next.show_deploy_markers = !next.show_deploy_markers;
+        next.set(ctx);
+    }
 }

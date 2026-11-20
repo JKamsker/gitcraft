@@ -1,0 +1,47 @@
+graph-deployments-toggle = Deployments
+graph-deployments-toggle-tip = A pill on the commit each environment last deployed, as the forge's deployment records say (GitHub and GitLab). They are read in the background, like the build statuses, and only while this is on.
+graph-deployments-palette = Show or hide deployment markers on the graph
+graph-deployments-palette-hint = deploy environment production staging
+graph-deployments-previews = { $count ->
+    [one] 1 preview
+   *[other] { $count } previews
+}
+graph-deployments-more = +{ $count }
+graph-deployments-heading = Deployed to { $environment }
+graph-deployments-standing-current = current
+graph-deployments-standing-stale = stale: this may no longer be what runs there
+graph-deployments-standing-unknown = unknown: no successful deployment was among those read, this is its newest record
+graph-deployments-deployed = Deployed { $age }
+graph-deployments-deployed-unknown = No deployment time recorded
+graph-deployments-status = Status: { $status }, { $reported }
+graph-deployments-reported = reported { $age }
+graph-deployments-reported-unknown = no report time recorded
+graph-deployments-commit = Commit { $sha } from { $reference }
+graph-deployments-digest = Artifact { $name }: { $digest }
+graph-deployments-no-digest = No artifact digest recorded
+graph-deployments-source-github = Source: GitHub Deployments API (gh)
+graph-deployments-source-gitlab = Source: GitLab deployments (glab)
+graph-deployments-observed = Observed { $age }
+graph-deployments-read-failed = The latest read failed ({ $error }): this is what an earlier read found.
+graph-deployments-read-old = Not read again since then: refresh the repository to read it again.
+graph-deployments-partial = Incomplete: { $why }
+graph-deployments-not-here = The deployed commit isn't in this repository (nothing is fetched).
+graph-deployments-evidence = Only the forge's deployment records count: a green build or a release tag is not a deployment.
+graph-deployments-click = Click to select the commit; right-click to compare environments.
+graph-deployments-state-success = succeeded
+graph-deployments-state-in-progress = in progress
+graph-deployments-state-queued = queued
+graph-deployments-state-failed = failed
+graph-deployments-state-inactive = replaced
+graph-deployments-state-cancelled = cancelled
+graph-deployments-state-no-status = no status
+graph-deployments-state-not-read = status not read
+graph-deployments-menu-select = Select the deployed commit
+graph-deployments-menu-compare = Compare { $environment } with { $other }
+graph-deployments-menu-compare-tip = Every difference between the commits the two environments last deployed
+graph-deployments-menu-reached = Has { $commit } reached { $environment }?
+graph-deployments-menu-reached-tip = Asks the repository's own history (merge-base --is-ancestor) in the background; nothing is fetched.
+graph-deployments-menu-open = Open the deployment on the forge
+graph-deployments-reached-yes = Yes: { $environment } runs { $deployed }, which contains { $commit }.
+graph-deployments-reached-no = No: { $environment } runs { $deployed }, which doesn't contain { $commit }.
+graph-deployments-reached-unknown = Can't tell whether { $commit } reached { $environment }: { $deployed } or { $commit } isn't in this repository (nothing is fetched).

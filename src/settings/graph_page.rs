@@ -102,7 +102,7 @@ pub(super) fn render(settings: &mut Settings, ui: &mut Ui, f: &Filter) {
         card.row_hint(
             "Columns",
             crate::i18n::text("interaction-settings-columns-tip"),
-            "author when date hash tests show",
+            "author when date hash tests show deployments environments",
             |ui| {
                 ui.horizontal_wrapped(|ui| {
                     ui.spacing_mut().item_spacing.x = 18.0;
@@ -126,6 +126,11 @@ pub(super) fn render(settings: &mut Settings, ui: &mut Ui, f: &Filter) {
                         &mut settings.show_test_lane,
                         crate::i18n::text("interaction-settings-tests"),
                     );
+                    ui.checkbox(
+                        &mut settings.show_deploy_markers,
+                        crate::i18n::text("graph-deployments-toggle"),
+                    )
+                    .on_hover_text(crate::i18n::text("graph-deployments-toggle-tip"));
                 });
             },
         );

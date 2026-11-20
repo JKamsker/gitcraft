@@ -3857,7 +3857,7 @@
     },
     "insights": {
       "domains": 15,
-      "exported": 337
+      "exported": 338
     },
     "os": {
       "domains": 4,
@@ -3873,7 +3873,7 @@
     },
     "repo-core": {
       "domains": 24,
-      "symbols": 614,
+      "symbols": 615,
       "exported": 179
     },
     "review": {
