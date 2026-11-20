@@ -129,7 +129,8 @@ fn refuse_named_streams(path: &Path) -> Result<(), PolicyError> {
             Err(e) => return Err(PolicyError::StreamQuery(native_code(&e))),
         }
     })();
-    // SAFETY: the find handle is owned here and closed exactly once.
+    // SAFETY: the find handle is owned here and closed exactly once. A failed close
+    // leaves nothing to undo and does not change what was found.
     let _ = unsafe { FindClose(handle) };
     result
 }
@@ -226,7 +227,8 @@ impl Descriptor {
 impl Drop for Descriptor {
     fn drop(&mut self) {
         if !self.descriptor.0.is_null() {
-            // SAFETY: allocated by GetNamedSecurityInfoW and freed exactly once.
+            // SAFETY: allocated by GetNamedSecurityInfoW and freed exactly once; a failed
+            // free cannot be retried from a destructor.
             let _ = unsafe { LocalFree(Some(HLOCAL(self.descriptor.0))) };
         }
     }

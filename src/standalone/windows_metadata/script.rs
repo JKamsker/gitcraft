@@ -169,8 +169,8 @@ pub(super) fn script_prepare(source: &Path, target: &Path) -> Result<(), String>
     }
     Ok(())
 }
-#[cfg(windows)]
 /// The helper's own snapshot, the reference for the native one.
+#[cfg(windows)]
 pub(super) fn script_snapshot(source: &Path) -> Result<Vec<u8>, String> {
     let out = execute(source, None)?;
     let encoded = std::str::from_utf8(&out)

@@ -74,14 +74,19 @@ fn place(out: &mut Vec<u8>, slot: usize, part: Option<&[u8]>) -> Result<(), Desc
     Ok(())
 }
 
+/// `at + len`, refusing an offset past the address space as malformed.
+fn end(at: usize, len: usize) -> Result<usize, DescriptorError> {
+    at.checked_add(len).ok_or(DescriptorError::Malformed)
+}
+
 fn u16_at(raw: &[u8], at: usize) -> Result<u16, DescriptorError> {
-    raw.get(at..at + 2)
+    raw.get(at..end(at, 2)?)
         .map(|b| u16::from_le_bytes([b[0], b[1]]))
         .ok_or(DescriptorError::Malformed)
 }
 
 fn u32_at(raw: &[u8], at: usize) -> Result<usize, DescriptorError> {
-    raw.get(at..at + 4)
+    raw.get(at..end(at, 4)?)
         .map(|b| u32::from_le_bytes([b[0], b[1], b[2], b[3]]) as usize)
         .ok_or(DescriptorError::Malformed)
 }
@@ -90,12 +95,12 @@ fn sid(raw: &[u8], at: usize) -> Result<Option<Vec<u8>>, DescriptorError> {
     if at == 0 {
         return Ok(None);
     }
-    let head = raw.get(at..at + 8).ok_or(DescriptorError::Malformed)?;
+    let head = raw.get(at..end(at, 8)?).ok_or(DescriptorError::Malformed)?;
     if head[0] != 1 || head[1] > 15 {
         return Err(DescriptorError::Malformed);
     }
     let len = 8 + 4 * usize::from(head[1]);
-    raw.get(at..at + len)
+    raw.get(at..end(at, len)?)
         .map(|b| Some(b.to_vec()))
         .ok_or(DescriptorError::Malformed)
 }
@@ -105,24 +110,26 @@ fn acl(raw: &[u8], at: usize, present: bool) -> Result<Option<Vec<u8>>, Descript
     if !present || at == 0 {
         return Ok(None);
     }
-    let size = usize::from(u16_at(raw, at + 2)?);
-    let count = usize::from(u16_at(raw, at + 4)?);
-    let body = raw.get(at..at + size).ok_or(DescriptorError::Malformed)?;
+    let size = usize::from(u16_at(raw, end(at, 2)?)?);
+    let count = usize::from(u16_at(raw, end(at, 4)?)?);
     if size < 8 {
         return Err(DescriptorError::Malformed);
     }
+    let body = raw
+        .get(at..end(at, size)?)
+        .ok_or(DescriptorError::Malformed)?;
     let mut aces = Vec::new();
     let mut next = 8;
     for _ in 0..count {
-        let ace_size = usize::from(u16_at(body, next + 2)?);
+        let ace_size = usize::from(u16_at(body, end(next, 2)?)?);
         if ace_size < 4 || !ace_size.is_multiple_of(4) {
             return Err(DescriptorError::Malformed);
         }
         aces.extend_from_slice(
-            body.get(next..next + ace_size)
+            body.get(next..end(next, ace_size)?)
                 .ok_or(DescriptorError::Malformed)?,
         );
-        next += ace_size;
+        next = end(next, ace_size)?;
     }
     let total = u16::try_from(8 + aces.len()).map_err(|_| DescriptorError::Malformed)?;
     let mut out = vec![body[0], 0];
