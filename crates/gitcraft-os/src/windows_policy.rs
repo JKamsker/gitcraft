@@ -8,9 +8,10 @@
 //!
 //! Scope: OWNER|GROUP|DACL|SACL|LABEL|ATTRIBUTE|SCOPE|PROCESS_TRUST_LABEL|ACCESS_FILTER,
 //! with SeSecurityPrivilege enabled on this thread while a handle is opened for the SACL, when
-//! the token holds it (as GetNamedSecurityInfo did). Only ERROR_PRIVILEGE_NOT_HELD narrows it, first to
-//! OWNER|GROUP|DACL|LABEL, then to OWNER|GROUP|DACL. A snapshot is the canonical descriptor
-//! bound to the scope captured.
+//! the token holds it (as GetNamedSecurityInfo did). Any failure in that scope narrows it
+//! to OWNER|GROUP|DACL|LABEL (so elevation never makes a read or copy fail that would work
+//! unprivileged); only ERROR_PRIVILEGE_NOT_HELD narrows that further to OWNER|GROUP|DACL.
+//! A snapshot is the canonical descriptor bound to the scope captured.
 //!
 //! These are synchronous file-system calls without a process deadline. Callers run them on
 //! background workers (staging mutations, standalone tool jobs), never on a UI thread; a
@@ -34,7 +35,7 @@ const LABEL_POLICY: u32 = 0x0000_0017;
 const BASIC_POLICY: u32 = 0x0000_0007;
 const SACL_INFORMATION: u32 = 0x0000_0008;
 const LABEL_INFORMATION: u32 = 0x0000_0010;
-/// Narrowed only when the wider scope needs a privilege the caller does not hold.
+/// Widest first; see `narrows` for when a narrower one is tried.
 const SCOPES: [u32; 3] = [ALL_POLICY, LABEL_POLICY, BASIC_POLICY];
 
 const READ_CONTROL: u32 = 0x0002_0000;
@@ -94,10 +95,19 @@ pub fn file_policy_snapshot_in_scope(path: &Path, scope: u32) -> Result<Vec<u8>,
 
 /// Apply the policy of `source` to `target`, then verify both through their handles.
 pub fn copy_file_policy(source: &Path, target: &Path) -> Result<(), PolicyError> {
-    let (source, descriptor) = read_widest(source)?;
+    widest(|scope| copy_in_scope(source, target, scope))
+}
+
+/// The owner, group, DACL, SACL and label parts of a scope: what a copy sets. Resource
+/// attribute, scoped policy, trust label and access filter ACEs are compared, never written;
+/// a source that has them fails verification in that scope and narrows like any failure.
+const APPLIED: u32 = 0x0000_001f;
+
+fn copy_in_scope(source: &Path, target: &Path, scope: u32) -> Result<(), PolicyError> {
+    let source = open(source, read_access(scope))?;
     streams::refuse_named(&source)?;
+    let descriptor = Descriptor::read(&source, scope)?;
     let before = descriptor.snapshot()?;
-    let scope = descriptor.info;
     let (_, control) =
         security_descriptor::canonical(descriptor.bytes()?).map_err(descriptor_error)?;
     let mut protection = if control & DACL_PROTECTED != 0 {
@@ -118,9 +128,9 @@ pub fn copy_file_policy(source: &Path, target: &Path) -> Result<(), PolicyError>
     // protected. Without a source label, leave the target's untouched: the verification
     // below still refuses a target that carries a label of its own.
     let applied = if scope & SACL_INFORMATION == 0 && descriptor.sacl.is_null() {
-        scope & !LABEL_INFORMATION
+        scope & APPLIED & !LABEL_INFORMATION
     } else {
-        scope
+        scope & APPLIED
     };
     let target = open(target, read_access(scope) | WRITE_DAC | WRITE_OWNER)?;
     descriptor.apply(&target, applied | protection)?;
@@ -144,18 +154,36 @@ fn read_access(scope: u32) -> u32 {
 
 /// The widest scope this caller may read, with the handle it was read through.
 fn read_widest(path: &Path) -> Result<(File, Descriptor), PolicyError> {
+    widest(|scope| {
+        let file = open(path, read_access(scope))?;
+        Descriptor::read(&file, scope).map(|d| (file, d))
+    })
+}
+
+/// Whether a failure in `scope` lets the next, narrower scope be tried. With the SACL in
+/// scope any failure does, so an elevated caller is never worse off than an unprivileged
+/// one (the narrower scope is recorded in the snapshot). Below it, only a missing
+/// privilege does. Named streams and links are refused in every scope.
+fn narrows(scope: u32, error: PolicyError) -> bool {
+    match error {
+        PolicyError::NamedStreams | PolicyError::ReparsePoint => false,
+        _ if scope & SACL_INFORMATION != 0 => true,
+        PolicyError::Native(code) => code == PRIVILEGE_NOT_HELD,
+        _ => false,
+    }
+}
+
+/// `attempt` in the widest scope `narrows` permits, widest first.
+fn widest<T>(mut attempt: impl FnMut(u32) -> Result<T, PolicyError>) -> Result<T, PolicyError> {
     let mut last = PolicyError::Native(PRIVILEGE_NOT_HELD);
     for scope in SCOPES {
-        let read = open(path, read_access(scope))
-            .and_then(|file| Descriptor::read(&file, scope).map(|d| (file, d)));
-        match read {
-            Err(e @ PolicyError::Native(PRIVILEGE_NOT_HELD)) => last = e,
+        match attempt(scope) {
+            Err(error) if narrows(scope, error) => last = error,
             result => return result,
         }
     }
     Err(last)
 }
-
 /// Open `path` itself, never what a link names; a reparse point is refused.
 fn open(path: &Path, access: u32) -> Result<File, PolicyError> {
     use std::os::windows::ffi::OsStrExt;

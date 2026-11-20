@@ -75,6 +75,29 @@ fn a_non_surrogate_reparse_file_keeps_its_policy_and_a_name_surrogate_is_refused
     assert_eq!(tag, 0x0000_1234);
     let snapshot = file_policy_snapshot(&placeholder);
     assert!(snapshot.is_ok(), "{snapshot:?}");
+    // Elevated runners hold SeSecurityPrivilege: record what the SACL scope does there, step
+    // by step, without depending on it (a failure narrows to the label scope).
+    eprintln!(
+        "[policy-probe] full-scope copy: {:?}",
+        copy_in_scope(&placeholder, &plain, ALL_POLICY)
+    );
+    if let Ok(target) = open(&plain, read_access(ALL_POLICY) | WRITE_DAC | WRITE_OWNER) {
+        let source = open(&placeholder, read_access(ALL_POLICY));
+        let descriptor = source.and_then(|s| Descriptor::read(&s, ALL_POLICY));
+        if let Ok(d) = descriptor {
+            for info in [APPLIED, ALL_POLICY, 0x7, 0x8, 0x10] {
+                eprintln!(
+                    "[policy-probe] apply {info:#x}: {:?}",
+                    d.apply(
+                        &target,
+                        info | if info & 0x4 != 0 { 0x2000_0000 } else { 0 }
+                    )
+                );
+            }
+        }
+    } else {
+        eprintln!("[policy-probe] no full-scope target handle");
+    }
     assert_eq!(copy_file_policy(&placeholder, &plain), Ok(()));
     assert_eq!(copy_file_policy(&plain, &placeholder), Ok(()));
     assert_eq!(
@@ -123,4 +146,68 @@ fn the_privilege_guard_reverts_this_thread_and_is_absent_without_the_privilege()
         !impersonating(),
         "the thread is back to the process identity"
     );
+}
+
+#[test]
+fn any_failure_with_the_sacl_in_scope_narrows_like_a_missing_privilege() {
+    // Elevated: the SACL-scope attempt fails with access denied; the label scope is used.
+    let mut tried = Vec::new();
+    let result = widest(|scope| {
+        tried.push(scope);
+        if scope & SACL_INFORMATION != 0 {
+            Err(PolicyError::Native(5))
+        } else {
+            Ok(scope)
+        }
+    });
+    assert_eq!(result, Ok(LABEL_POLICY));
+    assert_eq!(tried, [ALL_POLICY, LABEL_POLICY]);
+    // Verification and descriptor failures in the SACL scope narrow too.
+    for error in [
+        PolicyError::Differs,
+        PolicyError::Malformed,
+        PolicyError::StreamQuery(1),
+    ] {
+        let result = widest(|scope| {
+            if scope == ALL_POLICY {
+                Err(error)
+            } else {
+                Ok(scope)
+            }
+        });
+        assert_eq!(result, Ok(LABEL_POLICY), "{error:?}");
+    }
+}
+
+#[test]
+fn below_the_sacl_only_a_missing_privilege_narrows_and_refusals_never_do() {
+    let denied = widest(|scope| {
+        if scope == LABEL_POLICY {
+            Err(PolicyError::Native(5))
+        } else if scope == ALL_POLICY {
+            Err(PolicyError::Native(PRIVILEGE_NOT_HELD))
+        } else {
+            Ok(scope)
+        }
+    });
+    assert_eq!(
+        denied,
+        Err(PolicyError::Native(5)),
+        "a real error is reported"
+    );
+    let unprivileged = widest(|scope| match scope {
+        BASIC_POLICY => Ok(scope),
+        _ => Err(PolicyError::Native(PRIVILEGE_NOT_HELD)),
+    });
+    assert_eq!(unprivileged, Ok(BASIC_POLICY));
+    for refusal in [PolicyError::ReparsePoint, PolicyError::NamedStreams] {
+        let mut tried = 0;
+        let result: Result<u32, _> = widest(|_| {
+            tried += 1;
+            Err(refusal)
+        });
+        assert_eq!((result, tried), (Err(refusal), 1));
+    }
+    let nothing: Result<u32, _> = widest(|_| Err(PolicyError::Native(PRIVILEGE_NOT_HELD)));
+    assert_eq!(nothing, Err(PolicyError::Native(PRIVILEGE_NOT_HELD)));
 }
