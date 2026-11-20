@@ -9,6 +9,7 @@ mod algorithm_tests;
 mod binary;
 pub(super) mod context;
 pub(in crate::repo) mod encrypted;
+pub(super) mod file_meta;
 mod fold_view;
 mod image_compare;
 mod images;
@@ -125,6 +126,8 @@ pub struct DiffData {
     pub notebook: Option<notebook::NotebookData>,
     /// The patch's file header (`diff --git`, `index`, `---`, `+++`), for partial patches.
     pub header: String,
+    /// Mode and name changes, shown apart from the lines.
+    pub file_meta: file_meta::FileMeta,
     /// Hunks and lines can be staged, unstaged or discarded on their own.
     pub partial: bool,
     pub sops: bool,

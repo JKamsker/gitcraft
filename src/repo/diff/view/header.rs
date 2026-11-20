@@ -248,6 +248,7 @@ impl RepoTab {
                                 |ui, acts| {
                                     self.lock_menu_items(ui, path, rev, acts);
                                     self.storage_menu_items(ui, path, rev, acts);
+                                    self.file_metadata_menu_items(ui, &view.key, acts);
                                 },
                             );
                             let mut source = origin.to_owned();
@@ -270,6 +271,9 @@ impl RepoTab {
                                 .truncate(),
                             )
                             .on_hover_text(source);
+                            if let Some(Ok(data)) = &view.data {
+                                super::super::file_meta::show(ui, &data.file_meta);
+                            }
                         });
                     });
                 });
