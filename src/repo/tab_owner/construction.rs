@@ -117,7 +117,6 @@ impl RepoTab {
             stash_view: None,
             scroll_to: None,
             detail_hash: None,
-            commit_changes: Default::default(),
             detail: None,
             detail_error: None,
             detail_cache: Default::default(),

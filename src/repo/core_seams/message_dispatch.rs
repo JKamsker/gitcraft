@@ -235,7 +235,7 @@ impl RepoTab {
             // Older than the working tree shown (a reload started since came in first).
             Msg::Status(read, _) if read <= self.work_read => {}
             Msg::Status(read, result) => self.status_arrived(read, result, ctx),
-            Msg::Detail(hash, result) => self.detail_arrived(hash, result, ctx),
+            Msg::Detail(hash, result) => self.detail_arrived(hash, result),
             Msg::DetailPrefetched(result) => self.detail_prefetched(result),
             Msg::FilesPrefetched(asked, result) => self.files_prefetched(asked, result, ctx),
             Msg::RebaseCommits {

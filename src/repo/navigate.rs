@@ -79,7 +79,6 @@ impl RepoTab {
     }
 
     pub(super) fn load_detail(&mut self, hash: String, ctx: &egui::Context) {
-        self.commit_changes.cancel_pending();
         // A row of no commit (the changes row, a merge put aside): nothing for git to read.
         if hash.starts_with('\u{0}') {
             return;
@@ -102,7 +101,7 @@ impl RepoTab {
         self.detail_cancel.cancel();
         self.detail_cancel = self.tx.cancel.child();
         if let Some(detail) = self.detail_cache.get(&hash, &self.refs.head) {
-            self.show_detail(detail, ctx);
+            self.show_detail(detail);
             return;
         }
         self.detail_asked = Some(std::time::Instant::now());
@@ -135,11 +134,9 @@ impl RepoTab {
     }
 
     /// The selected commit's detail, read or from the cache.
-    pub(super) fn show_detail(&mut self, detail: git::CommitDetail, ctx: &egui::Context) {
-        let hash = detail.hash.clone();
+    pub(super) fn show_detail(&mut self, detail: git::CommitDetail) {
         self.detail = Some(detail);
         self.fill_reword();
-        self.finish_commit_changes(&hash, ctx);
     }
 
     /// Reads ahead the files of the commits on screen (`rows`, and as many again around them),

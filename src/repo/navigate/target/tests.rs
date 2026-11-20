@@ -124,20 +124,34 @@ fn destinations() -> Vec<Action> {
 }
 
 #[test]
-fn all_primary_destination_intents_retire_only_the_older_restoration() {
+fn all_primary_destination_intents_retire_the_older_restoration() {
     let ctx = egui::Context::default();
     let mut tab = RepoTab::new_deferred("/recording-only/destination-classification".into(), &ctx);
     for (index, action) in destinations().into_iter().enumerate() {
         tab.pending_goto = Some(PendingGoto::Restore("old".into()));
         tab.retire_navigation_restore(&action);
         assert!(tab.pending_goto.is_none(), "destination {index}");
-        tab.pending_goto = Some(PendingGoto::History("new".into()));
-        tab.retire_navigation_restore(&action);
-        assert!(
-            tab.pending_goto
-                .as_ref()
-                .is_some_and(|target| !target.restoring() && target.hash() == "new")
+        // A row, pill, stash or pull request picked directly also retires a paging link;
+        // any other destination leaves it to arrive.
+        let direct = matches!(
+            action,
+            Action::Select(_)
+                | Action::SelectBranchTip(_)
+                | Action::SelectStash(_)
+                | Action::SelectPr(_)
         );
+        for link in [
+            PendingGoto::History("new".into()),
+            PendingGoto::BranchTip("new".into()),
+        ] {
+            tab.pending_goto = Some(link);
+            tab.retire_navigation_restore(&action);
+            assert_eq!(
+                tab.pending_goto.is_none(),
+                direct,
+                "destination {index} kept or dropped the paging link wrongly"
+            );
+        }
     }
 }
 

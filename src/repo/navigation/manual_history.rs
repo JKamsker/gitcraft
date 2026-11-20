@@ -126,7 +126,6 @@ fn manual_case(saved: bool, same_row: bool, first: &str, readiness: Readiness) {
         assert_eq!(tab.current_view(), Some(diff_at(key, Some(&head))));
         act(&mut tab, Action::Navigate(1), &ctx);
         assert!(tab.file_view.is_some());
-        assert!(!tab.commit_changes.follows_history());
     });
 }
 
@@ -165,21 +164,19 @@ fn user_case(saved: bool, by_hash: bool, same_file: bool, readiness: Readiness) 
             Action::Select(tab.index[&head])
         };
         act(&mut tab, action, &ctx);
-        let ready = matches!(readiness, Readiness::Ready | Readiness::Cached);
-        let automatic = by_hash && ready;
-        assert_eq!(
-            tab.diff.as_ref().map(|view| view.key.clone()),
-            automatic.then(|| commit_key(&head, first))
-        );
+        // Neither a row click nor a commit link opens a diff, however ready its detail is.
+        assert!(tab.diff.is_none(), "selecting a commit opened a diff");
+        deliver(&mut tab, &head, first, &ctx);
+        assert!(tab.diff.is_none(), "the commit's detail opened a diff");
+        // Only the explicit file click does, and it stays as the detail arrives.
         let manual = commit_key(&head, FILE);
         act(&mut tab, Action::OpenDiff(manual.clone()), &ctx);
-        // The explicit same-file action toggles a ready automatic diff, but opens
-        // when its first file differs or the detail has not arrived yet.
-        let expected = (!(automatic && same_file)).then_some(manual);
-        assert_eq!(tab.diff.as_ref().map(|view| view.key.clone()), expected);
+        assert_eq!(
+            tab.diff.as_ref().map(|view| view.key.clone()),
+            Some(manual.clone())
+        );
         deliver(&mut tab, &head, first, &ctx);
-        assert_eq!(tab.diff.as_ref().map(|view| view.key.clone()), expected);
-        assert!(!tab.commit_changes.follows_history());
+        assert_eq!(tab.diff.as_ref().map(|view| view.key.clone()), Some(manual));
     });
 }
 
@@ -215,11 +212,9 @@ fn graph_refinement_case(saved: bool, cached: bool) {
         tab.record_view();
         act(&mut tab, Action::SelectHash(base.clone()), &ctx);
         act(&mut tab, Action::SelectHash(head.clone()), &ctx);
-        let forward = cached.then(|| diff_at(commit_key(&head, FILE), Some(&head)));
-        assert_eq!(
-            tab.current_view(),
-            Some(forward.clone().unwrap_or_else(|| graph(Some(&head))))
-        );
+        // A commit link opens no diff, even with its detail cached.
+        let forward = None;
+        assert_eq!(tab.current_view(), Some(graph(Some(&head))));
         act(&mut tab, Action::Navigate(-1), &ctx);
         assert_eq!(tab.selected_hash(), Some(base.clone()));
         act(&mut tab, Action::Navigate(-1), &ctx);

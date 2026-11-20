@@ -81,9 +81,9 @@ pub(crate) enum Action {
     },
     ComparisonNormalPatch,
     SelectHash(String),
-    /// Select a branch's tip commit by hash: details only, never an automatic file diff.
+    /// Select a branch's tip commit by hash: details only, never a file diff.
     SelectBranch(String),
-    /// Follow a backlink directly to changed files and the first file diff.
+    /// Follow a backlink to the commit's details and changed files (never a file diff).
     OpenCommitChanges(String),
     ActivityCommit(String),
     /// Focus a pull request's branch and compare all of its proposed changes.
