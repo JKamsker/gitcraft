@@ -118,11 +118,20 @@ Locally (32 threads, unloaded) one staging test started 38 helpers (0.3-0.7s eac
 24s for the test); three parallel file_comparison runs started 759 helpers, waited
 up to 11.5s for the helper lock and kept every staging test over 60 seconds.
 
-`gitcraft_os::windows_policy` now runs the same protocol in-process (named-stream
-refusal, full scope with the ERROR_PRIVILEGE_NOT_HELD basic retry, canonical
-descriptor bound to its scope, explicit protection on copy, target and source
-verified afterwards). No PowerShell process is started for access metadata outside
-tests. The helper remains the reference: `native_equivalence_tests` check that
-native snapshots are byte-identical to the helper's for inherited, explicitly
-granted and low-integrity-labelled files, that native and helper copies give the
-same policy, and that both refuse named data streams. The 20-second bounds are unchanged.
+`gitcraft_os::windows_policy` now runs the protocol in-process, with two deliberate
+improvements over the helper. Every call goes through one handle opened with
+`FILE_FLAG_OPEN_REPARSE_POINT`, and a link, junction or other reparse point is refused;
+named streams are listed through the same handle (`FileStreamInfo`). Without
+SeSecurityPrivilege the scope narrows to OWNER|GROUP|DACL|LABEL before OWNER|GROUP|DACL,
+so a low-integrity label is captured and copied instead of dropped. The descriptor is
+canonical and bound to the scope captured; copies set explicit DACL protection, SACL
+protection only with the SACL, and are verified on target and source in that scope.
+No PowerShell process is started for access metadata outside tests. The calls are
+synchronous file-system calls without a process deadline; every caller runs on a
+background worker (staging via `spawn_mutation`, standalone via `standalone::submit`)
+and inherits the OS I/O timeouts. The helper remains the reference: the native tests
+check byte-identical snapshots within the helper's scope for inherited, granted, denied,
+labelled and protected (under a widening parent) files, equal copies, a kept label, and
+refusal of named streams and junctions. File symbolic links are checked only where they
+can be created unprivileged; FAT/exFAT volumes need administrator rights to mount and are
+not covered. The 20-second bounds are unchanged.

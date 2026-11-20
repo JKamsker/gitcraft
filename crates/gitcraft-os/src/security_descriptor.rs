@@ -4,6 +4,8 @@
 //! each ACL's size recomputed) after clearing the inheritance status bits the resource
 //! manager recalculates on an otherwise identical apply. ACE bytes are kept as stored.
 //! Pure byte parsing: no OS calls, so it is checked on every platform.
+// Elsewhere only its tests use it.
+#![cfg_attr(not(windows), allow(dead_code))]
 
 /// Longest descriptor a snapshot accepts.
 pub const DESCRIPTOR_LIMIT: usize = 1024 * 1024;

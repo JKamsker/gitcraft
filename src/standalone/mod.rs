@@ -84,7 +84,7 @@ mod localization_tests {
                     vars.extend(variable.captures_iter(line).map(|c| c[1].to_owned()));
                 }
             }
-            assert_eq!(contract.len(), 129);
+            assert_eq!(contract.len(), 135);
             let mut bundle =
                 FluentBundle::new_concurrent(vec![locale.parse().map_err(|e| format!("{e}"))?]);
             bundle.add_builtins().map_err(|e| format!("{e:?}"))?;
