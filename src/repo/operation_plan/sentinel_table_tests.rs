@@ -25,9 +25,8 @@ pub(in crate::repo::operations) struct Sentinel {
     /// whole git step, holding the placeholder. Others: nothing.
     pub sample: &'static [&'static str],
     /// `Plan::decode`'s classification of the sample (see `classify`); empty for no step.
+    /// Never `Git` for a step marker: each decodes to its own typed variant.
     pub decodes: &'static str,
-    /// For a step marker that decodes as `Git`: what handles it before any git runs.
-    pub handled_by: &'static str,
 }
 
 impl Sentinel {
@@ -63,7 +62,6 @@ const fn step(
         persisted,
         sample,
         decodes,
-        handled_by: "",
     }
 }
 
@@ -81,7 +79,6 @@ const fn other(
         persisted: false,
         sample: &[],
         decodes: "",
-        handled_by: "",
     }
 }
 
@@ -149,7 +146,7 @@ pub(in crate::repo::operations) const INVENTORY: &[Sentinel] = &[
         "\0gerrit-review",
         false,
         &[SHA, SHA],
-        "Expectation::FeatureGuard",
+        "Expectation::GerritStack",
     ),
     step(
         "AMEND",
@@ -181,7 +178,7 @@ pub(in crate::repo::operations) const INVENTORY: &[Sentinel] = &[
         "\0fork-destination",
         true,
         &[DESTINATION],
-        "Expectation::FeatureGuard",
+        "Expectation::ForkDestination",
     ),
     step(
         "CHECKOUT_MARK",
@@ -189,7 +186,7 @@ pub(in crate::repo::operations) const INVENTORY: &[Sentinel] = &[
         "\0fork-checkout",
         true,
         &[DESTINATION],
-        "Expectation::FeatureGuard",
+        "Expectation::ForkCheckout",
     ),
     Sentinel {
         role: Role::Placeholder,
@@ -203,18 +200,14 @@ pub(in crate::repo::operations) const INVENTORY: &[Sentinel] = &[
         decodes: "Git",
         ..other("PUSHED_TIP", GUARD, "\0fork-pushed-tip", Role::Placeholder)
     },
-    Sentinel {
-        handled_by: "Execution::step (operation_plan/executor/steps.rs) runs [APPLY, json] \
-                     through tracking::execute before dispatch",
-        ..step(
-            "APPLY",
-            "src/git/repository_tools/tracking.rs",
-            "\0tracking",
-            true,
-            &[r#"{"branch":"topic"}"#],
-            "Git",
-        )
-    },
+    step(
+        "APPLY",
+        "src/git/repository_tools/tracking.rs",
+        "\0tracking",
+        true,
+        &[r#"{"branch":"topic"}"#],
+        "TrackingApply",
+    ),
     other(
         "GHOST_MERGE",
         "src/repo/ghost/plan.rs",

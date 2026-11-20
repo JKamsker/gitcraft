@@ -108,7 +108,10 @@ the allocation when no boot identity is available.
   adds to the branch pull requests go to (main, master or develop) and shows the answer in a
   window. When amending, the message is written from the last commit with what is staged. The tool runs on the repository's machine (here,
   in WSL or over SSH) with its own sign-in, the prompt on its input: gitcraft keeps no API key.
-  Off until you pick a tool; the tools installed there are found for you. The diff sent is cut
+  Off until you pick a tool; the tools installed there are found for you, without running them.
+  GitHub Copilot counts as found when `gh` and the Copilot CLI are both there (`copilot` on the
+  PATH, or the copy `gh copilot` downloads); this assumes gh 2.86 or newer, whose built-in
+  `copilot` command runs it. The diff sent is cut
   to a size you set (64 KB at first), each file getting a fair share, lock files and what didn't
   fit named with their line counts; the prompt follows the repository's style (Conventional
   Commits when its history uses them) and can be edited. Cancel stops the tool, and one that

@@ -186,8 +186,15 @@ impl Destination {
     }
 }
 const MARK: &str = "\0fork-destination";
-pub(in crate::repo) fn is_guard(step: &[String]) -> bool {
-    matches!(step, [mark, _] if mark == MARK || mark == CHECKOUT_MARK)
+/// The fork guard `step` starts with, whatever follows its marker: whether it is a
+/// checkout's (`CHECKOUT_MARK`) rather than a fork action's destination (`MARK`), and the
+/// operands after the marker. A well-formed guard has one, its JSON. `None` for other steps.
+pub(in crate::repo) fn guard_of(step: &[String]) -> Option<(bool, &[String])> {
+    match step.split_first() {
+        Some((mark, operands)) if mark == MARK => Some((false, operands)),
+        Some((mark, operands)) if mark == CHECKOUT_MARK => Some((true, operands)),
+        _ => None,
+    }
 }
 /// Rechecked before every real step, including immediately before a force push. These
 /// checks also survive retry and persisted undo/redo; no Git command receives the marker.
