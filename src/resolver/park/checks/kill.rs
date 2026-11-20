@@ -106,7 +106,11 @@ pub(super) fn boundary(at: &At) -> (usize, String) {
         .iter()
         .enumerate()
         .filter(|(_, l)| l.starts_with(at.prefix));
-    let found = if at.last { hits.next_back() } else { hits.next() };
+    let found = if at.last {
+        hits.next_back()
+    } else {
+        hits.next()
+    };
     let (n, label) = found.unwrap_or_else(|| panic!("{} has no boundary {}", at.action, at.prefix));
     (n + 1, label.clone())
 }
