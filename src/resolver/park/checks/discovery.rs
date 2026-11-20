@@ -84,3 +84,45 @@ fn discovery_reports_corrupt_missing_mismatched_and_duplicate_manifests() {
     assert_eq!(list(&f.0).unwrap(), vec![p]);
     f.proof();
 }
+
+/// Gap G2: a manifest torn before the Archived receipt (written in place by an older version)
+/// is an incomplete reservation; it must not hide the repository's other archives.
+#[test]
+fn a_torn_manifest_while_archiving_hides_no_other_archive() {
+    let f = Fixture::new();
+    let p = f.park();
+    let torn = folder(&f.0, "torn-id").unwrap();
+    std::fs::create_dir(&torn).unwrap();
+    journal::record(&torn, journal::Phase::Archiving).unwrap();
+    let bytes = br#"{"id":"torn-id","worktree":"#;
+    std::fs::write(torn.join("parked.json"), bytes).unwrap();
+    effects::NOTES.with(|n| n.borrow_mut().clear());
+    for _ in 0..2 {
+        assert_eq!(list(&f.0).unwrap(), vec![p.clone()]);
+    }
+    let notes = effects::NOTES.with(|n| n.borrow().clone());
+    assert!(
+        notes
+            .iter()
+            .any(|n| n.contains("Incomplete recovery reservation")),
+        "{notes:?}"
+    );
+    assert_eq!(std::fs::read(torn.join("parked.json")).unwrap(), bytes);
+    // Once the worktree may have been cleared, or with no receipts at all (a legacy
+    // archive), an unreadable manifest is corruption and fails closed.
+    journal::record(&torn, journal::Phase::Archived).unwrap();
+    assert!(
+        list(&f.0)
+            .unwrap_err()
+            .contains("Invalid recovery manifest")
+    );
+    std::fs::remove_dir_all(torn.join("journal-v1")).unwrap();
+    assert!(
+        list(&f.0)
+            .unwrap_err()
+            .contains("Invalid recovery manifest")
+    );
+    std::fs::remove_dir_all(&torn).unwrap();
+    assert_eq!(list(&f.0).unwrap(), vec![p]);
+    f.proof();
+}

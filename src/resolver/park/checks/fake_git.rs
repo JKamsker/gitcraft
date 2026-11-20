@@ -1,9 +1,25 @@
 use std::collections::BTreeMap;
 use std::path::Path;
-static REFS: std::sync::Mutex<BTreeMap<std::path::PathBuf, BTreeMap<String, String>>> =
-    std::sync::Mutex::new(BTreeMap::new());
+/// Serializes this process's ref updates. The refs live in a file of the fixture's own
+/// `.git`, like Git's, so a restarted process (the kill tests' parent) sees what a killed
+/// child wrote. Each update is written before the call returns, so it survives the kill.
+static REFS: std::sync::Mutex<()> = std::sync::Mutex::new(());
 fn with_refs<T>(repo: &Path, f: impl FnOnce(&mut BTreeMap<String, String>) -> T) -> T {
-    f(REFS.lock().unwrap().entry(repo.to_path_buf()).or_default())
+    let _guard = REFS
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner);
+    let path = repo.join(".git/fake-refs.json");
+    let mut refs: BTreeMap<String, String> = match std::fs::read(&path) {
+        Ok(bytes) => serde_json::from_slice(&bytes).unwrap(),
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => BTreeMap::new(),
+        Err(e) => panic!("fake refs {}: {e}", path.display()),
+    };
+    let before = refs.clone();
+    let value = f(&mut refs);
+    if refs != before {
+        std::fs::write(&path, serde_json::to_vec(&refs).unwrap()).unwrap();
+    }
+    value
 }
 #[derive(Default)]
 pub struct Call {

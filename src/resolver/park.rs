@@ -441,3 +441,11 @@ mod recording_discovery;
 #[cfg(recovery_recording)]
 #[path = "park/checks/readonly.rs"]
 mod recording_readonly;
+
+#[cfg(recovery_recording)]
+#[path = "park/checks/kill.rs"]
+mod recording_kill;
+
+#[cfg(recovery_recording)]
+#[path = "park/checks/kill_cases.rs"]
+mod recording_kill_cases;

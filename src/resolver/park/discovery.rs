@@ -90,8 +90,22 @@ pub(super) fn manifest(repo: &Path, id: &str) -> Result<Option<Parked>, String> 
         }
         Err(e) => return Err(format!("Read {}: {e}", path.display())),
     };
-    let parked: Parked = serde_json::from_slice(&bytes)
-        .map_err(|e| format!("Invalid recovery manifest {}: {e}", path.display()))?;
+    let parked: Parked = match serde_json::from_slice(&bytes) {
+        Ok(parked) => parked,
+        // While the last receipt is Archiving the worktree was never cleared, so an
+        // unreadable manifest (torn by a version that wrote it in place) is an incomplete
+        // reservation, not an archive: it must not hide every other archive of the
+        // repository. It stays on disk, untouched. Without receipts (a legacy archive, whose
+        // worktree may have been cleared) or past Archiving it is corruption: fail closed.
+        Err(e) if journal::latest(&dir)? == Some(journal::Phase::Archiving) => {
+            effects::note(&format!(
+                "Incomplete recovery reservation {} (unreadable manifest: {e})",
+                dir.display()
+            ));
+            return Ok(None);
+        }
+        Err(e) => return Err(format!("Invalid recovery manifest {}: {e}", path.display())),
+    };
     if parked.id != id {
         return Err(format!("Recovery manifest identity mismatch: {id}"));
     }
