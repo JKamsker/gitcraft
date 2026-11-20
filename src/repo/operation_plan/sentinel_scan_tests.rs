@@ -105,8 +105,14 @@ fn past_item(lines: &[&str], at: usize) -> usize {
     if item.ends_with([';', ',', '}']) {
         return next + 1;
     }
-    // Otherwise rustfmt closes it at the attribute's indentation: `}`, `];` or `);`.
-    let closes = |l: &&str| indentation(l) == indent && l.trim_start().starts_with(['}', ']', ')']);
+    // Otherwise rustfmt closes it at the attribute's indentation: `}`, `];` or `);`. A wrapped
+    // signature's `) -> T {` starts the same way but opens the body, so it does not close.
+    let closes = |l: &&str| {
+        let code = l.trim();
+        indentation(l) == indent
+            && code.starts_with(['}', ']', ')'])
+            && code.ends_with(['}', ';', ','])
+    };
     lines[next..]
         .iter()
         .position(closes)
@@ -242,4 +248,23 @@ const PAST_TABLE: &str = "\0past-table";
     assert!(scan_text("src/x/tests.rs", source).is_empty());
     assert!(scan_text("src/x_tests/a.rs", source).is_empty());
     assert!(!scan_text("src/insights/ci_path/test_history.rs", source).is_empty());
+}
+
+#[test]
+fn a_wrapped_test_signature_keeps_its_body_test_only() {
+    let source = r#"
+#[cfg(test)]
+fn wrapped(
+    value: u8,
+) -> u8 {
+    let _ = "\0in-body";
+    value
+}
+const AFTER: &str = "\0after";
+"#;
+    let found: Vec<_> = scan_text("src/x.rs", source)
+        .into_iter()
+        .map(|f| (f.line, f.value))
+        .collect();
+    assert_eq!(found, [(9, "\0after".to_owned())]);
 }
