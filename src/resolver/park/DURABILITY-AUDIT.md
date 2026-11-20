@@ -19,17 +19,17 @@ slice.
 | `atomic_write(path, bytes)` | `journal/receipts.rs` | Writes `path.pending` (create, truncate), `sync_all`, renames it over `path`, then `sync_dir(parent)`. Boundaries: `atomic-temp-synced`, `atomic-renamed`, `atomic-parent-synced`. |
 | `record(dir, phase)` | `journal/receipts.rs` | Reads every receipt first (`latest`), creates `journal-v1/` if needed, `sync_ancestors(journal-v1)`, then `atomic_write(journal-v1/<n:08>.json)`. Receipts are append-only. |
 | `latest(dir)` | `journal/receipts.rs` | Reads receipts in name order. Only `*.json` counts, so a `.pending` temp file is never a receipt. A torn **final** version-1 receipt is copied to `.torn` and replaced with `Uncertain`. Any other unreadable receipt, or an unknown version, is an error. |
-| `sync_dir(dir)` | `journal.rs` → `crate::dir_sync::sync` | Flushes a directory's entries. Unix: `fsync` on a read-only fd. Windows (since this slice): `FlushFileBuffers` on a directory handle opened with `FILE_FLAG_BACKUP_SEMANTICS` and `FILE_ADD_FILE` access, or `FILE_ADD_SUBDIRECTORY` if that is denied. Before this slice it did nothing on Windows. |
-| `sync_ancestors(path)` | `journal.rs` | `sync_dir` on `path` and then each parent up to the filesystem root. Boundary `directory-synced` after each one. On Windows the climb stops at the first ancestor (never `path` itself) that cannot be opened for flushing. One reason is access denied for both entry-adding rights, which means this process cannot have created anything there. The other is `ERROR_SHARING_VIOLATION`: another process holds the directory without `FILE_SHARE_WRITE`. This was observed on `%LOCALAPPDATA%` during a harness run. **[gap G8]** If that ancestor is one gitcraft created (`gitcraft/`, `parked/`, `parked-recovery/<id>/`), every later receipt retries its entry. While another process keeps holding that directory, the entry stays unflushed. Retrying a few times, or failing when the held directory is inside the store, would close this. |
+| `sync_dir(dir)` | `journal/dirs.rs` → `crate::dir_sync::sync` | Flushes a directory's entries. Unix: `fsync` on a read-only fd. Windows (since this slice): `FlushFileBuffers` on a directory handle opened with `FILE_FLAG_BACKUP_SEMANTICS` and `FILE_ADD_FILE` access, or `FILE_ADD_SUBDIRECTORY` if that is denied. Before this slice it did nothing on Windows. The outcomes are as follows. If another process holds the directory without write sharing (`ERROR_SHARING_VIOLATION`), the open is tried 5 times, pausing 20, 40, 60 and 80 ms, then the call fails. Access denial is never retried. If the open succeeds but the flush answers error 1, 50, 87 or 120, the result is `Flushed::Unsupported`: the filesystem does not implement directory flushes. That result is skipped with a diagnostic note, which `effects::note` keeps for the test and recording harnesses; production has no log. Any other flush error, including `PermissionDenied` from the flush itself, is a failure. |
+| `sync_ancestors(path)` | `journal/dirs.rs` | `sync_dir` on `path` and then each parent up to the filesystem root. Parents are tried once, with no retry. Boundary `directory-synced` after each one. On Windows the climb stops at the first ancestor (never `path` itself) whose **open** fails. One reason is access denied for both entry-adding rights, which means this process cannot have created anything there. The other is `ERROR_SHARING_VIOLATION`: another process holds the directory without `FILE_SHARE_WRITE`. This was observed on `%LOCALAPPDATA%` during a harness run. A flush that was opened and then refused is never skipped. **[gap G8]** If the stopping ancestor is one gitcraft created (`gitcraft/`, `parked/`, `parked-recovery/<id>/`), every later receipt retries its entry. While another process keeps holding that directory, the entry stays unflushed. |
 | `sync_existing` / `sync_file` | `journal.rs` | Opens an existing file without truncating it (write access on Windows, because `FlushFileBuffers` needs it) and calls `sync_all`. |
 | `sync_tree(dir)` | `journal.rs` | Flushes every regular file under `dir` unless `durability::proven` shows it is already flushed and unchanged. Then `sync_dir` on every directory, children before parents. Errors on a non-regular entry. |
 | `durability::copy` | `durability.rs` | `fs::copy` to a new owned output, `sync_all` (on Windows through a writable handle, after clearing and then restoring the output's READONLY bit), then `remember`: a content, identity and mtime stamp written with `atomic_write` under `durable-v1/`, plus `sync_ancestors`. |
 | `publication::publish` | `publication.rs` | Makes a fresh `.gitcraft-restore-<n>/` directory next to the live file, copies the bytes there with `durability::copy`, then `sync_dir(staging)` and `sync_dir(parent)`. Re-checks the target, renames the copy over it, then `sync_dir(parent)`, `sync_dir(staging)`, `remove_dir(staging)`, `sync_dir(parent)`. |
 
-All renames use `std::fs::rename`. On Windows that is
-`MoveFileExW(MOVEFILE_REPLACE_EXISTING)`, falling back to `SetFileInformationByHandle(
-FileRenameInfoEx, POSIX_SEMANTICS)` on access denial **[code: std
-`sys/fs/windows.rs` of the local 1.99.1 toolchain; older std versions may differ]**. No rename asks for write-through. The rename itself is
+All renames use `std::fs::rename`. **[observed in the local 1.99.1 toolchain's
+std source (`sys/fs/windows.rs`); toolchain-specific]** There it calls
+`MoveFileExW(MOVEFILE_REPLACE_EXISTING)` first, and on access denial falls back to `SetFileInformationByHandle(FileRenameInfoEx, POSIX_SEMANTICS)`.
+Other std versions may order these differently, and newer ones may try the POSIX-semantics rename first. Nothing here depends on the order. No rename asks for write-through. The rename itself is
 not flushed. It becomes durable through the `sync_dir` calls that follow it.
 
 ## Park (`park::park`)
@@ -133,6 +133,13 @@ Restart in `bring_back`, when `latest` is `Restoring`, `Restored`, `Cleanup` or
   (`journal::sync_ancestors_of`). The guarantee is the same: every directory above a live
   file is flushed before `Restored` is recorded. The recording harness now sees fewer
   `directory-synced` boundaries.
+- **Why `sync_live` still flushes every tracked directory:** `sync_live` cannot know which
+  directories changed. Git's `checkout` and `read-tree` create and rename files anywhere
+  between the current branch, `HEAD` and the snapshot, and their changes are not recorded.
+  On restart, `sync_live` runs again with no record of which steps already ran. The copy
+  plan lists only gitcraft's own writes. Restricting the flush to the `diff-tree` paths
+  plus the plan entries would miss directories that Git's branch switch changed. So each
+  distinct directory is flushed once instead.
 
 ## Cleanup (`journal::retire` / `retire_paths`) and drop (`park::drop_to_branch`)
 
@@ -226,7 +233,8 @@ restart.
   on this machine failed. The 2 runs whose logs were kept show that some other process held
   `C:\Users\Jonas\AppData\Local` that way, and the opens failed with
   `ERROR_SHARING_VIOLATION`. The
-  directory being flushed is never skipped. When another process holds it that way, the
+  directory being flushed is never skipped. When another process still holds it after the
+  open has been tried 5 times (about 0.2 s), the
   operation fails and keeps the archive. **[believed, not proven]** A directory flush writes out the
   directory's index and the NTFS log up to the rename's records. This is the guarantee
   that renames depend on. **Rename write-through:** `MOVEFILE_WRITE_THROUGH` affects only a
@@ -236,9 +244,20 @@ restart.
   nothing, and std cannot set it without `unsafe`. So the code relies on NTFS's logged
   rename plus the directory flushes that follow it. The Windows policy "Turn off Windows
   write-cache buffer flushing" voids every guarantee here.
-- **ReFS, FAT32, exFAT, SMB shares:** **untested.** If a filesystem refuses the directory
-  flush, the operation now fails with the error and keeps the archive. Before this slice
-  the flush was silently skipped. FAT and exFAT do not journal renames.
+- **SMB shares and WSL `\\wsl$` (9P):** **[observed, Windows 11 26200]** On
+  `\\localhost\D$\…` and on `\\wsl$\<distro>\tmp` (also `\\wsl.localhost`), files write,
+  rename and flush, and the directory opens with `FILE_ADD_FILE`. But the directory's
+  `FlushFileBuffers` answers `ERROR_INVALID_FUNCTION` (1). That result is
+  `Flushed::Unsupported`: noted, then treated as done. Parking works there, but nothing
+  makes those directory entries durable. That depends on the server: the SMB server's
+  NTFS, or the Linux side of 9P. Run the ignored test
+  `dir_sync::outcome_tests::a_real_smb_or_9p_directory_reports_unsupported_flush` with
+  `GITCRAFT_TEST_UNFLUSHABLE_DIR` to repeat this.
+- **ReFS, FAT32, exFAT, cloud-filter folders:** **untested.** Mounting a FAT or exFAT VHD
+  needs admin rights, which this run did not have. If such a filesystem answers one of the
+  "not implemented" codes (1, 50, 87, 120), the flush is skipped with a note, as on SMB.
+  Any other error fails the operation and keeps the archive. FAT and exFAT do not journal
+  renames.
 - **APFS (macOS):** std's `sync_all` uses `fcntl(F_FULLFSYNC)` **[code: std
   `sys/fs/unix.rs`]**, which also flushes the drive cache. A plain `fsync` would not. The
   same call is made on directory descriptors. **[believed; macOS not run for this
@@ -261,7 +280,9 @@ restart.
   above assumes the worst case, any subset of unflushed writes, only for the items marked.
 - How Git itself behaves when interrupted (checkout, read-tree, reset, update-ref) beyond
   its documented `core.fsync` defaults.
-- ReFS, FAT, exFAT, network filesystems, WSL `drvfs` (`/mnt/c`) and macOS.
+- ReFS, FAT, exFAT, cloud-filter folders, WSL `drvfs` (`/mnt/c`) and macOS. On SMB and
+  `\\wsl$` the directory flush is observed to be unsupported, so directory durability there
+  depends only on the server.
 
 Repeating the Windows observations: run the `dir_sync` and `ancestor_tests` unit tests (see
 the PR) unelevated on Windows. The ancestor test walks up from `%TEMP%`, so it reaches

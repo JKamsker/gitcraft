@@ -346,5 +346,13 @@
     "reason": "#205: new platform helper gitcraft::dir_sync (std-only directory flush, Windows FlushFileBuffers included) exports sync and unopenable_for_flush, both used by the conflicts domain (resolver parking journal and agent run record) instead of two diverging copies. 113 -> 115.",
     "owner": "@JKamsker",
     "remediation": "Narrow the listed exported-but-unused runtime items (diagnostics, network, portable) and ratchet the budget."
+  },
+  "205-runtime-dir-sync-outcomes-117": {
+    "changes": [
+      "budget/runtime/exported=117"
+    ],
+    "reason": "#205 review: gitcraft::dir_sync now returns a typed outcome (Flushed::Done/Unsupported, Failure with open/flush stage) and offers sync_once beside the retrying sync, replacing unopenable_for_flush. Callers in the conflicts domain need the types to skip unsupported filesystems (SMB, 9P) and to tell a failed open from a refused flush. 115 -> 117.",
+    "owner": "@JKamsker",
+    "remediation": "Narrow the listed exported-but-unused runtime items (diagnostics, network, portable) and ratchet the budget."
   }
 }

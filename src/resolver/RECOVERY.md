@@ -106,16 +106,20 @@ not power-loss or process-kill evidence.
 Directory flushes run on Unix (`fsync` of a read-only descriptor) and on Windows
 (`FlushFileBuffers` on a directory handle with `FILE_ADD_FILE`, or else
 `FILE_ADD_SUBDIRECTORY`, access; a read-only handle is refused), via `src/dir_sync.rs`.
-Every flush failure is returned, so a filesystem that cannot flush a directory fails the
+If another process holds the directory without write sharing, its open is retried 5 times
+(about 0.2 s); access denial is never retried. A filesystem that opens a directory but does
+not implement its flush (error 1, 50, 87 or 120; observed as error 1 on SMB shares and
+`\\wsl$`) is skipped with a diagnostic note. Directory durability there rests on the server.
+Any other flush failure, including a refused flush after a successful open, fails the
 operation and keeps the archive. Climbing ancestors on Windows stops at the first one that
 cannot be opened for flushing: this process may not add entries to it (e.g. `C:\Users`),
 or another process holds it without write sharing (seen on `%LOCALAPPDATA%`). An
 archive directory itself is never skipped. A live worktree directory that this process may
-not add entries to is skipped on Windows, because neither the restore nor Git could have
-written there. Renames do not request write-through:
+not add entries to is not flushed on Windows, because neither the restore nor Git could have
+written there, and its parent still is. Renames do not request write-through:
 `MOVEFILE_WRITE_THROUGH` only affects cross-volume copy moves and all renames here stay on
 one volume, so NTFS's logged rename plus the following directory flushes is what is relied
-on. Flush success is observed on NTFS; its on-disk effect, ReFS/FAT/SMB and power loss are
+on. Flush success is observed on NTFS; its on-disk effect, ReFS/FAT/exFAT and power loss are
 unvalidated. Git's default `core.fsync` does not harden loose objects or refs, so a snapshot
 ref can outlive its objects after power loss even though `raw/`, `index` and metadata are
 durable. Durability also depends on the device honoring flushes. See

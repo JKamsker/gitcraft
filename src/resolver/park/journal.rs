@@ -20,12 +20,9 @@ struct Receipt {
     phase: Phase,
 }
 
-/// Flushes `dir`'s entries on every platform: Windows too (`FlushFileBuffers` on a
-/// directory handle, see `crate::dir_sync`). Renames do not request write-through; a
-/// rename is durable once the directories it touched are flushed by this.
-pub(super) fn sync_dir(dir: &Path) -> Result<(), String> {
-    crate::dir_sync::sync(dir).map_err(|e| format!("sync {}: {e}", dir.display()))
-}
+#[path = "journal/dirs.rs"]
+mod dirs;
+pub(super) use dirs::{sync_ancestors, sync_ancestors_of, sync_dir};
 
 // FlushFileBuffers requires GENERIC_WRITE on Windows, including for an existing
 // archive or live file. Unix permits fsync on a read-only descriptor. Never create,
@@ -89,70 +86,6 @@ fn sync_subtree(dir: &Path, root: &Path) -> Result<(), String> {
 #[path = "journal/receipts.rs"]
 mod receipts;
 pub(super) use receipts::{atomic_write, latest, record};
-
-/// Persist reachability, including ancestors created by repo_file/reserve.
-pub(super) fn sync_ancestors(path: &Path) -> Result<(), String> {
-    climb_ancestors(path, &mut Default::default(), false, crate::dir_sync::sync)
-}
-
-/// [`sync_ancestors`] of each live directory (children first), flushing a shared ancestor
-/// once rather than once per file below it (each flush is a real `FlushFileBuffers` call on
-/// Windows). Unlike an archive directory, a live directory may be one this process may not
-/// add entries to (a deny ACL on a tracked folder): then neither this restore nor Git running
-/// as this process created or renamed anything in it, so it is skipped on Windows. A live
-/// directory held by another process without write sharing still fails the restore.
-pub(super) fn sync_ancestors_of<'a>(
-    dirs: impl IntoIterator<Item = &'a Path>,
-) -> Result<(), String> {
-    sync_each(dirs, crate::dir_sync::sync)
-}
-
-fn sync_each<'a>(
-    dirs: impl IntoIterator<Item = &'a Path>,
-    mut sync: impl FnMut(&Path) -> std::io::Result<()>,
-) -> Result<(), String> {
-    let mut done = std::collections::BTreeSet::new();
-    for dir in dirs {
-        climb_ancestors(dir, &mut done, true, &mut sync)?;
-    }
-    Ok(())
-}
-
-/// `path` itself must flush, unless `live` and this process may not add entries to it (see
-/// [`sync_ancestors_of`]). On Windows the climb stops at the first ancestor that cannot be
-/// opened for flushing: one this process may not add entries to (e.g. `C:\Users` for a
-/// standard user), which it cannot have created anything in, or one another process holds
-/// without write sharing (e.g. `%LOCALAPPDATA%`). Above the archive store such ancestors
-/// predate gitcraft. Inside it, a directory gitcraft created is retried by every later
-/// receipt's climb, but stays unflushed for as long as another process keeps holding it.
-/// Unix flushes through read-only descriptors and propagates every failure. A directory
-/// in `done` was flushed already, and the climb from it already ran.
-fn climb_ancestors(
-    path: &Path,
-    done: &mut std::collections::BTreeSet<PathBuf>,
-    live: bool,
-    mut sync: impl FnMut(&Path) -> std::io::Result<()>,
-) -> Result<(), String> {
-    let denied =
-        |e: &std::io::Error| cfg!(windows) && e.kind() == std::io::ErrorKind::PermissionDenied;
-    let mut at = Some(path);
-    while let Some(dir) = at {
-        if done.contains(dir) {
-            break;
-        }
-        match sync(dir) {
-            Ok(()) => {}
-            // Not remembered: should it be another call's own `path`, it must flush then.
-            Err(e) if dir != path && crate::dir_sync::unopenable_for_flush(&e) => break,
-            Err(e) if dir == path && live && denied(&e) => break,
-            Err(e) => return Err(format!("sync {}: {e}", dir.display())),
-        }
-        done.insert(dir.to_path_buf());
-        super::effects::boundary("directory-synced")?;
-        at = dir.parent();
-    }
-    Ok(())
-}
 
 /// Finish only archive movement after a proven restore. Repeated calls are harmless.
 /// Raw files, original index and metadata are retained even after successful restoration.
@@ -264,11 +197,3 @@ pub(super) fn recover_locked(repo: &Path, parked: &Parked) -> Result<bool, Strin
 #[cfg(test)]
 #[path = "journal/tests.rs"]
 mod tests;
-
-#[cfg(test)]
-#[path = "journal/ancestor_tests.rs"]
-mod ancestor_tests;
-
-#[cfg(test)]
-#[path = "journal/live_dir_tests.rs"]
-mod live_dir_tests;

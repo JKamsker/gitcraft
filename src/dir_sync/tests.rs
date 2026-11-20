@@ -19,16 +19,25 @@ impl Drop for Fixture {
     }
 }
 
+/// A local NTFS/ext4 temporary directory must really flush: anything else fails the test.
+pub(super) fn done(flushed: Result<Flushed, Failure>) -> io::Result<()> {
+    match flushed {
+        Ok(Flushed::Done) => Ok(()),
+        Ok(Flushed::Unsupported(e)) => Err(io::Error::other(format!("unsupported: {e}"))),
+        Err(failure) => Err(io::Error::other(failure.to_string())),
+    }
+}
+
 #[test]
 fn flushes_a_real_directory_after_a_rename_without_changing_entries() -> io::Result<()> {
     let fixture = Fixture::new("rename")?;
     let temp = fixture.0.join("receipt.pending");
     std::fs::write(&temp, b"\xff\0receipt\r\n")?;
     std::fs::rename(&temp, fixture.0.join("receipt.json"))?;
-    sync(&fixture.0)?;
+    done(sync(&fixture.0))?;
     // Repeated flushes are harmless, and the handle shares deletion: the directory
     // can still be renamed and removed right after.
-    sync(&fixture.0)?;
+    done(sync_once(&fixture.0))?;
     let moved = fixture.0.with_extension("moved");
     std::fs::rename(&fixture.0, &moved)?;
     let names: Vec<_> = std::fs::read_dir(&moved)?
@@ -50,22 +59,10 @@ fn missing_directory_is_an_error_not_a_silent_success() -> io::Result<()> {
     let error = sync(&missing)
         .err()
         .ok_or_else(|| io::Error::other("flushed nothing"))?;
-    assert_eq!(error.kind(), io::ErrorKind::NotFound, "{error}");
-    assert!(!unopenable_for_flush(&error));
+    assert_eq!(error.error.kind(), io::ErrorKind::NotFound, "{error}");
+    assert!(!error.opened && !error.unopenable() && !error.denied());
     assert!(!missing.exists(), "a flush never creates its directory");
     Ok(())
-}
-
-#[test]
-fn only_windows_denial_or_sharing_violation_means_unopenable_for_flush() {
-    let denied = io::Error::from(io::ErrorKind::PermissionDenied);
-    assert_eq!(unopenable_for_flush(&denied), cfg!(windows));
-    // ERROR_SHARING_VIOLATION on Windows (EPIPE on Unix, never skipped there).
-    let shared = io::Error::from_raw_os_error(32);
-    assert_eq!(unopenable_for_flush(&shared), cfg!(windows));
-    for other in [io::ErrorKind::NotFound, io::ErrorKind::Other] {
-        assert!(!unopenable_for_flush(&io::Error::from(other)));
-    }
 }
 
 /// Another process holding a directory without write sharing blocks its flush open.
@@ -82,8 +79,8 @@ fn windows_reports_a_directory_held_without_write_sharing_as_unopenable() -> io:
     let error = sync(&fixture.0)
         .err()
         .ok_or_else(|| io::Error::other("flushed a directory held without write sharing"))?;
-    assert_eq!(error.raw_os_error(), Some(32), "{error}");
-    assert!(unopenable_for_flush(&error));
+    assert_eq!(error.error.raw_os_error(), Some(32), "{error}");
+    assert!(error.unopenable() && !error.denied());
     Ok(())
 }
 
@@ -102,7 +99,7 @@ fn windows_refuses_to_flush_a_read_only_directory_handle() -> io::Result<()> {
         .err()
         .ok_or_else(|| io::Error::other("a read-only directory handle flushed"))?;
     assert_eq!(error.kind(), io::ErrorKind::PermissionDenied, "{error}");
-    sync(&fixture.0)
+    done(sync(&fixture.0))
 }
 
 /// The READONLY attribute does not stop adding entries to a Windows directory, nor its flush.
@@ -114,7 +111,7 @@ fn windows_flushes_a_directory_marked_read_only() -> io::Result<()> {
     let mut permissions = std::fs::metadata(&fixture.0)?.permissions();
     permissions.set_readonly(true);
     std::fs::set_permissions(&fixture.0, permissions.clone())?;
-    let flushed = sync(&fixture.0);
+    let flushed = done(sync(&fixture.0));
     permissions.set_readonly(false);
     std::fs::set_permissions(&fixture.0, permissions)?;
     flushed

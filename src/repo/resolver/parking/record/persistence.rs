@@ -3,9 +3,14 @@
 use super::*;
 use std::io::Write as _;
 
-/// Flushes `dir`'s entries on every platform, Windows included (`crate::dir_sync`).
+/// Flushes `dir`'s entries on every platform, Windows included (`crate::dir_sync`). A
+/// filesystem that does not implement directory flushes (SMB, `\\wsl$`) is accepted as is:
+/// this record has no diagnostic log, and failing would make keeping runs impossible there.
 fn sync_dir(dir: &Path) -> Result<(), String> {
-    crate::dir_sync::sync(dir).map_err(|e| format!("couldn't sync {}: {e}", dir.display()))
+    match crate::dir_sync::sync(dir) {
+        Ok(crate::dir_sync::Flushed::Done | crate::dir_sync::Flushed::Unsupported(_)) => Ok(()),
+        Err(failure) => Err(format!("couldn't sync {}: {failure}", dir.display())),
+    }
 }
 fn sync_tree(dir: &Path) -> Result<(), String> {
     for entry in std::fs::read_dir(dir).map_err(|e| e.to_string())? {
