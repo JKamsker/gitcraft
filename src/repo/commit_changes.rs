@@ -21,11 +21,7 @@ impl RepoTab {
             self.diff = None;
         }
         self.select(row, ctx);
-        crate::settings::Settings::set_show_detail(ctx, true);
-        // Give details priority just as an explicit reopen of the folded sidebar does.
-        ctx.data_mut(|data| {
-            data.insert_temp(egui::Id::new("repo_detail").with("reopen-small"), true);
-        });
+        reveal_details(ctx);
         self.hint_after_select(row, ctx);
     }
 
@@ -48,8 +44,17 @@ impl RepoTab {
         self.compare = None;
         // Works outside a filtered/bounded graph, without loading the entire history.
         self.activity_commit(hash, ctx);
-        crate::settings::Settings::set_show_detail(ctx, true);
+        reveal_details(ctx);
     }
+}
+
+/// Shows the detail panel, with priority over the graph even where it does not fit, just as
+/// an explicit reopen of the folded sidebar does.
+fn reveal_details(ctx: &egui::Context) {
+    crate::settings::Settings::set_show_detail(ctx, true);
+    ctx.data_mut(|data| {
+        data.insert_temp(egui::Id::new("repo_detail").with("reopen-small"), true);
+    });
 }
 
 #[cfg(test)]

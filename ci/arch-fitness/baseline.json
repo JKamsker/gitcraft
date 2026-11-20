@@ -2417,13 +2417,6 @@
     },
     {
       "domain": "diff",
-      "field": "commit_changes",
-      "reason": "Newly visible after #215 conservative receiver detection: set_diff_beside_graph stops automatic commit following when the layout is explicitly changed; existing real cross-feature mutation previously hidden by unrelated stop methods.",
-      "owner": "@JKamsker",
-      "remediation": "Route this coordination through the owning domain."
-    },
-    {
-      "domain": "diff",
       "field": "conflict",
       "reason": "Legacy direct mutation at adoption (#209): diff changes RepoTab.conflict (owned by conflicts) at 1 sites, e.g. src/repo/file_view/line_history.rs:32 (write).",
       "owner": "@JKamsker",
@@ -3816,11 +3809,11 @@
   "budgets": {
     "agents": {
       "domains": 18,
-      "exported": 258
+      "exported": 244
     },
     "app": {
       "domains": 17,
-      "exported": 107
+      "exported": 89
     },
     "bisect": {
       "domains": 10,
@@ -3828,11 +3821,11 @@
     },
     "changes": {
       "domains": 14,
-      "exported": 116
+      "exported": 99
     },
     "conflicts": {
       "domains": 11,
-      "exported": 113
+      "exported": 108
     },
     "dev": {
       "domains": 0,
@@ -3852,7 +3845,7 @@
     },
     "git": {
       "domains": 12,
-      "exported": 1025
+      "exported": 1002
     },
     "graph": {
       "domains": 18,
@@ -3860,11 +3853,11 @@
     },
     "guidance": {
       "domains": 8,
-      "exported": 48
+      "exported": 47
     },
     "insights": {
       "domains": 15,
-      "exported": 339
+      "exported": 337
     },
     "os": {
       "domains": 4,
@@ -3872,33 +3865,33 @@
     },
     "release": {
       "domains": 9,
-      "exported": 83
+      "exported": 71
     },
     "remote": {
       "domains": 6,
-      "exported": 127
+      "exported": 115
     },
     "repo-core": {
       "domains": 24,
-      "symbols": 614,
-      "exported": 188
+      "symbols": 613,
+      "exported": 179
     },
     "review": {
       "domains": 15,
-      "exported": 117
+      "exported": 112
     },
     "rewrite": {
       "domains": 14,
-      "exported": 130
+      "exported": 119
     },
     "runtime": {
       "domains": 5,
-      "exported": 116
+      "exported": 113
     },
     "settings": {
       "domains": 15,
       "symbols": 181,
-      "exported": 67
+      "exported": 63
     },
     "sidebar": {
       "domains": 19,
@@ -3906,7 +3899,7 @@
     },
     "sync": {
       "domains": 13,
-      "exported": 57
+      "exported": 52
     },
     "terminal": {
       "domains": 9,
@@ -3918,7 +3911,7 @@
     },
     "ui-kit": {
       "domains": 4,
-      "exported": 172
+      "exported": 154
     },
     "update": {
       "domains": 2,
@@ -3926,7 +3919,7 @@
     },
     "worktrees": {
       "domains": 5,
-      "exported": 74
+      "exported": 69
     }
   }
 }

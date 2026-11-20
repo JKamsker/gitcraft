@@ -56,7 +56,17 @@ fn assert_details_without_diff(tab: &RepoTab, ctx: &egui::Context, hash: &str, h
         "{how}"
     );
     assert!(tab.diff.is_none(), "{how} opened a diff");
+    assert_details_revealed(ctx, how);
+}
+
+/// The detail panel shows, even where a narrow window would fold it away.
+fn assert_details_revealed(ctx: &egui::Context, how: &str) {
     assert!(crate::settings::Settings::get(ctx).show_detail, "{how}");
+    assert_eq!(
+        ctx.data(|data| data.get_temp::<bool>(egui::Id::new("repo_detail").with("reopen-small"))),
+        Some(true),
+        "{how} left a folded detail panel closed"
+    );
 }
 
 /// How a selection is reached, and the action it sends for a commit hash.
@@ -131,7 +141,7 @@ fn a_backlink_outside_the_loaded_graph_shows_its_details_without_a_diff() {
     assert_eq!(tab.selected, None);
     assert_eq!(tab.detail.as_ref().map(|d| &d.hash), Some(&outside));
     assert!(tab.diff.is_none(), "a backlink opened a diff");
-    assert!(crate::settings::Settings::get(&ctx).show_detail);
+    assert_details_revealed(&ctx, "a backlink outside the graph");
 }
 
 #[test]
