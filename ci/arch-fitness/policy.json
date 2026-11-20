@@ -193,7 +193,7 @@
     "forge": {
       "layer": "services",
       "owner": "@JKamsker",
-      "description": "Forge APIs (GitHub, GitLab, Forgejo, Gitea, Gerrit), pull requests, CI runs, issue trackers, avatars, CODEOWNERS.",
+      "description": "Forge APIs (GitHub, GitLab, Forgejo, Gitea, Gerrit), pull requests, CI runs, issue trackers, code-analysis providers (SonarQube), avatars, CODEOWNERS.",
       "modules": [
         "gitcraft::forge",
         "gitcraft::pull_request",
@@ -202,6 +202,7 @@
         "gitcraft::ci",
         "gitcraft::gerrit",
         "gitcraft::trackers",
+        "gitcraft::analysis",
         "gitcraft::avatars",
         "gitcraft::codeowners"
       ]
@@ -292,7 +293,8 @@
         "gitcraft::repo::dco",
         "gitcraft::repo::issue_work",
         "gitcraft::repo::review_workflow",
-        "gitcraft::repo::owners"
+        "gitcraft::repo::owners",
+        "gitcraft::repo::quality_gate"
       ]
     },
     "sync": {

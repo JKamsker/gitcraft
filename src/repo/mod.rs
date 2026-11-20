@@ -125,6 +125,7 @@ mod process_benchmarks;
 pub(crate) mod pull;
 mod push;
 mod push_preflight;
+mod quality_gate;
 mod quick_edit;
 mod rebase;
 mod reflog;

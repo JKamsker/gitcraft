@@ -111,7 +111,7 @@ checker) take their crate's `domain`.
 | `os` | platform | The gitcraft-os crate and OS shell integration: taskbar, single instance, desktop/Finder/Nautilus entries. |
 | `runtime` | platform | Process event loop, bounded workers, timing, safe file reads, PATH, network policy, portable mode, catalogs, sound, diagnostics and secret scrubbing. |
 | `ui-kit` | presentation | Shared presentation: theme tokens, icons, widgets without product state, accessibility, key list. |
-| `forge` | services | Forge APIs (GitHub, GitLab, Forgejo, Gitea, Gerrit), pull requests, CI runs, issue trackers, avatars, CODEOWNERS. |
+| `forge` | services | Forge APIs (GitHub, GitLab, Forgejo, Gitea, Gerrit), pull requests, CI runs, issue trackers, code-analysis providers (SonarQube), avatars, CODEOWNERS. |
 | `git` | services | Typed Git operations, graph lane layout and merge drivers. |
 | `remote` | services | Repositories on other machines (WSL, SSH) and connection profiles. |
 | `settings` | services | User settings, the settings window, the portable setup file and persisted drafts. |

@@ -75,6 +75,8 @@ pub(crate) struct Choices {
     /// Selected tracker accounts and secure-store references only; no exported tokens.
     pub jira: crate::trackers::Account,
     pub linear: crate::trackers::Account,
+    /// SonarQube Server / Cloud connection metadata and secure-store reference only.
+    pub sonar: crate::analysis::sonar::Account,
     pub ssh_key: String,
     pub github: Account,
     pub gitlab: Account,
@@ -90,6 +92,7 @@ impl Default for Choices {
             bitbucket: Default::default(),
             jira: Default::default(),
             linear: Default::default(),
+            sonar: Default::default(),
             ssh_key: String::new(),
             github: Account::on("github.com"),
             gitlab: Account::on("gitlab.com"),
@@ -106,6 +109,9 @@ impl Choices {
             .validate(crate::forge::cloud::Service::Bitbucket)?;
         self.jira.validate(crate::trackers::Kind::Jira)?;
         self.linear.validate(crate::trackers::Kind::Linear)?;
+        self.sonar
+            .validate()
+            .map_err(|id| crate::i18n::text(id).to_owned())?;
         self.github.validate()?;
         self.gitlab.validate()?;
         if !self.tea_login.is_empty() {

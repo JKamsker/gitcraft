@@ -4,6 +4,7 @@ mod a11y;
 mod across;
 mod agent;
 mod ai;
+mod analysis;
 pub mod app;
 mod app_buttons;
 mod authorship;

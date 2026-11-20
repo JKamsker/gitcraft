@@ -3841,7 +3841,7 @@
     },
     "forge": {
       "domains": 5,
-      "exported": 222
+      "exported": 237
     },
     "git": {
       "domains": 12,
@@ -3873,12 +3873,12 @@
     },
     "repo-core": {
       "domains": 24,
-      "symbols": 616,
+      "symbols": 617,
       "exported": 179
     },
     "review": {
       "domains": 15,
-      "exported": 112
+      "exported": 113
     },
     "rewrite": {
       "domains": 14,
@@ -3890,7 +3890,7 @@
     },
     "settings": {
       "domains": 15,
-      "symbols": 181,
+      "symbols": 182,
       "exported": 63
     },
     "sidebar": {

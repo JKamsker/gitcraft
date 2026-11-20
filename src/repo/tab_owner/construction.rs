@@ -103,6 +103,7 @@ impl RepoTab {
             pr_error: None,
             prs_loaded: None,
             ci: ci_status::CiStatuses::default(),
+            quality_gate: Default::default(),
             weakened: Default::default(),
             dco: dco::Dco::default(),
             collisions: None,
