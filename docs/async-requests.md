@@ -72,7 +72,7 @@ stateDiagram-v2
 | Conflict editor (remote) | `diff_navigation::RepoTab::open_diff_of_lines`, which sends `Msg::ConflictOpened(generation, …)` | `RepoTab::conflict_generation: u64`, plus the open diff's path | Another diff opening | `conflict_opened` and `conflict_changed` require the generation, the path and an open conflicted diff. | `ConflictSaved` clears `saving` by path. | Discard only |
 | File history, blame and text | `core_seams::file_navigation` loads through `then_or`; the replies are re-dispatched as `Msg::FileHistory`, `Msg::Blame` and `Msg::FileText` | `FileView::generation` and `blame_generation` (from `file_view::next_generation`), the `FileView::pending` slot tokens, and the probe's `ProbeState::active` and `input_check` | `invalidate_mutable_file_view` (a reload, or a status change seen by the probe), `retire_reads` (suspend), opening another file | `file_view::loading::RepoTab::finish_file_load` requires the slot token and the generation. `handle` then re-checks the generation, path and revision. `finish_file_probe` requires `probe.active == check`. | `finish_file_load` frees the slot and schedules a retry on `tasks::BUSY`. | Discard only |
 | Comparison | `navigate::RepoTab::reload_compare` and `pr_view::select`, which send `Msg::Compare(request, …)` | `Compare::request`, from `RepoTab::compare_requests: u64`, and `RepoTab::pr_selection_request: Option<u64>` | A new comparison. A file-system reload does not replace a pending PR selection. | `handle` applies the reply only when `c.request == request`. | `pr_selection_arrived` clears `pr_selection_request` only for the matching request. | Discard only |
-| Interactive rebase editor | `rewrite::RepoTab::interactive_rebase`, which sends `Msg::RebaseCommits` | None | — | `rewrite::RepoTab::open_rebase` always closes `diff`, `conflict` and `file_view` and replaces `rebase` (see [Gaps](#gaps)). Running the rebase is guarded separately by `rebase_ready` (the editor id, the branch guard, and `HEAD` unchanged). | — | — |
+| Interactive rebase editor | `rewrite::RepoTab::interactive_rebase`, which sends `Msg::RebaseCommits` | None | — | For a non-empty `Ok`, `rewrite::RepoTab::open_rebase` closes `diff`, `conflict` and `file_view` and replaces `rebase` (see [Gaps](#gaps)). Running the rebase is guarded separately by `rebase_ready` (the editor id, the branch guard, and `HEAD` unchanged). | — | — |
 
 ## Forge views
 
@@ -94,7 +94,7 @@ stateDiagram-v2
 | --- | --- | --- | --- | --- | --- | --- |
 | Commit search | `commit_search::RepoTab::run_search`, which sends `Msg::Search(request, …)` | The pointer identity of `Search::pending: Option<Arc<Request>>` (`Arc::ptr_eq`), then `Request::current`, which re-checks the path, the query and mode, the roots, the order, the excluded namespaces and the connection generation (`u64::MAX` is refused) | A new `run_search`, `toggle_search`, context retirement, `Drop`, suspend | `search_done` ignores a reply that is not pending. A pending reply that is no longer current only retires it. | `Search::retire` clears `running`. Only a current reply sets `problem` or calls `goto`. | Yes: `Request::cancel` is the job's cancellation token. |
 | Cochange | `cochanges::State` (`poll_cochanges`, then `State::context`, then `State::read`) | `cochange_owner::requests::Requests { generation, pending: Option<Request> }`, with `checked_add` (exhausted means no new read), plus the reader's own generation | A head or repository change, `invalidate_context`, hiding or sleeping (`State::suspend`), `Drop` | `State::complete` calls `Requests::finish`. Stale success and error are both dropped. | `reader.busy()`; `State::error` is set only by an accepted reply. | Yes: `Reader::cancel` cancels the child scope. |
-| Repository tools | `Dialog::RepositoryTools(Owner)` and `RepoTab::deferred: DeferredCache`; replies come as `Msg::Then` | `repository_tools::lifecycle::Ticket<S> { origin, scope }`. `Ticket::settle` requires `origin == Owner::id` (from the process-wide counter `REQUESTS`) and `scope ==` the current `owner::Scope` (path, profile, `DeferredCache` epoch, connection, choices, sign-in generation). `poll_deferred` and `poll_outbox` require `pending` or `outbox_poll == Some(request)`. | `invalidate_repository_tool_requests` (`Cache::reset_requests` advances the epoch with `checked_add(..).expect(..)`, so an exhausted epoch panics, and clears `pending`, `automatic`, `outbox_poll`, `reading` and markers), a scope change, closing or restarting the dialog | `Owner::complete` returns `Completion::Ignore` for a stale ticket. Mutation completions always reach `op_done` first. | `reset_requests` clears `reading`, `outbox_reading` and `outbox_last`. Only a current failure writes the result or a notice. | Discard only, until suspend or close drops the tab scope |
+| Repository tools | `Dialog::RepositoryTools(Owner)` and `RepoTab::deferred: DeferredCache`; replies come as `Msg::Then` | `repository_tools::lifecycle::Ticket<S> { origin, scope }`. `Ticket::settle` requires `origin == Owner::id` (from the process-wide counter `REQUESTS`) and `scope ==` the current `owner::Scope` (path, profile, `DeferredCache` epoch, connection, choices, sign-in generation). `poll_deferred` and `poll_outbox` require `pending` or `outbox_poll == Some(request)`. | `invalidate_repository_tool_requests` (`Cache::reset_requests` advances the epoch with `checked_add(..).expect(..)`, so an exhausted epoch panics, and clears `pending`, `automatic`, `outbox_poll`, `reading` and markers; the caller also resets `outbox_reading` and `outbox_last` and closes the dialog), a scope change, closing or restarting the dialog | `Ticket::settle` returns `Completion::Ignore` for a stale ticket, and `Owner::complete` then applies nothing. Mutation completions always reach `op_done` first. | `reset_requests` clears `reading`; `invalidate_repository_tool_requests` clears `outbox_reading` and `outbox_last`. Only a current failure writes the result or a notice. | Discard only, until suspend or close drops the tab scope |
 | Branch bands and graph topology | `history_reader::Reader<T>` (`RepoTab::band_reader`, `topology_reader`) | `Reader`'s private `generation: u64` (`wrapping_add`) | A new `queue` (every graph rebuild re-queues), `cancel`, suspend (the reader is replaced), `Drop` | `Reader::poll` returns only the current generation's result. | `Reader` | Yes: a child token and an `active()` check |
 | Line dossier, symbol biography, saved views, content recovery, working drafts | `saved_views::reader::Reader<T>` in each feature | The reader's `generation` (saved-view pages also match `history_gen`) | Hiding, closing the feature or dialog, `cancel` | Dropped by generation. These readers are not retired by `invalidate_repository_context`. **Uncertain:** whether a late working-drafts preview can replace another dialog while `loaded` is false. | The reader | Yes: the reader cancels its scope. |
 | Insights | `insights::context::Read { namespace, lifetime: Weak<()> }` | `Read::current`, which checks the `Weak` pointer and the namespace generation | `invalidate_repository_insights`, which replaces `read_lifetime`; `invalidate_forge_insights` | Dropped | Per sub-reader | Discard only |
@@ -109,7 +109,7 @@ stateDiagram-v2
 | Folder watcher | `watch::RepoTab::watch`, which sends `Msg::Watcher(watch, …)` | `RepoTab::watches: u64` | A new `watch`, suspend | `handle` accepts a watcher only when `watch == watches` and the tab is not sleeping. Otherwise it is dropped, which stops the OS watch. | — | **Uncertain:** whether `start_watcher` observes cancellation while it walks the tree |
 | Remote polling (SSH/WSL) | `watch_remote::Poller` | One look at a time (`Poller::running: Arc<AtomicBool>`, reset by a guard even when a queued look is purged), its own `Scope` (a child of the tab token), and the `watches` stamp | Replacing the poller, park, suspend | A cancelled look sends nothing. A late look sends to an `fs` sender whose receiver is gone, and its `Watcher` stamp is rejected. | The `Finished` guard clears `running`. | Yes: dropping the poller cancels its scope. |
 | Remote shell reads | `remote::shell::Shell` and its pool | The job's ambient cancellation (`tasks::cancellation()`) | Tab scope, ticket drop | A cancelled read returns `TimedOut`, and `begin_cleanup` closes stdin so the remote side stops the command. `output_written_late_stays_out_of_the_next_answer` covers late output. | — | Yes (cooperative). A broken network can prevent confirming the remote cleanup. |
-| Connection or credential change | `load_requests::RepoTab::notice_connections` | `RepoTab::connection_generation` and `connection_context` | `connections::generation()` or `current()` changing | Clears credentials, the PR list, CI, `ci_view` and avatars; bumps `pr_requests`; resets `prs_loaded`; recurses into `parked`. Jobs already running keep the context they captured. | Same function | Discard only |
+| Connection or credential change | `load_requests::RepoTab::notice_connections` | `RepoTab::connection_generation` and `connection_context` | `connections::generation()` or `current()` changing | Clears credentials, the PR list, CI, `ci_view` and avatars; bumps `pr_requests`; sets `prs_loaded` to a fresh `Instant` (so older `Prs` replies no longer match); recurses into `parked`. Jobs already running keep the context they captured. | Same function | Discard only |
 | SSH setup dialog | `ssh_setup::State` | A private channel per request plus an `active` flag | `cancel_worker`, a profile change | Discarded by `poll` | The dialog | The worker runs under a parentless `Scope`, so it stops only when the dialog state is dropped. The dialog counts as unfinished work, which blocks suspend. |
 | Terminals | `terminals::Terminals`, `terminal::Terminal` | — | — | No request/reply flow: `Terminal::spawn` is synchronous and PTY I/O stays on the terminal's own threads. No stale-result risk. | — | `Drop` kills the child. |
 
@@ -129,8 +129,8 @@ These were found while writing this page. They are not fixed here.
 1. **CI dots stop updating after a suspend that interrupts a CI read.** `ci_status::RepoTab::load_ci`
    sets `CiStatuses::loading`. `lifecycle::RepoTab::idle` does not check that flag, and
    `suspend` does not reset it, so the reply is lost with the old channel. After resume,
-   `take_loaded`, `refresh_ci` and `poll_ci` all reach `load_ci`, which returns early
-   because `loading` is still true. `account_changed` and `moved_to` keep the flag. Only
+   `take_loaded` and `refresh_ci` reach `load_ci`, which returns early because `loading` is
+   still true. `poll_ci` never fires, because `load_ci` had cleared `ci.next`. `account_changed` and `moved_to` keep the flag. Only
    `bind_forge_selection` (`self.ci = Default::default()`) clears it.
    Background tabs keep polling CI (`app::frame` polls every tab with `shown = true`), and
    `background_tick` runs right after `poll` in the same frame. A read started by
@@ -150,10 +150,18 @@ These were found while writing this page. They are not fixed here.
    not call `running::RepoTab::after_op`, so actions waiting in `RepoTab::waiting` (queued
    by `action_preconditions` through `wait_for_running`) do not start until some later
    operation completes.
-   *Reproduce:* start Create PR, press Fetch (which queues), then change the primary forge
-   before the create finishes. Fetch never runs.
-   Other completions that release `busy_op` without `after_op`, such as `forks::approval_result`
-   and `cleanup` completion, were reported by the audit but not verified one by one.
+   *Reproduce:* start Create PR and press Fetch, which queues. Before the create finishes,
+   change the primary forge in another tab of the same repository. This tab's own selector is
+   disabled while `forge_change_blocked`, but `sync_forge_selection` rebinds at the start of
+   `poll_as` without that check. A reload whose remotes changed (`take_forge_catalog`) rebinds too. `busy_op` is released, but Fetch does not run until some other operation that calls `after_op` (a background fetch, say) completes. `running` is not cleared either.
+   `forge_selection::tests::late_create_completion_releases_busy_slot_without_running_its_old_continuation`
+   simulates the rebind by calling `take_forge_selection` directly, and asserts only that
+   `busy_op` is released.
+   The same applies outside the stale path. About thirty feature completions set
+   `busy_op = None` directly, among them `forks::approval_result`, `cleanup`, `bisect`,
+   `email`, `devcontainer`, `release` and `resolver`. Only `op_done`, `bundle_done`, push and
+   echo call `after_op`. Whether each of those completions can have a waiter queued behind it
+   was not checked one by one.
 4. **A focus refresh drops a running commit search and does not restart it.**
    `RepoTab::refresh_on_focus` (and F5 through `refresh`) calls
    `invalidate_repository_context`, which calls `Search::retire`. `run_search` has already
@@ -167,8 +175,9 @@ These were found while writing this page. They are not fixed here.
    `pr_posted` sets `posting` and `settling` and calls `load_pr`. If the PR view is closed,
    or another PR is opened, before that read answers, `pr_details_arrived` and
    `pr_files_arrived` drop the reply (wrong `request`), so `settling` is never released.
-   `forge_change_blocked` then stays true, which disables changing the primary forge, until
-   the same PR is opened again and read.
+   `forge_change_blocked` then stays true, which disables changing the primary forge. It
+   clears when the same PR is opened and read again, when another tab rebinds the selection
+   (`bind_forge_selection` releases `settling` drafts), or when the repository moves.
 6. **An old issue refresh clears a newer one's flag.** The `refresh_issue` continuation
    in `issue_work` sets `refreshing = None` before checking anything. A refresh of a tracker
    issue uses the plain `tx`, so it is not dropped by the forge generation. After a forge
@@ -182,8 +191,14 @@ These were found while writing this page. They are not fixed here.
      the staged test lane refuse to act while `work_pending != 0`, until the next read
      succeeds.
    - `issue_work`'s `issue_then` leaves `refreshing` set.
-   - `load_pr` leaves `PrView::loading` set.
-   - `refresh_diff` leaves the view waiting for a reply that never comes.
+   - `load_pr` leaves `PrView::loading` set, and `PrDraft::settling` too after a post.
+   - `pr_review::send` leaves `PrDraft::posting` set, which keeps `forge_change_blocked`
+     true. `bind_forge_selection` releases `posting` only for drafts that are `settling`.
+   - `ci_view::RepoTab::ci_act` leaves `CiView::acting` set, and `load_ci_view` and
+     `load_ci_jobs` leave `CiView::loading` set.
+   - `refresh_diff` leaves `DiffView::request != data_request`. Until the diff is read
+     again, keyboard hunk commands (`keyboard_commands`) and partial-patch edits refuse to
+     act, and the view keeps showing the previous data, or nothing for a first read.
 8. **Suspend keeps other single-flight flags set.** `idle()` does not check
    `structural_running`, `issue_work.refreshing` or `pr_selection_request`, and `suspend`
    resets none of them. A request still in flight when the tab suspends leaves its flag set
@@ -192,7 +207,8 @@ These were found while writing this page. They are not fixed here.
    which is unlikely except for CI (item 1).
 9. **The interactive rebase read has no witness.** `Msg::RebaseCommits` carries no request
    id. `rewrite::RepoTab::open_rebase` closes the diff, the conflict editor and the file view,
-   and replaces `rebase`, whenever a reply arrives. Two `interactive_rebase` requests that
+   and replaces `rebase`, whenever a non-empty `Ok` reply arrives. An empty list or an `Err`
+   only sets `status`. Two `interactive_rebase` requests that
    complete out of order leave the older editor open. Running the rebase is still guarded:
    `run_rebase` and `rebase_ready` check the editor id, `same_branch` and `HEAD`.
 10. **The identity has no witness.** Both `Msg::Identity` and `take_loaded` overwrite
@@ -205,8 +221,9 @@ These were found while writing this page. They are not fixed here.
 ### Missing or unrun tests
 
 - No test sends a stale `Msg::PrDetails` or `Msg::PrFiles` against a newer `pr_requests`.
-- No CI explorer test covers stale `CiRuns`, `CiJobs`, `CiLog` or `CiActed` replies, and no
-  test covers `ci.loading` across a suspend.
+- No CI explorer test covers stale `CiRuns`, `CiJobs` or `CiLog` replies. The `CiActed`
+  replies in `forge_selection_tests.rs` test only the forge-generation drop, not a newer
+  view's `acting`. No test covers `ci.loading` across a suspend.
 - No test covers `watch_remote::Poller` cancellation or stale looks, in-flight requests
   across park and show, or the stale forge-operation path together with `waiting`.
 - No test covers `cochange_owner::requests::Requests` exhaustion.
