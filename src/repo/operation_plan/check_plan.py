@@ -24,7 +24,7 @@ decoder = '#[path = "model_decode.rs"]'
 assert decoder in plan, "model.rs no longer loads model_decode.rs"
 plan = plan.replace(decoder, f"#[path = {json.dumps(str(owner / 'model_decode.rs'))}]", 1)
 helpers = "\n".join(function(expectations, name) for name in
-    ["expected_ref", "expected_symref", "expected_tree", "is_expectation"])
+    ["expected_ref", "expected_symref", "expected_tree", "is_fork_guard", "is_expectation"])
 helpers += "\n" + "\n".join(function(dispatch, name) for name in
     ["retain_unfinished", "reviewed_operands"])
 tracking = constant((repo_source.parent / "git/repository_tools/tracking.rs").read_text(), "APPLY")
@@ -32,7 +32,7 @@ constants = "\n".join(constant(expectations, name) for name in
     ["EXPECT", "EXPECT_SYMREF", "EXPECT_TREE", "TRY", "EXPECT_FOLD_SAFE", "EXPECT_FOLD_IGNORED"])
 constants += "\n" + constant((repo_source / "operations.rs").read_text(), "EXPECT_HTTPS_ROUTE")
 fork_source = (repo_source / "forks/guard.rs").read_text()
-fork = "\n".join([constant(fork_source, "MARK"), constant(fork_source, "CHECKOUT_MARK"), function(fork_source, "is_guard")])
+fork = "\n".join([constant(fork_source, "MARK"), constant(fork_source, "CHECKOUT_MARK"), function(fork_source, "is_guard"), function(fork_source, "guard_of")])
 gerrit_source = (repo_source.parent / "gerrit.rs").read_text()
 gerrit = "\n".join(constant(gerrit_source, name) for name in ["AMEND", "CHECK"])
 push_source = (repo_source.parent / "push_preflight.rs").read_text()

@@ -59,7 +59,7 @@ impl<'a> Execution<'a> {
             checkout,
             head_before,
             stash_before,
-            guarded_fork: ops.iter().any(|op| crate::repo::forks::guard::is_guard(op)),
+            guarded_fork: ops.iter().any(|op| is_fork_guard(op)),
             owned_refs: Vec::new(),
             rewrite: None,
             pushed: Vec::new(),

@@ -165,8 +165,6 @@ fn inventoried_values_are_the_constants_the_code_uses() {
         ("APPROVED", crate::push_preflight::APPROVED),
         ("FIX", crate::push_preflight::FIX),
         ("APPLY", crate::git::repository_tools::tracking::APPLY),
-        ("MARK", crate::repo::forks::guard::MARK),
-        ("CHECKOUT_MARK", crate::repo::forks::guard::CHECKOUT_MARK),
         ("WIP_HASH", crate::repo::WIP_HASH),
     ];
     for (constant, value) in visible {

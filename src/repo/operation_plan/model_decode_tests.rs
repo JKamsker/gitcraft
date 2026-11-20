@@ -5,7 +5,10 @@ use super::*;
 use crate::gerrit::{AMEND, CHECK};
 use crate::git::repository_tools::tracking::APPLY;
 use crate::push_preflight::{APPROVED, FIX};
-use crate::repo::forks::guard::{CHECKOUT_MARK, MARK};
+
+// `forks::guard` keeps its markers private; the inventory pins these values to its constants.
+const MARK: &str = "\0fork-destination";
+const CHECKOUT_MARK: &str = "\0fork-checkout";
 
 fn kind(step: &[&str]) -> Step<'static> {
     // The decoded view borrows the argv; leak it so the test can compare by value.

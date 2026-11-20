@@ -6,10 +6,11 @@ use super::*;
 use crate::gerrit::{AMEND, CHECK};
 use crate::git::repository_tools::tracking::APPLY;
 use crate::push_preflight::{APPROVED, FIX};
-use crate::repo::forks::guard::{CHECKOUT_MARK, MARK};
+use crate::repo::forks::guard::guard_of;
 
 /// Markers of steps that run nothing and only check (`is_expectation` agrees on their shapes).
-const EXPECTATIONS: [&str; 9] = [
+/// The fork guards' markers stay private to `forks::guard`; `guard_of` recognizes them.
+const EXPECTATIONS: [&str; 7] = [
     EXPECT,
     EXPECT_SYMREF,
     EXPECT_TREE,
@@ -17,8 +18,6 @@ const EXPECTATIONS: [&str; 9] = [
     EXPECT_FOLD_SAFE,
     EXPECT_FOLD_IGNORED,
     CHECK,
-    MARK,
-    CHECKOUT_MARK,
 ];
 
 /// Markers of steps gitcraft runs itself, or runs as Git differently.
@@ -35,7 +34,8 @@ pub(super) fn step(argv: &[String]) -> Step<'_> {
         return kind;
     }
     let marker = marker.as_str();
-    if EXPECTATIONS.contains(&marker) || DISPATCHED.contains(&marker) {
+    let fork_guard = guard_of(argv).is_some();
+    if EXPECTATIONS.contains(&marker) || DISPATCHED.contains(&marker) || fork_guard {
         let count = operands.len();
         Step::Malformed(Malformed::Operands { marker, count })
     } else if marker.starts_with('\0') {
@@ -64,10 +64,16 @@ fn precondition(argv: &[String]) -> Option<Precondition<'_>> {
         [mark, target] if mark == EXPECT_FOLD_SAFE => Precondition::FoldSafe(target),
         [mark, target] if mark == EXPECT_FOLD_IGNORED => Precondition::FoldIgnored(target),
         [mark, base, head] if mark == CHECK => Precondition::GerritStack { base, head },
-        [mark, json] if mark == MARK => Precondition::ForkDestination(json),
-        [mark, json] if mark == CHECKOUT_MARK => Precondition::ForkCheckout(json),
-        _ => return None,
+        _ => return fork_guard(argv),
     })
+}
+
+fn fork_guard(argv: &[String]) -> Option<Precondition<'_>> {
+    match guard_of(argv)? {
+        (false, [json]) => Some(Precondition::ForkDestination(json)),
+        (true, [json]) => Some(Precondition::ForkCheckout(json)),
+        _ => None,
+    }
 }
 
 fn dispatched<'a>(marker: &str, operands: &'a [String], argv: &'a [String]) -> Option<Step<'a>> {

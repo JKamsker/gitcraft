@@ -103,9 +103,14 @@ pub(in crate::repo) fn tried_note(out: &str) -> Option<&str> {
     out.strip_prefix(TRIED)
 }
 
+/// Whether `op` is a well-formed fork guard: its marker and the JSON it saved.
+pub(super) fn is_fork_guard(op: &[String]) -> bool {
+    matches!(crate::repo::forks::guard::guard_of(op), Some((_, [_])))
+}
+
 /// Whether `op` is a step that runs nothing, only checks.
 pub(in crate::repo) fn is_expectation(op: &[String]) -> bool {
-    crate::repo::forks::guard::is_guard(op)
+    is_fork_guard(op)
         || expected_ref(op).is_some()
         || expected_symref(op).is_some()
         || expected_tree(op).is_some()
