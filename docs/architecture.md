@@ -181,6 +181,61 @@ plan migration must inventory these consumers together. Timeline records seriali
 defaulted id and agent. Do not change this disk format until old fixtures decode
 and round-trip with tested compatibility. This slice leaves it intact.
 
+### Operation sentinel inventory
+
+Internal steps are marked by sentinel strings, NUL-prefixed so no Git argument
+can collide with them (#193). The checked-in inventory is `INVENTORY` in
+`src/repo/operation_plan/sentinel_table_tests.rs`, and this table mirrors it.
+`sentinel_inventory_tests.rs` scans production `src/` for every NUL-prefixed
+string constant and inline literal, skipping `#[cfg(test)]` items and files named
+as tests. The test fails, and says what to add, when the scan and the inventory
+disagree. It also fails when a step marker's producer-shaped sample does not
+decode as listed, or when a step marker falls through to `Step::Git` without
+naming what handles it. Another test fails when a row below is missing.
+
+| Constant | Owner | Value | Role | Persisted by a producer | `Plan::decode` |
+|---|---|---|---|---|---|
+| `EXPECT` | `src/repo/operation_plan/expectations.rs` | `\0expect` | step | yes (most undo/redo guards) | `Expectation::Ref` |
+| `EXPECT_SYMREF` | `src/repo/operation_plan/expectations.rs` | `\0expect-symref` | step | yes (HEAD-move undo, restack in a worktree) | `Expectation::Symref` |
+| `EXPECT_TREE` | `src/repo/operation_plan/expectations.rs` | `\0expect-tree` | step | yes (staged-stash undo) | `Expectation::Tree` |
+| `TRY` | `src/repo/operation_plan/expectations.rs` | `\0try` | step | no (issue start runs plain) | `Try` |
+| `TRIED` | `src/repo/operation_plan/expectations.rs` | `\0tried\0` | output prefix | no | not a step |
+| `EXPECT_FOLD_SAFE` | `src/repo/operation_plan/expectations.rs` | `\0expect-fold-safe` | step | no (fold undo is a HEAD move) | `Expectation::FoldSafe` |
+| `EXPECT_FOLD_IGNORED` | `src/repo/operation_plan/expectations.rs` | `\0expect-fold-ignored` | step | no | `Expectation::FoldIgnored` |
+| `EXPECT_HTTPS_ROUTE` | `src/repo/operations.rs` | `--gitcraft-expect-https-route` (not NUL) | step | no (sign-in retry, in memory) | `Expectation::HttpsRoute` |
+| `CHECK` | `src/gerrit.rs` | `\0gerrit-review` | step | no | `Expectation::FeatureGuard` |
+| `AMEND` | `src/gerrit.rs` | `\0gerrit-amend` | step | no | `GerritAmend` |
+| `APPROVED` | `src/push_preflight.rs` | `\0push-preflight` | step | no (in-memory plan id) | `ReviewedPush` |
+| `FIX` | `src/push_preflight.rs` | `\0push-preflight-fix` | step | no | `PreflightFix` |
+| `MARK` | `src/repo/forks/guard.rs` | `\0fork-destination` | step | yes (fork rebase undo/redo) | `Expectation::FeatureGuard` |
+| `CHECKOUT_MARK` | `src/repo/forks/guard.rs` | `\0fork-checkout` | step | yes (fork checkout undo/redo) | `Expectation::FeatureGuard` |
+| `PUSHED_TIP` | `src/repo/forks/guard.rs` | `\0fork-pushed-tip` | placeholder in a push lease | no (bound to an OID before saving) | `Git` |
+| `APPLY` | `src/git/repository_tools/tracking.rs` | `\0tracking` | step | yes (tracking undo/redo) | `Git`; `Execution::step` runs it before dispatch |
+| `GHOST_MERGE` | `src/repo/ghost/plan.rs` | `\0ghost-merge` | graph stand-in hash | no | not a step |
+| `WIP_HASH` | `src/repo/mod.rs` | `\0wip` | graph stand-in hash | no | not a step |
+| `PREFIX` | `src/repo/resolver/graph.rs` | `\0parked:` | graph hash prefix | no | not a step |
+
+`APPLY` is the one step marker `Plan::decode` does not classify. The executor
+recognizes `[APPLY, json]` before dispatch, but every other consumer of
+`Plan::steps` sees a Git command. Typing it is a follow-up, not part of this slice.
+
+Version-1 persistence fixtures live in `src/repo/operation_plan/fixtures/v1/`,
+and `legacy_fixture_tests.rs` checks them. Each fixture copies the shape its
+producer emits. `timeline.json` is a full timeline file with commit (HEAD move),
+staged-stash, restack (worktree symref), fork checkout, fork rebase, tracking and
+outside entries. It covers every sentinel that is persisted today.
+`live_only_steps.json` holds the step markers that never reach disk. These two are
+canonical, because `store::save_to` writes `serde_json::to_string` output, so they
+must round-trip byte for byte. `timeline_legacy_fields.json` and
+`undo_entry_mixed_try.json` predate optional fields (`folder`, `root_redo`, entry
+`files`/`redo_child`/`receipt`, `UndoEntry` `id`/`agent`, and `heads` in one entry).
+They decode with defaults and round-trip semantically. Re-serializing them writes
+those defaults out, so their bytes cannot be stable. Each fixture step is checked
+against its expected `Plan::decode` classification. Where a producer is reachable
+from a test (`undo_entry`, `expect_*`, `try_step`, `gerrit::review_ops`), the
+fixture steps are compared with its output. The fixtures are pinned to
+`store::VERSION = 1`, so a format bump has to add v2 fixtures beside them.
+
 Background work flows through `messages::{JobSender,Msg,spawn}`, `then` and the
 tab job scope. Reload/paging use read/history generations; diff/rich/rendered,
 conflict, compare/PR selection, forge and watcher requests have their own checks.
