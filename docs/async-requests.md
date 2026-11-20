@@ -21,7 +21,7 @@ polled in `RepoTab::poll_as`. **Uncertain** marks a claim that was not confirmed
 | Tab suspend | `lifecycle::RepoTab::suspend` installs a new channel and `Scope`, calls `invalidate_repository_context` and `FileView::retire_reads`, and resets the private readers and graph caches | New channel and scope | Every reply already in flight is lost, including its failure continuation. A flag set before the suspend stays set (see [Gaps](#gaps)). | Yes, as for the job scope |
 | Suspend guard | `lifecycle::RepoTab::idle` | — | A tab suspends only when it has no `loading`, `busy_op`, snapshot, `loading_more`, `counting_worktrees`, queued actions, PR view, CI view, local CI or unfinished work. | — |
 | Forge generation | `forge_selection::RepoTab::forge_sender` sets `JobSender::forge_generation = Some(RepoTab::forge_generation)`. `send` wraps the reply as `Msg::ForgeResult(generation, operation, msg)` | `RepoTab::forge_generation: u64`, advanced by `bind_forge_selection` | `handle` drops the reply unless `generation == forge_generation`. A `PrPosted` for the same repository with `generation >= forge_repository_generation` is still delivered. A stale *operation* clears `busy_op` and reloads instead (see [Operations](#operations-and-busy-state)). | No |
-| Context retirement | `lifecycle::RepoTab::invalidate_repository_context` / `invalidate_forge_context`, which call `invalidate_repository_insights` (or `invalidate_forge_insights`), `Search::retire`, `invalidate_repository_tool_requests` and `cochanges::State::invalidate_context`, and recurse into `parked`. The repository variant is called by `shown_now`, `suspend`, `refresh_on_focus` (window focus and F5), `invalidate_https_challenge` (connection change, or remotes changed on reload), a profile change in `app::profiles`, and worktree park and show. The forge variant is called by `bind_forge_selection`. | Per feature (below) | The feature's witness no longer matches. `invalidate_repository_tool_requests` also closes an open Repository tools dialog. | Commit search cancels its child token. For the others, see their rows. |
+| Context retirement | `lifecycle::RepoTab::invalidate_repository_context` / `invalidate_forge_context`, which call `invalidate_repository_insights` (or `invalidate_forge_insights`), `Search::retire`, `invalidate_repository_tool_requests` and `cochanges::State::invalidate_context`, and recurse into `parked`. The repository variant is called by `shown_now`, `suspend`, `refresh_on_focus` (window focus and F5), `invalidate_https_challenge` (connection change, or remotes changed on reload), a profile change in `app::profiles`, and worktree park and show. The forge variant is called by `bind_forge_selection`. | Per feature (below) | The feature's witness no longer matches. `invalidate_repository_tool_requests` also closes an open Repository tools dialog. | Commit search cancels its child token; `refresh_on_focus` then runs a search that was in flight again. For the others, see their rows. |
 | `Msg::Then` closures | `job_submission::RepoTab::{then, then_or, here_or_later}`; `forge_then` | None of its own | The closure runs against whatever state the tab has when the reply arrives. Each caller must check its own witness. | No |
 | Submission failure | `job_submission::spawn_with`: queue rejection, cancellation while queued, or a panic sends `failed(error)` | — | `spawn` uses `Msg::JobPanicked`, which only sets `RepoTab::status`. `spawn_or` and `then_or` callers pass a feature-specific failure that releases their busy flag. | — |
 
@@ -79,8 +79,8 @@ stateDiagram-v2
 | Flow | Owner | Witness | Invalidated by | Late or stale reply | Busy and error cleared by | Stops work? |
 | --- | --- | --- | --- | --- | --- | --- |
 | PR list | `load_requests::RepoTab::load_prs`, which sends `Msg::Prs(asked, …)` through `forge_sender` | `RepoTab::prs_loaded: Option<Instant>`, plus `forge_generation` | A newer `load_prs`, `retire_pr_list` (refresh), `bind_forge_selection`, `notice_connections` | `handle` drops both `Ok` and `Err` when `prs_loaded != Some(asked)`, so a stale `Err` cannot set `pr_error`. | `prs_arrived` (current request only) | Discard only |
-| PR detail and files | `pr_view::RepoTab::load_pr`, which sends `Msg::PrDetails(request, …)`; the files follow with the same id | `PrView::request`, from `RepoTab::pr_requests: u64`, plus `forge_generation` | A newer `load_pr`, `notice_connections` (`PrView::account_changed`), `close_pr`, `bind_forge_selection` | `pr_details_arrived` and `pr_files_arrived` require `v.request == request`. | Those two functions clear `PrView::loading` and `PrDraft::settling` (current request only). | Discard only |
-| PR posting | `pr_review::send`, which sends `Msg::PrPosted { hosting, … }` | No request id. `PrDraft::posting` is single flight per PR number. `hosting` is compared with `load::same_repository`. | A move to another repository | Replies for another repository are dropped in `handle`. `pr_posted` always settles the draft. | `pr_posted`; `settling` is released by the next current PR detail or files reply (see [Gaps](#gaps)). | No (it is a mutation) |
+| PR detail and files | `pr_view::RepoTab::load_pr`, which sends `Msg::PrDetails(request, …)`; the files follow with the same id | `PrView::request`, from `RepoTab::pr_requests: u64`, plus `forge_generation` | A newer `load_pr`, `notice_connections` (`PrView::account_changed`), `close_pr`, `bind_forge_selection` | `pr_details_arrived` and `pr_files_arrived` require `v.request == request`. | Those two functions clear `PrView::loading` (current request only). A failed or refused read answers with `Err` (`spawn_or`). `PrDraft::settling` holds the request that settles it (see PR posting). | Discard only |
+| PR posting | `pr_review::send`, which sends `Msg::PrPosted { hosting, … }` | No request id. `PrDraft::posting` is single flight per PR number. `hosting` is compared with `load::same_repository`. | A move to another repository | Replies for another repository are dropped in `handle`. `pr_posted` always settles the draft. | `pr_posted`; then `settling` (the id of the read `pr_posted` started, moved to a newer `load_pr` of the same page) is released by that read's answer whichever PR is shown: details that are an error or for a page no longer shown, or the files. `bind_forge_selection` releases it too. | No (it is a mutation) |
 | CI status dots | `ci_status::RepoTab::load_ci`, which sends `Msg::CiStatuses(fresh, …)` through `forge_sender` | Single flight: `CiStatuses::loading`, with `superseded: bool` for a changed project set or account. `fresh` is not an identity. | `CiStatuses::account_changed` and `moved_to` keep `loading` and set `superseded`. `bind_forge_selection` resets `ci`. | `CiStatuses::arrived` drops a superseded reply and schedules a new read. | `CiStatuses::arrived` clears `loading`. Suspend does not (see [Gaps](#gaps)). | Discard only |
 | CI explorer runs, jobs and log | `ci_view` (`load_ci_view`, `load_ci_jobs`, the log toggle) | `CiView::request` and `log_request`, from the process-wide counter `ci_view::REQUESTS`; jobs also match the run | `CiAct::SelectRun`, reopening, `bind_forge_selection` | `ci_runs_arrived`, `ci_jobs_arrived` and `ci_log_arrived` filter on their ids. | — | Discard only |
 | CI re-run and cancel | `ci_view::RepoTab::ci_act`, which sends `Msg::CiActed(label, …)` | None. `CiView::acting` is single flight per view. | — | `ci_acted` clears `acting` on whichever `ci_view` is open (see [Gaps](#gaps)). | `ci_acted` | No (it is a mutation) |
@@ -92,7 +92,7 @@ stateDiagram-v2
 
 | Flow | Owner | Witness | Invalidated by | Late or stale reply | Busy and error cleared by | Stops work? |
 | --- | --- | --- | --- | --- | --- | --- |
-| Commit search | `commit_search::RepoTab::run_search`, which sends `Msg::Search(request, …)` | The pointer identity of `Search::pending: Option<Arc<Request>>` (`Arc::ptr_eq`), then `Request::current`, which re-checks the path, the query and mode, the roots, the order, the excluded namespaces and the connection generation (`u64::MAX` is refused) | A new `run_search`, `toggle_search`, context retirement, `Drop`, suspend | `search_done` ignores a reply that is not pending. A pending reply that is no longer current only retires it. | `Search::retire` clears `running`. Only a current reply sets `problem` or calls `goto`. | Yes: `Request::cancel` is the job's cancellation token. |
+| Commit search | `commit_search::RepoTab::run_search`, which sends `Msg::Search(request, …)` | The pointer identity of `Search::pending: Option<Arc<Request>>` (`Arc::ptr_eq`), then `Request::current`, which re-checks the path, the query and mode, the roots, the order, the excluded namespaces and the connection generation (`u64::MAX` is refused) | A new `run_search`, `toggle_search`, context retirement (a focus refresh or F5 asks a search in flight again), `Drop`, suspend | `search_done` ignores a reply that is not pending. A pending reply that is no longer current only retires it. | `Search::retire` clears `running`. Only a current reply sets `problem` or calls `goto`. | Yes: `Request::cancel` is the job's cancellation token. |
 | Cochange | `cochanges::State` (`poll_cochanges`, then `State::context`, then `State::read`) | `cochange_owner::requests::Requests { generation, pending: Option<Request> }`, with `checked_add` (exhausted means no new read), plus the reader's own generation | A head or repository change, `invalidate_context`, hiding or sleeping (`State::suspend`), `Drop` | `State::complete` calls `Requests::finish`. Stale success and error are both dropped. | `reader.busy()`; `State::error` is set only by an accepted reply. | Yes: `Reader::cancel` cancels the child scope. |
 | Repository tools | `Dialog::RepositoryTools(Owner)` and `RepoTab::deferred: DeferredCache`; replies come as `Msg::Then` | `repository_tools::lifecycle::Ticket<S> { origin, scope }`. `Ticket::settle` requires `origin == Owner::id` (from the process-wide counter `REQUESTS`) and `scope ==` the current `owner::Scope` (path, profile, `DeferredCache` epoch, connection, choices, sign-in generation). `poll_deferred` and `poll_outbox` require `pending` or `outbox_poll == Some(request)`. | `invalidate_repository_tool_requests` (`Cache::reset_requests` advances the epoch with `checked_add(..).expect(..)`, so an exhausted epoch panics, and clears `pending`, `automatic`, `outbox_poll`, `reading` and markers; the caller also resets `outbox_reading` and `outbox_last` and closes the dialog), a scope change, closing or restarting the dialog | `Ticket::settle` returns `Completion::Ignore` for a stale ticket, and `Owner::complete` then applies nothing. Mutation completions always reach `op_done` first. | `reset_requests` clears `reading`; `invalidate_repository_tool_requests` clears `outbox_reading` and `outbox_last`. Only a current failure writes the result or a notice. | Discard only, until suspend or close drops the tab scope |
 | Branch bands and graph topology | `history_reader::Reader<T>` (`RepoTab::band_reader`, `topology_reader`) | `Reader`'s private `generation: u64` (`wrapping_add`) | A new `queue` (every graph rebuild re-queues), `cancel`, suspend (the reader is replaced), `Drop` | `Reader::poll` returns only the current generation's result. | `Reader` | Yes: a child token and an `active()` check |
@@ -162,22 +162,27 @@ These were found while writing this page. They are not fixed here.
    `email`, `devcontainer`, `release` and `resolver`. Only `op_done`, `bundle_done`, push and
    echo call `after_op`. Whether each of those completions can have a waiter queued behind it
    was not checked one by one.
-4. **A focus refresh drops a running commit search and does not restart it.**
-   `RepoTab::refresh_on_focus` (and F5 through `refresh`) calls
-   `invalidate_repository_context`, which calls `Search::retire`. `run_search` has already
-   cleared `Search::edited`, and nothing re-runs the search after the reload. The box then
-   shows the new query while `searched` and `results` still belong to the previous one.
-   *Reproduce:* type a slow code search, switch to another window and back before it
-   finishes.
+4. **Fixed in [#264](https://github.com/JKamsker/gitcraft/pull/264): a focus refresh dropped a running commit search and did not restart
+   it.** `RepoTab::refresh_on_focus` (and F5 through `refresh`) calls
+   `invalidate_repository_context`, which calls `Search::retire`. `run_search` had already
+   cleared `Search::edited`, so nothing re-ran the search after the reload, and the box
+   showed the new query while `searched` and `results` still belonged to the previous one.
+   `refresh_on_focus` now runs a search that was in flight (`Search::in_flight`) again after
+   the retirement; the old request's child token is still cancelled, and a closed, cleared or
+   answered search is not re-run (`commit_search::refresh_tests`).
    The same retirement closes an open Repository tools dialog
    (`invalidate_repository_tool_requests`). **Uncertain:** whether that is intended.
-5. **A PR draft can stay in `posting`.** After a successful post, `pr_review::send`'s
-   `pr_posted` sets `posting` and `settling` and calls `load_pr`. If the PR view is closed,
-   or another PR is opened, before that read answers, `pr_details_arrived` and
-   `pr_files_arrived` drop the reply (wrong `request`), so `settling` is never released.
-   `forge_change_blocked` then stays true, which disables changing the primary forge. It
-   clears when the same PR is opened and read again, when another tab rebinds the selection
-   (`bind_forge_selection` releases `settling` drafts), or when the repository moves.
+5. **Fixed in [#264](https://github.com/JKamsker/gitcraft/pull/264): a PR draft could stay in `posting`.** After a successful post,
+   `pr_review::send`'s `pr_posted` sets `posting` and `settling` and calls `load_pr`. If the
+   PR view was closed, another PR was opened, or the account changed before that read
+   answered, `pr_details_arrived` and `pr_files_arrived` dropped the reply (wrong `request`),
+   so `settling` was never released and `forge_change_blocked` stayed true. Now `settling`
+   holds the id of the read that settles it, and that read's answer settles the draft
+   whichever PR is shown; a newer `load_pr` of the same page takes it over. Both reads use
+   `spawn_or`, so a refused or panicking read answers too. `forge_change_blocked` counts only
+   drafts whose post is still on its way (`PrDraft::sending`): a draft waiting only for its
+   page to be read again is released by `bind_forge_selection` anyway
+   (`pr_review::settling_tests`).
 6. **An old issue refresh clears a newer one's flag.** The `refresh_issue` continuation
    in `issue_work` sets `refreshing = None` before checking anything. A refresh of a tracker
    issue uses the plain `tx`, so it is not dropped by the forge generation. After a forge
@@ -191,7 +196,8 @@ These were found while writing this page. They are not fixed here.
      the staged test lane refuse to act while `work_pending != 0`, until the next read
      succeeds.
    - `issue_work`'s `issue_then` leaves `refreshing` set.
-   - `load_pr` leaves `PrView::loading` set, and `PrDraft::settling` too after a post.
+   - Fixed in [#264](https://github.com/JKamsker/gitcraft/pull/264): `load_pr` and the files read that follows use `spawn_or`, so they no
+     longer leave `PrView::loading` or `PrDraft::settling` set.
    - `pr_review::send` leaves `PrDraft::posting` set, which keeps `forge_change_blocked`
      true. `bind_forge_selection` releases `posting` only for drafts that are `settling`.
    - `ci_view::RepoTab::ci_act` leaves `CiView::acting` set, and `load_ci_view` and
