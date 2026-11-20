@@ -76,7 +76,7 @@ fn a_merge_started_since_the_dialog_stops_the_fold() {
     git_ok(&dir, &["merge", "-q", "--no-ff", "--no-commit", "side"]);
     git_ok(&dir, &["add", "f1.txt"]);
     let before = git::head(&dir);
-    tab.apply(Action::RunFold(Box::new(found.clone())), &ctx);
+    tab.apply(Action::Rewrite(crate::repo::rewrite::RewriteAct::RunFold(Box::new(found.clone()))), &ctx);
     settle(&mut tab, &ctx);
     let said = tab
         .status
@@ -124,7 +124,7 @@ fn a_patch_stopped_since_the_dialog_stops_the_fold() {
     assert!(stopped.is_err());
     assert_eq!(git::in_progress(&dir), Ok(Some(InProgress::Am)));
     let before = git::head(&dir);
-    tab.apply(Action::RunFold(Box::new(found)), &ctx);
+    tab.apply(Action::Rewrite(crate::repo::rewrite::RewriteAct::RunFold(Box::new(found))), &ctx);
     assert!(
         tab.busy_op.is_some(),
         "the preflight check holds the operation busy"
@@ -151,7 +151,7 @@ fn an_abort_confirmed_after_the_rebase_was_replaced_resets_no_other_branch() {
     let mut tab = tab(&dir, &ctx);
     let result = fold(&mut tab, &ctx, "HEAD~3", false);
     assert!(matches!(result, Some(Err(_))), "{result:?}");
-    tab.apply(Action::AbortFold, &ctx);
+    tab.apply(Action::Rewrite(crate::repo::rewrite::RewriteAct::AbortFold), &ctx);
     wait_for(&mut tab, &ctx, "abort confirmation", |t| t.dialog.is_some());
     let asked = match tab.dialog.take() {
         Some(Dialog::Confirm { ops, title, .. }) => Some((title, ops)),

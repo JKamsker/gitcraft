@@ -250,7 +250,7 @@ fn history_shortcut_uses_the_caret_line_on_each_side() {
         let line = if prefix == "context" { 1 } else { 2 };
         assert!(
             h.state().acts.iter().any(|a| matches!(a,
-                Action::LineHistory { at: crate::git::LinesAt::Rev(at), range, .. }
+                Action::FileView(crate::repo::file_view::FileViewAct::LineHistory { at: crate::git::LinesAt::Rev(at), range, .. })
                     if at == rev && *range == (line, line)
             )),
             "caret history mismatch for {prefix}: {:?}",

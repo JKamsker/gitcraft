@@ -209,11 +209,11 @@ pub(super) fn window(
                 .on_hover_text("Open the file as it was at the sample commit")
                 .clicked()
         {
-            acts.push(Action::FileView {
+            acts.push(Action::FileView(crate::repo::file_view::FileViewAct::Open {
                 path,
                 rev: Some(sample.sample.hash.clone()),
                 tab: FileTab::File,
-            });
+            }));
         }
         if ui.small_button("Close").on_hover_text("Esc").clicked() {
             open = false;

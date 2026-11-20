@@ -160,7 +160,7 @@ pub(super) fn request(view: &DiffView, on: bool, acts: &mut Vec<Action>) {
         && applies(&view.key)
         && view.coverage.asked != Some(view.data_request)
     {
-        acts.push(Action::DiffCoverage(CoverageAct::Load));
+        acts.push(Action::Diff(crate::repo::diff::DiffAct::Coverage(CoverageAct::Load)));
     }
 }
 
@@ -193,7 +193,7 @@ pub(super) fn control(ui: &mut Ui, t: &Tokens, acts: &mut Vec<Action>) {
         widgets::active_underline(ui, b.rect, t.accent);
     }
     if b.clicked() {
-        acts.push(Action::DiffCoverage(CoverageAct::Toggle));
+        acts.push(Action::Diff(crate::repo::diff::DiffAct::Coverage(CoverageAct::Toggle)));
     }
 }
 

@@ -18,18 +18,18 @@ const FIXTURE_PATH: &str = concat!(
 /// What an action is, named by its intent as it was declared before the families moved.
 fn moved(action: &Action) -> Option<String> {
     Some(match action {
-        Action::DiffCoverage(act) => format!("DiffCoverage({act:?})"),
-        Action::OpenFileComparison(page) => format!("OpenFileComparison({page:?})"),
-        Action::FileView { path, rev, tab } => format!("FileView({path:?}, {rev:?}, {tab:?})"),
-        Action::InteractiveRebase { onto, label } => {
+        Action::Diff(crate::repo::diff::DiffAct::Coverage(act)) => format!("DiffCoverage({act:?})"),
+        Action::Comparison(crate::repo::file_comparison::ComparisonAct::Open(page)) => format!("OpenFileComparison({page:?})"),
+        Action::FileView(crate::repo::file_view::FileViewAct::Open { path, rev, tab }) => format!("FileView({path:?}, {rev:?}, {tab:?})"),
+        Action::Rewrite(crate::repo::rewrite::RewriteAct::InteractiveRebase { onto, label }) => {
             format!("InteractiveRebase({onto:?}, {label:?})")
         }
-        Action::SavePatch { hash, summary } => format!("SavePatch({hash:?}, {summary:?})"),
-        Action::ApplyPatch => "ApplyPatch".into(),
-        Action::OpenSplit(hash) => format!("OpenSplit({hash:?})"),
-        Action::OpenMove(hash) => format!("OpenMove({hash:?})"),
-        Action::OpenAbsorb => "OpenAbsorb".into(),
-        Action::EarlierVersions => "EarlierVersions".into(),
+        Action::Rewrite(crate::repo::rewrite::RewriteAct::SavePatch { hash, summary }) => format!("SavePatch({hash:?}, {summary:?})"),
+        Action::Rewrite(crate::repo::rewrite::RewriteAct::ApplyPatch) => "ApplyPatch".into(),
+        Action::Surgery(crate::repo::surgery::SurgeryAct::OpenSplit(hash)) => format!("OpenSplit({hash:?})"),
+        Action::Surgery(crate::repo::surgery::SurgeryAct::OpenMove(hash)) => format!("OpenMove({hash:?})"),
+        Action::Surgery(crate::repo::surgery::SurgeryAct::OpenAbsorb) => "OpenAbsorb".into(),
+        Action::Drafts(crate::repo::working_drafts::DraftAct::EarlierVersions) => "EarlierVersions".into(),
         _ => return None,
     })
 }

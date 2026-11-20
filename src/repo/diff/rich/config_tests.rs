@@ -372,10 +372,10 @@ fn the_config_view_goes_to_the_line_of_a_key() -> Result<(), String> {
     harness.run();
     assert!(acts.borrow().iter().any(|a| matches!(
         a,
-        Action::DiffGoToLine {
+        Action::Diff(crate::repo::diff::DiffAct::GoToLine {
             old: None,
             new: Some(2)
-        }
+        })
     )));
     Ok(())
 }

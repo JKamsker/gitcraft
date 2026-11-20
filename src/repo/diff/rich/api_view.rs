@@ -98,6 +98,6 @@ fn row(ui: &mut Ui, t: &Tokens, c: &ApiChange, acts: &mut Vec<Action>) {
             Some(n) => (None, Some(n)),
             None => (c.old_line, None),
         };
-        acts.push(Action::DiffGoToLine { old, new });
+        acts.push(Action::Diff(crate::repo::diff::DiffAct::GoToLine { old, new }));
     }
 }

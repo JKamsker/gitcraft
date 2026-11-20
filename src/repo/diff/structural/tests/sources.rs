@@ -213,7 +213,7 @@ fn stale_answers_cannot_replace_a_newer_diff_or_read() -> Result<(), String> {
             .as_ref()
             .is_some_and(|v| matches!(&v.structural.result,Some(Err(e)) if e == "current"))
     );
-    tab.apply(Action::DiffStructural(false), &ctx);
+    tab.apply(Action::Diff(crate::repo::diff::DiffAct::Structural(false)), &ctx);
     assert!(tab.diff.as_ref().is_some_and(|v| !v.structural.enabled));
     Ok(())
 }

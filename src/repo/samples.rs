@@ -32,19 +32,19 @@ impl RepoTab {
                 if let Some(file) = self.work.unstaged.first() {
                     acts.push(Action::OpenDiff(DiffKey::Work(file.clone())));
                     // Read again as prose (a.txt), both sides read on that machine.
-                    acts.push(Action::DiffRich(Some(diff::rich::RichKind::Prose)));
+                    acts.push(Action::Diff(crate::repo::diff::DiffAct::Rich(Some(diff::rich::RichKind::Prose))));
                 }
-                acts.push(Action::FileView {
+                acts.push(Action::FileView(crate::repo::file_view::FileViewAct::Open {
                     path: "a.txt".to_owned(),
                     rev: None,
                     tab: FileTab::History,
-                });
-                acts.push(Action::FileView {
+                }));
+                acts.push(Action::FileView(crate::repo::file_view::FileViewAct::Open {
                     path: "a.txt".to_owned(),
                     rev: None,
                     tab: FileTab::Blame,
-                });
-                acts.push(Action::CloseFileView);
+                }));
+                acts.push(Action::FileView(crate::repo::file_view::FileViewAct::Close));
                 acts.push(Action::Ignore {
                     pattern: "/ignored.txt".to_owned(),
                     path: "ignored.txt".to_owned(),
@@ -76,10 +76,10 @@ impl RepoTab {
                 )));
                 acts.push(Action::Fetch);
                 acts.push(Action::Sync);
-                acts.push(Action::InteractiveRebase {
+                acts.push(Action::Rewrite(crate::repo::rewrite::RewriteAct::InteractiveRebase {
                     onto: "HEAD~1".to_owned(),
                     label: "HEAD~1".to_owned(),
-                });
+                }));
             }
             _ => {
                 // The lines of the diff opened, staged.
@@ -94,19 +94,19 @@ impl RepoTab {
                         lines: diff::hunk_changes(&data.lines, 0),
                     });
                     // After the pick, whose lines it numbers.
-                    acts.push(Action::DiffUnfold {
+                    acts.push(Action::Diff(crate::repo::diff::DiffAct::Unfold {
                         gap: 0,
                         how: diff::Unfold::All,
-                    });
+                    }));
                 }
                 // Back from the prose view opened in phase 1, to a line of the diff.
-                acts.push(Action::DiffGoToLine {
+                acts.push(Action::Diff(crate::repo::diff::DiffAct::GoToLine {
                     old: None,
                     new: Some(1),
-                });
-                acts.push(Action::DiffStructural(true));
-                acts.push(Action::DiffStructural(false));
-                acts.push(Action::RunRebase);
+                }));
+                acts.push(Action::Diff(crate::repo::diff::DiffAct::Structural(true)));
+                acts.push(Action::Diff(crate::repo::diff::DiffAct::Structural(false)));
+                acts.push(Action::Rewrite(crate::repo::rewrite::RewriteAct::RunRebase));
                 acts.push(Action::Stash(StashRequest::everything("sample")));
                 // A bisect from start to end, a run in it, and the dialog that starts one.
                 acts.push(Action::Dialog(self.start_bisect_dialog(&self.refs.head)));

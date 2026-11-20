@@ -101,7 +101,7 @@ pub(super) fn controls(
         let id = ui.id().with(("fold", i, label.as_str()));
         let (resp, at) = text_button(ui, right, y, label, t.accent, id);
         if resp.on_hover_text(*tip).clicked() {
-            acts.push(Action::DiffUnfold { gap: g, how: *how });
+            acts.push(Action::Diff(crate::repo::diff::DiffAct::Unfold { gap: g, how: *how }));
         }
         right = at - GAP;
     }

@@ -180,11 +180,11 @@ fn the_dialog_shows_the_preview_and_confirms_its_action() {
         lost_files: vec!["src/ünï code.rs".to_owned()],
         lost_total: 1,
     };
-    let quick = Action::QuickEdit {
+    let quick = Action::Rewrite(crate::repo::rewrite::RewriteAct::QuickEdit {
         edit: crate::repo::quick_edit::Edit::Drop,
         hash: "1111111111".to_owned(),
         branch_guard: crate::repo::operations::expect_symref("HEAD", "refs/heads/main"),
-    };
+    });
     let mut dialog = Dialog::confirm(
         "Drop commit",
         "Drop it?".to_owned(),
@@ -250,7 +250,7 @@ fn the_dialog_shows_the_preview_and_confirms_its_action() {
     drop(harness);
     let acts = acts.into_inner();
     assert!(
-        matches!(acts.as_slice(), [Action::QuickEdit { hash, .. }] if hash == "1111111111"),
+        matches!(acts.as_slice(), [Action::Rewrite(crate::repo::rewrite::RewriteAct::QuickEdit { hash, .. })] if hash == "1111111111"),
         "{} actions",
         acts.len()
     );

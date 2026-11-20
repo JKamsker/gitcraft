@@ -57,7 +57,7 @@ impl Rows<'_> {
             .on_hover_text(crate::i18n::text("repo-core-2313"))
             .clicked()
         {
-            acts.push(Action::DiffMoved(Some(b)));
+            acts.push(Action::Diff(crate::repo::diff::DiffAct::Moved(Some(b))));
         }
     }
 

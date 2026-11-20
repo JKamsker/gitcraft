@@ -56,7 +56,7 @@ fn optional_file_commands_capture_actual_reconciled_path_and_revision() {
         );
         if let Some(expected) = expected {
             assert!(
-                matches!(acts.as_slice(), [Action::FileView { path, rev, tab }] if path == "日本語.txt" && rev.as_deref() == Some("recorded-revision") && *tab == expected)
+                matches!(acts.as_slice(), [Action::FileView(crate::repo::file_view::FileViewAct::Open { path, rev, tab })] if path == "日本語.txt" && rev.as_deref() == Some("recorded-revision") && *tab == expected)
             );
         } else {
             assert!(acts.is_empty());

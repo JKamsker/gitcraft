@@ -253,10 +253,10 @@ fn the_api_view_opens_the_place_of_a_change() -> Result<(), String> {
     harness.run();
     assert!(acts.borrow().iter().any(|a| matches!(
         a,
-        Action::DiffGoToLine {
+        Action::Diff(crate::repo::diff::DiffAct::GoToLine {
             old: Some(29),
             new: None
-        }
+        })
     )));
     Ok(())
 }

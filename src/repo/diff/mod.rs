@@ -3,6 +3,8 @@
 //! their objects. Uncommitted changes can be staged, unstaged or discarded a hunk or a few
 //! lines at a time.
 
+mod act;
+pub(in crate::repo) use act::{DiffAct, coverage_palette_item};
 mod algorithm;
 #[cfg(test)]
 mod algorithm_tests;

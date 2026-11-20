@@ -143,7 +143,7 @@ fn row_selection_and_explicit_layout_choices_do_not_reapply_the_profile() {
         let (_, applied) = crate::connections::record_set_attempts(|| {
             crate::repo::messages::record_jobs(|| {
                 tab.apply(Action::Select(0), &ctx);
-                tab.apply(Action::DiffBesideGraph(true), &ctx);
+                tab.apply(Action::Diff(crate::repo::diff::DiffAct::BesideGraph(true)), &ctx);
             });
         });
         assert_eq!(

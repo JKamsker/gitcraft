@@ -150,10 +150,10 @@ fn undoing_a_rebase_that_updated_dependent_branches_puts_them_back() -> Result<(
     let mut tab = run(format_args!("open stack tab"), || open(&repo, &ctx))?;
     let onto = repo.tip("main")?;
     tab.apply(
-        Action::InteractiveRebase {
+        Action::Rewrite(crate::repo::rewrite::RewriteAct::InteractiveRebase {
             onto: "refs/heads/main".into(),
             label: "main".into(),
-        },
+        }),
         &ctx,
     );
     settle(&mut tab, &ctx, |t| t.rebase.is_some())?;
@@ -170,7 +170,7 @@ fn undoing_a_rebase_that_updated_dependent_branches_puts_them_back() -> Result<(
             .map(|e| format!("todo: Pick {} {}", e.commit.hash, e.message)),
     );
     run(format_args!("prepare interactive rebase"), || {
-        tab.apply(Action::RunRebase, &ctx)
+        tab.apply(Action::Rewrite(crate::repo::rewrite::RewriteAct::RunRebase), &ctx)
     });
     run(format_args!("review interactive rebase"), || {
         tab.review_rebase_for_test(&ctx, "ui", &before.2, &onto)
@@ -182,7 +182,7 @@ fn undoing_a_rebase_that_updated_dependent_branches_puts_them_back() -> Result<(
         .instead
         .as_ref()
         .ok_or("no confirmed rebase action")?;
-    assert!(matches!(instead.action, Action::ConfirmedRebase(approved) if approved == id));
+    assert!(matches!(instead.action, Action::Rewrite(crate::repo::rewrite::RewriteAct::ConfirmedRebase(approved)) if approved == id));
     assert_eq!(instead.described, described);
     assert_eq!(
         (repo.tip("schema")?, repo.tip("api")?, repo.tip("ui")?),

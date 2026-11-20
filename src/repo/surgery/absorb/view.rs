@@ -67,7 +67,7 @@ fn header(ui: &mut Ui, t: &Tokens, acts: &mut Vec<Action>) {
                     )
                     .clicked()
                     {
-                        acts.push(Action::CloseAbsorb);
+                        acts.push(Action::Surgery(crate::repo::surgery::SurgeryAct::CloseAbsorb));
                     }
                 });
             });
@@ -93,7 +93,7 @@ fn footer(ui: &mut Ui, t: &Tokens, editor: &mut AbsorbEditor, idle: bool, acts: 
                         &[("count", (n).into())],
                     );
                     if widgets::primary_button(ui, &label, free, 160.0).clicked() {
-                        acts.push(Action::RunAbsorb);
+                        acts.push(Action::Surgery(crate::repo::surgery::SurgeryAct::RunAbsorb));
                     }
                     if ui
                         .add_enabled(
@@ -114,13 +114,13 @@ fn footer(ui: &mut Ui, t: &Tokens, editor: &mut AbsorbEditor, idle: bool, acts: 
                 )
                 .clicked()
                 {
-                    acts.push(Action::CheckAbsorb);
+                    acts.push(Action::Surgery(crate::repo::surgery::SurgeryAct::CheckAbsorb));
                 }
                 if ui
                     .button(crate::i18n::text("repo-workflows-surgery-footer-19766ed6"))
                     .clicked()
                 {
-                    acts.push(Action::CloseAbsorb);
+                    acts.push(Action::Surgery(crate::repo::surgery::SurgeryAct::CloseAbsorb));
                 }
                 if editor.git_absorb
                     && ui
@@ -133,7 +133,7 @@ fn footer(ui: &mut Ui, t: &Tokens, editor: &mut AbsorbEditor, idle: bool, acts: 
                         .on_hover_text(crate::i18n::text("repo-workflows-surgery-footer-605de48c"))
                         .clicked()
                 {
-                    acts.push(Action::RunGitAbsorb);
+                    acts.push(Action::Surgery(crate::repo::surgery::SurgeryAct::RunGitAbsorb));
                 }
                 if editor.busy {
                     ui.add(crate::spinner::Spinner::new());

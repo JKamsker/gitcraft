@@ -153,7 +153,7 @@ fn header(ui: &mut Ui, t: &Tokens, editor: &SplitEditor, acts: &mut Vec<Action>)
                     )
                     .clicked()
                     {
-                        acts.push(Action::CloseSplit);
+                        acts.push(Action::Surgery(crate::repo::surgery::SurgeryAct::CloseSplit));
                     }
                 });
             });
@@ -187,7 +187,7 @@ fn footer(ui: &mut Ui, t: &Tokens, editor: &mut SplitEditor, idle: bool, acts: &
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                 if editor.checked.is_some() {
                     if widgets::primary_button(ui, run, idle && !editor.busy, 120.0).clicked() {
-                        acts.push(Action::RunSplit);
+                        acts.push(Action::Surgery(crate::repo::surgery::SurgeryAct::RunSplit));
                     }
                     if ui
                         .add_enabled(
@@ -208,13 +208,13 @@ fn footer(ui: &mut Ui, t: &Tokens, editor: &mut SplitEditor, idle: bool, acts: &
                 )
                 .clicked()
                 {
-                    acts.push(Action::CheckSplit);
+                    acts.push(Action::Surgery(crate::repo::surgery::SurgeryAct::CheckSplit));
                 }
                 if ui
                     .button(crate::i18n::text("repo-workflows-surgery-footer-19766ed6"))
                     .clicked()
                 {
-                    acts.push(Action::CloseSplit);
+                    acts.push(Action::Surgery(crate::repo::surgery::SurgeryAct::CloseSplit));
                 }
                 if editor.busy {
                     ui.add(crate::spinner::Spinner::new());

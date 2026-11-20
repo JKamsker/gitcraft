@@ -145,7 +145,7 @@ fn a_real_commit_is_drawn_and_its_nodes_open_at_its_revision() -> Result<(), Str
         .position(|n| *n == NodeRef::Symbol(0))
         .ok_or("no symbol node")?;
     match open_node(&data, laid.nodes[symbol]) {
-        Some(Action::BlameAt { path, rev, line }) => {
+        Some(Action::FileView(crate::repo::file_view::FileViewAct::BlameAt { path, rev, line })) => {
             assert_eq!(
                 (path.as_str(), rev.as_deref(), line),
                 ("src/lib.rs", Some(two.as_str()), 1)
@@ -155,7 +155,7 @@ fn a_real_commit_is_drawn_and_its_nodes_open_at_its_revision() -> Result<(), Str
     }
     for node in &laid.nodes {
         match open_node(&data, *node) {
-            Some(Action::BlameAt { rev, .. }) => assert_eq!(rev.as_deref(), Some(two.as_str())),
+            Some(Action::FileView(crate::repo::file_view::FileViewAct::BlameAt { rev, .. })) => assert_eq!(rev.as_deref(), Some(two.as_str())),
             Some(Action::OpenDiff(_)) => assert!(matches!(node, NodeRef::Other(_))),
             _ => return Err(format!("{node:?} opened something else")),
         }

@@ -6,10 +6,10 @@ fn target(action: &Action) -> &'static str {
     use file_comparison::Page;
     use repository_tools::Act;
     match action {
-        Action::OpenFileComparison(Page::CodeMoves) => "moves",
-        Action::OpenFileComparison(Page::Migration) => "migration",
-        Action::OpenFileComparison(Page::Lens) => "staging",
-        Action::OpenFileComparison(Page::Matrix) => "matrix",
+        Action::Comparison(crate::repo::file_comparison::ComparisonAct::Open(Page::CodeMoves)) => "moves",
+        Action::Comparison(crate::repo::file_comparison::ComparisonAct::Open(Page::Migration)) => "migration",
+        Action::Comparison(crate::repo::file_comparison::ComparisonAct::Open(Page::Lens)) => "staging",
+        Action::Comparison(crate::repo::file_comparison::ComparisonAct::Open(Page::Matrix)) => "matrix",
         Action::RepositoryTools(Act::Deferred) => "deferred",
         Action::RepositoryTools(Act::Virtuals) => "virtuals",
         Action::RepositoryTools(Act::StateReceipts) => "receipts",

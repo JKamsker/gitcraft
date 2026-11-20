@@ -243,11 +243,11 @@ impl RepoTab {
         let built = state.built.ready().cloned()?;
         let r = built.matrix.rows.get(row)?;
         if !r.folder {
-            return Some(Action::FileView {
+            return Some(Action::FileView(crate::repo::file_view::FileViewAct::Open {
                 path: r.name.clone(),
                 rev: Some(built.history.tip.clone()),
                 tab: FileTab::History,
-            });
+            }));
         }
         let depth = built.options.group.unwrap_or(1);
         state.options.filter = if r.name.is_empty() {

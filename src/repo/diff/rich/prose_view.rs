@@ -280,7 +280,7 @@ fn part(ui: &mut Ui, t: &Tokens, part: &Part, rect: Rect, captions: bool, acts: 
     };
     crate::a11y::a11y(&resp, egui::WidgetType::Button, &label);
     if resp.on_hover_text(tip).clicked() {
-        acts.push(Action::DiffGoToLine { old, new });
+        acts.push(Action::Diff(crate::repo::diff::DiffAct::GoToLine { old, new }));
     }
 }
 

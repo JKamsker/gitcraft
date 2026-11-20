@@ -18,42 +18,42 @@ pub(crate) fn actions(then: Then) -> Vec<Action> {
     use crate::repo::file_view::FileTab;
     match then {
         Then::Nothing => Vec::new(),
-        Then::History(path) => vec![Action::FileView {
+        Then::History(path) => vec![Action::FileView(crate::repo::file_view::FileViewAct::Open {
             path,
             rev: None,
             tab: FileTab::History,
-        }],
-        Then::Blame { path, line: None } => vec![Action::FileView {
+        })],
+        Then::Blame { path, line: None } => vec![Action::FileView(crate::repo::file_view::FileViewAct::Open {
             path,
             rev: None,
             tab: FileTab::Blame,
-        }],
+        })],
         Then::Blame {
             path,
             line: Some(line),
-        } => vec![Action::BlameAt {
+        } => vec![Action::FileView(crate::repo::file_view::FileViewAct::BlameAt {
             path,
             rev: None,
             line: line as usize,
-        }],
+        })],
         Then::FileAt {
             rev,
             path,
             line: None,
-        } => vec![Action::FileView {
+        } => vec![Action::FileView(crate::repo::file_view::FileViewAct::Open {
             path,
             rev,
             tab: FileTab::Blame,
-        }],
+        })],
         Then::FileAt {
             rev,
             path,
             line: Some(line),
-        } => vec![Action::BlameAt {
+        } => vec![Action::FileView(crate::repo::file_view::FileViewAct::BlameAt {
             path,
             rev,
             line: line as usize,
-        }],
+        })],
         Then::Commit(hash) => vec![Action::SelectHash(hash)],
         Then::PullRequest { number, remote } => vec![Action::OpenLinkedPr { number, remote }],
         // Cloned first, by the window (see `app::launch`).

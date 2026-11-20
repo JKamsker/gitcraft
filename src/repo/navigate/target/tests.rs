@@ -21,27 +21,27 @@ fn destinations() -> Vec<Action> {
         Action::ActivityCommit(hash.clone()),
         Action::OpenCommitChanges(hash.clone()),
         Action::OpenDiff(key),
-        Action::OpenDiffOfLines {
+        Action::FileView(crate::repo::file_view::FileViewAct::DiffOfLines {
             hash: hash.clone(),
             path: "file.txt".into(),
             lines: vec![(1, 2)],
-        },
+        }),
         Action::CloseDiff,
-        Action::FileView {
+        Action::FileView(crate::repo::file_view::FileViewAct::Open {
             path: "file.txt".into(),
             rev: None,
             tab: FileTab::History,
-        },
-        Action::LineHistory {
+        }),
+        Action::FileView(crate::repo::file_view::FileViewAct::LineHistory {
             path: "file.txt".into(),
             at: git::LinesAt::Rev(hash.clone()),
             range: (1, 2),
-        },
-        Action::BlameAt {
+        }),
+        Action::FileView(crate::repo::file_view::FileViewAct::BlameAt {
             path: "file.txt".into(),
             rev: None,
             line: 1,
-        },
+        }),
         Action::OpenPinnedFileLine(git::investigations::dossier::Seed {
             commit: hash.clone(),
             path: "file.txt".into(),
@@ -68,13 +68,13 @@ fn destinations() -> Vec<Action> {
             path: "file.txt".into(),
             line: 1,
         }),
-        Action::OpenSplit(hash.clone()),
-        Action::OpenMove(hash.clone()),
-        Action::OpenAbsorb,
-        Action::InteractiveRebase {
+        Action::Surgery(crate::repo::surgery::SurgeryAct::OpenSplit(hash.clone())),
+        Action::Surgery(crate::repo::surgery::SurgeryAct::OpenMove(hash.clone())),
+        Action::Surgery(crate::repo::surgery::SurgeryAct::OpenAbsorb),
+        Action::Rewrite(crate::repo::rewrite::RewriteAct::InteractiveRebase {
             onto: hash.clone(),
             label: "base".into(),
-        },
+        }),
         Action::Versions(VersionsAct::Rewrite(git::Rewrite {
             branch: "main".into(),
             time: 1,
@@ -94,7 +94,7 @@ fn destinations() -> Vec<Action> {
         Action::Reflog(ReflogAct::Show(crate::repo::reflog::Source::head())),
         Action::Reflog(ReflogAct::FindLost),
         Action::Reflog(ReflogAct::Select(0)),
-        Action::ComparisonNormalPatch,
+        Action::Comparison(crate::repo::file_comparison::ComparisonAct::NormalPatch),
         Action::Navigate(-1),
     ];
     actions.extend(
@@ -103,7 +103,7 @@ fn destinations() -> Vec<Action> {
     actions.extend(crate::repo::doctor::Section::ALL.map(Action::OpenDoctor));
     actions.extend(
         [Page::Migration, Page::CodeMoves, Page::Lens, Page::Matrix]
-            .map(Action::OpenFileComparison),
+            .map(|page| Action::Comparison(crate::repo::file_comparison::ComparisonAct::Open(page))),
     );
     actions.extend(
         [
@@ -160,14 +160,14 @@ fn controls_within_the_same_destination_preserve_the_pending_selection() {
     let ctx = egui::Context::default();
     let mut tab = RepoTab::new_deferred("/recording-only/destination-controls".into(), &ctx);
     for action in [
-        Action::DiffBesideGraph(true),
+        Action::Diff(crate::repo::diff::DiffAct::BesideGraph(true)),
         Action::Insights(InsightsAct::ToggleTable),
         Action::Review(ReviewAct::Reload),
         Action::Versions(VersionsAct::Select(0)),
         Action::Reflog(ReflogAct::Reload),
         Action::Bake(BakeAct::OpenFile("file.txt".into())),
         Action::Resolver(ResolverAct::ReviewAsDiff(true)),
-        Action::RefreshFileComparison,
+        Action::Comparison(crate::repo::file_comparison::ComparisonAct::Refresh),
     ] {
         tab.pending_goto = Some(PendingGoto::Restore("target".into()));
         tab.retire_navigation_restore(&action);

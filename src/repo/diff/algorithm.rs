@@ -96,7 +96,7 @@ pub(in crate::repo) fn algorithm_menu(
             ));
     }
     if picked != current {
-        acts.push(Action::SetDiffAlgorithm(picked));
+        acts.push(Action::Diff(crate::repo::diff::DiffAct::Algorithm(picked)));
     }
 }
 

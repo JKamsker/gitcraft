@@ -377,7 +377,7 @@ fn row(
             Change::Removed => (r.old_line, None),
             _ => (None, r.new_line),
         };
-        acts.push(Action::DiffGoToLine { old, new });
+        acts.push(Action::Diff(crate::repo::diff::DiffAct::GoToLine { old, new }));
     }
 }
 

@@ -123,7 +123,7 @@ pub(super) fn toggle(ui: &mut egui::Ui, on: bool, acts: &mut Vec<Action>) {
         .on_hover_text(crate::i18n::text("repo-core-4047"))
         .clicked()
     {
-        acts.push(Action::DiffStructural(!on));
+        acts.push(Action::Diff(crate::repo::diff::DiffAct::Structural(!on)));
     }
 }
 

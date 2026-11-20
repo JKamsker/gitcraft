@@ -92,11 +92,11 @@ pub fn file_menu_with(
                 .show(ui)
                 .clicked()
             {
-                acts.push(Action::FileView {
+                acts.push(Action::FileView(crate::repo::file_view::FileViewAct::Open {
                     path: path.to_owned(),
                     rev: rev.map(str::to_owned),
                     tab: FileTab::File,
-                });
+                }));
             }
             if let Some(rev) = rev
                 && ui.button(crate::i18n::text("repo-core-3751")).clicked()
@@ -111,11 +111,11 @@ pub fn file_menu_with(
                 .show(ui)
                 .clicked()
             {
-                acts.push(Action::FileView {
+                acts.push(Action::FileView(crate::repo::file_view::FileViewAct::Open {
                     path: path.to_owned(),
                     rev: rev.map(str::to_owned),
                     tab: FileTab::History,
-                });
+                }));
             }
             if crate::menu_item::MenuItem::new(crate::i18n::text("repo-core-2498"))
                 .icon("history")
@@ -123,11 +123,11 @@ pub fn file_menu_with(
                 .show(ui)
                 .clicked()
             {
-                acts.push(Action::FileView {
+                acts.push(Action::FileView(crate::repo::file_view::FileViewAct::Open {
                     path: path.to_owned(),
                     rev: rev.map(str::to_owned),
                     tab: FileTab::Blame,
-                });
+                }));
             }
             if revert && let Some(hash) = rev {
                 ui.separator();
@@ -219,11 +219,11 @@ pub(in crate::repo) fn selection_commands(
         (Command::FileBlame, FileTab::Blame),
     ] {
         if keymap::take(ctx, command) {
-            acts.push(Action::FileView {
+            acts.push(Action::FileView(crate::repo::file_view::FileViewAct::Open {
                 path: path.to_owned(),
                 rev: rev.map(str::to_owned),
                 tab,
-            });
+            }));
         }
     }
     if keymap::take(ctx, Command::FileCopyPath) {
@@ -408,7 +408,7 @@ mod registry_menu_tests {
         h.get_by_label("File history").click();
         h.run();
         assert!(
-            matches!(h.state().2.as_slice(), [Action::FileView { path, rev, tab: FileTab::History }] if path == "recorded.txt" && rev.as_deref() == Some("recorded-revision"))
+            matches!(h.state().2.as_slice(), [Action::FileView(crate::repo::file_view::FileViewAct::Open { path, rev, tab: FileTab::History })] if path == "recorded.txt" && rev.as_deref() == Some("recorded-revision"))
         );
     }
 }

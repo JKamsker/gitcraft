@@ -108,7 +108,7 @@ impl RepoTab {
                     ),
                 ] {
                     if ui.button(label).clicked() {
-                        acts.push(Action::OpenFileComparison(page));
+                        acts.push(Action::Comparison(crate::repo::file_comparison::ComparisonAct::Open(page)));
                         ui.close();
                     }
                 }

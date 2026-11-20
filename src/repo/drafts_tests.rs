@@ -164,7 +164,7 @@ fn a_rebase_list_cancelled_is_not_kept() {
     ));
     save(&tab);
     assert!(on_disk(&dir).rebase.is_some());
-    tab.apply(super::Action::CloseRebase, &ctx);
+    tab.apply(super::Action::Rewrite(crate::repo::rewrite::RewriteAct::CloseRebase), &ctx);
     save(&tab);
     let left = on_disk(&dir);
     let _ = std::fs::remove_dir_all(&dir);

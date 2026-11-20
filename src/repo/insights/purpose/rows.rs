@@ -51,7 +51,7 @@ pub(super) fn line_of(unit: &Unit) -> Option<(bool, u32)> {
 /// The actions that open `unit`.
 pub(super) fn open(files: &PrFiles, unit: &Unit) -> Vec<Action> {
     let key = key_of(files, unit);
-    let mut acts = vec![Action::OpenDiff(key.clone()), Action::UnfoldDiff];
+    let mut acts = vec![Action::OpenDiff(key.clone()), Action::Diff(crate::repo::diff::DiffAct::ShowFolded)];
     if let Some(at) = line_of(unit) {
         acts.push(act(Act::Jump { key, at }));
     }

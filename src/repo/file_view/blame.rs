@@ -209,7 +209,7 @@ impl RepoTab {
                         ],
                     ));
                     if gutter_resp.clicked() {
-                        acts.push(Action::CloseFileView);
+                        acts.push(Action::FileView(crate::repo::file_view::FileViewAct::Close));
                         acts.push(Action::SelectHash(line.hash.clone()));
                     }
                 }

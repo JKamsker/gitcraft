@@ -183,13 +183,13 @@ impl RepoTab {
             }
             if button.clicked() {
                 acts.push(match edit {
-                    Edit::Message => Action::EditMessage(hash.to_owned()),
+                    Edit::Message => Action::Rewrite(crate::repo::rewrite::RewriteAct::EditMessage(hash.to_owned())),
                     Edit::Drop => self.confirm_drop(&line, hash),
-                    _ => Action::QuickEdit {
+                    _ => Action::Rewrite(crate::repo::rewrite::RewriteAct::QuickEdit {
                         edit,
                         hash: hash.to_owned(),
                         branch_guard: self.same_branch(),
-                    },
+                    }),
                 });
             }
         }
@@ -198,11 +198,11 @@ impl RepoTab {
     /// Asks before dropping `hash` (of the checked-out branch, `line` from HEAD down), saying
     /// what leaves the branch and whether it was pushed.
     fn confirm_drop(&self, line: &[&Commit], hash: &str) -> Action {
-        let drop = Action::QuickEdit {
+        let drop = Action::Rewrite(crate::repo::rewrite::RewriteAct::QuickEdit {
             edit: Edit::Drop,
             hash: hash.to_owned(),
             branch_guard: self.same_branch(),
-        };
+        });
         let (Some(commit), Some(branch)) = (
             line.iter().find(|c| c.hash == hash),
             self.refs.current.as_deref(),

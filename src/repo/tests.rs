@@ -335,7 +335,7 @@ fn merging_and_rebasing_onto_a_branch_ignores_a_tag_of_the_same_name() -> Result
     }
     let before_rebase = rev("HEAD")?;
     let action = rebase_action(BranchRef::remote("origin/x"), "work");
-    assert!(matches!(&action, Action::AskRebase { onto, .. } if onto == "refs/remotes/origin/x"));
+    assert!(matches!(&action, Action::Rewrite(crate::repo::rewrite::RewriteAct::AskRebase { onto, .. }) if onto == "refs/remotes/origin/x"));
     tab.apply(action, &ctx);
     let accepted =
         tab.accept_rebase_for_test(&ctx, "work", &before_rebase, &branch_tip.clone()?)?;

@@ -50,18 +50,18 @@ impl RepoTab {
                             widgets::active_underline(ui, b.rect, t.accent);
                         }
                         if b.clicked() && !on {
-                            acts.push(Action::FileView {
+                            acts.push(Action::FileView(crate::repo::file_view::FileViewAct::Open {
                                 path: view.path.clone(),
                                 rev: view.rev.clone(),
                                 tab,
-                            });
+                            }));
                         }
                     }
                     ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                         if icons::small_button(ui, "x", crate::i18n::text("repo-core-0711"))
                             .clicked()
                         {
-                            acts.push(Action::CloseFileView);
+                            acts.push(Action::FileView(crate::repo::file_view::FileViewAct::Close));
                         }
                     });
                 });
@@ -138,11 +138,11 @@ impl RepoTab {
                         .rev
                         .clone()
                         .map_or(git::LinesAt::WorkTree, git::LinesAt::Rev);
-                    acts.push(Action::LineHistory {
+                    acts.push(Action::FileView(crate::repo::file_view::FileViewAct::LineHistory {
                         path: view.path.clone(),
                         at,
                         range,
-                    });
+                    }));
                 }
             }
         }

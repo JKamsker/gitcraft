@@ -83,13 +83,13 @@ pub(super) fn ready_data<'a>(
                     .selectable_label(!view.svg_source, crate::i18n::text("repo-core-2405"))
                     .clicked()
                 {
-                    acts.push(Action::DiffSvgSource(false));
+                    acts.push(Action::Diff(crate::repo::diff::DiffAct::SvgSource(false)));
                 }
                 if ui
                     .selectable_label(view.svg_source, crate::i18n::text("repo-core-2406"))
                     .clicked()
                 {
-                    acts.push(Action::DiffSvgSource(true));
+                    acts.push(Action::Diff(crate::repo::diff::DiffAct::SvgSource(true)));
                 }
             });
         }

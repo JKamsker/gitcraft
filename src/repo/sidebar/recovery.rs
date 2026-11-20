@@ -59,7 +59,7 @@ impl RepoTab {
             acts.push(Action::OpenContentRecovery);
         }
         if ui.button(crate::i18n::text("repo-core-3475")).clicked() {
-            acts.push(Action::EarlierVersions);
+            acts.push(Action::Drafts(crate::repo::working_drafts::DraftAct::EarlierVersions));
         }
         let t = Tokens::get(ui.ctx());
         if ui.button(crate::i18n::text("repo-core-3476")).clicked() {

@@ -338,11 +338,11 @@ fn lines_menu(
             more(ui, acts);
             match history() {
                 Ok(action) => {
-                    if let crate::repo::Action::LineHistory {
+                    if let crate::repo::Action::FileView(crate::repo::file_view::FileViewAct::LineHistory {
                         path,
                         at: crate::git::LinesAt::Rev(commit),
                         range,
-                    } = &action
+                    }) = &action
                         && crate::git::investigations::oid(commit)
                         && ui.button(crate::i18n::text("repo-core-2325")).clicked()
                     {
@@ -354,11 +354,11 @@ fn lines_menu(
                             },
                         )));
                     }
-                    if let crate::repo::Action::LineHistory {
+                    if let crate::repo::Action::FileView(crate::repo::file_view::FileViewAct::LineHistory {
                         path,
                         at: crate::git::LinesAt::Rev(commit),
                         range,
-                    } = &action
+                    }) = &action
                         && crate::git::investigations::oid(commit)
                         && ui.button(crate::i18n::text("repo-core-2326")).clicked()
                     {

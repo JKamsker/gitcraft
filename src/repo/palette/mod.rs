@@ -252,7 +252,7 @@ impl RepoTab {
                 "changes",
                 Action::Key(crate::keymap::Command::Commit),
             ),
-            PaletteItem::action("Apply patch…", "patch", Action::ApplyPatch),
+            PaletteItem::action("Apply patch…", "patch", Action::Rewrite(crate::repo::rewrite::RewriteAct::ApplyPatch)),
             PaletteItem::action("Undo", "history", Action::Undo),
             PaletteItem::action("Redo", "history", Action::Redo),
             PaletteItem::action("Stash changes", "stash", Action::Dialog(Dialog::stash())),

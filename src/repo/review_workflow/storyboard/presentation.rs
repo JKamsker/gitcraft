@@ -165,10 +165,10 @@ pub(super) fn open(acts: &mut Vec<Action>, commit: &str, path: &str, line: u64) 
             line,
         }));
     } else {
-        acts.push(Action::FileView {
+        acts.push(Action::FileView(crate::repo::file_view::FileViewAct::Open {
             path: path.into(),
             rev: Some(commit.into()),
             tab: FileTab::File,
-        });
+        }));
     }
 }

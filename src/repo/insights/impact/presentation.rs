@@ -225,11 +225,11 @@ pub(super) fn details(
                     if let Some(span) = span {
                         buttons.push((
                             format!("Definition at {side} {}", short(&span.rev)),
-                            Action::BlameAt {
+                            Action::FileView(crate::repo::file_view::FileViewAct::BlameAt {
                                 path: span.path.clone(),
                                 rev: Some(span.rev.clone()),
                                 line: span.line as usize,
-                            },
+                            }),
                         ));
                     }
                 }

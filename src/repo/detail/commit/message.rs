@@ -21,10 +21,10 @@ pub(super) fn message_section(
             if let Some(save) = reword_editor(ui, r) {
                 let message = r.message();
                 if save && message != detail.message.trim() {
-                    acts.push(Action::Reword {
+                    acts.push(Action::Rewrite(crate::repo::rewrite::RewriteAct::Reword {
                         hash: detail.hash.clone(),
                         message,
-                    });
+                    }));
                 }
                 close = true;
             }

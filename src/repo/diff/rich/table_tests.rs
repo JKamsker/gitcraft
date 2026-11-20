@@ -294,10 +294,10 @@ fn a_table_from_a_repository_and_the_grid() -> Result<(), String> {
     harness.run();
     assert!(acts.borrow().iter().any(|a| matches!(
         a,
-        Action::DiffGoToLine {
+        Action::Diff(crate::repo::diff::DiffAct::GoToLine {
             old: None,
             new: Some(3)
-        }
+        })
     )));
     Ok(())
 }

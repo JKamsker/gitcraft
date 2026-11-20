@@ -129,11 +129,11 @@ impl RepoTab {
         )
         .and_then(pick)
         {
-            acts.push(Action::LineHistory {
+            acts.push(Action::FileView(crate::repo::file_view::FileViewAct::LineHistory {
                 path: p.path,
                 at: p.at,
                 range: p.range,
-            });
+            }));
         }
     }
 
@@ -208,11 +208,11 @@ impl RepoTab {
                         }
                     });
                 if encoding != view.encrypted.json_encoding {
-                    acts.push(Action::DiffDecryptedEncoding(encoding));
+                    acts.push(Action::Diff(crate::repo::diff::DiffAct::DecryptedEncoding(encoding)));
                 }
                 if view.encrypted.enabled {
                     if ui.button(crate::i18n::text("repo-core-2347")).clicked() {
-                        acts.push(Action::DiffDecrypted(false));
+                        acts.push(Action::Diff(crate::repo::diff::DiffAct::Decrypted(false)));
                     }
                 } else if ui
                     .add_enabled(
@@ -222,7 +222,7 @@ impl RepoTab {
                     .on_hover_text(crate::i18n::text("repo-core-2349"))
                     .clicked()
                 {
-                    acts.push(Action::DiffDecrypted(true));
+                    acts.push(Action::Diff(crate::repo::diff::DiffAct::Decrypted(true)));
                 }
             });
         }

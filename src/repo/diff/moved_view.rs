@@ -207,21 +207,21 @@ fn header(
         ui.label(egui::RichText::new(note).color(t.text_dim));
         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
             if icons::small_button(ui, "x", crate::i18n::text("repo-core-0711")).clicked() {
-                acts.push(Action::DiffMoved(None));
+                acts.push(Action::Diff(crate::repo::diff::DiffAct::Moved(None)));
             }
             if ui
                 .button(crate::i18n::text("repo-core-3956"))
                 .on_hover_text(crate::i18n::text("repo-core-3957"))
                 .clicked()
             {
-                acts.push(Action::DiffJumpLine(block.add.start));
+                acts.push(Action::Diff(crate::repo::diff::DiffAct::JumpLine(block.add.start)));
             }
             if ui
                 .button(crate::i18n::text("repo-core-3958"))
                 .on_hover_text(crate::i18n::text("repo-core-3959"))
                 .clicked()
             {
-                acts.push(Action::DiffJumpLine(block.del.start));
+                acts.push(Action::Diff(crate::repo::diff::DiffAct::JumpLine(block.del.start)));
             }
         });
     });

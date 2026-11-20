@@ -37,7 +37,7 @@ impl RepoTab {
                 .on_hover_text(crate::i18n::text("repo-core-0813"))
                 .clicked()
             {
-                acts.push(Action::EarlierVersions);
+                acts.push(Action::Drafts(crate::repo::working_drafts::DraftAct::EarlierVersions));
             }
             self.review_all_button(
                 ui,
@@ -292,7 +292,7 @@ impl RepoTab {
                     .on_hover_text(crate::i18n::text("repo-core-0841"))
                     .on_disabled_hover_text(reason.unwrap_or_default());
                 if r.clicked() {
-                    acts.push(Action::OpenAbsorb);
+                    acts.push(Action::Surgery(crate::repo::surgery::SurgeryAct::OpenAbsorb));
                 }
             },
         ) {

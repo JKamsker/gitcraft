@@ -288,11 +288,11 @@ pub(super) fn unit_details(ui: &mut Ui, model: &Model, u: usize, acts: &mut Vec<
         &format!("{}: changed in {} commits", unit.name, unit.changes),
     );
     if c.options.depth.is_none() && ui.button("History of the file").clicked() {
-        acts.push(Action::FileView {
+        acts.push(Action::FileView(crate::repo::file_view::FileViewAct::Open {
             path: unit.name.clone(),
             rev: Some(model.history.tip.clone()),
             tab: FileTab::History,
-        });
+        }));
     }
     let widths = [320.0, 80.0, 90.0];
     common::table_row(

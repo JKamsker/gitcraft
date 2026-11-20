@@ -84,11 +84,11 @@ fn open_hunk(data: &Coverage, file: usize, hunk: usize) -> Option<Action> {
             to: None,
             path: f.path.clone(),
         }),
-        Ask::Commit(_) => Action::OpenDiffOfLines {
+        Ask::Commit(_) => Action::FileView(crate::repo::file_view::FileViewAct::DiffOfLines {
             hash: data.sha.clone(),
             path: f.path.clone(),
             lines: vec![h.span()],
-        },
+        }),
     })
 }
 
@@ -98,14 +98,14 @@ fn open_node(data: &Coverage, node: NodeRef, test: Option<usize>) -> Vec<Action>
         NodeRef::File(f) => data
             .files
             .get(f)
-            .map(|file| Action::FileView {
+            .map(|file| Action::FileView(crate::repo::file_view::FileViewAct::Open {
                 path: file.path.clone(),
                 rev: match data.ask {
                     Ask::WorkTree => None,
                     Ask::Commit(_) => Some(data.sha.clone()),
                 },
                 tab: FileTab::File,
-            })
+            }))
             .into_iter()
             .collect(),
         NodeRef::Hunk(f, h) => open_hunk(data, f, h).into_iter().collect(),

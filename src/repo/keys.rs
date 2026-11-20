@@ -80,8 +80,8 @@ impl RepoTab {
             }
             Command::Back => Action::Navigate(-1),
             Command::Forward => Action::Navigate(1),
-            Command::NextChange | Command::NextChangeAlt => Action::DiffStep(1),
-            Command::PreviousChange | Command::PreviousChangeAlt => Action::DiffStep(-1),
+            Command::NextChange | Command::NextChangeAlt => Action::Diff(crate::repo::diff::DiffAct::Step(1)),
+            Command::PreviousChange | Command::PreviousChangeAlt => Action::Diff(crate::repo::diff::DiffAct::Step(-1)),
             Command::Fetch => Action::Fetch,
             Command::Pull => Action::Pull,
             Command::Push => Action::Push,

@@ -82,11 +82,11 @@ fn act(a: Act) -> Action {
 
 /// Opens a reference's line at the revision it was read at.
 fn open_ref(r: &Reference) -> Action {
-    Action::BlameAt {
+    Action::FileView(crate::repo::file_view::FileViewAct::BlameAt {
         path: r.path.clone(),
         rev: Some(r.rev.clone()),
         line: r.line as usize,
-    }
+    })
 }
 
 /// What clicking a node opens: a symbol's definition or a site at the revision it was read
@@ -95,19 +95,19 @@ fn open_node(data: &Impact, node: NodeRef) -> Option<Action> {
     match node {
         NodeRef::Symbol(i) => {
             let span = data.symbols.get(i)?.at()?;
-            Some(Action::BlameAt {
+            Some(Action::FileView(crate::repo::file_view::FileViewAct::BlameAt {
                 path: span.path.clone(),
                 rev: Some(span.rev.clone()),
                 line: span.line as usize,
-            })
+            }))
         }
         NodeRef::Site(i) => {
             let site = data.sites.get(i)?;
-            Some(Action::BlameAt {
+            Some(Action::FileView(crate::repo::file_view::FileViewAct::BlameAt {
                 path: site.path.clone(),
                 rev: Some(site.rev.clone()),
                 line: site.line as usize,
-            })
+            }))
         }
         NodeRef::Other(i) => Some(file_diff(data, &data.other.get(i)?.path)),
     }

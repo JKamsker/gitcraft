@@ -25,7 +25,7 @@ fn decrypt_action_is_asynchronous_and_close_cancels_its_private_worker() -> Resu
     );
     tab.diff = Some(view);
     let start = std::time::Instant::now();
-    tab.apply(crate::repo::Action::DiffDecrypted(true), &ctx);
+    tab.apply(crate::repo::Action::Diff(crate::repo::diff::DiffAct::Decrypted(true)), &ctx);
     assert!(start.elapsed() < Duration::from_millis(200));
     let active = tab
         .diff

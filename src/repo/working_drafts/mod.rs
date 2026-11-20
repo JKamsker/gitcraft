@@ -1,4 +1,6 @@
 //! Independent index/worktree snapshots, read and written on the shared task service.
+mod act;
+pub(in crate::repo) use act::DraftAct;
 pub(in crate::repo) mod view;
 use super::saved_views::reader::Reader;
 use super::{Dialog, RepoTab};

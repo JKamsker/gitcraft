@@ -30,7 +30,7 @@ pub(in crate::repo) fn history(
         )
         .changed()
     {
-        return done(Action::DraftEnable(*on));
+        return done(Action::Drafts(crate::repo::working_drafts::DraftAct::Enable(*on)));
     }
     ui.label(crate::i18n::text(
         "repo-workflows-working_drafts-history-65b35d4c",
@@ -56,7 +56,7 @@ pub(in crate::repo) fn history(
             )
             .clicked()
         {
-            outcome = done(Action::DraftSnapshot);
+            outcome = done(Action::Drafts(crate::repo::working_drafts::DraftAct::Snapshot));
         }
         if ui
             .button(crate::i18n::text(
@@ -64,7 +64,7 @@ pub(in crate::repo) fn history(
             ))
             .clicked()
         {
-            outcome = done(Action::EarlierVersions);
+            outcome = done(Action::Drafts(crate::repo::working_drafts::DraftAct::EarlierVersions));
         }
         if ui
             .add_enabled(
@@ -75,7 +75,7 @@ pub(in crate::repo) fn history(
             )
             .clicked()
         {
-            outcome = done(Action::DraftUndo);
+            outcome = done(Action::Drafts(crate::repo::working_drafts::DraftAct::Undo));
         }
     });
     ui.separator();
@@ -146,11 +146,11 @@ pub(in crate::repo) fn history(
                                         .on_hover_text(&file.path)
                                         .clicked()
                                     {
-                                        outcome = done(Action::DraftPreview {
+                                        outcome = done(Action::Drafts(crate::repo::working_drafts::DraftAct::Preview {
                                             id: draft.id.clone(),
                                             path: file.path.clone(),
                                             index: *index,
-                                        });
+                                        }));
                                     }
                                 }
                             });
@@ -243,10 +243,10 @@ pub(in crate::repo) fn recovery(
             )
             .clicked()
         {
-            outcome = done(Action::DraftRecover {
+            outcome = done(Action::Drafts(crate::repo::working_drafts::DraftAct::Recover {
                 preview: Box::new(preview.clone()),
                 hunks: selected.iter().copied().collect(),
-            });
+            }));
         }
         if ui
             .button(crate::i18n::text(
@@ -254,7 +254,7 @@ pub(in crate::repo) fn recovery(
             ))
             .clicked()
         {
-            outcome = done(Action::EarlierVersions);
+            outcome = done(Action::Drafts(crate::repo::working_drafts::DraftAct::EarlierVersions));
         }
         if ui
             .button(crate::i18n::text(

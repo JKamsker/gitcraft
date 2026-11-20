@@ -8,22 +8,22 @@ pub(in crate::repo) fn items() -> [PaletteContribution; 4] {
         (
             "Code moved across files".into(),
             "refactor moved block".into(),
-            Action::OpenFileComparison(crate::repo::file_comparison::Page::CodeMoves),
+            Action::Comparison(crate::repo::file_comparison::ComparisonAct::Open(crate::repo::file_comparison::Page::CodeMoves)),
         ),
         (
             "File migration map".into(),
             "files".into(),
-            Action::OpenFileComparison(crate::repo::file_comparison::Page::Migration),
+            Action::Comparison(crate::repo::file_comparison::ComparisonAct::Open(crate::repo::file_comparison::Page::Migration)),
         ),
         (
             "Three-state staging lens".into(),
             "staging".into(),
-            Action::OpenFileComparison(crate::repo::file_comparison::Page::Lens),
+            Action::Comparison(crate::repo::file_comparison::ComparisonAct::Open(crate::repo::file_comparison::Page::Lens)),
         ),
         (
             "File versions across branches".into(),
             "files".into(),
-            Action::OpenFileComparison(crate::repo::file_comparison::Page::Matrix),
+            Action::Comparison(crate::repo::file_comparison::ComparisonAct::Open(crate::repo::file_comparison::Page::Matrix)),
         ),
     ]
 }

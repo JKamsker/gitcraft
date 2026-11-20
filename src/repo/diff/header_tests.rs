@@ -164,7 +164,7 @@ fn responsive_diff_overflow_keeps_algorithm_choices_and_keyboard_access()
     h.step();
     assert!(h.state().1.iter().any(|a| matches!(
         a,
-        Action::SetDiffAlgorithm(Some(crate::git::DiffAlgorithm::Histogram))
+        Action::Diff(crate::repo::diff::DiffAct::Algorithm(Some(crate::git::DiffAlgorithm::Histogram)))
     )));
     evidence(&mut h, "diff-overflow-algorithm");
     Ok(())

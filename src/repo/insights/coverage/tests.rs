@@ -128,7 +128,7 @@ fn a_commit_with_a_matching_report_is_drawn_and_opens_its_hunks() -> Result<(), 
         .copied()
         .ok_or("no hunk")?;
     match open_node(&data, hunk, None).first() {
-        Some(Action::OpenDiffOfLines { hash, path, lines }) => {
+        Some(Action::FileView(crate::repo::file_view::FileViewAct::DiffOfLines { hash, path, lines })) => {
             assert_eq!(
                 (hash.as_str(), path.as_str(), lines.as_slice()),
                 (two.as_str(), "src/lib.rs", &[(1, 3)][..])
@@ -137,7 +137,7 @@ fn a_commit_with_a_matching_report_is_drawn_and_opens_its_hunks() -> Result<(), 
         _ => return Err("the hunk opened something else".to_owned()),
     }
     match open_node(&data, NodeRef::File(0), None).first() {
-        Some(Action::FileView { rev, .. }) => assert_eq!(rev.as_deref(), Some(two.as_str())),
+        Some(Action::FileView(crate::repo::file_view::FileViewAct::Open { rev, .. })) => assert_eq!(rev.as_deref(), Some(two.as_str())),
         _ => return Err("the file opened something else".to_owned()),
     }
     tab.apply(

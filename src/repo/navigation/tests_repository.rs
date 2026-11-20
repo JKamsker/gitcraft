@@ -97,11 +97,11 @@ fn back_and_forward_through_a_repository() {
     act(&mut tab, Action::OpenDiff(key.clone()), &ctx);
     act(
         &mut tab,
-        Action::FileView {
+        Action::FileView(crate::repo::file_view::FileViewAct::Open {
             path: file.clone(),
             rev: Some(head.clone()),
             tab: FileTab::History,
-        },
+        }),
         &ctx,
     );
     assert!(tab.diff.is_none());
@@ -155,11 +155,11 @@ fn a_diff_beside_its_file_history_is_the_history() {
     act(&mut tab, Action::OpenDiff(key.clone()), &ctx);
     act(
         &mut tab,
-        Action::FileView {
+        Action::FileView(crate::repo::file_view::FileViewAct::Open {
             path: file.clone(),
             rev: None,
             tab: FileTab::History,
-        },
+        }),
         &ctx,
     );
     wait(&mut tab, &ctx, |t| {
@@ -375,11 +375,11 @@ fn below_the_graph_the_diff_stays_while_selecting() {
     // A file's history keeps its own place.
     act(
         &mut tab,
-        Action::FileView {
+        Action::FileView(crate::repo::file_view::FileViewAct::Open {
             path: file.clone(),
             rev: None,
             tab: FileTab::History,
-        },
+        }),
         &ctx,
     );
     assert!(!tab.diff_can_split());

@@ -125,11 +125,11 @@ fn ctrl_f_finds_in_the_diff_file_or_blame_shown_and_in_the_commits_otherwise() -
     let diff_closed = w.tab.diff.is_none();
 
     // The blame: Ctrl+F again finds in it, with the text typed before.
-    w.tab.queue(Action::FileView {
+    w.tab.queue(Action::FileView(crate::repo::file_view::FileViewAct::Open {
         path: PATH.to_owned(),
         rev: None,
         tab: FileTab::Blame,
-    });
+    }));
     let blamed = w.until(|t| matches!(&t.file_view, Some(v) if matches!(v.blame, Some(Ok(_)))));
     w.key(Key::F, Modifiers::COMMAND);
     w.until(|t| t.find.summary().is_some());
@@ -139,22 +139,22 @@ fn ctrl_f_finds_in_the_diff_file_or_blame_shown_and_in_the_commits_otherwise() -
         w.tab.find.count(),
     );
     // The file: the same, from its own lines.
-    w.tab.queue(Action::FileView {
+    w.tab.queue(Action::FileView(crate::repo::file_view::FileViewAct::Open {
         path: PATH.to_owned(),
         rev: None,
         tab: FileTab::File,
-    });
+    }));
     let read = w.until(|t| matches!(&t.file_view, Some(v) if matches!(v.text, Some(Ok(_)))));
     // Ctrl+F selects what was typed: typing replaces it.
     w.key(Key::F, Modifiers::COMMAND);
     w.type_text("omega");
     let in_file = w.tab.find.count();
     // History has nothing to search: back to the commit search.
-    w.tab.queue(Action::FileView {
+    w.tab.queue(Action::FileView(crate::repo::file_view::FileViewAct::Open {
         path: PATH.to_owned(),
         rev: None,
         tab: FileTab::History,
-    });
+    }));
     w.frame(Vec::new(), Modifiers::NONE);
     w.frame(Vec::new(), Modifiers::NONE);
     let left = !w.tab.find.open;

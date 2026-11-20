@@ -266,7 +266,7 @@ impl RepoTab {
             self.apply(Action::CloseCi, ctx);
         }
         if file_view && self.file_view.is_some() {
-            self.apply(Action::CloseFileView, ctx);
+            self.apply(Action::FileView(crate::repo::file_view::FileViewAct::Close), ctx);
         }
     }
 
@@ -304,11 +304,11 @@ impl RepoTab {
             View::File { path, rev, tab } => {
                 self.close_pages(false, ctx);
                 self.apply(
-                    Action::FileView {
+                    Action::FileView(crate::repo::file_view::FileViewAct::Open {
                         path: path.clone(),
                         rev: rev.clone(),
                         tab: *tab,
-                    },
+                    }),
                     ctx,
                 );
             }
@@ -318,14 +318,14 @@ impl RepoTab {
                 }
                 if self.pr_view.as_ref().is_some_and(|p| p.number == *number) {
                     self.apply(Action::CloseDiff, ctx);
-                    self.apply(Action::CloseFileView, ctx);
+                    self.apply(Action::FileView(crate::repo::file_view::FileViewAct::Close), ctx);
                 } else {
                     self.apply(Action::OpenPr(*number), ctx);
                 }
             }
             View::Ci(sha) => {
                 self.apply(Action::CloseDiff, ctx);
-                self.apply(Action::CloseFileView, ctx);
+                self.apply(Action::FileView(crate::repo::file_view::FileViewAct::Close), ctx);
                 if self.ci_view.as_ref().is_none_or(|c| &c.sha != sha) {
                     self.apply(
                         Action::OpenCi {

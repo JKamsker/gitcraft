@@ -56,13 +56,13 @@ fn decrypted_ui_is_read_only_and_mode_close_reload_or_park_disposes_it() -> Resu
     out.shapes.clear();
     out.textures_delta.clear();
     for action in [
-        crate::repo::Action::DiffAsFile(false),
-        crate::repo::Action::DiffRendered(false),
-        crate::repo::Action::DiffStructural(false),
-        crate::repo::Action::DiffDecryptedEncoding(JsonEncoding::Binary),
-        crate::repo::Action::OpenFileComparison(crate::repo::file_comparison::Page::Migration),
-        crate::repo::Action::OpenFileComparison(crate::repo::file_comparison::Page::Lens),
-        crate::repo::Action::OpenFileComparison(crate::repo::file_comparison::Page::Matrix),
+        crate::repo::Action::Diff(crate::repo::diff::DiffAct::AsFile(false)),
+        crate::repo::Action::Diff(crate::repo::diff::DiffAct::Rendered(false)),
+        crate::repo::Action::Diff(crate::repo::diff::DiffAct::Structural(false)),
+        crate::repo::Action::Diff(crate::repo::diff::DiffAct::DecryptedEncoding(JsonEncoding::Binary)),
+        crate::repo::Action::Comparison(crate::repo::file_comparison::ComparisonAct::Open(crate::repo::file_comparison::Page::Migration)),
+        crate::repo::Action::Comparison(crate::repo::file_comparison::ComparisonAct::Open(crate::repo::file_comparison::Page::Lens)),
+        crate::repo::Action::Comparison(crate::repo::file_comparison::ComparisonAct::Open(crate::repo::file_comparison::Page::Matrix)),
         crate::repo::Action::CloseDiff,
     ] {
         tab.diff = Some(make_view()?);

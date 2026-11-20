@@ -37,7 +37,7 @@ fn apply_patch_item(ui: &mut Ui, idle: bool, acts: &mut Vec<Action>) {
         .on_hover_text(crate::i18n::text(super::APPLY_PATCH_TIP))
         .clicked()
     {
-        acts.push(Action::ApplyPatch);
+        acts.push(Action::Rewrite(crate::repo::rewrite::RewriteAct::ApplyPatch));
     }
 }
 
@@ -240,10 +240,10 @@ impl RepoTab {
                     .on_hover_text(crate::i18n::text("repo-core-2629"))
                     .clicked()
                 {
-                    acts.push(Action::SavePatch {
+                    acts.push(Action::Rewrite(crate::repo::rewrite::RewriteAct::SavePatch {
                         hash: hash.clone(),
                         summary: summary.clone(),
-                    });
+                    }));
                 }
                 if is_head {
                     apply_patch_item(ui, idle, acts);

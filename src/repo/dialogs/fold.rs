@@ -76,7 +76,7 @@ pub(super) fn fold(ui: &mut Ui, plan: &mut Plan) -> Outcome {
         crate::i18n::text("repo-core-1315")
     };
     buttons(ui, button, true, false, || {
-        Action::RunFold(Box::new(plan.clone()))
+        Action::Rewrite(crate::repo::rewrite::RewriteAct::RunFold(Box::new(plan.clone())))
     })
 }
 

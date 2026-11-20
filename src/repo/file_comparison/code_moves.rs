@@ -388,10 +388,10 @@ pub(super) fn view(
                 .clicked()
             {
                 acts.push(Action::OpenDiff(l.key.clone()));
-                acts.push(Action::DiffGoToLine {
+                acts.push(Action::Diff(crate::repo::diff::DiffAct::GoToLine {
                     old: (side == 0).then_some(l.line),
                     new: (side == 1).then_some(l.line),
-                });
+                }));
             }
         }
     });

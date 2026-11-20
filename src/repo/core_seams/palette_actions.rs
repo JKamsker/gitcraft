@@ -16,7 +16,7 @@ impl RepoTab {
         items.push((
             crate::i18n::text("diff-coverage-toggle").to_owned(),
             "coverage lcov cobertura gutter tests".to_owned(),
-            Action::DiffCoverage(crate::repo::diff::coverage::CoverageAct::Toggle),
+            Action::Diff(crate::repo::diff::DiffAct::Coverage(crate::repo::diff::coverage::CoverageAct::Toggle)),
         ));
         items.extend(crate::repo::push::palette::items(
             ctx,
@@ -48,7 +48,7 @@ impl RepoTab {
         items.push((
             "Distribute staged fixes…".into(),
             "absorb".into(),
-            Action::OpenAbsorb,
+            Action::Surgery(crate::repo::surgery::SurgeryAct::OpenAbsorb),
         ));
         items.extend(crate::repo::timeline::palette::items(ctx));
         items.extend(crate::repo::partial_stash::palette::stash(ctx));

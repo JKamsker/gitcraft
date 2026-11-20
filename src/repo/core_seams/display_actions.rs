@@ -95,11 +95,11 @@ impl RepoTab {
             seed.line,
         );
         self.apply(
-            Action::FileView {
+            Action::FileView(crate::repo::file_view::FileViewAct::Open {
                 path: seed.path,
                 rev: Some(seed.commit),
                 tab: crate::repo::file_view::FileTab::File,
-            },
+            }),
             ctx,
         );
         true

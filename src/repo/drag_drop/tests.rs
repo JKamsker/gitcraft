@@ -417,11 +417,11 @@ fn filtered_ancestor_keeps_rewrite_offers_and_drop_replays_hidden_commit_then_un
     run(
         &mut tab,
         &ctx,
-        Action::QuickEdit {
+        Action::Rewrite(crate::repo::rewrite::RewriteAct::QuickEdit {
             edit: crate::repo::quick_edit::Edit::Drop,
             hash: older,
             branch_guard: crate::repo::operations::expect_symref("HEAD", "refs/heads/main"),
-        },
+        }),
     );
     assert_eq!(subjects(&dir), ["head", "hidden checkpoint", "base"]);
     assert_eq!(

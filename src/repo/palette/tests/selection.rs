@@ -227,7 +227,7 @@ fn the_open_file_has_its_actions() {
         .find(|i| i.label == format!("File history of {path}"));
     assert!(matches!(
         history.map(|i| &i.run),
-        Some(PaletteRun::Action(Action::FileView { rev: Some(rev), .. })) if *rev == "c".repeat(40)
+        Some(PaletteRun::Action(Action::FileView(crate::repo::file_view::FileViewAct::Open { rev: Some(rev), .. }))) if *rev == "c".repeat(40)
     ));
     assert!(
         !items

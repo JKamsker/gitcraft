@@ -13,11 +13,11 @@ fn quick_drop_refuses_a_different_branch_at_the_same_commit() -> Result<(), Stri
     let mut tab = RepoTab::new_deferred(dir.clone(), &ctx);
     tab.refs.current = Some("original".into());
     tab.refs.head = tip.clone();
-    let captured = Action::QuickEdit {
+    let captured = Action::Rewrite(crate::repo::rewrite::RewriteAct::QuickEdit {
         edit: Edit::Drop,
         hash: tip.clone(),
         branch_guard: tab.same_branch(),
-    };
+    });
     git::run(Some(&dir), &["checkout", "-q", "other"])?;
     tab.refs.current = Some("other".into());
     let execute = |tab: &mut RepoTab, action: Action| -> Result<bool, String> {
@@ -47,11 +47,11 @@ fn quick_drop_refuses_a_different_branch_at_the_same_commit() -> Result<(), Stri
             .all(|entry| entry.undo.is_none())
     );
     assert!(git::in_progress(&dir)?.is_none());
-    let fresh = Action::QuickEdit {
+    let fresh = Action::Rewrite(crate::repo::rewrite::RewriteAct::QuickEdit {
         edit: Edit::Drop,
         hash: tip.clone(),
         branch_guard: tab.same_branch(),
-    };
+    });
     assert!(execute(&mut tab, fresh)?);
     assert_eq!(git::head(&dir), base);
     assert_eq!(git::resolve(&dir, "refs/heads/original")?, tip);
@@ -266,11 +266,11 @@ fn startup_snapshot_retains_queued_links_through_failed_loading() {
         number: 42,
         remote: "https://github.com/example/repo".into(),
     });
-    tab.queue(crate::repo::Action::BlameAt {
+    tab.queue(crate::repo::Action::FileView(crate::repo::file_view::FileViewAct::BlameAt {
         path: "src/lib.rs".into(),
         rev: Some("main".into()),
         line: 17,
-    });
+    }));
     assert!(tab.take_queued_actions().is_empty());
     crate::repo::messages::record_jobs(|| {
         tab.handle(crate::repo::Msg::Loaded(Err("read failed".into())), &ctx);
@@ -285,7 +285,7 @@ fn startup_snapshot_retains_queued_links_through_failed_loading() {
     assert!(matches!(
         actions.as_slice(),
         [crate::repo::Action::OpenLinkedPr { number: 42, remote },
-         crate::repo::Action::BlameAt { path, rev: Some(rev), line: 17 }]
+         crate::repo::Action::FileView(crate::repo::file_view::FileViewAct::BlameAt { path, rev: Some(rev), line: 17 })]
             if remote == "https://github.com/example/repo"
                 && path == "src/lib.rs" && rev == "main"
     ));

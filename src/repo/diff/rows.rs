@@ -406,11 +406,11 @@ impl<'a> Rows<'a> {
                 sel.as_ref(),
                 &self.view.chosen,
             )
-            .map(|p| Action::LineHistory {
+            .map(|p| Action::FileView(crate::repo::file_view::FileViewAct::LineHistory {
                 path: p.path,
                 at: p.at,
                 range: p.range,
-            })
+            }))
         };
         let picks = std::mem::take(&mut self.picks);
         copy_selection(

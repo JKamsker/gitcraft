@@ -22,19 +22,8 @@ pub(crate) enum Action {
     OpenSymbolBiography(Option<git::investigations::dossier::Seed>),
     CloseSymbolBiography,
     OpenPinnedFileLine(git::investigations::dossier::Seed),
-    EarlierVersions,
-    DraftEnable(bool),
-    DraftSnapshot,
-    DraftUndo,
-    DraftPreview {
-        id: crate::git::drafts::Id,
-        path: String,
-        index: bool,
-    },
-    DraftRecover {
-        preview: Box<crate::git::drafts::RestorePreview>,
-        hunks: Vec<usize>,
-    },
+    /// Working-tree drafts: switching them, snapshots, undo, previews and recovery.
+    Drafts(super::working_drafts::DraftAct),
     OpenContentRecovery,
     ContentSearch(String),
     ContentInspect(usize, Option<usize>),
@@ -60,25 +49,8 @@ pub(crate) enum Action {
     Select(usize),
     SelectBranchTip(usize),
     DvcPull,
-    OpenFileComparison(super::file_comparison::Page),
-    RefreshFileComparison,
-    CloseFileComparison,
-    ComparisonMove {
-        request: u64,
-        index: usize,
-    },
-    ComparisonCell {
-        request: u64,
-        path: Vec<u8>,
-        column: usize,
-    },
-    ComparisonPick {
-        request: u64,
-        boundary: usize,
-        lines: std::collections::BTreeSet<usize>,
-        whole: bool,
-    },
-    ComparisonNormalPatch,
+    /// Something done in the raw file comparison panes.
+    Comparison(super::file_comparison::ComparisonAct),
     SelectHash(String),
     /// Select a branch's tip commit by hash: details only, never a file diff.
     SelectBranch(String),
@@ -239,51 +211,9 @@ pub(crate) enum Action {
         name: bool,
         email: bool,
     },
-    /// How diffs show: side by side, without whitespace changes, the whole file.
-    SetDiffOptions {
-        split: bool,
-        ignore_ws: bool,
-        whole_file: bool,
-    },
-    /// The diff algorithm for the open diff's file type (`None`: git's default), kept for
-    /// that type; the diff is read again where it was scrolled to.
-    SetDiffAlgorithm(Option<git::DiffAlgorithm>),
-    /// The open diff of a folded file (a lockfile…) shows its lines.
-    UnfoldDiff,
-    /// Ask git what `.gitattributes` says about folding these files.
-    FoldAttributes(Vec<String>),
-    /// Diffs show the whole file as it is after the change, or the changes.
-    DiffAsFile(bool),
-    /// Markdown files show rendered in diffs, or as text.
-    DiffRendered(bool),
-    DiffBesideGraph(bool),
-    /// Diffs show as this rich view (prose…), for the files it reads, or as their lines.
-    DiffRich(Option<diff::rich::RichKind>),
-    /// Back from a rich view to the plain diff, at the line numbered `old` before the change
-    /// or `new` after it.
-    DiffGoToLine {
-        old: Option<u32>,
-        new: Option<u32>,
-    },
-    /// Read syntax changes through Difftastic; staging stays in the patch.
-    DiffStructural(bool),
-    DiffDecrypted(bool),
-    DiffSvgSource(bool),
-    DiffWrap(bool),
-    DiffCoverage(diff::coverage::CoverageAct),
-    DiffDecryptedEncoding(super::diff::encrypted::JsonEncoding),
-    /// Scroll the diff to the next change (`1`) or the previous one (`-1`).
-    DiffStep(i32),
-    /// Show the two places of a moved block of the diff together (by its index), or stop.
-    DiffMoved(Option<usize>),
-    /// Scroll the diff to one of its lines (by its index).
-    DiffJumpLine(usize),
-    /// Show some of the unchanged lines folded in a gap of the diff (by its index).
-    DiffUnfold {
-        gap: usize,
-        how: diff::Unfold,
-    },
     /// The commit pane lists every file of the commit, or only those it changed.
+    /// How the open diff shows, and moving around in it.
+    Diff(diff::DiffAct),
     ViewAllFiles(bool),
     /// The commit pane of a merge shows what it resolved, or the files it changed.
     ShowRemerge(bool),
@@ -306,65 +236,20 @@ pub(crate) enum Action {
     SolveWithMergiraf,
     /// Preview keeping both versions of a conflicted file that can't be merged.
     KeepBoth(String),
-    /// A file's history, blame or contents in the central pane (`rev`: the commit they are at).
-    FileView {
-        path: String,
-        rev: Option<String>,
-        tab: file_view::FileTab,
-    },
-    CloseFileView,
     /// Go back (`-1`) or forward (`1`) through the recent views.
+    /// A file's view in the central pane: its history, blame or contents, or line history.
+    FileView(file_view::FileViewAct),
     Navigate(i32),
-    /// The history of lines `range` of `path` (numbered as they are `at`), in the file view.
-    LineHistory {
-        path: String,
-        at: crate::git::LinesAt,
-        range: crate::git::LineRange,
-    },
-    /// The part of commit `hash`'s diff that changed lines `lines` of `path` (as they are in
-    /// the commit); its whole diff of the file when there are none.
-    OpenDiffOfLines {
-        hash: String,
-        path: String,
-        lines: Vec<crate::git::LineRange>,
-    },
     /// Undo commit `hash`'s changes to `path` in the working tree.
     RevertFile {
         hash: String,
         path: String,
-    },
-    /// A file's blame (at `rev`, or HEAD and the working tree), scrolled to `line` (1 is the
-    /// first) and marking it.
-    BlameAt {
-        path: String,
-        rev: Option<String>,
-        line: usize,
-    },
-    /// Open the interactive rebase editor for the commits after `onto`.
-    /// Gives a commit of the checked-out branch a new message: amending the latest, rebasing
-    /// for an older one.
-    Reword {
-        hash: String,
-        message: String,
     },
     /// Have the AI tool review what `branch` adds to `base` (see `ai::review`).
     ReviewBranch {
         branch: String,
         base: String,
     },
-    /// Open the editor of a commit's message in the detail pane.
-    EditMessage(String),
-    /// Save a commit as a patch file, asking where.
-    SavePatch {
-        hash: String,
-        summary: String,
-    },
-    /// Apply a patch file, asking which.
-    ApplyPatch,
-    /// Open the menu of what a drop offers.
-    DropMenu(drag_drop::DropMenu),
-    /// Move or squash a commit of the checked-out branch onto another of it.
-    CommitDrop(drag_drop::CommitDrop),
     OpenBehaviour,
     OpenLinkedMachines,
     OpenBundleExport,
@@ -373,47 +258,12 @@ pub(crate) enum Action {
         refs: Vec<git::BundleRef>,
         base: String,
     },
-    /// Drop or move a commit of the checked-out branch.
-    QuickEdit {
-        edit: quick_edit::Edit,
-        hash: String,
-        branch_guard: Vec<String>,
-    },
-    InteractiveRebase {
-        onto: String,
-        label: String,
-    },
-    /// Ask before folding the staged changes into the commit `hash` (once what that rewrites
-    /// is read).
-    FoldInto(String),
-    /// Fold as the dialog confirmed it.
-    RunFold(Box<super::fold::Plan>),
-    /// Abort the rebase of a fold stopped on a conflict, asked first once it is checked to be
-    /// the fold's.
-    AbortFold,
-    RunRebase,
-    ConfirmedRebase(u64),
-    AskRebase {
-        onto: String,
-        label: String,
-    },
-    CloseRebase,
-    /// Open the split editor on a commit of the checked-out branch.
-    OpenSplit(String),
-    /// Open the editor moving some changes of a commit to another one, or out of the branch.
-    OpenMove(String),
-    /// Prepare the split being edited and show each new commit's patch.
-    CheckSplit,
-    RunSplit,
-    CloseSplit,
-    /// Open the editor distributing the staged changes into the commits they belong to.
-    OpenAbsorb,
-    CheckAbsorb,
-    RunAbsorb,
-    /// Run the installed `git-absorb` instead.
-    RunGitAbsorb,
-    CloseAbsorb,
     /// Something done on stacked branches.
+    /// Rewriting the checked-out branch: rewording, rebasing, folding, dropping or moving
+    /// commits, and patches.
+    Rewrite(super::rewrite::RewriteAct),
+    /// History surgery: splitting a commit, moving changes, distributing staged fixes.
+    Surgery(super::surgery::SurgeryAct),
     Stack(super::stack::StackAct),
     /// Remember these HTTPS credentials and run the operation that needed them again.
     SignIn(git::Credentials),

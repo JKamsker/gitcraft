@@ -385,11 +385,11 @@ impl RepoTab {
                     let unit = model.nodes[i];
                     acts.push(act(Act::Unit(Some(unit))));
                     if c.options.depth.is_none() {
-                        acts.push(Action::FileView {
+                        acts.push(Action::FileView(crate::repo::file_view::FileViewAct::Open {
                             path: c.units[unit].name.clone(),
                             rev: Some(model.history.tip.clone()),
                             tab: FileTab::History,
-                        });
+                        }));
                     }
                 }
                 None => {}

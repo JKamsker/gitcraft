@@ -98,11 +98,11 @@ pub(super) fn matrix(
                                     ],
                                 ));
                                 if clicked {
-                                    acts.push(Action::ComparisonCell {
+                                    acts.push(Action::Comparison(crate::repo::file_comparison::ComparisonAct::Cell {
                                         request: state.data_request,
                                         path: path.clone(),
                                         column,
-                                    });
+                                    }));
                                 }
                             }
                         });
