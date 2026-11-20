@@ -99,6 +99,9 @@ impl RepoTab {
         } else if std::mem::take(&mut self.recheck_after_load) {
             self.recheck(ctx);
         }
+        if !self.loading {
+            self.search_after_load(ctx);
+        }
     }
 
     fn take_loaded(&mut self, loaded: Loaded, ctx: &egui::Context) {
