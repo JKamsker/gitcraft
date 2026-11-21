@@ -8,8 +8,8 @@
 
 The gates are the exact commands CI runs: formatting, the tooling tests, the Rust
 file-size and complexity-policy checks of the committed tree (`--revision HEAD`,
-so commit first), the pure operation-plan compiles, and strict all-target Clippy
-for every package. Cargo and rustc run at the lowest OS priority. Windows shards:
+so commit first), the pure operation-plan compiles, the architecture boundary check
+of the committed tree, and strict all-target Clippy for every package. Cargo and rustc run at the lowest OS priority. Windows shards:
 after `python ci/windows-test-build.py`,
 `python ci/test-shards.py --check-only` and `python ci/test-shards.py <shard>`
 run the CI shards natively. It stops at the first failure.
@@ -37,6 +37,9 @@ GATES = (
     ("complexity policy", [PYTHON, "ci/complexity_policy.py", "--revision", "HEAD"]),
     ("operation plan", [PYTHON, PLAN_CHECKER]),
     ("operation grammar", [PYTHON, GRAMMAR_CHECKER, "src/git/global_options.rs"]),
+    # CI's boundary check, without its step-summary output.
+    ("architecture boundaries", ["cargo", "run", "--locked", "--release", "--manifest-path",
+                                 "ci/arch-fitness/Cargo.toml", "--", "check", "--revision", "HEAD"]),
     ("clippy and complexity gate", [PYTHON, "ci/clippy_packages.py"]),
 )
 

@@ -7,8 +7,11 @@ import unittest
 
 sys.path.insert(0, str(Path(__file__).parent))
 import check  # noqa: E402
-from test_workflow_gates import (CLIPPY_CHECK, COMPLEXITY_CHECK, GRAMMAR_CHECK, PLAN_CHECK,  # noqa: E402
-                                 SIZE_CHECK, TOOLING_CHECK)
+from test_workflow_gates import (ARCH_CHECK, CLIPPY_CHECK, COMPLEXITY_CHECK, GRAMMAR_CHECK,  # noqa: E402
+                                 PLAN_CHECK, SIZE_CHECK, TOOLING_CHECK)
+
+# CI's boundary check without its `--markdown "$GITHUB_STEP_SUMMARY"` output.
+ARCH_LOCAL = ARCH_CHECK.split(" --markdown ")[0]
 
 WORKFLOWS = Path(__file__).resolve().parents[1] / ".github/workflows"
 
@@ -22,12 +25,13 @@ class PrePushTests(unittest.TestCase):
     def test_the_gates_are_the_commands_ci_requires(self):
         ci = [normalized(command) for command in
               ("cargo fmt --check", TOOLING_CHECK, SIZE_CHECK, COMPLEXITY_CHECK, PLAN_CHECK, GRAMMAR_CHECK,
-               CLIPPY_CHECK)]
+               ARCH_LOCAL, CLIPPY_CHECK)]
         self.assertEqual([normalized(command) for _, command in check.GATES], ci)
         workflows = "".join(path.read_text(encoding="utf-8") for path in WORKFLOWS.glob("*.yml"))
         for command in ("cargo fmt --check", TOOLING_CHECK, SIZE_CHECK, COMPLEXITY_CHECK, PLAN_CHECK, GRAMMAR_CHECK,
-                        CLIPPY_CHECK):
+                        ARCH_CHECK, CLIPPY_CHECK):
             self.assertIn(f"run: {command}\n", workflows)
+        self.assertNotEqual(ARCH_LOCAL, ARCH_CHECK)
 
     def test_focused_full_and_default_plans(self):
         self.assertEqual(check.plan()[-1][1], ["cargo", "test", "--locked", "--no-run"])
