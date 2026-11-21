@@ -133,6 +133,53 @@ jobs:
           if-no-files-found: warn
           retention-days: 14
 
+  # The parking recovery harness (#205): production park/restore/drop against recording Git,
+  # every effect boundary interrupted, and real kill-and-restart of an owned child process. It
+  # is its own Cargo package built with `--cfg recovery_recording`, so it has its own target
+  # directory and cache and never rebuilds the main crate. Linux and native Windows differ in
+  # directory flushes, sharing and rename semantics, so both run it.
+  recovery-recording:
+    needs: rust-file-size
+    name: recovery recording (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    env:
+      RUSTFLAGS: --cfg recovery_recording
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src/resolver/park/checks -> target
+          shared-key: recovery-recording-v1
+          save-if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/dev' }}
+          cache-on-failure: true
+      - name: Build the recovery recording harness
+        run: cargo test --locked --manifest-path src/resolver/park/checks/Cargo.toml --no-run
+      - name: Recovery recording harness and real kill/restart tests
+        timeout-minutes: 20
+        env:
+          RUST_BACKTRACE: "1"
+        run: >-
+          python ci/libtest_watchdog.py --name recovery-recording --report-dir ci-reports/recovery-recording
+          --deadline 1080 --stall 600 --
+          cargo test --locked --manifest-path src/resolver/park/checks/Cargo.toml -- --nocapture
+      - name: Upload test reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-report-recovery-recording-${{ matrix.os }}-attempt-${{ github.run_attempt }}
+          path: ci-reports/
+          if-no-files-found: warn
+          retention-days: 14
+
   windows-clippy:
     needs: rust-file-size
     name: Windows Clippy
@@ -277,7 +324,7 @@ jobs:
   # classifies every recorded test failure (ci/ci_summary.py).
   ci-result:
     name: CI result
-    needs: [rust-file-size, lint, test, windows-clippy, windows-tests, windows-test-result, package-version, package-smoke, changes, forges]
+    needs: [rust-file-size, lint, test, recovery-recording, windows-clippy, windows-tests, windows-test-result, package-version, package-smoke, changes, forges]
     if: ${{ always() }}
     runs-on: ubuntu-latest
     steps:

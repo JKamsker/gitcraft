@@ -96,7 +96,9 @@ pub(super) fn keep(
         }
     }
     let text = serde_json::to_string_pretty(&parked).map_err(|e| e.to_string())?;
-    std::fs::write(dir.join("parked.json"), text)
+    // Published whole or not at all (temp file, flush, rename, folder flush): a torn
+    // manifest would make the archive unreadable for every listing.
+    journal::atomic_write(&dir.join("parked.json"), text.as_bytes())
         .map_err(|e| format!("couldn't write what was kept: {e}"))?;
     effects::boundary("archive-manifest-written")?;
     Ok(parked)

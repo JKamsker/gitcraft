@@ -124,6 +124,8 @@ pub(crate) struct ResolverState {
     reading_parked: bool,
     /// The list changed (or was asked for) while it was read: that read is stale.
     read_parked_again: bool,
+    /// The incomplete put-aside reservations last reported (see `parking/incomplete.rs`).
+    incomplete_reported: Vec<String>,
     /// The row to select and scroll to once the graph has it: the merge just put aside, or
     /// the changes of the one just brought back. Given up on after [`REVEAL_WITHIN`].
     reveal: Option<(Reveal, Instant)>,

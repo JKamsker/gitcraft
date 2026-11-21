@@ -36,6 +36,19 @@ class PrePushTests(unittest.TestCase):
                          [["cargo", "test", "--locked", "repo::stack"], ["cargo", "test", "--locked", "git::drafts"]])
         self.assertEqual(check.plan(full=True)[-1][1], ["cargo", "test", "--locked"])
 
+    def test_the_recovery_harness_is_opt_in_and_runs_like_ci(self):
+        self.assertNotIn(check.RECOVERY, check.plan())
+        self.assertNotIn(check.RECOVERY, check.plan(full=True))
+        self.assertEqual(check.plan(["x"], recovery=True)[-1], check.RECOVERY)
+        name, command = check.RECOVERY
+        self.assertEqual(check.environment(name), {"RUSTFLAGS": "--cfg recovery_recording"})
+        self.assertEqual(check.environment(check.GATES[0][0]), {})
+        ci = (WORKFLOWS / "ci.yml").read_text(encoding="utf-8")
+        self.assertIn(f"\n          {shlex.join(command)}\n", ci)
+        self.assertIn("RUSTFLAGS: --cfg recovery_recording\n", ci)
+        lowered, extra = check.low_priority(command)
+        self.assertTrue(lowered[:3] == ["nice", "-n", "19"] or extra.get("creationflags") == 0x40)
+
     def test_cargo_runs_at_low_priority(self):
         command, extra = check.low_priority(["cargo", "test"])
         self.assertTrue(command[:3] == ["nice", "-n", "19"] or extra.get("creationflags") == 0x40)

@@ -13,7 +13,7 @@ pull requests (the merge commit), merge-queue candidates (`merge_group`), pushes
 | Stage | Jobs |
 | --- | --- |
 | Fast preflight | `rust-file-size / check` (tooling tests, file-size, complexity-policy, and architecture fitness gates), `lint` (rustfmt, strict Clippy for every package), `windows-clippy` (strict Windows Clippy for every package, parallel with the test build) |
-| Correctness matrix | `test (ubuntu-22.04)`, `test (ubuntu-latest)`, the Windows build plus ten complete, disjoint shards (`windows-tests.yml`) aggregated as `test (windows-latest)` |
+| Correctness matrix | `test (ubuntu-22.04)`, `test (ubuntu-latest)`, the Windows build plus ten complete, disjoint shards (`windows-tests.yml`) aggregated as `test (windows-latest)`, and `recovery recording (ubuntu-latest | windows-latest)`: the parking recovery harness (`src/resolver/park/checks/`, built with `--cfg recovery_recording`, own cache) with real kill-and-restart of an owned child (#205) |
 | Release smoke | `package-version` computes a dev prerelease version the way Release does. `package-smoke` builds the Windows zip and installer, the tarball, AppImage, `.deb` and `.rpm` through `package.yml`, the workflow Release builds with. |
 | Live services | `forges`: real Forgejo and Gitea, run for changes to `src/forge/`, `ci/forge-server.sh`, `Cargo.lock` or `ci.yml` (`ci/changed_paths.py`), nightly, and by hand |
 | Required check | `CI result`: fails unless every job succeeded. Only `forges` may be skipped. |

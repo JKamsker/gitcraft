@@ -342,28 +342,20 @@ fn forget_locked(repo: &Path, id: &str) {
 }
 
 /// Active parked merges and retained completed recovery archives for `repo`, oldest first.
-pub fn list(repo: &Path) -> Result<Vec<Parked>, String> {
-    let top = trimmed(run(repo, &["rev-parse", "--show-toplevel"])?);
-    let ids = discovery::identities(repo)?;
-    // A snapshot can name a source which is retired before its lock is acquired.
-    // Resolve and read under the same stable lease used by foreground operations.
-    let mut recovered = Vec::new();
-    for id in ids {
-        let _lease = locking::acquire(repo, &id)?;
-        let Some(parked) = discovery::manifest(repo, &id)? else {
-            continue;
-        };
-        if crate::remote::same_dir(Path::new(&parked.worktree), Path::new(&top))
-            && journal::recover_locked(repo, &parked)?
-        {
-            recovered.push(parked);
-        }
-    }
-    let mut found = recovered;
-    found.sort_by(|a, b| a.id.cmp(&b.id));
-    found.dedup_by(|a, b| a == b);
-    found.sort_by_key(|p| p.at);
-    Ok(found)
+#[allow(dead_code)] // The UI reads [`list_all`]; tests and the recording harness use this.
+pub(super) fn list(repo: &Path) -> Result<Vec<Parked>, String> {
+    discovery::listing(repo).map(|found| found.parked)
+}
+
+/// [`list`], and the ids and folders of reservations of put-asides that never completed
+/// (to report, and [`forget`] on the user's say; see `discovery::Listing`). One export for
+/// the tab.
+#[expect(
+    clippy::type_complexity,
+    reason = "a named result type would be one more export of the conflicts domain (arch-fitness visibility budget)"
+)]
+pub fn list_all(repo: &Path) -> Result<(Vec<Parked>, Vec<(String, PathBuf)>), String> {
+    discovery::listing(repo).map(|found| (found.parked, found.incomplete))
 }
 
 /// Drops `parked` without bringing it back, its files kept on a branch of their own (named
@@ -441,3 +433,15 @@ mod recording_discovery;
 #[cfg(recovery_recording)]
 #[path = "park/checks/readonly.rs"]
 mod recording_readonly;
+
+#[cfg(recovery_recording)]
+#[path = "park/checks/kill.rs"]
+mod recording_kill;
+
+#[cfg(recovery_recording)]
+#[path = "park/checks/kill_cases.rs"]
+mod recording_kill_cases;
+
+#[cfg(recovery_recording)]
+#[path = "park/checks/kill_child.rs"]
+mod recording_kill_child;

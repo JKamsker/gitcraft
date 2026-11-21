@@ -13,7 +13,7 @@ fn a_read_of_the_parked_list_from_before_a_change_here_is_dropped() {
     tab.resolver.reading_parked = true;
     tab.resolver.parked.push(parked.clone());
     tab.resolver.parked_changed();
-    tab.parked_read(Ok(Vec::new()), &ctx);
+    tab.parked_read(Ok((Vec::new(), Vec::new())), &ctx);
     assert_eq!(tab.resolver.parked, vec![parked]);
     assert!(tab.resolver.reading_parked, "read again");
     assert!(!tab.resolver.read_parked_again);
@@ -41,7 +41,7 @@ fn failed_discovery_keeps_recovery_rows_and_finishes_the_read() {
         assert!(!tab.resolver.reading_parked);
         assert!(tab.status.is_some());
         // A later successful empty snapshot must still remove obsolete rows.
-        tab.parked_read(Ok(Vec::new()), &ctx);
+        tab.parked_read(Ok((Vec::new(), Vec::new())), &ctx);
         assert!(tab.resolver.parked.is_empty());
     }
 }

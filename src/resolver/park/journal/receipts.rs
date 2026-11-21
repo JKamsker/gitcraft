@@ -68,8 +68,9 @@ pub(in crate::resolver::park) fn latest(dir: &Path) -> Result<Option<Phase>, Str
         };
         if !matches!(receipt.version, 1 | 2) {
             return Err(format!(
-                "Unsupported parking journal version {}",
-                receipt.version
+                "Unsupported parking journal version {}: {}",
+                receipt.version,
+                path.display()
             ));
         }
         latest = Some(receipt.phase);

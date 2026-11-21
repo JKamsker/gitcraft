@@ -6,6 +6,7 @@
 //! kept, or waits to be brought back.
 
 mod drop;
+mod incomplete;
 mod record;
 pub(super) use record::preserve_uncertain;
 use record::*;
@@ -26,6 +27,10 @@ use crate::resolver::workspace::{FileResult, Workspace};
 /// What the tab says it is doing while a merge is brought back, or dropped.
 const BRINGING_BACK: &str = "Bring the merge back";
 const DROPPING: &str = "Drop the merge put aside";
+
+/// What [`park::list_all`] finds: the merges put aside, and the ids and folders of put-asides
+/// that never completed (see `incomplete.rs`).
+type Found = (Vec<Parked>, Vec<(String, PathBuf)>);
 
 /// Drops `ws` away from the UI thread: dropping a scratch worktree runs git.
 fn let_go(ws: Option<Arc<Workspace>>) {
@@ -53,12 +58,12 @@ impl RepoTab {
         let repo = self.path.clone();
         self.then(
             ctx,
-            move || park::list(&repo),
+            move || park::list_all(&repo),
             |tab, parked, ctx| tab.parked_read(parked, ctx),
         );
     }
 
-    fn parked_read(&mut self, parked: Result<Vec<Parked>, String>, ctx: &egui::Context) {
+    fn parked_read(&mut self, parked: Result<Found, String>, ctx: &egui::Context) {
         self.resolver.reading_parked = false;
         // Read before a change made here (or asked for since): read again, this one dropped.
         if std::mem::take(&mut self.resolver.read_parked_again) {
@@ -66,7 +71,10 @@ impl RepoTab {
             return;
         }
         let parked = match parked {
-            Ok(parked) => parked,
+            Ok((parked, incomplete)) => {
+                self.report_incomplete(&incomplete);
+                parked
+            }
             Err(error) => {
                 self.status = Some(crate::repo::notice::Notice::plain((
                     format!("The recovery archives couldn't be read: {error}"),

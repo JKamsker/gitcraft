@@ -160,7 +160,8 @@ fn a_merge_put_aside_is_resolved_brought_back_and_applied() -> Result<(), String
         "the user is told: {:?}",
         tab.finished
     );
-    let recovery = crate::resolver::park::list(&dir)?
+    let recovery = crate::resolver::park::list_all(&dir)?
+        .0
         .into_iter()
         .next()
         .ok_or("missing parked merge")?;
@@ -196,7 +197,10 @@ fn a_merge_put_aside_is_resolved_brought_back_and_applied() -> Result<(), String
         std::thread::sleep(Duration::from_millis(50));
     }
     assert!(!kept.exists(), "the agent's kept work is removed");
-    assert_eq!(crate::resolver::park::list(&dir)?, vec![recovery.clone()]);
+    assert_eq!(
+        crate::resolver::park::list_all(&dir)?.0,
+        vec![recovery.clone()]
+    );
     let archive = crate::resolver::park::recovery_location(&dir, &recovery)?;
     assert!(archive.ends_with("parked"));
     assert!(archive.join("index").is_file());
@@ -252,7 +256,8 @@ fn a_merge_brought_back_while_its_agent_works_gets_its_work_after() -> Result<()
         "while the agent works"
     );
 
-    let recovery = crate::resolver::park::list(&dir)?
+    let recovery = crate::resolver::park::list_all(&dir)?
+        .0
         .into_iter()
         .find(|p| p.id == id)
         .ok_or("missing parked merge")?;
